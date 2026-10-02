@@ -1,0 +1,434 @@
+# problem.yaml: one per task folder. File paths are relative to this folder.
+
+domain: physics
+
+required_dependencies: |-
+  import numpy as np
+  from scipy.optimize import brentq
+
+problem_description_main: |-
+  We study the 2D Ising model on a square lattice with coupling J = 1 and k_B = 1, using long
+  strips that are L spins wide, periodic across the width and infinitely long. Everything
+  about a strip follows from its row-to-row transfer matrix. For a strip of width L at
+  temperature T we compute the free energy per spin, the correlation lengths of the spin and
+  of the bond energy, the amplitude m_L of the slowest term of the spin correlation (the
+  strip estimate of the spontaneous magnetization), the zero-field susceptibility, and the
+  Yang-Lee edge of the strip in an imaginary magnetic field. At the exact critical
+  temperature Tc = 2 / ln(1 + sqrt(2)), strips of widths L, L+1 and L+2 then give
+  finite-size estimates of the scaling dimensions x_sigma and x_energy, of the exponent
+  ratios beta/nu and gamma/nu, of the magnetic exponent y_h and of the central charge c.
+  The last function leaves the strips: it returns, to stated accuracies, the free energy,
+  magnetization, susceptibility and specific heat per spin of the infinite lattice in a
+  uniform field, the values that the strip quantities approach as the width grows, down to
+  weak fields near Tc where the correlation length is large.
+
+problem_io: |-
+  def bulk_thermodynamics(T, h):
+      '''Free energy, magnetization, susceptibility and specific heat per spin of the infinite lattice in a field.
+
+      Inputs:
+        T: float, temperature, 2 <= T <= 3 (J = 1, k_B = 1).
+        h: float, uniform field, 0.005 <= h <= 0.2; the energy is E = - sum_<ij> s_i s_j - h sum_i s_i.
+
+      Output:
+        (f, m, chi, c): tuple of four Python floats for the infinite square lattice (the limit of
+        the strip quantities as the width goes to infinity):
+          f: free energy per spin, f = -T lim ln(Z) / N (units of J), absolute accuracy 1e-10;
+          m: magnetization per spin <s_i> = -df/dh, absolute accuracy 1e-9;
+          chi: susceptibility per spin, chi = dm/dh at fixed T (units 1/J), relative accuracy 1e-5;
+          c: specific heat per spin at fixed h, c = -T d2f/dT2 (units k_B), relative accuracy 1e-5.
+      '''
+
+general_tests: tests/general.py
+
+second_solution: second_solution.py
+
+mutants:
+  - name: whole_task_field_not_scaled
+    description: "The field enters the Boltzmann weight of the infinite lattice as exp(h s) instead of exp(h s / T), so every bulk quantity is that of a field T times stronger."
+    file: mutants/whole_task_field_not_scaled.py
+
+# On a new version of an uploaded task only, what kind of edit it is.
+edit_label: difficulty_increase
+
+sub_steps:
+  - step_number: 1
+    scaffold: steps/step_1.py
+    solution: solution/step_1.py
+    tests: tests/step_1.py
+    step_description_prompt: |-
+      Build the row-to-row transfer matrix of the 2D Ising model on a strip that is L spins
+      wide, in a uniform field h. The energy is E = - sum over nearest-neighbour pairs of
+      s_i s_j - h * sum over sites of s_i (J = 1, k_B = 1, K = 1/T). The strip is periodic
+      across its width: spin L is the same as spin 0. A row has L spins s_0, ..., s_(L-1),
+      each +1 or -1. Give each row an integer label n = sum over i of b_i * 2**i, where
+      b_i = 0 when s_i = +1 and b_i = 1 when s_i = -1. So label 0 is the row with all spins
+      up, and label 2**L - 1 is the row with all spins down.
+
+      M[n, m] must be the Boltzmann weight that joins row n to the next row m, so that the
+      partition function of N rows with periodic ends is trace(M**N). The bonds inside a row
+      and the field term of a row must each be shared equally between the two matrix factors
+      that touch that row; this makes M equal to its transpose and fixes every entry.
+
+      h may be complex. Later steps call this function with a purely imaginary field
+      h = 1j * H, and M must then be the complex matrix given by the same rule (symmetric, not
+      Hermitian). Return M as a numpy array of shape (2**L, 2**L), every entry with relative
+      accuracy 1e-10. L is an integer with L >= 3, and T > 0.
+    function_header: |-
+      def transfer_matrix(L, T, h=0.0):
+          '''Symmetric row-to-row transfer matrix of the 2D Ising model on a periodic strip in a field h.
+
+          Inputs:
+            L: int, width of the strip in spins, L >= 3. Spin L is the same as spin 0.
+            T: float, temperature, T > 0 (J = 1, k_B = 1).
+            h: float or complex, uniform field; the energy is E = - sum_<ij> s_i s_j - h sum_i s_i.
+               A complex h, such as 1j * H, is allowed.
+
+          Output:
+            M: numpy array of shape (2**L, 2**L), complex when h is complex. Row label
+               n = sum_i b_i * 2**i, with b_i = 0 for spin i = +1 and b_i = 1 for spin i = -1.
+               M[n, m] is the Boltzmann weight that joins row n to row m, with the bonds inside a
+               row and the field on a row shared equally between the two factors that touch that
+               row, so that M == M.T. Relative accuracy 1e-10 for every entry.
+          '''
+    return_line: return M
+    step_background: |-
+      The partition function of a strip of N rows with periodic ends is the trace of M**N, so
+      for an infinitely long strip only the largest eigenvalues of M matter. Sharing the in-row
+      bonds and the field equally between the two factors does not change the eigenvalues; it
+      only makes M symmetric. For real h the eigenvalues are real; for imaginary h the matrix
+      is complex symmetric and its eigenvalues need not be real.
+    n_test_cases: 3
+    contract:
+      quantity: "The symmetric row-to-row transfer matrix of the 2D Ising model on a periodic strip of width L in a uniform field h (real or complex)."
+      assumptions: "Nearest-neighbour coupling J = 1, k_B = 1, periodic boundary across the width, rows labelled by the bit rule of the prompt, in-row bonds and field shared equally between the two factors that touch a row."
+      result_kind: exact
+      valid_input_ranges: "Integer L from 3 to about 11 (memory grows as 4**L); T > 0; h real or complex."
+      units: "Dimensionless (Boltzmann weights)."
+      output_shape: "Numpy array of shape (2**L, 2**L), symmetric; complex when h is complex."
+      step_dependencies: []
+    mutants:
+      - name: field_not_shared
+        description: "Puts the whole field term of a row into each of the two factors instead of half, so the field is counted twice."
+        file: mutants/step_1_field_not_shared.py
+
+  - step_number: 2
+    scaffold: steps/step_2.py
+    solution: solution/step_2.py
+    tests: tests/step_2.py
+    step_description_prompt: |-
+      Use transfer_matrix(L, T) (step 1, zero field) to get three properties of a periodic
+      strip of width L that is infinitely long:
+
+        f: the free energy per spin, f = -T ln(Z) / (number of spins), in the limit of
+           infinite length (units of J);
+        xi_spin: the correlation length of the spin along the strip, defined by
+           <s_0(row 0) s_0(row r)> ~ exp(-r / xi_spin) for large r;
+        xi_energy: the correlation length of the bond energy along the strip. With
+           e = s_0 s_1, the product of the two neighbouring spins 0 and 1 of the same row, it
+           is defined by the connected correlation <e(row 0) e(row r)> - <e>**2 ~
+           exp(-r / xi_energy) for large r.
+
+      Lengths are in lattice spacings. Return the tuple (f, xi_spin, xi_energy) of three
+      Python floats, f with relative accuracy 1e-10 and both lengths with relative accuracy
+      1e-6, for every integer L from 3 to 10 and every T from 1 to 10.
+    function_header: |-
+      def strip_lengths(L, T):
+          '''Free energy per spin and the spin and energy correlation lengths of an infinitely long periodic strip.
+
+          Inputs:
+            L: int, width of the strip in spins, 3 <= L <= 10.
+            T: float, temperature, 1 <= T <= 10 (J = 1, k_B = 1, zero field).
+
+          Output:
+            (f, xi_spin, xi_energy): tuple of three floats.
+              f: free energy per spin (units of J), relative accuracy 1e-10.
+              xi_spin: decay length of <s_0(row 0) s_0(row r)> along the strip (lattice spacings).
+              xi_energy: decay length of the connected correlation of e = s_0 s_1 along the strip.
+              Both lengths with relative accuracy 1e-6.
+          '''
+    return_line: return f, xi_spin, xi_energy
+    step_background: |-
+      For a long strip, Z is dominated by the largest eigenvalue of M, and a correlation along
+      the strip is a sum over the other eigenstates of M, each decaying as the ratio of its
+      eigenvalue to the largest one. A state contributes only if the operator joins it to the
+      top state. At Tc, xi_L / L tends to 1 / (2 pi x) for an operator of scaling dimension x
+      (Cardy), with x = 1/8 for the spin and x = 1 for the energy.
+    n_test_cases: 5
+    contract:
+      quantity: "Free energy per spin, spin correlation length and energy correlation length of an infinitely long periodic strip."
+      assumptions: "Zero field. xi_energy is the decay length of the connected correlation of e = s_0 s_1, which is even under the global spin flip."
+      result_kind: exact
+      valid_input_ranges: "Integer L from 3 to 10; 1 <= T <= 10."
+      units: "f in units of J; lengths in lattice spacings."
+      output_shape: "Tuple (f, xi_spin, xi_energy) of three Python floats."
+      step_dependencies: [1]
+    mutants:
+      - name: third_eigenvalue
+        description: "Takes xi_energy from the third-largest eigenvalue of the whole matrix, which above Tc belongs to the odd sector."
+        file: mutants/step_2_third_eigenvalue.py
+
+  - step_number: 3
+    scaffold: steps/step_3.py
+    solution: solution/step_3.py
+    tests: tests/step_3.py
+    step_description_prompt: |-
+      In zero field, the spin-spin correlation along an infinitely long periodic strip of
+      width L, G(r) = <s_0(row 0) s_0(row r)>, is a sum of decaying exponentials in r. Its
+      slowest-decaying term is m_L**2 * exp(-r / xi_spin), where xi_spin is the correlation
+      length of the spin. Below Tc, m_L is the strip estimate of the spontaneous magnetization;
+      above Tc the same term still defines it. Use transfer_matrix(L, T) (step 1) to compute
+      m_L >= 0. Return it as a Python float with absolute accuracy 1e-9, for every integer L
+      from 3 to 10 and every T from 0.5 to 10.
+    function_header: |-
+      def strip_magnetization(L, T):
+          '''Amplitude m_L of the slowest-decaying term of the spin correlation along a periodic strip.
+
+          Inputs:
+            L: int, width of the strip in spins, 3 <= L <= 10.
+            T: float, temperature, 0.5 <= T <= 10 (J = 1, k_B = 1, zero field).
+
+          Output:
+            m_L: float >= 0, defined for an infinitely long strip by
+                 <s_0(row 0) s_0(row r)> = m_L**2 * exp(-r / xi_spin) + (terms that decay faster).
+                 Absolute accuracy 1e-9.
+          '''
+    return_line: return m_L
+    step_background: |-
+      Below Tc the strip has no true long-range order, but its spin correlation stays close to
+      m_L**2 over a distance xi_spin that grows exponentially with L. m_L converges quickly to
+      Yang's spontaneous magnetization (1 - sinh(2K)**-4)**(1/8) as L grows. At Tc it decays
+      like L**(-beta/nu) with beta/nu = 1/8.
+    n_test_cases: 6
+    contract:
+      quantity: "Amplitude m_L of the slowest-decaying term of the zero-field spin correlation along the strip (finite-width spontaneous magnetization below Tc)."
+      assumptions: "Zero field; m_L = |<top state|s_0|top odd state>|. Below Tc the two top states are degenerate to machine precision for the larger widths and lower temperatures of the range."
+      result_kind: exact
+      valid_input_ranges: "Integer L from 3 to 10; 0.5 <= T <= 10."
+      units: "Dimensionless."
+      output_shape: "One Python float >= 0."
+      step_dependencies: [1]
+    mutants:
+      - name: correlation_one_row
+        description: "Returns the square root of the correlation one row away, G(1), instead of the amplitude of its slowest-decaying term."
+        file: mutants/step_3_correlation_one_row.py
+
+  - step_number: 4
+    scaffold: steps/step_4.py
+    solution: solution/step_4.py
+    tests: tests/step_4.py
+    step_description_prompt: |-
+      Compute the zero-field magnetic susceptibility per spin of an infinitely long periodic
+      strip of width L,
+
+        chi_L = - d**2 f / d h**2 at h = 0,
+
+      where f(h) is the free energy per spin of the infinitely long strip in the uniform field
+      h of step 1 (the energy has the term - h * sum of s_i). Use transfer_matrix (step 1).
+      Return chi_L as a Python float (units of 1/J) with relative accuracy 1e-6, for every
+      integer L from 3 to 10 and every T from 1 to 10.
+    function_header: |-
+      def strip_susceptibility(L, T):
+          '''Zero-field magnetic susceptibility per spin of an infinitely long periodic strip.
+
+          Inputs:
+            L: int, width of the strip in spins, 3 <= L <= 10.
+            T: float, temperature, 1 <= T <= 10 (J = 1, k_B = 1).
+
+          Output:
+            chi: float, chi = - d^2 f / d h^2 at h = 0, where f(h) is the free energy per spin of
+                 the infinitely long strip in the uniform field h of transfer_matrix (units 1/J).
+                 Relative accuracy 1e-6.
+          '''
+    return_line: return chi
+    step_background: |-
+      By the fluctuation relation, chi_L is the sum along the whole strip of the spin-spin
+      correlation of the row magnetization, divided by T and by L. At Tc it grows like
+      L**(gamma/nu) with gamma/nu = 7/4. Below Tc it grows exponentially with L, because the
+      correlation length does.
+    n_test_cases: 6
+    contract:
+      quantity: "Zero-field susceptibility per spin, -d2f/dh2 at h = 0, of an infinitely long periodic strip."
+      assumptions: "Field coupled as - h sum s_i. Below Tc the curvature of f(h) is confined to |h| of the order of the tiny gap between the two top eigenvalues, so the value must not depend on a finite step in h."
+      result_kind: exact
+      valid_input_ranges: "Integer L from 3 to 10; 1 <= T <= 10."
+      units: "1/J."
+      output_shape: "One Python float."
+      step_dependencies: [1]
+    mutants:
+      - name: finite_difference
+        description: "Second difference of f(h) with a fixed step h = 1e-4, far wider than the field scale of the curvature below Tc."
+        file: mutants/step_4_finite_difference.py
+
+  - step_number: 5
+    scaffold: steps/step_5.py
+    solution: solution/step_5.py
+    tests: tests/step_5.py
+    step_description_prompt: |-
+      Put the strip in a purely imaginary field h = 1j * H with H real. Then
+      transfer_matrix(L, T, 1j * H) (step 1) is complex symmetric but not Hermitian. For an
+      infinitely long strip the zeros of the partition function in H lie where the two
+      eigenvalues of largest modulus of this matrix have equal modulus. At H = 0 these two
+      eigenvalues are real and different. As H grows they move toward each other, meet at the
+      Yang-Lee edge H_edge(L, T) and then become a complex-conjugate pair.
+
+      Find H_edge, the smallest H > 0 at which the two eigenvalues of largest modulus are
+      equal. Return it as a Python float (units of J) with relative accuracy 1e-8, for every
+      integer L from 3 to 8 and every T from 1.5 to 10.
+    function_header: |-
+      def lee_yang_edge(L, T):
+          '''Yang-Lee edge of an infinitely long periodic strip in a purely imaginary field.
+
+          Inputs:
+            L: int, width of the strip in spins, 3 <= L <= 8.
+            T: float, temperature, 1.5 <= T <= 10 (J = 1, k_B = 1).
+
+          Output:
+            H_edge: float, the smallest H > 0 at which the two eigenvalues of largest modulus of
+                    transfer_matrix(L, T, 1j * H) are equal (units of J). Relative accuracy 1e-8.
+          '''
+    return_line: return H_edge
+    step_background: |-
+      Lee and Yang showed that the zeros of the Ising partition function in a complex field
+      lie on the imaginary field axis. Above Tc they start at a finite edge, whose
+      neighbourhood is a critical point of its own (Fisher's Yang-Lee edge singularity). At Tc
+      the edge of a strip of width L shrinks like L**(-y_h) with y_h = 15/8, and below Tc it
+      closes exponentially fast with L.
+    n_test_cases: 6
+    contract:
+      quantity: "Yang-Lee edge of the strip: smallest imaginary field H at which the two leading eigenvalues of the transfer matrix meet."
+      assumptions: "Imaginary field h = i H; the leading pair stays real and distinct for 0 <= H < H_edge (checked on a fine grid over the whole input range), while lower eigenvalue pairs may leave the real axis earlier."
+      result_kind: exact
+      valid_input_ranges: "Integer L from 3 to 8; 1.5 <= T <= 10."
+      units: "Units of J."
+      output_shape: "One Python float."
+      step_dependencies: [1]
+    mutants:
+      - name: first_complex_eigenvalue
+        description: "Returns the first field at which any eigenvalue of the matrix becomes complex, not the meeting point of the two leading ones."
+        file: mutants/step_5_first_complex_eigenvalue.py
+
+  - step_number: 6
+    scaffold: steps/step_6.py
+    solution: solution/step_6.py
+    tests: tests/step_6.py
+    step_description_prompt: |-
+      Combine strips at the exact critical temperature Tc = 2 / ln(1 + sqrt(2)) into
+      finite-size estimates. Every quantity below is taken at T = Tc, and r = ln((L+1) / L).
+
+        x_sigma = L / (2 pi xi_spin(L)) and x_energy = L / (2 pi xi_energy(L)), with the
+          lengths from strip_lengths (step 2);
+        beta_over_nu = ln(m_L / m_(L+1)) / r, with m from strip_magnetization (step 3);
+        gamma_over_nu = ln(chi_(L+1) / chi_L) / r, with chi from strip_susceptibility (step 4);
+        y_h = ln(H_edge(L) / H_edge(L+1)) / r, with H_edge from lee_yang_edge (step 5);
+        c: write f_W = f_inf - pi * c * Tc / (6 * W**2) + d / W**4 for W = L, L+1 and L+2,
+          with f_W from strip_lengths (step 2), and solve the three equations exactly for
+          f_inf, c and d.
+
+      Return a dict with exactly the keys "x_sigma", "x_energy", "beta_over_nu",
+      "gamma_over_nu", "y_h" and "c", each a Python float within 1e-4 of the value of its
+      formula, for every integer L from 3 to 7.
+    function_header: |-
+      def critical_exponents(L):
+          '''Finite-size estimates of critical exponents and of the central charge at the exact Tc.
+
+          Input:
+            L: int, strip width, 3 <= L <= 7.
+
+          Output:
+            dict with exactly the keys "x_sigma", "x_energy", "beta_over_nu", "gamma_over_nu", "y_h"
+            and "c", each a float within 1e-4 of its formula. With Tc = 2 / ln(1 + sqrt(2)),
+            r = ln((L+1) / L) and every quantity taken at T = Tc:
+              x_sigma = L / (2 pi xi_spin(L)), x_energy = L / (2 pi xi_energy(L));
+              beta_over_nu = ln(m_L / m_(L+1)) / r;
+              gamma_over_nu = ln(chi_(L+1) / chi_L) / r;
+              y_h = ln(H_edge(L) / H_edge(L+1)) / r;
+              c from f_W = f_inf - pi c Tc / (6 W**2) + d / W**4, solved exactly for W = L, L+1, L+2.
+          '''
+    return_line: return result
+    step_background: |-
+      Conformal invariance at Tc ties the strip quantities to the scaling dimensions:
+      xi_L / L -> 1 / (2 pi x) (Cardy) and f_L = f_inf - pi c T / (6 L**2) + ... (Bloete,
+      Cardy and Nightingale; Affleck), and for the periodic Ising strip the next correction to
+      f_L is of order 1/L**4. For the 2D Ising model x_sigma = 1/8, x_energy = 1, c = 1/2, and
+      the scaling relations give beta/nu = x_sigma, gamma/nu = 2 - 2 x_sigma = 7/4 and
+      y_h = 2 - x_sigma = 15/8. The two-width estimates approach these values as L grows.
+    n_test_cases: 3
+    contract:
+      quantity: "Two-width finite-size estimates at the exact Tc of x_sigma, x_energy, beta/nu, gamma/nu, y_h, and the three-width estimate of c."
+      assumptions: "Formulas exactly as in the prompt, all at T = Tc = 2 / ln(1 + sqrt(2))."
+      result_kind: approximate
+      valid_input_ranges: "Integer L from 3 to 7."
+      units: "Dimensionless."
+      output_shape: "Dict with the six keys of the prompt, Python float values."
+      step_dependencies: [2, 3, 4, 5]
+    mutants:
+      - name: inverted_edge_ratio
+        description: "Writes y_h with the ratio of the two edges inverted, so it has the wrong sign."
+        file: mutants/step_6_inverted_edge_ratio.py
+
+  - step_number: 7
+    scaffold: steps/step_7.py
+    solution: solution/step_7.py
+    tests: tests/step_7.py
+    step_description_prompt: |-
+      Leave the strips for the infinite square lattice. In a uniform field h > 0 the model of
+      step 1 (energy - sum over nearest-neighbour pairs of s_i s_j - h * sum of s_i, J = 1,
+      k_B = 1) has a single equilibrium state on the infinite lattice, and its thermodynamics
+      per spin is the limit, as the width L goes to infinity, of that of the infinitely long
+      periodic strip of width L in the same field. Compute, for every T from 2 to 3 and every h
+      from 0.005 to 0.2, the four quantities per spin of the infinite lattice:
+
+        f = -T lim ln(Z) / N, the free energy (units of J), with absolute accuracy 1e-10;
+        m = <s_i> = -df/dh, the magnetization, with absolute accuracy 1e-9;
+        chi = dm/dh at fixed T, the susceptibility (units 1/J), with relative accuracy 1e-5;
+        c = -T d2f/dT2 at fixed h, the specific heat (units k_B), with relative accuracy 1e-5.
+
+      Return the tuple (f, m, chi, c) of four Python floats. Near Tc in the weakest fields the
+      bulk correlation length is many lattice spacings, so strips of any width that can be
+      diagonalized are far from these limits, and the response functions are large and vary
+      quickly with T and h.
+    function_header: |-
+      def bulk_thermodynamics(T, h):
+          '''Free energy, magnetization, susceptibility and specific heat per spin of the infinite lattice in a field.
+
+          Inputs:
+            T: float, temperature, 2 <= T <= 3 (J = 1, k_B = 1).
+            h: float, uniform field, 0.005 <= h <= 0.2; the energy is E = - sum_<ij> s_i s_j - h sum_i s_i.
+
+          Output:
+            (f, m, chi, c): tuple of four Python floats for the infinite square lattice (the limit of
+            the strip quantities as the width goes to infinity):
+              f: free energy per spin, f = -T lim ln(Z) / N (units of J), absolute accuracy 1e-10;
+              m: magnetization per spin <s_i> = -df/dh, absolute accuracy 1e-9;
+              chi: susceptibility per spin, chi = dm/dh at fixed T (units 1/J), relative accuracy 1e-5;
+              c: specific heat per spin at fixed h, c = -T d2f/dT2 (units k_B), relative accuracy 1e-5.
+          '''
+    return_line: return result
+    step_background: |-
+      For h > 0 the infinite lattice has a finite correlation length; it is largest near Tc in a
+      weak field, where it grows like h**(-8/15). The free energy of the infinite lattice is
+      analytic in T and h for h > 0, so its derivatives are well defined, but near Tc in a weak
+      field they come from a free energy that varies on small scales: chi grows like
+      h**(-14/15) at Tc, and c keeps the trace of the logarithmic specific-heat singularity of
+      the zero-field model. At h = 0 the exact free energy is Onsager's; the quantities here are
+      not known in closed form for h > 0.
+    n_test_cases: 6
+    contract:
+      quantity: "Free energy, magnetization, susceptibility and specific heat per spin of the infinite square-lattice Ising model in a uniform field h > 0."
+      assumptions: "Single Gibbs state for h > 0; all four are infinite-width limits of the strip quantities; chi = dm/dh at fixed T, c = -T d2f/dT2 at fixed h. Strips of feasible width stay far from the limits near Tc in weak fields, so a method that works on the infinite lattice is needed."
+      result_kind: approximate
+      valid_input_ranges: "2 <= T <= 3 and 0.005 <= h <= 0.2."
+      units: "f in J, m dimensionless, chi in 1/J, c in k_B."
+      output_shape: "Tuple of four Python floats (f, m, chi, c)."
+      step_dependencies: []
+    mutants:
+      - name: missing_corner_normalization
+        description: "Takes the partition function per site as Z(3x3 block) / Z(corners and two edges) without dividing out the corner contribution, so f is wrong."
+        file: mutants/step_7_missing_corner_normalization.py
+      - name: specific_heat_without_T
+        description: "Returns -d2f/dT2 instead of -T d2f/dT2 for the specific heat."
+        file: mutants/step_7_specific_heat_without_T.py
+      - name: free_spin_susceptibility
+        description: "Uses the susceptibility of independent spins, (1 - m**2) / T, instead of dm/dh of the interacting lattice."
+        file: mutants/step_7_free_spin_susceptibility.py
