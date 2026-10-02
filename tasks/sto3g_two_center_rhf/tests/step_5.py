@@ -195,7 +195,8 @@ _t_check_levels((1.0, 1.0, 1.24, 1.24, 1.0, 1.0))
 # --- test case 6: no five bound levels (He2 2+ only has a metastable well above He+ + He+),
 # or a mass that is not finite or outside [1, 10] u, raise ValueError ---
 for _t_bad in ((2.0, 2.0, 2.0925, 2.0925, _T_MHE, _T_MHE), (1.0, 1.0, 1.24, 1.24, np.nan, _T_MH),
-               (1.0, 1.0, 1.24, 1.24, _T_MH, np.inf), (1.0, 1.0, 1.24, 1.24, 10.5, _T_MH)):
+               (1.0, 1.0, 1.24, 1.24, _T_MH, np.inf), (1.0, 1.0, 1.24, 1.24, 10.5, _T_MH),
+               (1.0, 1.0, 1.24, 1.24, 0.5, _T_MH)):
     try:
         vibrational_levels(*_t_bad)
     except ValueError:

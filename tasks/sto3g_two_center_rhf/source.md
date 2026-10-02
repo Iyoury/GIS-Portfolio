@@ -70,3 +70,5 @@ and [0.1, 54] until the five levels change by less than 1e-4 cm^-1. New converge
 the ends of the ranges: zeta = 0.8 and zeta = 3 with 10 u nuclei, and 1 u nuclei. The
 output shape (5,) and the Python-float type of the step 4 energies are asserted; the
 internal checks of the fragment-charge product were removed from the step 5 tests.
+
+Version 6: the step 5 tests also check that a mass below 1 u (0.5 u) raises ValueError.
