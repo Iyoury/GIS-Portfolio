@@ -1,0 +1,357 @@
+# problem.yaml: one per task folder. File paths are relative to this folder.
+
+domain: chemistry
+
+required_dependencies: |-
+  import numpy as np
+  from scipy.special import erf
+  from scipy.optimize import minimize_scalar
+  from scipy.integrate import quad
+
+problem_description_main: |-
+  Compute the electronic ground state of a diatomic molecule with two electrons, such as
+  H2 or HeH+, in the minimal STO-3G basis, and from the resulting potential energy curve
+  the vibrational energy levels of the nuclei. Atom A (nuclear charge ZA) sits at the
+  origin and atom B (nuclear charge ZB) sits at distance R on the z axis. Each atom
+  carries one 1s basis function, written as a fixed sum of three normalized s-type
+  Gaussian functions (STO-3G). You will build, in order: the Boys function, the
+  one-electron integrals (overlap, kinetic energy, attraction to the nuclei), the
+  two-electron repulsion integrals, the full-CI and restricted Hartree-Fock (RHF) total
+  energies, and finally the lowest vibrational levels on the full-CI curve, measured from
+  its exact dissociation limit. Use atomic units: lengths in bohr, energies in hartree;
+  vibrational levels are given in cm^-1.
+
+problem_io: |-
+  def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
+      '''Lowest five vibrational levels (J = 0) on the full-CI potential curve, from the dissociation limit.
+
+      Inputs:
+        ZA, ZB: float, nuclear charges, 1 <= Z <= 3.
+        zetaA, zetaB: float, Slater exponents of the 1s functions on A and B, 0.8 <= zeta <= 3.
+        massA, massB: float, nuclear masses in unified atomic mass units (u), > 0.
+
+      Output:
+        levels: float numpy array of shape (5,), the energies of the vibrational states
+                v = 0..4 in cm^-1, measured from the exact R -> infinity limit of the
+                full-CI energy (so all are negative), increasing. Absolute error below
+                0.01 cm^-1 for each level.
+
+      Raises:
+        ValueError if a mass is not positive and finite, or if fewer than five bound
+        vibrational levels lie below the dissociation limit.
+      '''
+
+general_tests: tests/general.py
+
+second_solution: second_solution.py
+
+mutants:
+  - name: whole_task_covalent_limit
+    description: "Always takes two one-electron atoms (one electron on each centre) as the dissociation limit, so the levels of molecules that dissociate into a two-electron atom plus a bare nucleus (HeH+) or into an ion pair are measured from the wrong energy."
+    file: mutants/whole_task_covalent_limit.py
+
+# On a new version of an uploaded task only, what kind of edit it is.
+edit_label: grading_fix
+
+sub_steps:
+  - step_number: 1
+    scaffold: steps/step_1.py
+    solution: solution/step_1.py
+    tests: tests/step_1.py
+    step_description_prompt: |-
+      The Boys function of order zero is
+
+        F0(t) = integral from u = 0 to 1 of exp(-t * u**2) du,   t >= 0.
+
+      Write a function that returns F0(t) with a relative error below 1e-11 for every
+      t >= 0, including t = 0 (where F0(0) = 1) and very small t. The input t is a
+      float or a numpy array of any shape. Return a float numpy array with the same
+      shape as np.asarray(t) (a 0-d array or numpy float when t is a plain number).
+      Errors: raise ValueError if any t is negative or not finite.
+    function_header: |-
+      def boys_f0(t):
+          '''Boys function of order zero, F0(t) = integral from 0 to 1 of exp(-t u**2) du.
+
+          Input:
+            t: float or numpy array of floats (any shape), t >= 0 (t = 0 is allowed).
+
+          Output:
+            F: float numpy array with the same shape as np.asarray(t); F0(0) = 1.
+               Relative error below 1e-11 for every t >= 0.
+
+          Raises:
+            ValueError if any t is negative or not finite.
+          '''
+    return_line: return F
+    step_background: |-
+      F0 appears in every integral over Gaussian functions that contains a Coulomb
+      operator 1/r. It can be written with a standard special function, but that form
+      cannot be evaluated at t = 0 as it stands; near t = 0 a short Taylor series works,
+      and for large t the integrand is concentrated near u = 0.
+    n_test_cases: 5
+    contract:
+      quantity: The Boys function F0(t) = integral_0^1 exp(-t u^2) du.
+      assumptions: Real t >= 0.
+      result_kind: exact
+      valid_input_ranges: 0 <= t <= 1e6.
+      units: Dimensionless.
+      output_shape: Float numpy array with the shape of np.asarray(t).
+      step_dependencies: []
+    mutants:
+      - name: erf_of_t
+        description: Evaluates the error function at t instead of sqrt(t) in the closed form of F0.
+        file: mutants/step_1_erf_of_t.py
+
+  - step_number: 2
+    scaffold: steps/step_2.py
+    solution: solution/step_2.py
+    tests: tests/step_2.py
+    step_description_prompt: |-
+      The basis. Atom A is at the origin and atom B is at distance R (bohr) on the z
+      axis. Each atom has one contracted 1s function
+
+        phi(r) = sum over i = 1, 2, 3 of d_i * (2 a_i / pi)**(3/4) * exp(-a_i * |r - center|**2),
+
+      with a_i = zeta**2 * (0.109818, 0.405771, 2.22766) and
+      d_i = (0.444635, 0.535328, 0.154329), where zeta is the Slater exponent of that
+      atom (zetaA or zetaB). Use exactly these numbers and do not renormalize the
+      contracted function (so S[0, 0] comes out very slightly above 1). Index 0 is the
+      function on A and index 1 is the function on B.
+
+      Compute the 2x2 overlap matrix S[m, n] = integral of phi_m phi_n over all space,
+      and the 2x2 core Hamiltonian
+
+        H[m, n] = integral of phi_m * ( -(1/2) Laplacian - ZA / |r - R_A| - ZB / |r - R_B| ) phi_n,
+
+      that is, the kinetic energy plus the attraction to both nuclei. The attraction
+      integrals need the Boys function: use boys_f0 (step 1). Return the tuple (S, H) of
+      two float numpy arrays of shape (2, 2), in atomic units, each entry with an
+      absolute error below 1e-10.
+      Errors: raise ValueError if R, ZA, ZB, zetaA or zetaB is not positive.
+    function_header: |-
+      def sto3g_one_electron(ZA, ZB, zetaA, zetaB, R):
+          '''Overlap and core-Hamiltonian matrices for two atoms with one STO-3G 1s function each.
+
+          Inputs:
+            ZA, ZB: float, nuclear charges of atom A (at the origin) and atom B (at distance R on z), > 0.
+            zetaA, zetaB: float, Slater exponents of the 1s functions on A and B, > 0.
+            R: float, distance between the nuclei in bohr, R > 0.
+
+          Output:
+            (S, H): two float numpy arrays of shape (2, 2). Index 0 is the function on A and
+            index 1 the function on B. S is the overlap matrix and H = T + V is the core
+            Hamiltonian (kinetic energy plus attraction to both nuclei), in hartree.
+            Absolute error below 1e-10 for every entry.
+
+          Raises:
+            ValueError if R, ZA, ZB, zetaA or zetaB is not positive.
+          '''
+    return_line: return S, H
+    step_background: |-
+      The product of two Gaussians on different centres is one Gaussian on a point between
+      them (Gaussian product theorem). This gives closed forms for the overlap, kinetic and
+      nuclear-attraction integrals between primitive s Gaussians; the attraction integral
+      contains F0. The contracted integrals are the coefficient-weighted sums of the
+      primitive ones (Szabo and Ostlund, Appendix A).
+    n_test_cases: 5
+    contract:
+      quantity: Overlap matrix S and core Hamiltonian H = T + V_A + V_B over the two STO-3G 1s functions.
+      assumptions: STO-3G exponents scaled by zeta**2, the six fixed numbers of the prompt, no renormalization of the contracted functions, point nuclei.
+      result_kind: exact
+      valid_input_ranges: ZA, ZB from 1 to 3; zeta from 0.5 to 3; 0.3 <= R <= 10 bohr.
+      units: S dimensionless; H in hartree.
+      output_shape: Tuple (S, H) of two float numpy arrays of shape (2, 2), both symmetric.
+      step_dependencies: [1]
+    mutants:
+      - name: zeta_not_squared
+        description: Scales the Gaussian exponents by zeta instead of zeta**2.
+        file: mutants/step_2_zeta_not_squared.py
+
+  - step_number: 3
+    scaffold: steps/step_3.py
+    solution: solution/step_3.py
+    tests: tests/step_3.py
+    step_description_prompt: |-
+      Use the same basis as in step 2: atom A at the origin and atom B at distance R on
+      the z axis, one STO-3G 1s function per atom with exponents
+      zeta**2 * (0.109818, 0.405771, 2.22766), coefficients (0.444635, 0.535328, 0.154329),
+      normalized primitives and no renormalization; index 0 is the function on A and
+      index 1 the function on B.
+
+      Compute all two-electron repulsion integrals in chemists' notation,
+
+        eri[i, j, k, l] = (ij|kl) = double integral of phi_i(r1) phi_j(r1) (1 / |r1 - r2|) phi_k(r2) phi_l(r2),
+
+      for i, j, k, l in {0, 1}. These integrals need the Boys function: use boys_f0
+      (step 1). Return a float numpy array of shape (2, 2, 2, 2), in hartree, each entry
+      with an absolute error below 1e-10.
+      Errors: raise ValueError if R, zetaA or zetaB is not positive.
+    function_header: |-
+      def sto3g_two_electron(zetaA, zetaB, R):
+          '''Two-electron repulsion integrals over the two STO-3G 1s functions.
+
+          Inputs:
+            zetaA, zetaB: float, Slater exponents of the 1s functions on A (origin) and B, > 0.
+            R: float, distance between the nuclei in bohr, R > 0.
+
+          Output:
+            eri: float numpy array of shape (2, 2, 2, 2), in hartree, with
+                 eri[i, j, k, l] = (ij|kl) = integral of phi_i(1) phi_j(1) (1/r12) phi_k(2) phi_l(2).
+                 Absolute error below 1e-10 for every entry.
+
+          Raises:
+            ValueError if R, zetaA or zetaB is not positive.
+          '''
+    return_line: return eri
+    step_background: |-
+      With the Gaussian product theorem, each charge cloud phi_i phi_j becomes a sum of
+      single Gaussians, and the repulsion between two Gaussian clouds has a closed form
+      that contains F0. The integrals have the 8-fold symmetry
+      (ij|kl) = (ji|kl) = (kl|ij) = ..., so only 6 of the 16 values are different here.
+    n_test_cases: 4
+    contract:
+      quantity: The 2x2x2x2 array of two-electron repulsion integrals (ij|kl) over the two STO-3G 1s functions.
+      assumptions: Same basis as step 2.
+      result_kind: exact
+      valid_input_ranges: zeta from 0.5 to 3; 0.3 <= R <= 10 bohr.
+      units: Hartree.
+      output_shape: Float numpy array of shape (2, 2, 2, 2) with 8-fold permutation symmetry.
+      step_dependencies: [1]
+    mutants:
+      - name: wrong_boys_argument
+        description: Uses (p + q)|P - Q|^2 instead of p q / (p + q) |P - Q|^2 as the Boys function argument.
+        file: mutants/step_3_wrong_boys_argument.py
+
+  - step_number: 4
+    scaffold: steps/step_4.py
+    solution: solution/step_4.py
+    tests: tests/step_4.py
+    step_description_prompt: |-
+      Find the ground-state total energy of the two electrons in the two basis functions in
+      two ways, using sto3g_one_electron (step 2) and sto3g_two_electron (step 3).
+      E_fci (full configuration interaction): the lowest eigenvalue of the electronic
+      Hamiltonian (kinetic energy and attraction to both nuclei of each electron, plus the
+      repulsion 1/r12) in the space of all two-electron states that can be built from the two
+      basis functions. Remember that the basis functions are not orthogonal.
+      E_rhf (closed-shell restricted Hartree-Fock): both electrons occupy the same spatial
+      orbital psi = c_0 phi_0 + c_1 phi_1 with c^T S c = 1, one with spin up and one with spin
+      down; E_rhf is the lowest expectation value of the electronic Hamiltonian over such
+      single Slater determinants.
+      Add the nuclear repulsion ZA * ZB / R to both and return the tuple (E_fci, E_rhf) of two
+      Python floats in hartree, each with an absolute error below 1e-9.
+    function_header: |-
+      def fci_energy(ZA, ZB, zetaA, zetaB, R):
+          '''Full-CI and closed-shell RHF ground-state energies of a two-electron diatomic in STO-3G.
+
+          Inputs:
+            ZA, ZB: float, nuclear charges (for example 1, 1 for H2 and 2, 1 for HeH+), > 0.
+            zetaA, zetaB: float, Slater exponents of the 1s functions on A and B, > 0.
+            R: float, distance between the nuclei in bohr, R > 0.
+
+          Output:
+            (E_fci, E_rhf): tuple of two Python floats, total energies in hartree (electronic
+            energy plus the nuclear repulsion ZA * ZB / R), absolute errors below 1e-9.
+              E_fci: lowest eigenvalue of the electronic Hamiltonian in the space of all
+                     two-electron states built from the two basis functions (full CI).
+              E_rhf: closed-shell restricted Hartree-Fock ground-state energy.
+          '''
+    return_line: return result
+    step_background: |-
+      Two electrons in two spatial functions give three singlet configurations (both electrons
+      in one orbital, both in the other, one in each); the triplet states lie higher. The
+      ground state is the lowest singlet, and E_fci <= E_rhf always. Near equilibrium the two
+      differ by the correlation energy (about 0.02 hartree for H2). On stretching, RHF keeps a
+      fixed 50 percent ionic weight for H2 and goes to a wrong limit, while full CI dissociates
+      correctly; Szabo and Ostlund give -1.1373 (full CI) and -1.1167 hartree (RHF) for H2 at
+      R = 1.4 bohr with zeta = 1.24.
+    n_test_cases: 5
+    contract:
+      quantity: "Full-CI and closed-shell RHF total energies of two electrons in the two-function STO-3G basis."
+      assumptions: "Non-orthogonal basis of steps 2-3, singlet ground state, variational RHF, point-charge nuclear repulsion ZA ZB / R."
+      result_kind: exact
+      valid_input_ranges: "ZA, ZB from 1 to 3; zeta from 0.5 to 3; 0.3 <= R <= 30 bohr."
+      units: "Hartree."
+      output_shape: "Tuple of two Python floats (E_fci, E_rhf)."
+      step_dependencies: [2, 3]
+    mutants:
+      - name: full_exchange
+        description: "Builds the Fock matrix with the full exchange term K instead of K/2, so E_rhf is wrong."
+        file: mutants/step_4_full_exchange.py
+      - name: orthonormal_atomic_basis
+        description: "Builds the configuration-interaction matrix directly from the atomic-function integrals as if the basis were orthonormal (overlap ignored)."
+        file: mutants/step_4_orthonormal_atomic_basis.py
+
+  - step_number: 5
+    scaffold: steps/step_5.py
+    solution: solution/step_5.py
+    tests: tests/step_5.py
+    step_description_prompt: |-
+      Use E_fci from fci_energy (step 4) as the potential energy curve of the nuclei
+      (Born-Oppenheimer) and compute the five lowest vibrational levels of the rotationless
+      (J = 0) molecule. With mu = massA massB / (massA + massB) the reduced mass of the nuclei
+      and V(R) = E_fci(R) - E_inf, the radial equation is
+        -(1 / (2 mu)) chi''(R) + V(R) chi(R) = E chi(R),  chi(0) = 0, chi -> 0 for R -> infinity,
+      and the bound states are its solutions with E < 0. E_inf is the exact limit of E_fci(R)
+      for R -> infinity, the energy of the separated fragments in this basis. It is not the
+      value of E_fci at any finite R: depending on ZA, ZB, zetaA and zetaB the lowest
+      separated arrangement can be two one-electron atoms, or a two-electron atom plus a bare
+      nucleus, and when the separated fragments are both charged E_fci(R) approaches E_inf
+      only as q_A q_B / R (q = the fragment charges), which can be attractive or repulsive.
+      The masses are in unified atomic mass units; use exactly 1 u = 1822.888486209 electron
+      masses and 1 hartree = 219474.6313632 cm^-1.
+
+      Inputs: ZA, ZB (1 <= Z <= 3, real numbers allowed), zetaA, zetaB (0.8 <= zeta <= 3) and
+      massA, massB (u, > 0; at most 10 u in the intended range). Return a float numpy array of
+      shape (5,) with the levels v = 0..4 in cm^-1 measured from E_inf (all negative), in
+      increasing order, each with an absolute error below 0.01 cm^-1.
+      Errors: raise ValueError if a mass is not positive and finite, or if fewer than five
+      vibrational levels lie below E_inf (for example when the only well lies above the
+      dissociation limit).
+    function_header: |-
+      def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
+          '''Lowest five vibrational levels (J = 0) on the full-CI potential curve, from the dissociation limit.
+
+          Inputs:
+            ZA, ZB: float, nuclear charges, 1 <= Z <= 3.
+            zetaA, zetaB: float, Slater exponents of the 1s functions on A and B, 0.8 <= zeta <= 3.
+            massA, massB: float, nuclear masses in unified atomic mass units (u), > 0.
+
+          Output:
+            levels: float numpy array of shape (5,), the energies of the vibrational states
+                    v = 0..4 in cm^-1, measured from the exact R -> infinity limit of the
+                    full-CI energy (so all are negative), increasing. Absolute error below
+                    0.01 cm^-1 for each level.
+
+          Raises:
+            ValueError if a mass is not positive and finite, or if fewer than five bound
+            vibrational levels lie below the dissociation limit.
+          '''
+    return_line: return levels
+    step_background: |-
+      As R -> infinity all integrals between the two centres vanish, and the lowest singlet
+      becomes the lowest of three arrangements: both electrons on A, both on B, or one on each
+      centre. The leftover energy at large R is the Coulomb interaction of the two fragment
+      charges, q_A q_B / R; it vanishes exponentially only when one fragment is neutral. For
+      H2 and HeH+ the limit is H + H and He + H+; with very different exponents the lowest
+      limit can be an ion pair such as H- + H+, whose -1/R tail leaves E_fci(60 bohr) 1/60
+      hartree (about 3658 cm^-1) below the limit. Wells that lie above the limit (He2 2+) give
+      no bound levels. The levels are anharmonic: their spacing shrinks with v.
+    n_test_cases: 6
+    contract:
+      quantity: "Lowest five J = 0 vibrational levels on the full-CI potential curve, measured from the exact dissociation limit."
+      assumptions: "Born-Oppenheimer curve from fci_energy, reduced mass of the nuclei, exact R -> infinity limit including charged-fragment (q_A q_B / R) tails, CODATA 2018 conversion factors given in the prompt."
+      result_kind: exact
+      valid_input_ranges: "ZA, ZB from 1 to 3; zeta from 0.8 to 3; masses from 1 to 10 u; at least five bound levels."
+      units: "cm^-1 relative to the dissociation limit."
+      output_shape: "Float numpy array of shape (5,), increasing."
+      step_dependencies: [4]
+    mutants:
+      - name: limit_at_finite_distance
+        description: "Takes E_fci at 60 bohr as the dissociation limit, which is wrong by q_A q_B / 60 hartree when both fragments are charged."
+        file: mutants/step_5_limit_at_finite_distance.py
+      - name: total_mass
+        description: "Uses the total mass massA + massB instead of the reduced mass."
+        file: mutants/step_5_total_mass.py
+      - name: harmonic_levels
+        description: "Uses harmonic-oscillator levels from the curvature at the minimum instead of solving the radial equation on the full curve."
+        file: mutants/step_5_harmonic_levels.py
