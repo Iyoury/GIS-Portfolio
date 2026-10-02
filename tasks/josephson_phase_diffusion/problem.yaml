@@ -1,0 +1,379 @@
+# problem.yaml: one per task folder. File paths are relative to this folder.
+
+domain: physics
+
+required_dependencies: |-
+  import numpy as np
+  import mpmath as mp
+  from scipy.optimize import brentq
+
+problem_description_main: |-
+  An overdamped (resistively shunted) Josephson junction with critical current I_c and
+  normal resistance R is biased by a constant current I at temperature T. The phase
+  difference phi across the junction obeys
+
+    (hbar / 2e R) dphi/dt = I - I_c sin(phi) + I_N(t),
+
+  where I_N is the Johnson-Nyquist noise current of the resistor, Gaussian white noise with
+  <I_N(t)> = 0 and <I_N(t) I_N(t')> = (2 k_B T / R) delta(t - t'). With the reduced time
+  tau = (2 e I_c R / hbar) t, the reduced bias i = I / I_c and the noise strength
+  theta = k_B T / E_J (E_J = hbar I_c / 2e is the Josephson energy) this becomes
+
+    dphi/dtau = i - sin(phi) + xi(tau),   <xi(tau) xi(tau')> = 2 theta delta(tau - tau'),
+
+  i.e. overdamped Brownian motion of the phase in the tilted washboard potential
+  U(phi) = -cos(phi) - i phi (in units of E_J). The noise is additive. The dc voltage is
+  <V> = (hbar / 2e) <dphi/dt> = I_c R v with the mean phase velocity
+  v = lim_{tau -> inf} <phi(tau)> / tau, and the phase spreads diffusively with the
+  effective diffusion coefficient D_eff = lim_{tau -> inf} [<phi(tau)**2> - <phi(tau)>**2] / (2 tau),
+  which sets the low-frequency voltage noise. Both limits are exact properties of the
+  stationary state (no small-noise or Kramers approximation) and do not depend on the
+  initial phase. We compute the exact mean voltage and differential resistance, the
+  effective phase diffusion, the bias at which phase diffusion is largest, the noise
+  temperature inferred from a measured voltage, and the criterion current, differential
+  resistance and voltage noise of a series array of different junctions. Unless stated
+  otherwise, currents are in units of I_c, voltages in units of I_c R and theta is
+  dimensionless; the valid model ranges are |i| <= 10 and 0.02 <= theta <= 50.
+
+problem_io: |-
+  def array_criterion(ics, rs, theta0, v_crit):
+      '''Criterion current, differential resistance and voltage noise of a series junction array.
+
+      Inputs:
+        ics: 1-D array of critical currents c_k in units of I_0, finite, > 0,
+             max(ics) / min(ics) <= 5.
+        rs: 1-D array of the same length, normal resistances r_k in units of R_0, finite, > 0.
+        theta0: float, k_B T / E_J0 with E_J0 = hbar I_0 / (2 e); every theta0 / c_k must
+                lie in [0.02, 50].
+        v_crit: float, voltage criterion in units of I_0 R_0,
+                0 < v_crit <= 0.5 * sum(c_k * r_k).
+
+      Output:
+        (j_star, r_diff, s_v): tuple of three Python floats.
+          j_star: bias current (units of I_0) at which the mean array voltage equals v_crit.
+          r_diff: differential resistance dV/dJ of the array at j_star (units of R_0).
+          s_v: lim_{t->inf} Var(int_0^t V dt') / t at j_star, the zero-frequency (two-sided)
+               voltage noise, in units of (hbar / 2e) I_0 R_0.
+          Relative errors below 1e-9 (j_star) and 1e-8 (r_diff, s_v).
+
+      Raises:
+        ValueError if ics and rs are not 1-D arrays of the same nonzero length, if an entry
+        is not finite and positive, if max(ics) / min(ics) > 5, if theta0 is not finite and
+        positive or a ratio theta0 / c_k is outside [0.02, 50], or if v_crit is not in
+        (0, 0.5 * sum(c_k * r_k)].
+      '''
+
+general_tests: tests/general.py
+
+second_solution: second_solution.py
+
+mutants:
+  - name: whole_task_common_noise_strength
+    description: "Gives every junction of the array the noise strength theta0 instead of theta0 / c_k (the Josephson energy is proportional to the critical current), so the criterion current, resistance and noise of arrays with different junctions are wrong."
+    file: mutants/whole_task_common_noise_strength.py
+
+sub_steps:
+  - step_number: 1
+    scaffold: steps/step_1.py
+    solution: solution/step_1.py
+    tests: tests/step_1.py
+    step_description_prompt: |-
+      Compute the exact stationary mean phase velocity v(i, theta) = <V> / (I_c R) of the noisy
+      overdamped junction, together with the differential resistance r_d = dv/di (in units of
+      R) at the same bias and noise strength. Thermally activated phase slips in both
+      directions must be included exactly: below the critical current (|i| < 1) and at low
+      noise v is exponentially small, and it must still be returned with the stated relative
+      accuracy (a method whose absolute error is only near machine precision is not enough).
+      v is odd in i and r_d is even in i; at i = 0 return v = 0.0 exactly.
+
+      Inputs: i (float, |i| <= 10) and theta (float, 0.02 <= theta <= 50). Return the tuple
+      (v, r_d) of two Python floats, v with a relative error below 1e-9 and r_d with a relative
+      error below 1e-8.
+      Errors: raise ValueError if i or theta is not finite, if |i| > 10 or if theta is outside
+      [0.02, 50].
+    function_header: |-
+      def mean_voltage(i, theta):
+          '''Stationary dc voltage and differential resistance of a noisy overdamped junction.
+
+          Inputs:
+            i: float, reduced bias current I / I_c, |i| <= 10.
+            theta: float, noise strength k_B T / E_J, 0.02 <= theta <= 50.
+
+          Output:
+            (v, r_d): tuple of two Python floats.
+              v: mean phase velocity lim <phi(tau)> / tau = <V> / (I_c R).
+              r_d: differential resistance dv/di (in units of R).
+              Relative errors below 1e-9 for v (v = 0 exactly at i = 0) and below 1e-8
+              for r_d.
+
+          Raises:
+            ValueError if i or theta is not finite, if |i| > 10 or if theta is outside
+            [0.02, 50].
+          '''
+    return_line: return result
+    step_background: |-
+      This is the Ambegaokar-Halperin (Ivanchenko-Zil'berman) problem. The stationary
+      Fokker-Planck equation on the circle has a constant probability current; its exact
+      solution gives the velocity as a ratio of integrals of Boltzmann factors of the tilted
+      potential (Stratonovich formula). For theta -> 0 the voltage tends to the noiseless value
+      sqrt(max(i**2 - 1, 0)); for theta -> infinity it tends to the ohmic value i. At i = 0 the
+      system is in equilibrium and the linear-response resistance is 1 / I_0(1/theta)**2.
+    n_test_cases: 5
+    contract:
+      quantity: "Mean dc voltage and differential resistance of an overdamped Josephson junction with thermal noise."
+      assumptions: "RSJ model, overdamped, additive white Johnson noise, stationary state; exact, no Kramers approximation."
+      result_kind: exact
+      valid_input_ranges: "|i| <= 10, 0.02 <= theta <= 50."
+      units: "v in units of I_c R, r_d in units of R."
+      output_shape: "Tuple of two Python floats."
+      step_dependencies: []
+    mutants:
+      - name: forward_slips_only
+        description: "Drops the backward phase slips (the factor 1 - exp(-2 pi i / theta)), so v is wrong at small i / theta and nonzero at i = 0."
+        file: mutants/step_1_forward_slips_only.py
+      - name: kramers_rate
+        description: "Uses Kramers escape rates over the washboard barriers below the critical current and the noiseless running solution above it."
+        file: mutants/step_1_kramers_rate.py
+
+  - step_number: 2
+    scaffold: steps/step_2.py
+    solution: solution/step_2.py
+    tests: tests/step_2.py
+    step_description_prompt: |-
+      Compute the effective diffusion coefficient of the phase,
+      D_eff = lim_{tau -> inf} [<phi(tau)**2> - <phi(tau)>**2] / (2 tau), in the reduced units of
+      the model (the same model as mean_voltage, step 1). The junction is driven out of
+      equilibrium by the bias, so the Einstein relation D_eff = theta * dv/di is not valid for
+      i != 0; the result must be exact (no Kramers or small-noise approximation). Near the
+      critical current at low noise D_eff can exceed theta several times (giant diffusion);
+      below it at low noise D_eff is exponentially small and must still have the stated
+      relative accuracy. D_eff is even in i.
+
+      Inputs: i (float, |i| <= 10) and theta (float, 0.02 <= theta <= 50). Return D_eff as a
+      Python float with a relative error below 1e-9.
+      Errors: raise ValueError if i or theta is not finite, if |i| > 10 or if theta is outside
+      [0.02, 50].
+    function_header: |-
+      def effective_diffusion(i, theta):
+          '''Effective diffusion coefficient of the junction phase.
+
+          Inputs:
+            i: float, reduced bias current I / I_c, |i| <= 10.
+            theta: float, noise strength k_B T / E_J, 0.02 <= theta <= 50.
+
+          Output:
+            D: Python float, lim [<phi(tau)**2> - <phi(tau)>**2] / (2 tau) in reduced units
+               (tau = 2 e I_c R t / hbar). Relative error below 1e-9.
+
+          Raises:
+            ValueError if i or theta is not finite, if |i| > 10 or if theta is outside
+            [0.02, 50].
+          '''
+    return_line: return D
+    step_background: |-
+      For Brownian motion in a tilted periodic potential the effective diffusion coefficient
+      has an exact expression in terms of the same kind of Boltzmann-factor integrals that give
+      the mean velocity (Reimann et al. 2001); equivalently it follows from homogenization
+      (corrector) theory or from the moments of the first passage time over one period. At zero
+      tilt it reduces to the Lifson-Jackson formula, D = theta / I_0(1/theta)**2 for this
+      potential. For free diffusion (no potential) D_eff = theta.
+    n_test_cases: 5
+    contract:
+      quantity: "Effective (long-time) diffusion coefficient of the phase of a noisy overdamped Josephson junction."
+      assumptions: "Same model as step 1; exact long-time limit of the variance."
+      result_kind: exact
+      valid_input_ranges: "|i| <= 10, 0.02 <= theta <= 50."
+      units: "Reduced units of the model (phase**2 per reduced time)."
+      output_shape: "One Python float."
+      step_dependencies: [1]
+    mutants:
+      - name: einstein_relation
+        description: "Uses the equilibrium Einstein relation D = theta * dv/di out of equilibrium."
+        file: mutants/step_2_einstein_relation.py
+
+  - step_number: 3
+    scaffold: steps/step_3.py
+    solution: solution/step_3.py
+    tests: tests/step_3.py
+    step_description_prompt: |-
+      At fixed noise strength, D_eff(i, theta) of effective_diffusion (step 2), as a function of
+      the bias i > 0, has a single maximum (giant diffusion near the critical current); for
+      0.02 <= theta <= 1 it lies in 0.5 < i < 3. Find it.
+
+      Input: theta (float, 0.02 <= theta <= 1). Return the tuple (i_peak, d_peak) of two
+      Python floats: i_peak is the bias of the maximum of D_eff with an absolute error below
+      1e-6, and d_peak = D_eff(i_peak, theta) / theta, the enhancement over free diffusion,
+      with a relative error below 1e-9.
+      Errors: raise ValueError if theta is not finite or is outside [0.02, 1].
+    function_header: |-
+      def diffusion_peak(theta):
+          '''Bias current of maximal phase diffusion (giant diffusion) and the enhancement there.
+
+          Inputs:
+            theta: float, noise strength k_B T / E_J, 0.02 <= theta <= 1.
+
+          Output:
+            (i_peak, d_peak): tuple of two Python floats.
+              i_peak: the bias i > 0 at which effective_diffusion(i, theta) is largest
+                      (absolute error below 1e-6).
+              d_peak: D_eff(i_peak, theta) / theta (relative error below 1e-9).
+
+          Raises:
+            ValueError if theta is not finite or is outside [0.02, 1].
+          '''
+    return_line: return result
+    step_background: |-
+      Near the critical tilt the phase alternates between long dwell times in a shallow
+      minimum and fast running stretches, which makes its displacement strongly dispersed;
+      D_eff can then exceed the free value theta by a large factor that grows as theta -> 0
+      (Reimann et al. 2001; Lindner et al. 2001). As theta grows the peak flattens and moves to
+      larger bias. The maximum is flat, so locating it to 1e-6 needs D_eff (or its derivative)
+      far more accurately than to 1e-6.
+    n_test_cases: 4
+    contract:
+      quantity: "Bias current of maximal phase diffusion and the diffusion enhancement there."
+      assumptions: "Same model as steps 1 and 2."
+      result_kind: exact
+      valid_input_ranges: "0.02 <= theta <= 1."
+      units: "i_peak in units of I_c; d_peak dimensionless."
+      output_shape: "Tuple of two Python floats."
+      step_dependencies: [2]
+    mutants:
+      - name: einstein_peak
+        description: "Takes the phase diffusion as theta * dv/di and returns the maximum of the differential resistance instead of the maximum of D_eff."
+        file: mutants/step_3_einstein_peak.py
+
+  - step_number: 4
+    scaffold: steps/step_4.py
+    solution: solution/step_4.py
+    tests: tests/step_4.py
+    step_description_prompt: |-
+      Noise thermometry. A junction biased at i > 0 shows the measured reduced voltage v. Find
+      the noise strength theta for which the exact mean voltage of mean_voltage (step 1)
+      equals v. At fixed i > 0 the mean voltage rises strictly with theta, from the noiseless
+      value sqrt(max(i**2 - 1, 0)) as theta -> 0 to the ohmic value i as theta -> infinity, so
+      the answer is unique when it exists. Below the critical current v can be exponentially
+      small.
+
+      Inputs: i (float, 0 < i <= 10) and v (float). Return theta as a Python float with a
+      relative error below 1e-7.
+      Errors: raise ValueError if i or v is not finite, if i is not in (0, 10], if v is not
+      strictly between sqrt(max(i**2 - 1, 0)) and i, or if the theta that reproduces v lies
+      outside [0.02, 50].
+    function_header: |-
+      def noise_temperature(i, v):
+          '''Noise strength theta = k_B T / E_J inferred from a measured dc voltage.
+
+          Inputs:
+            i: float, reduced bias current, 0 < i <= 10.
+            v: float, measured reduced mean voltage <V> / (I_c R) at this bias,
+               sqrt(max(i**2 - 1, 0)) < v < i.
+
+          Output:
+            theta: Python float in [0.02, 50] with mean_voltage(i, theta)[0] == v,
+                   relative error below 1e-7.
+
+          Raises:
+            ValueError if i or v is not finite, if i is not in (0, 10], if v is not strictly
+            between sqrt(max(i**2 - 1, 0)) and i, or if no theta in [0.02, 50] gives v.
+          '''
+    return_line: return theta
+    step_background: |-
+      Phase diffusion in small junctions is used as a thermometer for the electromagnetic
+      environment: the voltage below the critical current is set by thermally activated phase
+      slips, whose rate depends exponentially on E_J / k_B T. Kramers-type rate formulas are
+      only asymptotic; inverting them gives a biased temperature, while the exact voltage gives
+      the noise strength consistently at every bias.
+    n_test_cases: 4
+    contract:
+      quantity: "Noise strength k_B T / E_J inferred from a measured dc voltage."
+      assumptions: "Same model as step 1; the measured voltage is the exact stationary mean voltage."
+      result_kind: exact
+      valid_input_ranges: "0 < i <= 10; v strictly between sqrt(max(i**2 - 1, 0)) and i; resulting theta in [0.02, 50]."
+      units: "Dimensionless (k_B T / E_J)."
+      output_shape: "One Python float."
+      step_dependencies: [1]
+    mutants:
+      - name: kramers_inversion
+        description: "Below the critical current inverts the Kramers-rate voltage instead of the exact voltage."
+        file: mutants/step_4_kramers_inversion.py
+
+  - step_number: 5
+    scaffold: steps/step_5.py
+    solution: solution/step_5.py
+    tests: tests/step_5.py
+    step_description_prompt: |-
+      A series array of junctions k = 1..n with critical currents I_ck = c_k I_0 and normal
+      resistances R_k = r_k R_0 carries the same bias current J I_0 at the same temperature.
+      Every junction has its own Johnson noise (independent noise sources), so the phases are
+      independent, and each follows the model of steps 1 and 2 with its own reduced bias
+      i_k = J / c_k, its own noise strength theta_k = k_B T / E_Jk = theta0 / c_k (theta0 =
+      k_B T / E_J0 with E_J0 = hbar I_0 / 2e) and its own reduced time
+      tau_k = (2 e I_ck R_k / hbar) t. The array voltage is the sum of the junction voltages.
+
+      Return the tuple (j_star, r_diff, s_v) of three Python floats:
+        j_star: the bias J (units of I_0) at which the mean array voltage equals v_crit (units
+                of I_0 R_0), relative error below 1e-9;
+        r_diff: the differential resistance dV/dJ of the array at j_star (units of R_0),
+                relative error below 1e-8;
+        s_v: the zero-frequency voltage noise of the array at j_star, defined as
+             lim_{t -> inf} Var(int_0^t V(t') dt') / t (the two-sided spectral density of the
+             voltage at zero frequency), in units of (hbar / 2e) I_0 R_0, relative error below 1e-8.
+      Use mean_voltage (step 1) and effective_diffusion (step 2). The mean array voltage rises
+      strictly with J from 0 at J = 0.
+
+      Inputs: ics and rs (1-D arrays of the same length, finite and > 0, with
+      max(ics) / min(ics) <= 5), theta0 (float, > 0, with every theta0 / c_k in [0.02, 50]) and
+      v_crit (float, 0 < v_crit <= 0.5 * sum(c_k r_k)).
+      Errors: raise ValueError if ics and rs are not 1-D arrays of the same nonzero length, if
+      an entry is not finite and positive, if max(ics) / min(ics) > 5, if theta0 is not finite
+      and positive or a ratio theta0 / c_k is outside [0.02, 50], or if v_crit is not in
+      (0, 0.5 * sum(c_k r_k)].
+    function_header: |-
+      def array_criterion(ics, rs, theta0, v_crit):
+          '''Criterion current, differential resistance and voltage noise of a series junction array.
+
+          Inputs:
+            ics: 1-D array of critical currents c_k in units of I_0, finite, > 0,
+                 max(ics) / min(ics) <= 5.
+            rs: 1-D array of the same length, normal resistances r_k in units of R_0, finite, > 0.
+            theta0: float, k_B T / E_J0 with E_J0 = hbar I_0 / (2 e); every theta0 / c_k must
+                    lie in [0.02, 50].
+            v_crit: float, voltage criterion in units of I_0 R_0,
+                    0 < v_crit <= 0.5 * sum(c_k * r_k).
+
+          Output:
+            (j_star, r_diff, s_v): tuple of three Python floats.
+              j_star: bias current (units of I_0) at which the mean array voltage equals v_crit.
+              r_diff: differential resistance dV/dJ of the array at j_star (units of R_0).
+              s_v: lim_{t->inf} Var(int_0^t V dt') / t at j_star, the zero-frequency (two-sided)
+                   voltage noise, in units of (hbar / 2e) I_0 R_0.
+              Relative errors below 1e-9 (j_star) and 1e-8 (r_diff, s_v).
+
+          Raises:
+            ValueError if ics and rs are not 1-D arrays of the same nonzero length, if an entry
+            is not finite and positive, if max(ics) / min(ics) > 5, if theta0 is not finite and
+            positive or a ratio theta0 / c_k is outside [0.02, 50], or if v_crit is not in
+            (0, 0.5 * sum(c_k * r_k)].
+          '''
+    return_line: return result
+    step_background: |-
+      The critical current of junction arrays and nanowires is measured with a voltage
+      criterion. With thermal phase diffusion it depends on the criterion and on temperature,
+      and weaker junctions (smaller E_J) are noisier. The low-frequency voltage noise of each
+      junction comes from its phase diffusion: the variance of hbar/2e times the accumulated
+      phase grows linearly in time, and the reduced time of each junction runs at its own rate
+      2 e I_ck R_k / hbar.
+    n_test_cases: 4
+    contract:
+      quantity: "Voltage-criterion current, differential resistance and zero-frequency voltage noise of a series array of noisy overdamped Josephson junctions."
+      assumptions: "Independent junctions with independent Johnson noise at a common temperature; each junction obeys the model of steps 1-2."
+      result_kind: exact
+      valid_input_ranges: "Positive c_k with max/min <= 5, positive r_k, theta0 / c_k in [0.02, 50], 0 < v_crit <= 0.5 sum(c_k r_k)."
+      units: "j_star in units of I_0, r_diff in units of R_0, s_v in units of (hbar / 2e) I_0 R_0."
+      output_shape: "Tuple of three Python floats."
+      step_dependencies: [1, 2]
+    mutants:
+      - name: squared_voltage_scale
+        description: "Scales each junction's phase diffusion by (c_k r_k)**2 and ignores that each junction has its own reduced time unit."
+        file: mutants/step_5_squared_voltage_scale.py
