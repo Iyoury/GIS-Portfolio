@@ -135,7 +135,8 @@ def _t_fci(ZA, ZB, za, zb, R):
 def _t_check(args):
     out = fci_energy(*args)
     assert isinstance(out, tuple) and len(out) == 2, out
-    E_fci, E_rhf = float(out[0]), float(out[1])
+    assert type(out[0]) is float and type(out[1]) is float, out
+    E_fci, E_rhf = out
     t_fci, t_rhf = _t_fci(*args), _t_energy(*args)
     assert abs(E_fci - t_fci) < 1e-9, (args, E_fci, t_fci)
     assert abs(E_rhf - t_rhf) < 1e-9, (args, E_rhf, t_rhf)

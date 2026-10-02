@@ -60,3 +60,13 @@ q_A q_B / 60 hartree for charged fragments). Step 5 is tested on an ion-pair lim
 (-1/R tail) and a fractional-charge limit (+0.25/R tail) besides H2, D2 and HeH+; its
 validation checks were cut to two (no five bound levels for He2 2+, a zero mass), with
 no separate type or shape assertions.
+
+## Version 5 changes
+
+Step 5: the masses are restricted to 1 <= mass <= 10 u and validated (non-finite or
+out-of-range masses raise ValueError, tested with NaN, inf and 10.5). The reference no
+longer assumes a fixed radial domain: it widens [0.36, 16] bohr to [0.24, 24], [0.16, 36]
+and [0.1, 54] until the five levels change by less than 1e-4 cm^-1. New converged cases at
+the ends of the ranges: zeta = 0.8 and zeta = 3 with 10 u nuclei, and 1 u nuclei. The
+output shape (5,) and the Python-float type of the step 4 energies are asserted; the
+internal checks of the fragment-charge product were removed from the step 5 tests.

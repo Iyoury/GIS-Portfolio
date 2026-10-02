@@ -161,7 +161,7 @@ _T_MH, _T_MD, _T_MHE = 1.00782503207, 2.01410177812, 4.00260325413
 
 def _t_check_levels(args):
     lev = vibrational_levels(*args)
-    assert isinstance(lev, np.ndarray), type(lev)
+    assert isinstance(lev, np.ndarray) and lev.shape == (5,), lev
     target = _t_numerov_levels(*args)
     err = np.abs(lev - target)
     assert np.all(err < 0.01), (args, lev, target)
@@ -177,22 +177,25 @@ _t_check_levels((2.0, 1.0, 2.0925, 1.24, _T_MHE, _T_MH))
 
 # --- test case 2: ion-pair dissociation H- + H+ (attractive -1/R tail): the full-CI energy at
 # 60 bohr is still 1/60 hartree (about 3658 cm^-1) below the true limit ---
-_t_lim, _t_q = _t_limit(1.0, 1.0, 1.24, 2.69)
-assert _t_q == -1
 _t_check_levels((1.0, 1.0, 1.24, 2.69, _T_MH, _T_MH))
 
 # --- test case 3: fragments with charges 0.5 and 0.5 (repulsive +0.25/R tail) ---
-_t_lim, _t_q = _t_limit(1.5, 1.5, 2.0, 1.24)
-assert abs(_t_q - 0.25) < 1e-12
 _t_check_levels((1.5, 1.5, 2.0, 1.24, 3.0, 3.0))
 
 # --- test case 4: isotopes on the same curve (D2), heavier nuclei and lower, denser levels ---
 lev_d = _t_check_levels((1.0, 1.0, 1.24, 1.24, _T_MD, _T_MD))
 assert lev_d[0] < lev[0] and lev_d[1] - lev_d[0] < lev[1] - lev[0]
 
-# --- test case 5: no five bound levels (He2 2+ only has a metastable well above He+ + He+),
-# or a non-positive mass, raise ValueError ---
-for _t_bad in ((2.0, 2.0, 2.0925, 2.0925, _T_MHE, _T_MHE), (1.0, 1.0, 1.24, 1.24, 0.0, _T_MH)):
+# --- test case 5: ends of the allowed ranges: zeta = 0.8 (shallow, wide well) and zeta = 3
+# (tight well at small R), both with the heaviest nuclei 10 u, and the lightest nuclei 1 u ---
+_t_check_levels((1.0, 1.0, 0.8, 0.8, 10.0, 10.0))
+_t_check_levels((1.0, 1.0, 3.0, 3.0, 10.0, 10.0))
+_t_check_levels((1.0, 1.0, 1.24, 1.24, 1.0, 1.0))
+
+# --- test case 6: no five bound levels (He2 2+ only has a metastable well above He+ + He+),
+# or a mass that is not finite or outside [1, 10] u, raise ValueError ---
+for _t_bad in ((2.0, 2.0, 2.0925, 2.0925, _T_MHE, _T_MHE), (1.0, 1.0, 1.24, 1.24, np.nan, _T_MH),
+               (1.0, 1.0, 1.24, 1.24, _T_MH, np.inf), (1.0, 1.0, 1.24, 1.24, 10.5, _T_MH)):
     try:
         vibrational_levels(*_t_bad)
     except ValueError:

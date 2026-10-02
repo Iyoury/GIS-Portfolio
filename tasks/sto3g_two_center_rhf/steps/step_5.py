@@ -10,7 +10,7 @@ def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
     Inputs:
       ZA, ZB: float, nuclear charges, 1 <= Z <= 3.
       zetaA, zetaB: float, Slater exponents of the 1s functions on A and B, 0.8 <= zeta <= 3.
-      massA, massB: float, nuclear masses in unified atomic mass units (u), > 0.
+      massA, massB: float, nuclear masses in unified atomic mass units (u), 1 <= mass <= 10.
 
     Output:
       levels: float numpy array of shape (5,), the energies of the vibrational states
@@ -19,7 +19,7 @@ def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
               0.01 cm^-1 for each level.
 
     Raises:
-      ValueError if a mass is not positive and finite, or if fewer than five bound
-      vibrational levels lie below the dissociation limit.
+      ValueError if a mass is not finite or not in [1, 10] u, or if fewer than five
+      bound vibrational levels lie below the dissociation limit.
     '''
     raise NotImplementedError

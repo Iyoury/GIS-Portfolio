@@ -231,8 +231,8 @@ def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
     # by primitive pair, V(R) sampled on Chebyshev nodes in ln R and interpolated, and the
     # radial equation solved by Chebyshev spectral collocation (no DVR, no shooting).
     for m in (massA, massB):
-        if not (np.isfinite(m) and m > 0.0):
-            raise ValueError("nuclear masses must be positive and finite")
+        if not (np.isfinite(m) and 1.0 <= m <= 10.0):
+            raise ValueError("nuclear masses must be finite and between 1 and 10 u")
     alpha = np.array([0.109818, 0.405771, 2.22766])
     coef = np.array([0.444635, 0.535328, 0.154329])
 

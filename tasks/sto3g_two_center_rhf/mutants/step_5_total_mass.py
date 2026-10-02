@@ -25,7 +25,7 @@ def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
     Inputs:
       ZA, ZB: float, nuclear charges, 1 <= Z <= 3.
       zetaA, zetaB: float, Slater exponents of the 1s functions on A and B, 0.8 <= zeta <= 3.
-      massA, massB: float, nuclear masses in unified atomic mass units (u), > 0.
+      massA, massB: float, nuclear masses in unified atomic mass units (u), 1 <= mass <= 10.
 
     Output:
       levels: float numpy array of shape (5,), the energies of the vibrational states
@@ -34,12 +34,12 @@ def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
               0.01 cm^-1 for each level.
 
     Raises:
-      ValueError if a mass is not positive and finite, or if fewer than five bound
-      vibrational levels lie below the dissociation limit.
+      ValueError if a mass is not finite or not in [1, 10] u, or if fewer than five
+      bound vibrational levels lie below the dissociation limit.
     '''
     for m in (massA, massB):
-        if not (np.isfinite(m) and m > 0.0):
-            raise ValueError("nuclear masses must be positive and finite")
+        if not (np.isfinite(m) and 1.0 <= m <= 10.0):
+            raise ValueError("nuclear masses must be finite and between 1 and 10 u")
     # Dissociation limit in this basis: as R -> infinity all cross integrals vanish and the
     # lowest singlet is the lowest of the three fragment arrangements (both electrons on A,
     # both on B, one on each). The leftover Coulomb energy of the fragment charges
@@ -51,20 +51,41 @@ def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
                 hA / sA + hB / sB)
     # Radial nuclear equation -(1/2 mu) chi'' + V chi = E chi, V(R) = E_fci(R) - e_inf,
     # solved with the sinc discrete-variable representation (Colbert-Miller) on a uniform
-    # grid; the five lowest states are negligible outside [0.35, 16] bohr.
+    # grid R = k h. The domain is widened (inner wall moved in, outer wall moved out) until
+    # the five lowest levels no longer change, so diffuse states are not cut off.
     # MUTANT: total mass instead of the reduced mass
     mu = (massA + massB) * 1822.888486209
     h = 0.02
-    R = np.arange(0.35, 16.0 + 0.5 * h, h)
-    V = np.array([fci_energy(ZA, ZB, zetaA, zetaB, r)[0] for r in R]) - e_inf
-    n = np.arange(R.size)
-    diff = n[:, None] - n[None, :]
-    with np.errstate(divide="ignore"):
+    cache = {}
+
+    def V(k):
+        if k not in cache:
+            cache[k] = fci_energy(ZA, ZB, zetaA, zetaB, k * h)[0] - e_inf
+        return cache[k]
+
+    def solve(k_lo, k_hi):
+        n = np.arange(k_hi - k_lo + 1)
+        diff = n[:, None] - n[None, :]
         T = np.where(diff == 0, np.pi ** 2 / 3.0, 2.0 * (-1.0) ** diff / np.where(diff == 0, 1, diff) ** 2)
-    T = T / (2.0 * mu * h * h)
-    E = np.linalg.eigvalsh(T + np.diag(V))
-    bound = E[E < 0.0]
-    if bound.size < 5:
+        T = T / (2.0 * mu * h * h)
+        Vd = np.array([V(k) for k in range(k_lo, k_hi + 1)])
+        if Vd.min() >= 0.0:
+            return Vd, np.array([])           # no state can lie below the limit
+        E = np.linalg.eigvalsh(T + np.diag(Vd))
+        return Vd, E[E < 0.0]
+
+    domains = [(18, 800), (12, 1200), (8, 1800), (5, 2700)]   # [0.36, 16], [0.24, 24], ...
+    bound = None
+    for k_lo, k_hi in domains:
+        Vd, cur = solve(k_lo, k_hi)
+        if Vd.min() >= 0.0:
+            break
+        if (bound is not None and bound.size >= 5 and cur.size >= 5
+                and np.max(np.abs(cur[:5] - bound[:5])) * 219474.6313632 < 1e-4):
+            bound = cur
+            break
+        bound = cur
+    if bound is None or bound.size < 5:
         raise ValueError("fewer than five vibrational levels lie below the dissociation limit")
     levels = bound[:5] * 219474.6313632
     return levels

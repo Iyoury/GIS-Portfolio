@@ -161,7 +161,7 @@ _T_MH, _T_MD, _T_MHE3 = 1.00782503207, 2.01410177812, 3.01602932265
 
 def _t_check_levels(args):
     lev = vibrational_levels(*args)
-    assert isinstance(lev, np.ndarray), type(lev)
+    assert isinstance(lev, np.ndarray) and lev.shape == (5,), lev
     target = _t_numerov_levels(*args)
     assert np.all(np.abs(lev - target) < 0.01), (args, lev, target)
     return lev

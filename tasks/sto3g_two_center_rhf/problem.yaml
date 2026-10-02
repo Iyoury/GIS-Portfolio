@@ -28,7 +28,7 @@ problem_io: |-
       Inputs:
         ZA, ZB: float, nuclear charges, 1 <= Z <= 3.
         zetaA, zetaB: float, Slater exponents of the 1s functions on A and B, 0.8 <= zeta <= 3.
-        massA, massB: float, nuclear masses in unified atomic mass units (u), > 0.
+        massA, massB: float, nuclear masses in unified atomic mass units (u), 1 <= mass <= 10.
 
       Output:
         levels: float numpy array of shape (5,), the energies of the vibrational states
@@ -37,8 +37,8 @@ problem_io: |-
                 0.01 cm^-1 for each level.
 
       Raises:
-        ValueError if a mass is not positive and finite, or if fewer than five bound
-        vibrational levels lie below the dissociation limit.
+        ValueError if a mass is not finite or not in [1, 10] u, or if fewer than five
+        bound vibrational levels lie below the dissociation limit.
       '''
 
 general_tests: tests/general.py
@@ -301,12 +301,16 @@ sub_steps:
       masses and 1 hartree = 219474.6313632 cm^-1.
 
       Inputs: ZA, ZB (1 <= Z <= 3, real numbers allowed), zetaA, zetaB (0.8 <= zeta <= 3) and
-      massA, massB (u, > 0; at most 10 u in the intended range). Return a float numpy array of
+      massA, massB (u, 1 <= mass <= 10, endpoints included). Return a float numpy array of
       shape (5,) with the levels v = 0..4 in cm^-1 measured from E_inf (all negative), in
-      increasing order, each with an absolute error below 0.01 cm^-1.
-      Errors: raise ValueError if a mass is not positive and finite, or if fewer than five
-      vibrational levels lie below E_inf (for example when the only well lies above the
-      dissociation limit).
+      increasing order, each with an absolute error below 0.01 cm^-1. Make sure the
+      representation of the radial equation (grid step and the extent of the R range) is
+      converged for these five states for every allowed input; with heavy nuclei and tight
+      exponents the well sits at small R, with light nuclei and weak binding the states
+      reach far out.
+      Errors: raise ValueError if a mass is not finite or not in [1, 10] u, or if fewer
+      than five vibrational levels lie below E_inf (for example when the only well lies
+      above the dissociation limit).
     function_header: |-
       def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
           '''Lowest five vibrational levels (J = 0) on the full-CI potential curve, from the dissociation limit.
@@ -314,7 +318,7 @@ sub_steps:
           Inputs:
             ZA, ZB: float, nuclear charges, 1 <= Z <= 3.
             zetaA, zetaB: float, Slater exponents of the 1s functions on A and B, 0.8 <= zeta <= 3.
-            massA, massB: float, nuclear masses in unified atomic mass units (u), > 0.
+            massA, massB: float, nuclear masses in unified atomic mass units (u), 1 <= mass <= 10.
 
           Output:
             levels: float numpy array of shape (5,), the energies of the vibrational states
@@ -323,8 +327,8 @@ sub_steps:
                     0.01 cm^-1 for each level.
 
           Raises:
-            ValueError if a mass is not positive and finite, or if fewer than five bound
-            vibrational levels lie below the dissociation limit.
+            ValueError if a mass is not finite or not in [1, 10] u, or if fewer than five
+            bound vibrational levels lie below the dissociation limit.
           '''
     return_line: return levels
     step_background: |-
@@ -336,7 +340,7 @@ sub_steps:
       limit can be an ion pair such as H- + H+, whose -1/R tail leaves E_fci(60 bohr) 1/60
       hartree (about 3658 cm^-1) below the limit. Wells that lie above the limit (He2 2+) give
       no bound levels. The levels are anharmonic: their spacing shrinks with v.
-    n_test_cases: 6
+    n_test_cases: 7
     contract:
       quantity: "Lowest five J = 0 vibrational levels on the full-CI potential curve, measured from the exact dissociation limit."
       assumptions: "Born-Oppenheimer curve from fci_energy, reduced mass of the nuclei, exact R -> infinity limit including charged-fragment (q_A q_B / R) tails, CODATA 2018 conversion factors given in the prompt."
