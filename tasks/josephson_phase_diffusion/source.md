@@ -27,7 +27,7 @@ temperature and its thermometric sensitivity, criterion current and voltage nois
 dependent noise strengths and time scales), the parameter ranges and the accuracy
 requirements are our own design.
 
-Checks used while building the task:
+Consistency checks run while building the task:
 - The reference (Stratonovich and Reimann double integrals: periodic trapezoid rule in
   the position, composite Gauss-Legendre in the shift graded toward the tilt boundary
   layer) and the high-precision Fourier continued fractions agree to about 1e-13
@@ -57,3 +57,8 @@ No target is copied from the reference solution. Every test computes its own tar
 | noise temperature (step 4) | the voltage is generated at a known theta (including the endpoints 0.02 and 50) by the continued fraction (or the Bessel integral); the returned theta must recover it | relative 1e-7 |
 | thermometric sensitivity kappa (step 4) | central difference of ln v in ln theta with step 1e-15 theta, the continued fraction evaluated at 60 + 1.8 / theta digits | about 1e-15 relative |
 | array criterion (step 5, general) | one Newton step on V(J) = v_crit with V and dV/dJ from the continued fractions must move j_star by less than 1e-9 relative; r_diff and s_v compared with the continued-fraction sums; for one junction or identical junctions j_star is known from the Bessel-integral voltage | relative 1e-9 / 1e-8 |
+
+## Version 3 changes
+
+Editorial clean-up only: wording of the source notes and of the problem description.
+No change to any prompt requirement, function header, solution, test or mutant.

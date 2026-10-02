@@ -30,7 +30,7 @@ problem_description_main: |-
   stationary state (no small-noise or Kramers approximation) and do not depend on the
   initial phase. We compute the exact mean voltage and differential resistance, the
   effective phase diffusion, the bias at which phase diffusion is largest, the noise
-  temperature inferred from a measured voltage, and the criterion current, differential
+  temperature inferred from a measured voltage (with its thermometric sensitivity), and the criterion current, differential
   resistance and voltage noise of a series array of different junctions. Unless stated
   otherwise, currents are in units of I_c, voltages in units of I_c R and theta is
   dimensionless; the valid model ranges are |i| <= 10 and 0.02 <= theta <= 50.
@@ -71,6 +71,9 @@ mutants:
   - name: whole_task_common_noise_strength
     description: "Gives every junction of the array the noise strength theta0 instead of theta0 / c_k (the Josephson energy is proportional to the critical current), so the criterion current, resistance and noise of arrays with different junctions are wrong."
     file: mutants/whole_task_common_noise_strength.py
+
+# On a new version of an uploaded task only, what kind of edit it is.
+edit_label: grading_fix
 
 sub_steps:
   - step_number: 1
