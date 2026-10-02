@@ -269,8 +269,10 @@ sub_steps:
       Python floats, theta with a relative error below 1e-7 and kappa with a relative error
       below 1e-6.
       Errors: raise ValueError if i or v is not finite, if i is not in (0, 10], if v is not
-      strictly between sqrt(max(i**2 - 1, 0)) and i, or if the theta that reproduces v lies
-      outside [0.02, 50].
+      strictly between sqrt(max(i**2 - 1, 0)) and i, or if v lies outside the voltages
+      reached for theta in [0.02, 50] by more than a relative 1e-11. Endpoint tolerance: a v
+      that lies beyond the voltage at theta = 0.02 or theta = 50 by at most a relative 1e-11
+      is accepted and returns that endpoint (theta = 0.02 or 50, with its kappa).
     function_header: |-
       def noise_temperature(i, v):
           '''Noise strength theta = k_B T / E_J inferred from a measured dc voltage, and its sensitivity.
@@ -290,7 +292,9 @@ sub_steps:
 
           Raises:
             ValueError if i or v is not finite, if i is not in (0, 10], if v is not strictly
-            between sqrt(max(i**2 - 1, 0)) and i, or if no theta in [0.02, 50] gives v.
+            between sqrt(max(i**2 - 1, 0)) and i, or if v lies outside the voltages reached for
+            theta in [0.02, 50] by more than a relative 1e-11. A v within a relative 1e-11 beyond
+            the voltage at theta = 0.02 or theta = 50 returns that endpoint.
           '''
     return_line: return result
     step_background: |-
@@ -301,7 +305,7 @@ sub_steps:
       sensitive; near the ohmic limit the voltage hardly depends on temperature and kappa is
       large. Kramers-type rate formulas are only asymptotic; inverting them gives a biased
       temperature, and the Arrhenius estimate kappa ~ theta / barrier is only the leading term.
-    n_test_cases: 4
+    n_test_cases: 5
     contract:
       quantity: "Noise strength k_B T / E_J inferred from a measured dc voltage, and the thermometric sensitivity d ln(theta) / d ln(v)."
       assumptions: "Same model as step 1; the measured voltage is the exact stationary mean voltage."
@@ -387,7 +391,7 @@ sub_steps:
       junction comes from its phase diffusion: the variance of hbar/2e times the accumulated
       phase grows linearly in time, and the reduced time of each junction runs at its own rate
       2 e I_ck R_k / hbar.
-    n_test_cases: 5
+    n_test_cases: 6
     contract:
       quantity: "Voltage-criterion current, differential resistance and zero-frequency voltage noise of a series array of noisy overdamped Josephson junctions."
       assumptions: "Independent junctions with independent Johnson noise at a common temperature; each junction obeys the model of steps 1-2."

@@ -108,10 +108,23 @@ _t_check_array(array_criterion(_t_c, _t_r, 0.1, 0.5), _t_c, _t_r, 0.1, 0.5)
 _t_c, _t_r = np.array([0.2, 1.0]), np.array([2.0, 1.0])
 _t_check_array(array_criterion(_t_c, _t_r, 10.0, 0.3), _t_c, _t_r, 10.0, 0.3)
 
-# --- test case 4: arrays and criteria outside the stated limits raise ValueError ---
+# --- test case 4: more arrays across the noise range (moderate, strong and mixed noise) ---
+_t_c, _t_r = np.array([1.0, 1.5]), np.array([1.0, 2.0])
+_t_check_array(array_criterion(_t_c, _t_r, 0.3, 0.4), _t_c, _t_r, 0.3, 0.4)
+_t_check_array(array_criterion(np.array([1.0]), np.array([2.0]), 5.0, 0.6), [1.0], [2.0], 5.0, 0.6)
+_t_c, _t_r = np.array([0.7, 1.0, 2.1]), np.array([1.0, 0.8, 0.6])
+_t_check_array(array_criterion(_t_c, _t_r, 0.15, 0.05), _t_c, _t_r, 0.15, 0.05)
+
+# --- test case 5: inputs outside the stated limits raise ValueError ---
 for _t_bad in ((np.array([1.0, 2.0]), np.array([1.0]), 0.1, 0.1),
+               (np.array([[1.0, 2.0]]), np.array([[1.0, 1.0]]), 0.1, 0.1),
+               (np.array([]), np.array([]), 0.1, 0.1),
+               (np.array([1.0, np.nan]), np.array([1.0, 1.0]), 0.1, 0.1),
+               (np.array([1.0, 1.0]), np.array([1.0, 0.0]), 0.1, 0.1),
                (np.array([1.0, 6.0]), np.array([1.0, 1.0]), 0.2, 0.1),
                (np.array([1.0, 2.0]), np.array([1.0, 1.0]), 0.03, 0.1),
+               (np.array([1.0]), np.array([1.0]), 51.0, 0.1),
+               (np.array([1.0]), np.array([1.0]), 0.1, 0.0),
                (np.array([1.0]), np.array([1.0]), 0.1, 0.51)):
     try:
         array_criterion(*_t_bad)

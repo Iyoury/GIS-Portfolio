@@ -112,7 +112,23 @@ _t_check_temp(0.9, 0.02, _t_cf(0.9, 0.02, want_D=False)[0])
 _t_check_temp(0.7, 50.0, _t_cf(0.7, 50.0, want_D=False)[0])
 _t_check_temp(0.4, 0.06, _t_v_bessel(0.4, 0.06))
 
-# --- test case 3: impossible voltages and bad inputs raise ValueError ---
+# --- test case 3: the stated endpoint tolerance (relative 1e-11 on v): just inside it the
+# endpoint is returned, a relative 1e-9 beyond the attainable voltage raises ValueError ---
+_t_v02 = _t_cf(0.9, 0.02, want_D=False)[0]
+_t_o = noise_temperature(0.9, _t_v02 * (1.0 - 1e-12))
+assert _t_rel(_t_o[0], 0.02) < 1e-7, _t_o
+_t_v50 = _t_cf(0.7, 50.0, want_D=False)[0]
+_t_o = noise_temperature(0.7, _t_v50 * (1.0 + 1e-12))
+assert _t_rel(_t_o[0], 50.0) < 1e-7, _t_o
+for _t_bad in ((0.9, _t_v02 * (1.0 - 1e-9)), (0.7, _t_v50 * (1.0 + 1e-9))):
+    try:
+        noise_temperature(*_t_bad)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("noise_temperature%r must raise ValueError" % (_t_bad,))
+
+# --- test case 4: impossible voltages and bad inputs raise ValueError ---
 for _t_bad in ((0.5, 0.5), (2.0, np.sqrt(3.0)), (0.0, 0.1), (11.0, 10.9), (0.5, float("nan")),
                (0.5, 1e-60), (0.3, 0.2999999999999)):
     try:

@@ -62,3 +62,11 @@ No target is copied from the reference solution. Every test computes its own tar
 
 Editorial clean-up only: wording of the source notes and of the problem description.
 No change to any prompt requirement, function header, solution, test or mutant.
+
+## Version 4 changes
+
+Step 4: the endpoint tolerance is now part of the stated contract (a voltage at most a
+relative 1e-11 beyond the voltage at theta = 0.02 or 50 returns that endpoint; farther out
+raises ValueError) and is tested on both sides (1e-12 accepted, 1e-9 rejected). Step 5: the
+validation tests cover 2-D arrays, empty arrays, a NaN entry, a zero resistance, theta0 / c_k
+above 50 and v_crit = 0, and three more computed-value cases were added.
