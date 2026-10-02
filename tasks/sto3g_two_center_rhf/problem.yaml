@@ -374,8 +374,9 @@ sub_steps:
       of step 1 up to order 4) and return the ground-state total energies (electronic energy plus
       ZA * ZB / R) of the two electrons in this basis:
         E_fci: the lowest singlet eigenvalue of the electronic Hamiltonian in the space of all
-               two-electron states built from the 8 functions (full CI). The two electrons have
-               opposite spins, so the spatial wave function is symmetric in the two electrons;
+               two-electron states built from the 8 functions (full CI). For the singlet, the
+               antisymmetric spin function requires the spatial wave function to be symmetric
+               under exchange of the two electrons;
         E_rhf: the closed-shell restricted Hartree-Fock energy, i.e. the lowest energy of a
                single determinant with both electrons in the same spatial orbital (the global
                minimum over all normalized orbitals, not merely a self-consistent solution).

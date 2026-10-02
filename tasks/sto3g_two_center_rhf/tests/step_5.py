@@ -161,6 +161,8 @@ assert 4000.0 < lev[1] - lev[0] < 6000.0              # fundamental near the min
 
 # --- test case 1: HeH+; the lowest separated arrangement is He + H+ (both electrons on He) ---
 _t_check_levels((2.0, 1.0, 2.0925, 1.24, _T_MHE, _T_MH))
+# the same molecule with the centres swapped: now both electrons end on B (the limit H+ + He)
+_t_check_levels((1.0, 2.0, 1.24, 2.0925, _T_MH, _T_MHE))
 
 # --- test case 2: ion-pair dissociation H- + H+ (attractive -1/R tail): the full-CI energy at
 # 60 bohr is still 1/60 hartree (about 3658 cm^-1) below the true limit ---

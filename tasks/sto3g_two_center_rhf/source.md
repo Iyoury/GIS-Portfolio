@@ -111,3 +111,9 @@ the hardest test cases) with the domain widened [0.36, 16] -> [0.27, 20] -> ...,
 test oracle for the levels uses second-order finite differences on steps 0.004, 0.002 and
 0.001 bohr with two Richardson extrapolations (tridiagonal eigenproblems) instead of
 Numerov shooting in pure Python.
+
+## Version 9 changes
+
+Step 5 also tests HeH+ with the centres swapped (ZA = 1, ZB = 2), whose limit has both
+electrons on atom B. Step 6 wording: the spatial symmetry of the full-CI ground state is
+stated as a consequence of the singlet spin function.
