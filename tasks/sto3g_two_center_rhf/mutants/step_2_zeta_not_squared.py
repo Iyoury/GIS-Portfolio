@@ -45,7 +45,7 @@ def sto3g_one_electron(ZA, ZB, zetaA, zetaB, R):
             kinetic = mu * (3.0 - 2.0 * mu * dist2) * (np.pi / p) ** 1.5
             attract = np.zeros_like(p)
             for C in range(2):
-                attract -= 2.0 * np.pi / p * charges[C] * boys_f0(p * (center_p - centers[C]) ** 2)
+                attract -= 2.0 * np.pi / p * charges[C] * boys_function(0, p * (center_p - centers[C]) ** 2)[..., 0]
             S[m, n] = np.sum(weight * overlap)
             H[m, n] = np.sum(weight * (kinetic + attract))
     return S, H

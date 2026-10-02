@@ -10,35 +10,30 @@ required_dependencies: |-
 
 problem_description_main: |-
   Compute the electronic ground state of a diatomic molecule with two electrons, such as
-  H2 or HeH+, in the minimal STO-3G basis, and from the resulting potential energy curve
-  the vibrational energy levels of the nuclei. Atom A (nuclear charge ZA) sits at the
-  origin and atom B (nuclear charge ZB) sits at distance R on the z axis. Each atom
-  carries one 1s basis function, written as a fixed sum of three normalized s-type
-  Gaussian functions (STO-3G). You will build, in order: the Boys function, the
-  one-electron integrals (overlap, kinetic energy, attraction to the nuclei), the
-  two-electron repulsion integrals, the full-CI and restricted Hartree-Fock (RHF) total
-  energies, and finally the lowest vibrational levels on the full-CI curve, measured from
-  its exact dissociation limit. Use atomic units: lengths in bohr, energies in hartree;
-  vibrational levels are given in cm^-1.
+  H2 or HeH+, with Gaussian basis functions, and from it the vibrational levels of the
+  nuclei and the effect of polarization functions. Atom A (nuclear charge ZA) sits at the
+  origin and atom B (nuclear charge ZB) at distance R on the z axis. You will build, in
+  order: the Boys functions F_n, the one- and two-electron integrals over one STO-3G 1s
+  function per atom, the full-CI and restricted Hartree-Fock (RHF) energies in that minimal
+  basis, the lowest vibrational levels on the full-CI curve measured from its exact
+  dissociation limit, and finally the full-CI and RHF energies in a larger basis that adds a
+  shell of p functions on each atom, which needs integrals over Gaussians with angular
+  momentum. Use atomic units: lengths in bohr, energies in hartree; vibrational levels in cm^-1.
 
 problem_io: |-
-  def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
-      '''Lowest five vibrational levels (J = 0) on the full-CI potential curve, from the dissociation limit.
+  def polarized_energies(ZA, ZB, zetaA, zetaB, alphaA, alphaB, R):
+      '''Full-CI and RHF energies of a two-electron diatomic in the STO-3G 1s + p-shell basis.
 
       Inputs:
-        ZA, ZB: float, nuclear charges, 1 <= Z <= 3.
-        zetaA, zetaB: float, Slater exponents of the 1s functions on A and B, 0.8 <= zeta <= 3.
-        massA, massB: float, nuclear masses in unified atomic mass units (u), 1 <= mass <= 10.
+        ZA, ZB: float, nuclear charges, 1 <= Z <= 3 (A at the origin, B at (0, 0, R)).
+        zetaA, zetaB: float, Slater exponents of the STO-3G 1s functions, 0.5 <= zeta <= 3.
+        alphaA, alphaB: float, exponents of the p shells on A and B, 0.1 <= alpha <= 5.
+        R: float, distance between the nuclei in bohr, 0.3 <= R <= 10.
 
       Output:
-        levels: float numpy array of shape (5,), the energies of the vibrational states
-                v = 0..4 in cm^-1, measured from the exact R -> infinity limit of the
-                full-CI energy (so all are negative), increasing. Absolute error below
-                0.01 cm^-1 for each level.
-
-      Raises:
-        ValueError if a mass is not finite or not in [1, 10] u, or if fewer than five
-        bound vibrational levels lie below the dissociation limit.
+        (E_fci, E_rhf): tuple of two Python floats, total energies in hartree (electronic energy
+        plus ZA * ZB / R) of the singlet ground state in the 8-function basis, full CI and
+        closed-shell RHF, absolute errors below 1e-9.
       '''
 
 general_tests: tests/general.py
@@ -46,12 +41,12 @@ general_tests: tests/general.py
 second_solution: second_solution.py
 
 mutants:
-  - name: whole_task_covalent_limit
-    description: "Always takes two one-electron atoms (one electron on each centre) as the dissociation limit, so the levels of molecules that dissociate into a two-electron atom plus a bare nucleus (HeH+) or into an ion pair are measured from the wrong energy."
-    file: mutants/whole_task_covalent_limit.py
+  - name: whole_task_missing_hermite_sign
+    description: "In the McMurchie-Davidson electron-repulsion integrals the sign (-1)**(tau + nu + phi) of the second charge distribution is dropped, so the repulsion integrals with p functions on the second electron and both energies of the last step are wrong."
+    file: mutants/whole_task_missing_hermite_sign.py
 
 # On a new version of an uploaded task only, what kind of edit it is.
-edit_label: grading_fix
+edit_label: difficulty_increase
 
 sub_steps:
   - step_number: 1
@@ -59,48 +54,52 @@ sub_steps:
     solution: solution/step_1.py
     tests: tests/step_1.py
     step_description_prompt: |-
-      The Boys function of order zero is
-
-        F0(t) = integral from u = 0 to 1 of exp(-t * u**2) du,   t >= 0.
-
-      Write a function that returns F0(t) with a relative error below 1e-11 for every
-      t >= 0, including t = 0 (where F0(0) = 1) and very small t. The input t is a
-      float or a numpy array of any shape. Return a float numpy array with the same
-      shape as np.asarray(t) (a 0-d array or numpy float when t is a plain number).
-      Errors: raise ValueError if any t is negative or not finite.
+      The Boys functions are
+        F_n(t) = integral from u = 0 to 1 of u**(2n) exp(-t * u**2) du,   t >= 0, n = 0, 1, 2, ...
+      They appear in every Coulomb integral over Gaussian functions; integrals over functions
+      with angular momentum need F_n for several n at the same argument. Write a function that
+      returns F_0(t), ..., F_(n_max)(t) together, each with a relative error below 1e-12, for
+      every integer n_max from 0 to 16 and every t from 0 to 1e6 (including t = 0, very small t,
+      and the whole range in between). The input t is a float or a numpy array of any shape;
+      return a float numpy array of shape np.shape(t) + (n_max + 1,), with F[..., n] = F_n(t).
+      Errors: raise ValueError if n_max is not an integer in [0, 16] or if any t is negative,
+      not finite or larger than 1e6.
     function_header: |-
-      def boys_f0(t):
-          '''Boys function of order zero, F0(t) = integral from 0 to 1 of exp(-t u**2) du.
+      def boys_function(n_max, t):
+          '''Boys functions F_n(t) = integral from 0 to 1 of u**(2n) exp(-t u**2) du for n = 0..n_max.
 
-          Input:
-            t: float or numpy array of floats (any shape), t >= 0 (t = 0 is allowed).
+          Inputs:
+            n_max: int, highest order, 0 <= n_max <= 16.
+            t: float or numpy array of floats (any shape), 0 <= t <= 1e6 (t = 0 is allowed).
 
           Output:
-            F: float numpy array with the same shape as np.asarray(t); F0(0) = 1.
-               Relative error below 1e-11 for every t >= 0.
+            F: float numpy array of shape np.shape(t) + (n_max + 1,), F[..., n] = F_n(t).
+               Relative error below 1e-12 for every entry; F_n(0) = 1 / (2n + 1).
 
           Raises:
-            ValueError if any t is negative or not finite.
+            ValueError if n_max is not an integer in [0, 16], or if any t is negative, not finite
+            or larger than 1e6.
           '''
     return_line: return F
     step_background: |-
-      F0 appears in every integral over Gaussian functions that contains a Coulomb
-      operator 1/r. It can be written with a standard special function, but that form
-      cannot be evaluated at t = 0 as it stands; near t = 0 a short Taylor series works,
-      and for large t the integrand is concentrated near u = 0.
+      F_0 has a closed form with the error function, and the F_n obey the two-term recursion
+      F_(n+1)(t) = ((2n + 1) F_n(t) - exp(-t)) / (2t). Used upward from F_0 it loses accuracy
+      catastrophically for small t, where the subtraction cancels; used downward it is stable,
+      but it then needs an accurate starting value at the highest order. Robust codes switch
+      between such representations depending on t.
     n_test_cases: 5
     contract:
-      quantity: The Boys function F0(t) = integral_0^1 exp(-t u^2) du.
-      assumptions: Real t >= 0.
+      quantity: "Boys functions F_0(t) .. F_nmax(t) = integral_0^1 u^(2n) exp(-t u^2) du."
+      assumptions: "Real t >= 0."
       result_kind: exact
-      valid_input_ranges: 0 <= t <= 1e6.
-      units: Dimensionless.
-      output_shape: Float numpy array with the shape of np.asarray(t).
+      valid_input_ranges: "Integer n_max from 0 to 16; 0 <= t <= 1e6."
+      units: "Dimensionless."
+      output_shape: "Float numpy array of shape np.shape(t) + (n_max + 1,)."
       step_dependencies: []
     mutants:
-      - name: erf_of_t
-        description: Evaluates the error function at t instead of sqrt(t) in the closed form of F0.
-        file: mutants/step_1_erf_of_t.py
+      - name: upward_recursion
+        description: "Computes F_0 with erf and every higher order by the upward recursion for all t, which is unstable for small t."
+        file: mutants/step_1_upward_recursion.py
 
   - step_number: 2
     scaffold: steps/step_2.py
@@ -124,7 +123,7 @@ sub_steps:
         H[m, n] = integral of phi_m * ( -(1/2) Laplacian - ZA / |r - R_A| - ZB / |r - R_B| ) phi_n,
 
       that is, the kinetic energy plus the attraction to both nuclei. The attraction
-      integrals need the Boys function: use boys_f0 (step 1). Return the tuple (S, H) of
+      integrals need the Boys function: use boys_function (step 1). Return the tuple (S, H) of
       two float numpy arrays of shape (2, 2), in atomic units, each entry with an
       absolute error below 1e-10.
       Errors: raise ValueError if R, ZA, ZB, zetaA or zetaB is not positive.
@@ -182,8 +181,8 @@ sub_steps:
 
         eri[i, j, k, l] = (ij|kl) = double integral of phi_i(r1) phi_j(r1) (1 / |r1 - r2|) phi_k(r2) phi_l(r2),
 
-      for i, j, k, l in {0, 1}. These integrals need the Boys function: use boys_f0
-      (step 1). Return a float numpy array of shape (2, 2, 2, 2), in hartree, each entry
+      for i, j, k, l in {0, 1}. These integrals need the Boys function: use
+      boys_function (step 1). Return a float numpy array of shape (2, 2, 2, 2), in hartree, each entry
       with an absolute error below 1e-10.
       Errors: raise ValueError if R, zetaA or zetaB is not positive.
     function_header: |-
@@ -359,3 +358,71 @@ sub_steps:
       - name: harmonic_levels
         description: "Uses harmonic-oscillator levels from the curvature at the minimum instead of solving the radial equation on the full curve."
         file: mutants/step_5_harmonic_levels.py
+
+  - step_number: 6
+    scaffold: steps/step_6.py
+    solution: solution/step_6.py
+    tests: tests/step_6.py
+    step_description_prompt: |-
+      Enlarge the basis. On each atom keep the STO-3G 1s function of steps 2 and 3 (same zeta,
+      exponents, coefficients, no renormalization) and add a shell of three normalized primitive
+      Cartesian p functions with exponent alpha (alphaA on A, alphaB on B):
+        (x - X) N exp(-alpha |r - C|**2),  (y - Y) N exp(...),  (z - Z) N exp(...),
+      with C = (X, Y, Z) the atom position and N = (2 alpha / pi)**(3/4) * 2 sqrt(alpha), so that
+      each p function has norm 1. The basis has 8 functions. Compute all overlap, kinetic,
+      nuclear-attraction and electron-repulsion integrals over it (these need the Boys functions
+      of step 1 up to order 4) and return the ground-state total energies (electronic energy plus
+      ZA * ZB / R) of the two electrons in this basis:
+        E_fci: the lowest singlet eigenvalue of the electronic Hamiltonian in the space of all
+               two-electron states built from the 8 functions (full CI). The two electrons have
+               opposite spins, so the spatial wave function is symmetric in the two electrons;
+        E_rhf: the closed-shell restricted Hartree-Fock energy, i.e. the lowest energy of a
+               single determinant with both electrons in the same spatial orbital (the global
+               minimum over all normalized orbitals, not merely a self-consistent solution).
+      Return the tuple (E_fci, E_rhf) of two Python floats in hartree, each with an absolute
+      error below 1e-9.
+    function_header: |-
+      def polarized_energies(ZA, ZB, zetaA, zetaB, alphaA, alphaB, R):
+          '''Full-CI and RHF energies of a two-electron diatomic in the STO-3G 1s + p-shell basis.
+
+          Inputs:
+            ZA, ZB: float, nuclear charges, 1 <= Z <= 3 (A at the origin, B at (0, 0, R)).
+            zetaA, zetaB: float, Slater exponents of the STO-3G 1s functions, 0.5 <= zeta <= 3.
+            alphaA, alphaB: float, exponents of the p shells on A and B, 0.1 <= alpha <= 5.
+            R: float, distance between the nuclei in bohr, 0.3 <= R <= 10.
+
+          Output:
+            (E_fci, E_rhf): tuple of two Python floats, total energies in hartree (electronic energy
+            plus ZA * ZB / R) of the singlet ground state in the 8-function basis, full CI and
+            closed-shell RHF, absolute errors below 1e-9.
+          '''
+    return_line: return result
+    step_background: |-
+      Integrals over Cartesian Gaussians with angular momentum follow from recursions: the
+      McMurchie-Davidson scheme expands each product of Gaussians in Hermite Gaussians, the
+      Obara-Saika and Head-Gordon-Pople schemes recur on the angular momentum directly; both use
+      F_n up to the total angular momentum of the integral. The p functions polarize the 1s
+      orbitals along the bond (sigma) and across it (pi); in full CI the pi functions also
+      describe angular correlation. With diffuse p shells the self-consistent-field solution
+      built from the lowest Fock eigenvector can be an excited state of higher energy than the
+      true RHF minimum, and in a finite basis the lowest eigenvalue of the full two-electron
+      product space can belong to a triplet at large R.
+    n_test_cases: 4
+    contract:
+      quantity: "Singlet full-CI and closed-shell RHF total energies of two electrons in the 8-function STO-3G 1s + p-shell basis."
+      assumptions: "Cartesian normalized p primitives, point nuclei, singlet ground state, RHF as the global minimum over closed-shell determinants."
+      result_kind: exact
+      valid_input_ranges: "ZA, ZB from 1 to 3; zeta from 0.5 to 3; alpha from 0.1 to 5; 0.3 <= R <= 10 bohr."
+      units: "Hartree."
+      output_shape: "Tuple of two Python floats (E_fci, E_rhf)."
+      step_dependencies: [1]
+    mutants:
+      - name: kinetic_without_angular_momentum
+        description: "Uses the kinetic-energy formula of s functions for the p functions (the angular-momentum terms are dropped)."
+        file: mutants/step_6_kinetic_without_angular_momentum.py
+      - name: sigma_p_only
+        description: "Adds only the p function along the bond and omits the two pi functions on each atom."
+        file: mutants/step_6_sigma_p_only.py
+      - name: aufbau_scf
+        description: "Takes the RHF energy from a plain aufbau self-consistent field started from the core Hamiltonian, which can converge to a higher-energy solution."
+        file: mutants/step_6_aufbau_scf.py

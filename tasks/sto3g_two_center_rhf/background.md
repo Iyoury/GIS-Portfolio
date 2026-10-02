@@ -20,7 +20,7 @@ by zeta. The usual molecular values are zeta = 1.24 for H in molecules and
 zeta = 2.0925 for He. With the six rounded numbers the contracted function has a norm
 of 1.0000014, not exactly 1; the task keeps it that way, as in Szabo and Ostlund.
 
-## Integrals over Gaussians
+## Integrals over Gaussians and the Boys functions
 
 The product of two Gaussians on different centres is one Gaussian on a point between
 them (Gaussian product theorem). This gives closed forms for the overlap, kinetic and
@@ -80,3 +80,24 @@ vibrational wavenumber omega_e = sqrt(k/mu)/(2 pi c), where mu is the reduced ma
 the nuclei. For H2 the RHF/STO-3G values are R_e = 1.3459 bohr (0.712 angstrom),
 E_e = -1.11751 hartree and omega_e of about 5481 cm^-1 (the experimental values are
 1.401 bohr and 4401 cm^-1; the gap is the known error of minimal-basis Hartree-Fock).
+
+## Boys functions of higher order
+
+Integrals over Gaussians with angular momentum need F_n(t) = integral_0^1 u^(2n)
+exp(-t u^2) du for n up to the total angular momentum. The recursion
+F_(n+1) = ((2n + 1) F_n - exp(-t)) / (2t) is unstable upward at small t (cancellation) and
+stable downward, so accurate codes combine a series or tabulation at small and moderate t
+with the erf form and upward recursion at large t.
+
+## Polarization functions
+
+A minimal basis cannot describe the distortion of the atomic clouds in the molecule. Adding
+a shell of p functions on each atom (as in the 6-31G** basis) lets the orbitals polarize
+along the bond and gives full CI access to angular (pi) correlation. The integrals then
+involve Cartesian Gaussians with angular momentum, evaluated by recursion schemes
+(McMurchie-Davidson, Obara-Saika, Head-Gordon-Pople). Two pitfalls appear with larger
+bases: the self-consistent-field solution that occupies the lowest Fock eigenvector need
+not be the lowest closed-shell determinant (it can be a higher stationary point, notably
+with diffuse functions), and in a finite basis the lowest eigenvalue of the unrestricted
+two-electron product space can belong to a triplet at large R, so the singlet must be
+selected explicitly.

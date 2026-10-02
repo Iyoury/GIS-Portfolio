@@ -27,7 +27,8 @@ def boys_function(n_max, t):
         raise ValueError("t must be finite with 0 <= t <= 1e6")
     flat = t_arr.ravel()
     F = np.empty((flat.size, n_max + 1))
-    split = n_max + 25.0
+    # MUTANT: F_0 from erf and the upward recursion for every t (unstable for small t)
+    split = -1.0
     small = flat < split
     # small t: series for the highest order, F_n(t) = exp(-t) sum_k (2t)^k / ((2n+1)(2n+3)...(2n+2k+1)),
     # then the downward recursion F_(m-1) = (2 t F_m + exp(-t)) / (2m - 1), which is stable

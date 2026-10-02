@@ -213,11 +213,22 @@ def _t_check_pol(args):
     return out
 
 
-# --- test case 0: stretched H2 with polarization functions on both atoms ---
-_t_check_pol((1.0, 1.0, 1.24, 1.24, 1.0, 1.0, 3.0))
+# --- test case 0: H2 at 1.4 bohr with p shells (alpha = 1.1): polarization lowers both energies
+# below the 1s-only values of step 4 (variational principle), and full CI stays below RHF ---
+_t_o = _t_check_pol((1.0, 1.0, 1.24, 1.24, 1.1, 1.1, 1.4))
+_t_s = fci_energy(1.0, 1.0, 1.24, 1.24, 1.4)
+assert _t_o[0] < _t_s[0] - 1e-3 and _t_o[1] < _t_s[1] - 1e-4 and _t_o[0] < _t_o[1]
 
-# --- test case 1: HeH+ with a tight p shell on He and a diffuse one on H ---
-_t_check_pol((2.0, 1.0, 2.0925, 1.24, 3.5, 0.15, 1.8))
+# --- test case 1: HeH+ near its minimum, different p exponents on the two atoms ---
+_t_check_pol((2.0, 1.0, 2.0925, 1.24, 0.8, 1.1, 1.4632))
 
-# --- test case 2: unequal non-integer charges ---
-_t_check_pol((2.4, 1.3, 1.9, 1.1, 0.6, 0.9, 2.2))
+# --- test case 2: cases where the orbital with the lowest Fock eigenvalue is NOT the RHF
+# ground state (a diffuse p shell): the RHF energy is the lowest closed-shell determinant ---
+_t_check_pol((1.0, 1.0, 1.24, 1.24, 0.1, 5.0, 10.0))
+_t_check_pol((1.561, 1.97, 2.952, 2.904, 1.704, 0.831, 2.986))
+
+# --- test case 3: ends of the ranges (Z = 3 and 1, zeta = 3 and 0.5, alpha = 5 and 0.1,
+# R = 0.3 and 10) and non-integer charges ---
+_t_check_pol((3.0, 1.0, 3.0, 0.5, 5.0, 0.1, 0.3))
+_t_check_pol((1.0, 3.0, 0.5, 3.0, 0.1, 5.0, 10.0))
+_t_check_pol((2.639, 2.367, 2.468, 0.979, 2.308, 0.211, 1.091))

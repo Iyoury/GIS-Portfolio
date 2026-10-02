@@ -44,6 +44,6 @@ def sto3g_two_electron(zetaA, zetaB, R):
                     gauss = np.exp(-a * b / p * (centers[i] - centers[j]) ** 2
                                    - c * d / q * (centers[k] - centers[l]) ** 2)
                     pre = 2.0 * np.pi ** 2.5 / (p * q * np.sqrt(p + q))
-                    val = pre * gauss * boys_f0(p * q / (p + q) * (center_p - center_q) ** 2)
+                    val = pre * gauss * boys_function(0, p * q / (p + q) * (center_p - center_q) ** 2)[..., 0]
                     eri[i, j, k, l] = np.sum(w * norm * val)
     return eri

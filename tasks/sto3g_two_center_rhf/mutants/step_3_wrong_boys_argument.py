@@ -45,6 +45,6 @@ def sto3g_two_electron(zetaA, zetaB, R):
                                    - c * d / q * (centers[k] - centers[l]) ** 2)
                     pre = 2.0 * np.pi ** 2.5 / (p * q * np.sqrt(p + q))
                     # Deliberate error: the Boys argument uses (p + q) instead of p q / (p + q).
-                    val = pre * gauss * boys_f0((p + q) * (center_p - center_q) ** 2)
+                    val = pre * gauss * boys_function(0, (p + q) * (center_p - center_q) ** 2)[..., 0]
                     eri[i, j, k, l] = np.sum(w * norm * val)
     return eri

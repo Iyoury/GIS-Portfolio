@@ -5,8 +5,8 @@ from scipy.integrate import quad as _t_quad
 # Independent targets for the energy curve and the vibrational levels.
 # - integrals: closed-form s-Gaussian formulas re-implemented here, vectorized over many R
 #   (F0 from erf with its small-argument series), cross-checked against steps 2 and 3 tests;
-# - full CI: lowest eigenvalue of the 4 x 4 two-electron Hamiltonian in the NON-orthogonal
-#   product basis phi_i(1) phi_j(2), generalized eigenproblem with overlap S (x) S
+# - full CI: lowest eigenvalue of the two-electron Hamiltonian in the symmetric (singlet)
+#   combinations of the NON-orthogonal products phi_i(1) phi_j(2), generalized eigenproblem
 #   (no orbitals, no configuration state functions);
 # - dissociation limit: one-centre integrals by adaptive radial quadrature of the
 #   Gaussian expansion (no closed forms);
@@ -74,6 +74,9 @@ def _t_curve(ZA, ZB, za, zb, R):
     Hp = (np.einsum('nik,njl->nijkl', H, S) + np.einsum('nik,njl->nijkl', S, H)
           + np.einsum('nikjl->nijkl', G)).reshape(n, 4, 4)
     Sp = np.einsum('nik,njl->nijkl', S, S).reshape(n, 4, 4)
+    B = np.array([[1, 0, 0], [0, 0, np.sqrt(0.5)], [0, 0, np.sqrt(0.5)], [0, 1, 0]], float)   # singlet functions
+    Hp = B.T @ Hp @ B
+    Sp = B.T @ Sp @ B
     L = np.linalg.cholesky(Sp)
     Li = np.linalg.inv(L)
     E = np.linalg.eigvalsh(Li @ Hp @ np.swapaxes(Li, 1, 2))[:, 0]

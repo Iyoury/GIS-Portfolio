@@ -120,7 +120,7 @@ def _t_energy(ZA, ZB, za, zb, R):
 
 
 # Independent full-CI target: lowest eigenvalue of the two-electron Hamiltonian in the
-# non-orthogonal product basis phi_i(1) phi_j(2) (generalized eigenproblem with overlap
+# symmetric (singlet) combinations of the non-orthogonal products phi_i(1) phi_j(2) (generalized eigenproblem with overlap
 # S (x) S), with the quadrature integrals above (no orbitals, no configuration functions).
 def _t_fci(ZA, ZB, za, zb, R):
     from scipy.linalg import eigh as _t_eigh
@@ -129,7 +129,8 @@ def _t_fci(ZA, ZB, za, zb, R):
     Hp = (np.einsum("ik,jl->ijkl", H, S) + np.einsum("ik,jl->ijkl", S, H)
           + np.einsum("ikjl->ijkl", G)).reshape(4, 4)
     Sp = np.einsum("ik,jl->ijkl", S, S).reshape(4, 4)
-    return float(_t_eigh(Hp, Sp, eigvals_only=True)[0]) + ZA * ZB / R
+    B = np.array([[1, 0, 0], [0, 0, np.sqrt(0.5)], [0, 0, np.sqrt(0.5)], [0, 1, 0]], float)   # singlet functions
+    return float(_t_eigh(B.T @ Hp @ B, B.T @ Sp @ B, eigvals_only=True)[0]) + ZA * ZB / R
 
 
 def _t_check(args):

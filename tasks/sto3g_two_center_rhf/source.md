@@ -8,6 +8,12 @@
 - W. J. Hehre, R. F. Stewart and J. A. Pople, "Self-consistent molecular-orbital
   methods. I. Use of Gaussian expansions of Slater-type atomic orbitals", J. Chem.
   Phys. 51, 2657 (1969). The STO-3G expansion.
+- L. E. McMurchie and E. R. Davidson, "One- and two-electron integrals over Cartesian
+  Gaussian functions", Journal of Computational Physics 26, 218-231 (1978).
+- S. Obara and A. Saika, "Efficient recursive computation of molecular integrals over
+  Cartesian Gaussian functions", Journal of Chemical Physics 84, 3963-3974 (1986).
+- T. Helgaker, P. Jorgensen and J. Olsen, Molecular Electronic-Structure Theory (Wiley,
+  2000), chapter 9 (integrals, Boys function) and chapter 10 (Hartree-Fock).
 - S. F. Boys, "Electronic wave functions. I. A general method of calculation for the
   stationary states of any molecular system", Proc. R. Soc. London A 200, 542 (1950).
   Gaussian basis functions and the F0 function.
@@ -72,3 +78,24 @@ output shape (5,) and the Python-float type of the step 4 energies are asserted;
 internal checks of the fragment-charge product were removed from the step 5 tests.
 
 Version 6: the step 5 tests also check that a mass below 1 u (0.5 u) raises ValueError.
+
+## Version 7 changes (difficulty increase)
+
+Step 1 now returns F_0 .. F_nmax (n_max <= 16, 0 <= t <= 1e6, relative 1e-12); the tests
+use the incomplete gamma function at 40 digits, and the upward recursion fails them.
+Steps 2 and 3 call boys_function(0, t). New final step 6: singlet full-CI and RHF energies
+in the 8-function basis STO-3G 1s + one Cartesian p shell per atom.
+- Reference: McMurchie-Davidson integrals; full CI in the symmetric (singlet) product
+  functions of Loewdin orbitals; RHF as the global minimum over closed-shell determinants
+  (projected-gradient descent on the unit sphere from 48 starts, polished by a
+  maximum-overlap SCF).
+- Test oracle: Obara-Saika integrals with F_n from Kummer's function 1F1 (independent of
+  steps 1-3), full CI as a generalized eigenproblem in the non-orthogonal symmetric product
+  functions, RHF by BFGS from 40 random starts. Integrals agree with the reference to
+  5e-15 and both energies to 2e-14 on 16 random points of the range.
+- Second solution: Obara-Saika integrals, full CI in singlet configuration functions,
+  RHF by steepest descent along great circles with Brent line searches.
+- While building this step, two traps were found and are tested: the aufbau SCF converges
+  to a solution 0.06-0.33 hartree too high for diffuse p shells, and the lowest eigenvalue
+  of the full product space is a triplet 2e-7 hartree below the singlet at R = 10. The
+  full-CI oracles of steps 4 and 5 were also restricted to singlet functions.

@@ -4,30 +4,23 @@ from scipy.optimize import minimize_scalar
 from scipy.integrate import quad
 
 
-def boys_f0(t):
-    '''Boys function of order zero, F0(t) = integral from 0 to 1 of exp(-t u**2) du.
-
-    Input:
-      t: float or numpy array of floats (any shape), t >= 0 (t = 0 is allowed).
-
-    Output:
-      F: float numpy array with the same shape as np.asarray(t); F0(0) = 1.
-         Relative error below 1e-11 for every t >= 0.
-
-    Raises:
-      ValueError if any t is negative or not finite.
-    '''
-    # Other method: adaptive numerical quadrature of the defining integral.
+def boys_function(n_max, t):
+    '''Boys functions F_n(t) = integral from 0 to 1 of u**(2n) exp(-t u**2) du for n = 0..n_max.'''
+    # Other method: the regularized lower incomplete gamma function,
+    # F_n(t) = Gamma(n + 1/2) P(n + 1/2, t) / (2 t**(n + 1/2)), and a two-term series for tiny t.
+    from scipy.special import gammainc, gammaln
+    if isinstance(n_max, bool) or not isinstance(n_max, (int, np.integer)) or not (0 <= n_max <= 16):
+        raise ValueError("n_max must be an integer from 0 to 16")
     t_arr = np.asarray(t, dtype=float)
-    if not np.all(np.isfinite(t_arr)) or np.any(t_arr < 0.0):
-        raise ValueError("t must be finite and >= 0")
-    flat = t_arr.ravel()
-    out = np.empty_like(flat)
-    for i, tv in enumerate(flat):
-        upper = 1.0 if tv <= 100.0 else 10.0 / np.sqrt(tv)
-        out[i] = quad(lambda u: np.exp(-tv * u * u), 0.0, upper,
-                      epsabs=1e-16, epsrel=1e-13, limit=200)[0]
-    F = out.reshape(t_arr.shape)
+    if not np.all(np.isfinite(t_arr)) or np.any(t_arr < 0.0) or np.any(t_arr > 1e6):
+        raise ValueError("t must be finite with 0 <= t <= 1e6")
+    F = np.empty(t_arr.shape + (int(n_max) + 1,))
+    tiny = t_arr < 1e-9
+    ts = np.where(tiny, 1.0, t_arr)
+    for n in range(int(n_max) + 1):
+        a = n + 0.5
+        val = gammainc(a, ts) * np.exp(gammaln(a) - a * np.log(ts)) / 2.0
+        F[..., n] = np.where(tiny, 1.0 / (2 * n + 1) - t_arr / (2 * n + 3), val)
     return F
 
 
@@ -289,3 +282,228 @@ def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
         raise ValueError("fewer than five vibrational levels lie below the dissociation limit")
     levels = bound[:5] * 219474.6313632
     return levels
+
+
+from functools import lru_cache
+
+# Second solution, step 6: Obara-Saika recursions instead of McMurchie-Davidson Hermite
+# expansions; kinetic energy as (1/2) sum_i <d_i a | d_i b>.
+_T_AL = np.array([0.109818, 0.405771, 2.22766])
+_T_DC = np.array([0.444635, 0.535328, 0.154329])
+
+
+def _g6_F(m, T):
+    return float(boys_function(m, T)[m])
+
+
+def _g6_basis(zA, zB, aA, aB, R):
+    out = []
+    for cen, z, ap in ((np.zeros(3), zA, aA), (np.array([0.0, 0.0, R]), zB, aB)):
+        e = _T_AL * z * z
+        out.append([(ee, cc, (0, 0, 0), cen) for ee, cc in zip(e, _T_DC * (2 * e / np.pi) ** 0.75)])
+        for ang in ((1, 0, 0), (0, 1, 0), (0, 0, 1)):
+            out.append([(ap, (2 * ap / np.pi) ** 0.75 * 2 * np.sqrt(ap), ang, cen)])
+    return out
+
+
+def _g6_ovl1d(a, la, Ax, b, lb, Bx):
+    # 1-D Obara-Saika overlap of x^la e^{-a x^2} (centred Ax) and x^lb e^{-b x^2} (centred Bx), without (pi/p)^1/2
+    p = a + b
+    P = (a * Ax + b * Bx) / p
+
+    @lru_cache(None)
+    def S(i, j):
+        if i < 0 or j < 0:
+            return 0.0
+        if i == 0 and j == 0:
+            return np.exp(-a * b / p * (Ax - Bx) ** 2)
+        if i > 0:
+            return (P - Ax) * S(i - 1, j) + ((i - 1) * S(i - 2, j) + j * S(i - 1, j - 1)) / (2 * p)
+        return (P - Bx) * S(i, j - 1) + (i * S(i - 1, j - 1) + (j - 1) * S(i, j - 2)) / (2 * p)
+    return S(la, lb) * np.sqrt(np.pi / p)
+
+
+def _g6_S(a, la, A, b, lb, B):
+    return np.prod([_g6_ovl1d(a, la[k], A[k], b, lb[k], B[k]) for k in range(3)])
+
+
+def _g6_T(a, la, A, b, lb, B):
+    # (1/2) sum_i <d_i a | d_i b>, d/dx x^l e^{-a x^2} = l x^(l-1) - 2 a x^(l+1)
+    tot = 0.0
+    for k in range(3):
+        da = [(la[k], -2 * a, 1)] + ([(la[k], la[k], -1)] if la[k] > 0 else [])
+        db = [(lb[k], -2 * b, 1)] + ([(lb[k], lb[k], -1)] if lb[k] > 0 else [])
+        for _, ca, sa in da:
+            for _, cb, sb in db:
+                l1 = list(la); l1[k] += sa
+                l2 = list(lb); l2[k] += sb
+                tot += 0.5 * ca * cb * _g6_S(a, l1, A, b, l2, B)
+    return tot
+
+
+def _g6_V(a, la, A, b, lb, B, C):
+    p = a + b
+    P = (a * A + b * B) / p
+    K = np.exp(-a * b / p * np.sum((A - B) ** 2))
+    T = p * np.sum((P - C) ** 2)
+
+    @lru_cache(None)
+    def V(l1, l2, m):
+        if min(l1) < 0 or min(l2) < 0:
+            return 0.0
+        if sum(l1) == 0 and sum(l2) == 0:
+            return 2 * np.pi / p * K * _g6_F(m, T)
+        if sum(l1) > 0:
+            i = next(k for k in range(3) if l1[k] > 0)
+            d1 = tuple(x - (k == i) for k, x in enumerate(l1))
+            d11 = tuple(x - (k == i) for k, x in enumerate(d1))
+            d2 = tuple(x - (k == i) for k, x in enumerate(l2))
+            r = (P[i] - A[i]) * V(d1, l2, m) - (P[i] - C[i]) * V(d1, l2, m + 1)
+            r += d1[i] / (2 * p) * (V(d11, l2, m) - V(d11, l2, m + 1))
+            r += l2[i] / (2 * p) * (V(d1, d2, m) - V(d1, d2, m + 1))
+            return r
+        i = next(k for k in range(3) if l2[k] > 0)
+        d2 = tuple(x - (k == i) for k, x in enumerate(l2))
+        d22 = tuple(x - (k == i) for k, x in enumerate(d2))
+        d1 = tuple(x - (k == i) for k, x in enumerate(l1))
+        r = (P[i] - B[i]) * V(l1, d2, m) - (P[i] - C[i]) * V(l1, d2, m + 1)
+        r += d2[i] / (2 * p) * (V(l1, d22, m) - V(l1, d22, m + 1))
+        r += l1[i] / (2 * p) * (V(d1, d2, m) - V(d1, d2, m + 1))
+        return r
+    return V(tuple(la), tuple(lb), 0)
+
+
+def _g6_ERI(a, la, A, b, lb, B, c, lc, C, d, ld, D):
+    z, e = a + b, c + d
+    P = (a * A + b * B) / z
+    Q = (c * C + d * D) / e
+    W = (z * P + e * Q) / (z + e)
+    rho = z * e / (z + e)
+    K = np.exp(-a * b / z * np.sum((A - B) ** 2) - c * d / e * np.sum((C - D) ** 2))
+    T = rho * np.sum((P - Q) ** 2)
+    pre = 2 * np.pi ** 2.5 / (z * e * np.sqrt(z + e)) * K
+    cen = (A, B, C, D)
+
+    def dec(l, i):
+        return tuple(x - (k == i) for k, x in enumerate(l))
+
+    @lru_cache(None)
+    def I(l1, l2, l3, l4, m):
+        ls = (l1, l2, l3, l4)
+        if any(min(l) < 0 for l in ls):
+            return 0.0
+        if all(sum(l) == 0 for l in ls):
+            return pre * _g6_F(m, T)
+        pos = next(q for q in range(4) if sum(ls[q]) > 0)
+        i = next(k for k in range(3) if ls[pos][k] > 0)
+        L = list(ls)
+        L[pos] = dec(ls[pos], i)
+        if pos < 2:      # electron 1, exponent z, centre P
+            Xi, Ce, own, oth = z, P, pos, 1 - pos
+            r = (P[i] - cen[pos][i]) * I(*L, m) + (W[i] - P[i]) * I(*L, m + 1)
+            for q in (0, 1):
+                n = L[q][i]
+                if n > 0:
+                    M = list(L); M[q] = dec(L[q], i)
+                    r += n / (2 * z) * (I(*M, m) - rho / z * I(*M, m + 1))
+            for q in (2, 3):
+                n = L[q][i]
+                if n > 0:
+                    M = list(L); M[q] = dec(L[q], i)
+                    r += n / (2 * (z + e)) * I(*M, m + 1)
+        else:            # electron 2, exponent e, centre Q
+            r = (Q[i] - cen[pos][i]) * I(*L, m) + (W[i] - Q[i]) * I(*L, m + 1)
+            for q in (2, 3):
+                n = L[q][i]
+                if n > 0:
+                    M = list(L); M[q] = dec(L[q], i)
+                    r += n / (2 * e) * (I(*M, m) - rho / e * I(*M, m + 1))
+            for q in (0, 1):
+                n = L[q][i]
+                if n > 0:
+                    M = list(L); M[q] = dec(L[q], i)
+                    r += n / (2 * (z + e)) * I(*M, m + 1)
+        return r
+    return I(tuple(la), tuple(lb), tuple(lc), tuple(ld), 0)
+
+
+def _g6_integrals(ZA, ZB, zA, zB, aA, aB, R):
+    bs = _g6_basis(zA, zB, aA, aB, R)
+    n = len(bs)
+    nuc = ((ZA, np.zeros(3)), (ZB, np.array([0.0, 0.0, R])))
+    S = np.zeros((n, n)); H = np.zeros((n, n)); G = np.zeros((n,) * 4)
+    for i in range(n):
+        for j in range(n):
+            for (a, ca, la, A) in bs[i]:
+                for (b, cb, lb, B) in bs[j]:
+                    S[i, j] += ca * cb * _g6_S(a, la, A, b, lb, B)
+                    H[i, j] += ca * cb * (_g6_T(a, la, A, b, lb, B) - sum(Z * _g6_V(a, la, A, b, lb, B, C) for Z, C in nuc))
+    done = {}
+    for i in range(n):
+        for j in range(n):
+            for k in range(n):
+                for l in range(n):
+                    key = tuple(sorted([tuple(sorted((i, j))), tuple(sorted((k, l)))]))
+                    if key not in done:
+                        done[key] = sum(ca * cb * cc * cd * _g6_ERI(a, la, A, b, lb, B, c, lc, C, d, ld, D)
+                                        for (a, ca, la, A) in bs[i] for (b, cb, lb, B) in bs[j]
+                                        for (c, cc, lc, C) in bs[k] for (d, cd, ld, D) in bs[l])
+                    G[i, j, k, l] = done[key]
+    return S, H, G
+
+
+def polarized_energies(ZA, ZB, zetaA, zetaB, alphaA, alphaB, R):
+    '''Full-CI and RHF energies of a two-electron diatomic in the STO-3G 1s + p-shell basis.'''
+    # Other routes: full CI in the singlet configuration functions (i <= j) of Loewdin
+    # orbitals; RHF by steepest descent along great circles with an exact line search.
+    S, H, G = _g6_integrals(ZA, ZB, zetaA, zetaB, alphaA, alphaB, R)
+    n = S.shape[0]
+    w, U = np.linalg.eigh(S)
+    X = U @ np.diag(w ** -0.5) @ U.T
+    h = X.T @ H @ X
+    g = np.einsum("pi,qj,rk,sl,pqrs->ijkl", X, X, X, X, G)
+    pairs = [(i, j) for i in range(n) for j in range(i, n)]
+
+    def norm(i, j):
+        return 0.5 if i == j else np.sqrt(0.5)
+
+    M = np.zeros((len(pairs), len(pairs)))
+    I = np.eye(n)
+    for a, (i, j) in enumerate(pairs):
+        for b, (k, l) in enumerate(pairs):
+            # singlet |ij> = N (chi_i chi_j + chi_j chi_i); matrix element from the product basis
+            val = 0.0
+            for (p, q) in ((i, j), (j, i)):
+                for (r, s) in ((k, l), (l, k)):
+                    val += h[p, r] * I[q, s] + I[p, r] * h[q, s] + g[p, r, q, s]
+            M[a, b] = norm(i, j) * norm(k, l) * val
+    E_fci = float(np.linalg.eigvalsh(M)[0]) + ZA * ZB / R
+
+    def energy(x):
+        return float(2.0 * (x @ h @ x) + np.einsum("i,j,k,l,ijkl->", x, x, x, x, g))
+
+    def grad(x):
+        r = 4.0 * (h + np.einsum("k,l,ijkl->ij", x, x, g)) @ x
+        return r - (r @ x) * x
+
+    rng = np.random.default_rng(77)
+    best = np.inf
+    for x in list(np.linalg.eigh(h)[1].T) + list(rng.normal(size=(40, n))):
+        x = x / np.linalg.norm(x)
+        for _ in range(3000):
+            d = -grad(x)
+            nd = np.linalg.norm(d)
+            if nd < 1e-10:
+                break
+            d /= nd
+            # great circle x cos(s) + d sin(s); exact line search with Brent's method
+            res = minimize_scalar(lambda s_: energy(np.cos(s_) * x + np.sin(s_) * d), bounds=(0.0, 0.5),
+                                  method="bounded", options={"xatol": 1e-14})
+            y = np.cos(res.x) * x + np.sin(res.x) * d
+            if energy(y) >= energy(x):
+                break
+            x = y / np.linalg.norm(y)
+        best = min(best, energy(x))
+    E_rhf = best + ZA * ZB / R
+    result = (float(E_fci), float(E_rhf))
+    return result

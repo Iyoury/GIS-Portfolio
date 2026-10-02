@@ -359,7 +359,8 @@ def _s6_repulsion(a, la, A, b, lb, B, c, lc, C, d, ld, D):
                 for tau, fx in enumerate(E2[0]):
                     for nu, fy in enumerate(E2[1]):
                         for phi, fz in enumerate(E2[2]):
-                            val += (ex * ey * ez * fx * fy * fz * (-1) ** (tau + nu + phi)
+                            # MUTANT: the sign (-1)**(tau + nu + phi) of the second Hermite expansion is dropped
+                            val += (ex * ey * ez * fx * fy * fz
                                     * _s6_R(t + tau, u + nu, v + phi, 0, al, PQ, F))
     return 2.0 * np.pi ** 2.5 / (p * q * np.sqrt(p + q)) * val
 
