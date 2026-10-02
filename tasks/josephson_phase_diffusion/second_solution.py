@@ -60,6 +60,20 @@ def _g_velocity(i, theta):
         return float(v if i >= 0 else -v), float(dv)
 
 
+def _g_dlogv_dlogtheta(i, theta):
+    # differentiate the Galerkin system in theta: A dc/dtheta = -(dA/dtheta) c, dA/dtheta = diag(2 n)
+    dps, N = _g_size(theta)
+    dps += 20
+    with mp.workdps(dps):
+        a, th = mp.mpf(i), mp.mpf(theta)
+        c0, c, _ = _g_density(a, th, N)
+        diag = [2 * th * n + 2 * mp.mpc(0, 1) * a for n in range(1, N + 1)]
+        dc = _g_thomas([mp.mpf(-1)] * N, diag, [mp.mpf(1)] * N, [-2 * n * c[n - 1] for n in range(1, N + 1)])
+        v = 2 * mp.pi * (a * c0 + mp.im(c[0]))
+        dv = 2 * mp.pi * mp.im(dc[0])
+        return float(th * dv / v)
+
+
 def _g_diffusion(i, theta):
     dps, N = _g_size(theta)
     with mp.workdps(dps):
@@ -152,7 +166,7 @@ def diffusion_peak(theta):
 
 
 def noise_temperature(i, v):
-    '''Noise strength theta = k_B T / E_J inferred from a measured dc voltage.'''
+    '''Noise strength theta inferred from a measured dc voltage, and d ln(theta) / d ln(v).'''
     i = float(i)
     v = float(v)
     if not (np.isfinite(i) and np.isfinite(v)):
@@ -167,26 +181,32 @@ def noise_temperature(i, v):
 
     lo, hi = 1.0 / 50.0, 1.0 / 0.02          # u = 1 / theta; v decreases with u
     f_lo, f_hi = f(lo), f(hi)
-    if f_lo < 0.0 or f_hi > 0.0:
+    if f_lo < -1e-11 or f_hi > 1e-11:
         raise ValueError("no theta in [0.02, 50] reproduces this voltage")
-    side = 0
-    for _ in range(300):
-        u = (lo * f_hi - hi * f_lo) / (f_hi - f_lo)
-        fu = f(u)
-        if fu == 0.0 or hi - lo < 1e-14 * u:
-            break
-        if fu > 0.0:
-            lo, f_lo = u, fu
-            if side == 1:
-                f_hi *= 0.5
-            side = 1
-        else:
-            hi, f_hi = u, fu
-            if side == -1:
-                f_lo *= 0.5
-            side = -1
+    if f_lo <= 0.0:
+        u = lo
+    elif f_hi >= 0.0:
+        u = hi
+    else:
+        side = 0
+        for _ in range(300):
+            u = (lo * f_hi - hi * f_lo) / (f_hi - f_lo)
+            fu = f(u)
+            if fu == 0.0 or hi - lo < 1e-14 * u:
+                break
+            if fu > 0.0:
+                lo, f_lo = u, fu
+                if side == 1:
+                    f_hi *= 0.5
+                side = 1
+            else:
+                hi, f_hi = u, fu
+                if side == -1:
+                    f_lo *= 0.5
+                side = -1
     theta = float(1.0 / u)
-    return theta
+    result = (theta, 1.0 / _g_dlogv_dlogtheta(i, theta))
+    return result
 
 
 def array_criterion(ics, rs, theta0, v_crit):

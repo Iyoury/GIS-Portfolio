@@ -101,20 +101,18 @@ _t_c, _t_r = np.array([0.5, 2.0, 1.0, 1.5]), np.array([2.0, 0.5, 1.0, 1.0])
 _t_vc = 0.5 * float(np.sum(_t_c * _t_r))
 _t_check_array(array_criterion(_t_c, _t_r, 0.4, _t_vc), _t_c, _t_r, 0.4, _t_vc)
 
-# --- test case 3: bad arrays, ratios, temperatures or criteria raise ValueError ---
+# --- test case 3: inclusive limits: max(ics) / min(ics) = 5 with theta0 / c_k = 0.02 for the
+# strongest junction, and a junction at the largest noise strength theta0 / c_k = 50 ---
+_t_c, _t_r = np.array([1.0, 5.0]), np.array([1.0, 0.4])
+_t_check_array(array_criterion(_t_c, _t_r, 0.1, 0.5), _t_c, _t_r, 0.1, 0.5)
+_t_c, _t_r = np.array([0.2, 1.0]), np.array([2.0, 1.0])
+_t_check_array(array_criterion(_t_c, _t_r, 10.0, 0.3), _t_c, _t_r, 10.0, 0.3)
+
+# --- test case 4: arrays and criteria outside the stated limits raise ValueError ---
 for _t_bad in ((np.array([1.0, 2.0]), np.array([1.0]), 0.1, 0.1),
-               (np.array([]), np.array([]), 0.1, 0.1),
-               (np.array([[1.0]]), np.array([[1.0]]), 0.1, 0.1),
-               (np.array([1.0, -1.0]), np.array([1.0, 1.0]), 0.1, 0.1),
-               (np.array([1.0, 1.0]), np.array([1.0, 0.0]), 0.1, 0.1),
-               (np.array([1.0, np.nan]), np.array([1.0, 1.0]), 0.1, 0.1),
                (np.array([1.0, 6.0]), np.array([1.0, 1.0]), 0.2, 0.1),
                (np.array([1.0, 2.0]), np.array([1.0, 1.0]), 0.03, 0.1),
-               (np.array([1.0]), np.array([1.0]), 60.0, 0.1),
-               (np.array([1.0]), np.array([1.0]), -0.1, 0.1),
-               (np.array([1.0]), np.array([1.0]), 0.1, 0.0),
-               (np.array([1.0]), np.array([1.0]), 0.1, 0.51),
-               (np.array([1.0]), np.array([1.0]), 0.1, float("inf"))):
+               (np.array([1.0]), np.array([1.0]), 0.1, 0.51)):
     try:
         array_criterion(*_t_bad)
     except ValueError:

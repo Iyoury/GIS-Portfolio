@@ -253,16 +253,24 @@ sub_steps:
       equals v. At fixed i > 0 the mean voltage rises strictly with theta, from the noiseless
       value sqrt(max(i**2 - 1, 0)) as theta -> 0 to the ohmic value i as theta -> infinity, so
       the answer is unique when it exists. Below the critical current v can be exponentially
-      small.
+      small. The endpoints theta = 0.02 and theta = 50 are valid answers.
 
-      Inputs: i (float, 0 < i <= 10) and v (float). Return theta as a Python float with a
-      relative error below 1e-7.
+      Also return the thermometric sensitivity kappa = d ln(theta) / d ln(v) at fixed bias i,
+      evaluated at the theta found: a relative error dv / v of the measured voltage produces
+      the relative error kappa dv / v of the inferred temperature. mean_voltage gives only
+      dv/di, not the derivative with respect to theta, so the derivative of the exact stationary
+      voltage with respect to the noise strength must be obtained here; near the ohmic limit
+      d ln(v) / d ln(theta) is very small and must still have the stated relative accuracy.
+
+      Inputs: i (float, 0 < i <= 10) and v (float). Return the tuple (theta, kappa) of two
+      Python floats, theta with a relative error below 1e-7 and kappa with a relative error
+      below 1e-6.
       Errors: raise ValueError if i or v is not finite, if i is not in (0, 10], if v is not
       strictly between sqrt(max(i**2 - 1, 0)) and i, or if the theta that reproduces v lies
       outside [0.02, 50].
     function_header: |-
       def noise_temperature(i, v):
-          '''Noise strength theta = k_B T / E_J inferred from a measured dc voltage.
+          '''Noise strength theta = k_B T / E_J inferred from a measured dc voltage, and its sensitivity.
 
           Inputs:
             i: float, reduced bias current, 0 < i <= 10.
@@ -270,33 +278,45 @@ sub_steps:
                sqrt(max(i**2 - 1, 0)) < v < i.
 
           Output:
-            theta: Python float in [0.02, 50] with mean_voltage(i, theta)[0] == v,
-                   relative error below 1e-7.
+            (theta, kappa): tuple of two Python floats.
+              theta: noise strength in [0.02, 50] with mean_voltage(i, theta)[0] == v,
+                     relative error below 1e-7 (the endpoints 0.02 and 50 are allowed).
+              kappa: thermometric sensitivity d ln(theta) / d ln(v) at fixed i, evaluated at
+                     theta (a relative voltage error dv/v gives the relative temperature error
+                     kappa dv/v), relative error below 1e-6.
 
           Raises:
             ValueError if i or v is not finite, if i is not in (0, 10], if v is not strictly
             between sqrt(max(i**2 - 1, 0)) and i, or if no theta in [0.02, 50] gives v.
           '''
-    return_line: return theta
+    return_line: return result
     step_background: |-
       Phase diffusion in small junctions is used as a thermometer for the electromagnetic
       environment: the voltage below the critical current is set by thermally activated phase
-      slips, whose rate depends exponentially on E_J / k_B T. Kramers-type rate formulas are
-      only asymptotic; inverting them gives a biased temperature, while the exact voltage gives
-      the noise strength consistently at every bias.
+      slips, whose rate depends exponentially on E_J / k_B T. In this Arrhenius regime
+      d ln(v) / d ln(theta) is roughly barrier / theta, so kappa is small and the thermometer is
+      sensitive; near the ohmic limit the voltage hardly depends on temperature and kappa is
+      large. Kramers-type rate formulas are only asymptotic; inverting them gives a biased
+      temperature, and the Arrhenius estimate kappa ~ theta / barrier is only the leading term.
     n_test_cases: 4
     contract:
-      quantity: "Noise strength k_B T / E_J inferred from a measured dc voltage."
+      quantity: "Noise strength k_B T / E_J inferred from a measured dc voltage, and the thermometric sensitivity d ln(theta) / d ln(v)."
       assumptions: "Same model as step 1; the measured voltage is the exact stationary mean voltage."
       result_kind: exact
-      valid_input_ranges: "0 < i <= 10; v strictly between sqrt(max(i**2 - 1, 0)) and i; resulting theta in [0.02, 50]."
-      units: "Dimensionless (k_B T / E_J)."
-      output_shape: "One Python float."
+      valid_input_ranges: "0 < i <= 10; v strictly between sqrt(max(i**2 - 1, 0)) and i; resulting theta in [0.02, 50] (endpoints included)."
+      units: "theta dimensionless (k_B T / E_J); kappa dimensionless."
+      output_shape: "Tuple of two Python floats."
       step_dependencies: [1]
     mutants:
       - name: kramers_inversion
         description: "Below the critical current inverts the Kramers-rate voltage instead of the exact voltage."
         file: mutants/step_4_kramers_inversion.py
+      - name: inverted_sensitivity
+        description: "Returns d ln(v) / d ln(theta) instead of d ln(theta) / d ln(v)."
+        file: mutants/step_4_inverted_sensitivity.py
+      - name: arrhenius_sensitivity
+        description: "Uses the Arrhenius estimate kappa = theta / barrier below the critical current instead of the exact derivative."
+        file: mutants/step_4_arrhenius_sensitivity.py
 
   - step_number: 5
     scaffold: steps/step_5.py
@@ -364,7 +384,7 @@ sub_steps:
       junction comes from its phase diffusion: the variance of hbar/2e times the accumulated
       phase grows linearly in time, and the reduced time of each junction runs at its own rate
       2 e I_ck R_k / hbar.
-    n_test_cases: 4
+    n_test_cases: 5
     contract:
       quantity: "Voltage-criterion current, differential resistance and zero-frequency voltage noise of a series array of noisy overdamped Josephson junctions."
       assumptions: "Independent junctions with independent Johnson noise at a common temperature; each junction obeys the model of steps 1-2."

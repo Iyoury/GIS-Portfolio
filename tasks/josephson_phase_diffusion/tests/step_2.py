@@ -78,13 +78,13 @@ for _t_i, _t_th in ((1.0, 0.03), (0.99, 0.05), (1.02, 0.1), (1.15, 0.5)):
     assert _t_rel(D, _t_D) < 1e-9, (_t_i, _t_th, D, _t_D)
 
 # --- test case 2: tilted states away from equilibrium (Einstein relation D = theta dv/di fails) ---
-for _t_i, _t_th in ((0.5, 0.05), (0.3, 0.2), (0.8, 0.02), (2.0, 0.3), (6.0, 0.05), (9.0, 30.0)):
+for _t_i, _t_th in ((0.5, 0.05), (0.3, 0.2), (0.8, 0.02), (2.0, 0.3), (6.0, 0.05), (9.0, 30.0), (10.0, 0.02), (10.0, 50.0)):
     D = effective_diffusion(_t_i, _t_th)
     _t_D = _t_cf(_t_i, _t_th)[2]
     assert _t_rel(D, _t_D) < 1e-9, (_t_i, _t_th, D, _t_D)
 
 # --- test case 3: mirror symmetry D(-i) = D(i) ---
-for _t_i, _t_th in ((-0.7, 0.1), (-1.0, 0.04), (-3.0, 2.0)):
+for _t_i, _t_th in ((-0.7, 0.1), (-1.0, 0.04), (-3.0, 2.0), (-10.0, 0.5)):
     D = effective_diffusion(_t_i, _t_th)
     _t_D = _t_cf(-_t_i, _t_th)[2]
     assert _t_rel(D, _t_D) < 1e-9, (_t_i, _t_th, D, _t_D)

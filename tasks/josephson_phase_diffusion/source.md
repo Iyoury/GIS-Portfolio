@@ -23,7 +23,7 @@
 
 The combination of steps (exact voltage and differential resistance, effective phase
 diffusion, location of the giant-diffusion peak, inversion of the voltage for the noise
-temperature, criterion current and voltage noise of a series array with junction-
+temperature and its thermometric sensitivity, criterion current and voltage noise of a series array with junction-
 dependent noise strengths and time scales), the parameter ranges and the accuracy
 requirements are our own design.
 
@@ -38,7 +38,8 @@ Checks used while building the task:
   truncation with tridiagonal eliminations in extended precision, gets dv/di from the
   linearized system, evaluates D_eff = theta int (1 + chi')**2 p from the Fourier
   coefficients, finds the diffusion peak by a double-precision scan followed by secant
-  iterations on high-precision differences, the noise temperature by Illinois regula falsi in 1 / theta, and the
+  iterations on high-precision differences, the noise temperature by Illinois regula falsi in 1 / theta with the thermometric
+  sensitivity from the Galerkin system differentiated in theta, and the
   criterion current by safeguarded Newton iterations on ln V.
 
 ## How the test targets are obtained
@@ -53,5 +54,6 @@ No target is copied from the reference solution. Every test computes its own tar
 | D_eff (steps 2, 3, 5, general) | homogenization: D = theta int (1 + chi')**2 p dx with the corrector chi and the density p both from continued fractions in extended precision; Fourier convolution for the average | about 1e-15 relative |
 | D_eff at i = 0 (step 2) | Lifson-Jackson, theta / I_0(1/theta)**2 | exact |
 | diffusion peak (step 3) | one Newton step on dD/di = 0 with central differences (h = 2e-5) of the continued-fraction D must move i_peak by less than 1e-6; D lower at i_peak +- 0.05 | truncation of the differences below 1e-8 |
-| noise temperature (step 4) | the voltage is generated at a known theta by the continued fraction (or the Bessel integral); the returned theta must recover it | relative 1e-7 |
+| noise temperature (step 4) | the voltage is generated at a known theta (including the endpoints 0.02 and 50) by the continued fraction (or the Bessel integral); the returned theta must recover it | relative 1e-7 |
+| thermometric sensitivity kappa (step 4) | central difference of ln v in ln theta with step 1e-15 theta, the continued fraction evaluated at 60 + 1.8 / theta digits | about 1e-15 relative |
 | array criterion (step 5, general) | one Newton step on V(J) = v_crit with V and dV/dJ from the continued fractions must move j_star by less than 1e-9 relative; r_diff and s_v compared with the continued-fraction sums; for one junction or identical junctions j_star is known from the Bessel-integral voltage | relative 1e-9 / 1e-8 |

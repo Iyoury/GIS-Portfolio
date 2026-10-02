@@ -71,15 +71,8 @@ def noise_temperature(i, v):
     # v rises monotonically with the noise strength (from the noiseless value to i), and
     # ln v is a smooth function of ln theta; ln v is used because v can be exponentially
     # small below the critical current.
-    # MUTANT: below the critical current the voltage is taken from Kramers rates,
-    # v = sqrt(1 - i**2) exp(-dU / theta) (1 - exp(-2 pi i / theta)), instead of the exact current
     def g(s):
-        t = np.exp(s)
-        if i < 1.0:
-            w = np.sqrt(1.0 - i * i)
-            dU = 2.0 * w - i * (np.pi - 2.0 * np.arcsin(i))
-            return np.log(w) - dU / t + np.log(-np.expm1(-2.0 * np.pi * i / t)) - lv
-        return np.log(mean_voltage(i, t)[0]) - lv
+        return np.log(mean_voltage(i, np.exp(s))[0]) - lv
 
     lo, hi = np.log(0.02), np.log(50.0)
     g_lo, g_hi = g(lo), g(hi)
@@ -92,6 +85,7 @@ def noise_temperature(i, v):
         theta = 50.0
     else:
         theta = float(np.exp(brentq(g, lo, hi, xtol=1e-14, rtol=1e-15)))
-    kappa = float(1.0 / _s4_dlogv_dlogtheta(i, theta))
+    # MUTANT: returns d ln(v) / d ln(theta) (the voltage response) instead of its inverse
+    kappa = float(_s4_dlogv_dlogtheta(i, theta))
     result = (theta, kappa)
     return result
