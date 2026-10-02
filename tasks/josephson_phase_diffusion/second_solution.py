@@ -181,11 +181,13 @@ def noise_temperature(i, v):
 
     lo, hi = 1.0 / 50.0, 1.0 / 0.02          # u = 1 / theta; v decreases with u
     f_lo, f_hi = f(lo), f(hi)
-    if f_lo < -1e-11 or f_hi > 1e-11:
+    v50, v002 = _g_velocity(i, 50.0)[0], _g_velocity(i, 0.02)[0]
+    # endpoint tolerance: relative 1e-11 of the voltage at the endpoint
+    if (v - v50) / v50 > 1e-11 or (v002 - v) / v002 > 1e-11:
         raise ValueError("no theta in [0.02, 50] reproduces this voltage")
-    if f_lo <= 0.0:
+    if v >= v50:
         u = lo
-    elif f_hi >= 0.0:
+    elif v <= v002:
         u = hi
     else:
         side = 0

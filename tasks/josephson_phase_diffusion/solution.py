@@ -257,13 +257,16 @@ def noise_temperature(i, v):
         return np.log(mean_voltage(i, np.exp(s))[0]) - lv
 
     lo, hi = np.log(0.02), np.log(50.0)
-    g_lo, g_hi = g(lo), g(hi)
-    tol = 1e-11                       # stated endpoint tolerance on ln v (relative 1e-11)
-    if g_lo > tol or g_hi < -tol:
-        raise ValueError("no theta in [0.02, 50] reproduces this voltage")
-    if g_lo >= 0.0:
+    # stated endpoint tolerance: a v beyond the voltage at an endpoint by at most a relative
+    # 1e-11 of that voltage returns the endpoint; farther out there is no solution
+    v_lo, v_hi = mean_voltage(i, 0.02)[0], mean_voltage(i, 50.0)[0]
+    if v <= v_lo:
+        if (v_lo - v) / v_lo > 1e-11:
+            raise ValueError("no theta in [0.02, 50] reproduces this voltage")
         theta = 0.02
-    elif g_hi <= 0.0:
+    elif v >= v_hi:
+        if (v - v_hi) / v_hi > 1e-11:
+            raise ValueError("no theta in [0.02, 50] reproduces this voltage")
         theta = 50.0
     else:
         theta = float(np.exp(brentq(g, lo, hi, xtol=1e-14, rtol=1e-15)))

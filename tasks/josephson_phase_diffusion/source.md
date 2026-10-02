@@ -90,3 +90,10 @@ relative over a 112-point grid of the range. The second solution centres the bas
 overdamped mean velocity. A sparse direct solve of the same hierarchy and a continued
 fraction over the Fourier index were tried and rejected: both lose accuracy in the running
 state at weak noise and strong inertia. Step 1 also tests the endpoint i = -10.
+
+## Version 6 changes
+
+Step 4: the endpoint tolerance is applied exactly as stated, as a relative difference of the
+voltage to the endpoint voltage (no longer through ln v), and is tested just around the
+cutoff at both endpoints (0.9e-11 accepted, 1.1e-11 rejected). Step 6: non-finite input,
+i = -2.6, theta = 2.01 and beta_c = 2.01 are tested as ValueError. Step 2: i = -10.01 too.

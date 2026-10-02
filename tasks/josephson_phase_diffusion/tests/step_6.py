@@ -131,7 +131,8 @@ _t_check_rcsj(-2.5, 2.0, 2.0)
 _t_check_rcsj(1.2, 2.0, 0.1)
 
 # --- test case 3: inputs outside the stated ranges raise ValueError ---
-for _t_bad in ((0.5, 0.3, 0.05), (2.6, 0.3, 1.0), (0.5, 0.09, 1.0)):
+for _t_bad in ((0.5, 0.3, 0.05), (2.6, 0.3, 1.0), (-2.6, 0.3, 1.0), (0.5, 0.09, 1.0), (0.5, 2.01, 1.0),
+               (0.5, 0.3, 2.01), (float("nan"), 0.3, 1.0)):
     try:
         rcsj_voltage(*_t_bad)
     except ValueError:

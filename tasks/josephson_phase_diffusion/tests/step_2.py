@@ -90,7 +90,7 @@ for _t_i, _t_th in ((-0.7, 0.1), (-1.0, 0.04), (-3.0, 2.0), (-10.0, 0.5)):
     assert _t_rel(D, _t_D) < 1e-9, (_t_i, _t_th, D, _t_D)
 
 # --- test case 4: non-finite input, |i| > 10 or theta outside [0.02, 50] raises ValueError ---
-for _t_bad in ((float("nan"), 0.1), (0.5, float("nan")), (10.01, 0.1), (0.5, 0.01), (0.5, 60.0), (0.5, -0.1)):
+for _t_bad in ((float("nan"), 0.1), (0.5, float("nan")), (10.01, 0.1), (-10.01, 0.1), (0.5, 0.01), (0.5, 60.0), (0.5, -0.1)):
     try:
         effective_diffusion(*_t_bad)
     except ValueError:
