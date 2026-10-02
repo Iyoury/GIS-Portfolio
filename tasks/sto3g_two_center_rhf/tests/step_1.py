@@ -22,7 +22,7 @@ def _t_check(n_max, t):
     for idx in np.ndindex(tt.shape):
         for n in range(n_max + 1):
             target = _t_F(n, tt[idx])
-            assert abs(F[idx + (n,)] / target - 1.0) < 1e-12, (n, tt[idx], F[idx + (n,)], target)
+            assert abs(F[idx + (n,)] / target - 1.0) < 1e-11, (n, tt[idx], F[idx + (n,)], target)
     return F
 
 

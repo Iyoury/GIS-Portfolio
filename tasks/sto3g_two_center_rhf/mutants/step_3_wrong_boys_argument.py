@@ -24,27 +24,26 @@ def sto3g_two_electron(zetaA, zetaB, R):
     alpha_one = np.array([0.109818, 0.405771, 2.22766])
     coef = np.array([0.444635, 0.535328, 0.154329])
     centers = np.array([0.0, float(R)])
-    expo = [alpha_one * zetaA ** 2, alpha_one * zetaB ** 2]
+    expo = np.array([alpha_one * zetaA ** 2, alpha_one * zetaB ** 2])          # (function, primitive)
+    # axes (i, j, k, l, pi, pj, pk, pl): functions i..l and their primitives, all at once
+    a = expo[:, None, None, None, :, None, None, None]
+    b = expo[None, :, None, None, None, :, None, None]
+    c = expo[None, None, :, None, None, None, :, None]
+    d = expo[None, None, None, :, None, None, None, :]
+    xa = centers[:, None, None, None, None, None, None, None]
+    xb = centers[None, :, None, None, None, None, None, None]
+    xc = centers[None, None, :, None, None, None, None, None]
+    xd = centers[None, None, None, :, None, None, None, None]
     w = (coef[:, None, None, None] * coef[None, :, None, None]
          * coef[None, None, :, None] * coef[None, None, None, :])
-    eri = np.zeros((2, 2, 2, 2))
-    for i in range(2):
-        for j in range(2):
-            for k in range(2):
-                for l in range(2):
-                    a = expo[i][:, None, None, None]
-                    b = expo[j][None, :, None, None]
-                    c = expo[k][None, None, :, None]
-                    d = expo[l][None, None, None, :]
-                    p = a + b
-                    q = c + d
-                    center_p = (a * centers[i] + b * centers[j]) / p
-                    center_q = (c * centers[k] + d * centers[l]) / q
-                    norm = (2.0 * a / np.pi * 2.0 * b / np.pi * 2.0 * c / np.pi * 2.0 * d / np.pi) ** 0.75
-                    gauss = np.exp(-a * b / p * (centers[i] - centers[j]) ** 2
-                                   - c * d / q * (centers[k] - centers[l]) ** 2)
-                    pre = 2.0 * np.pi ** 2.5 / (p * q * np.sqrt(p + q))
-                    # Deliberate error: the Boys argument uses (p + q) instead of p q / (p + q).
-                    val = pre * gauss * boys_function(0, (p + q) * (center_p - center_q) ** 2)[..., 0]
-                    eri[i, j, k, l] = np.sum(w * norm * val)
+    p = a + b
+    q = c + d
+    center_p = (a * xa + b * xb) / p
+    center_q = (c * xc + d * xd) / q
+    norm = (2.0 * a / np.pi * 2.0 * b / np.pi * 2.0 * c / np.pi * 2.0 * d / np.pi) ** 0.75
+    gauss = np.exp(-a * b / p * (xa - xb) ** 2 - c * d / q * (xc - xd) ** 2)
+    pre = 2.0 * np.pi ** 2.5 / (p * q * np.sqrt(p + q))
+    # MUTANT: Boys argument (p + q)|P - Q|^2 instead of p q / (p + q) |P - Q|^2
+    val = pre * gauss * boys_function(0, (p + q) * (center_p - center_q) ** 2)[..., 0]
+    eri = np.sum(w * norm * val, axis=(4, 5, 6, 7))
     return eri

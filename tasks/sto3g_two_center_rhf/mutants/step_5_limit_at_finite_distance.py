@@ -53,7 +53,7 @@ def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
     # grid R = k h. The domain is widened (inner wall moved in, outer wall moved out) until
     # the five lowest levels no longer change, so diffuse states are not cut off.
     mu = massA * massB / (massA + massB) * 1822.888486209
-    h = 0.02
+    h = 0.03
     cache = {}
 
     def V(k):
@@ -72,7 +72,7 @@ def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
         E = np.linalg.eigvalsh(T + np.diag(Vd))
         return Vd, E[E < 0.0]
 
-    domains = [(18, 800), (12, 1200), (8, 1800), (5, 2700)]   # [0.36, 16], [0.24, 24], ...
+    domains = [(12, 533), (9, 667), (6, 900), (4, 1200)]     # [0.36, 16], [0.27, 20], [0.18, 27], [0.12, 36]
     bound = None
     for k_lo, k_hi in domains:
         Vd, cur = solve(k_lo, k_hi)

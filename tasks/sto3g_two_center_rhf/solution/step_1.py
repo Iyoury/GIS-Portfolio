@@ -13,7 +13,7 @@ def boys_function(n_max, t):
 
     Output:
       F: float numpy array of shape np.shape(t) + (n_max + 1,), F[..., n] = F_n(t).
-         Relative error below 1e-12 for every entry; F_n(0) = 1 / (2n + 1).
+         Relative error below 1e-11 for every entry; F_n(0) = 1 / (2n + 1).
 
     Raises:
       ValueError if n_max is not an integer in [0, 16], or if any t is negative, not finite

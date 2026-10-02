@@ -13,7 +13,7 @@ def boys_function(n_max, t):
 
     Output:
       F: float numpy array of shape np.shape(t) + (n_max + 1,), F[..., n] = F_n(t).
-         Relative error below 1e-12 for every entry; F_n(0) = 1 / (2n + 1).
+         Relative error below 1e-11 for every entry; F_n(0) = 1 / (2n + 1).
 
     Raises:
       ValueError if n_max is not an integer in [0, 16], or if any t is negative, not finite
@@ -80,26 +80,25 @@ def sto3g_one_electron(ZA, ZB, zetaA, zetaB, R):
     coef = np.array([0.444635, 0.535328, 0.154329])
     centers = np.array([0.0, float(R)])
     charges = np.array([float(ZA), float(ZB)])
-    expo = [alpha_one * zetaA ** 2, alpha_one * zetaB ** 2]
-    S = np.zeros((2, 2))
-    H = np.zeros((2, 2))
-    for m in range(2):
-        for n in range(2):
-            a = expo[m][:, None]
-            b = expo[n][None, :]
-            p = a + b
-            mu = a * b / p
-            dist2 = (centers[m] - centers[n]) ** 2
-            norm = (2.0 * a / np.pi) ** 0.75 * (2.0 * b / np.pi) ** 0.75
-            weight = coef[:, None] * coef[None, :] * norm * np.exp(-mu * dist2)
-            center_p = (a * centers[m] + b * centers[n]) / p
-            overlap = (np.pi / p) ** 1.5
-            kinetic = mu * (3.0 - 2.0 * mu * dist2) * (np.pi / p) ** 1.5
-            attract = np.zeros_like(p)
-            for C in range(2):
-                attract -= 2.0 * np.pi / p * charges[C] * boys_function(0, p * (center_p - centers[C]) ** 2)[..., 0]
-            S[m, n] = np.sum(weight * overlap)
-            H[m, n] = np.sum(weight * (kinetic + attract))
+    expo = np.array([alpha_one * zetaA ** 2, alpha_one * zetaB ** 2])          # (function, primitive)
+    # all primitive pairs at once, axes (m, n, i, j): primitive i of function m, j of function n
+    a = expo[:, None, :, None]
+    b = expo[None, :, None, :]
+    xa = centers[:, None, None, None]
+    xb = centers[None, :, None, None]
+    p = a + b
+    mu = a * b / p
+    dist2 = (xa - xb) ** 2
+    norm = (2.0 * a / np.pi) ** 0.75 * (2.0 * b / np.pi) ** 0.75
+    weight = coef[None, None, :, None] * coef[None, None, None, :] * norm * np.exp(-mu * dist2)
+    center_p = (a * xa + b * xb) / p
+    overlap = (np.pi / p) ** 1.5
+    kinetic = mu * (3.0 - 2.0 * mu * dist2) * (np.pi / p) ** 1.5
+    # attraction to both nuclei, one Boys evaluation for every primitive pair and nucleus
+    F0 = boys_function(0, p[..., None] * (center_p[..., None] - centers) ** 2)[..., 0]
+    attract = -2.0 * np.pi / p * np.sum(charges * F0, axis=-1)
+    S = np.sum(weight * overlap, axis=(2, 3))
+    H = np.sum(weight * (kinetic + attract), axis=(2, 3))
     return S, H
 
 
@@ -123,28 +122,27 @@ def sto3g_two_electron(zetaA, zetaB, R):
     alpha_one = np.array([0.109818, 0.405771, 2.22766])
     coef = np.array([0.444635, 0.535328, 0.154329])
     centers = np.array([0.0, float(R)])
-    expo = [alpha_one * zetaA ** 2, alpha_one * zetaB ** 2]
+    expo = np.array([alpha_one * zetaA ** 2, alpha_one * zetaB ** 2])          # (function, primitive)
+    # axes (i, j, k, l, pi, pj, pk, pl): functions i..l and their primitives, all at once
+    a = expo[:, None, None, None, :, None, None, None]
+    b = expo[None, :, None, None, None, :, None, None]
+    c = expo[None, None, :, None, None, None, :, None]
+    d = expo[None, None, None, :, None, None, None, :]
+    xa = centers[:, None, None, None, None, None, None, None]
+    xb = centers[None, :, None, None, None, None, None, None]
+    xc = centers[None, None, :, None, None, None, None, None]
+    xd = centers[None, None, None, :, None, None, None, None]
     w = (coef[:, None, None, None] * coef[None, :, None, None]
          * coef[None, None, :, None] * coef[None, None, None, :])
-    eri = np.zeros((2, 2, 2, 2))
-    for i in range(2):
-        for j in range(2):
-            for k in range(2):
-                for l in range(2):
-                    a = expo[i][:, None, None, None]
-                    b = expo[j][None, :, None, None]
-                    c = expo[k][None, None, :, None]
-                    d = expo[l][None, None, None, :]
-                    p = a + b
-                    q = c + d
-                    center_p = (a * centers[i] + b * centers[j]) / p
-                    center_q = (c * centers[k] + d * centers[l]) / q
-                    norm = (2.0 * a / np.pi * 2.0 * b / np.pi * 2.0 * c / np.pi * 2.0 * d / np.pi) ** 0.75
-                    gauss = np.exp(-a * b / p * (centers[i] - centers[j]) ** 2
-                                   - c * d / q * (centers[k] - centers[l]) ** 2)
-                    pre = 2.0 * np.pi ** 2.5 / (p * q * np.sqrt(p + q))
-                    val = pre * gauss * boys_function(0, p * q / (p + q) * (center_p - center_q) ** 2)[..., 0]
-                    eri[i, j, k, l] = np.sum(w * norm * val)
+    p = a + b
+    q = c + d
+    center_p = (a * xa + b * xb) / p
+    center_q = (c * xc + d * xd) / q
+    norm = (2.0 * a / np.pi * 2.0 * b / np.pi * 2.0 * c / np.pi * 2.0 * d / np.pi) ** 0.75
+    gauss = np.exp(-a * b / p * (xa - xb) ** 2 - c * d / q * (xc - xd) ** 2)
+    pre = 2.0 * np.pi ** 2.5 / (p * q * np.sqrt(p + q))
+    val = pre * gauss * boys_function(0, p * q / (p + q) * (center_p - center_q) ** 2)[..., 0]
+    eri = np.sum(w * norm * val, axis=(4, 5, 6, 7))
     return eri
 
 
@@ -177,14 +175,14 @@ def fci_energy(ZA, ZB, zetaA, zetaB, R):
         P_new = 2.0 * np.outer(C[:, 0], C[:, 0])
         change = np.max(np.abs(P_new - P))
         P = P_new
-        if change < 1e-14:
+        if change < 1e-11:          # the energy error is quadratic in the density error
             break
     F = H + np.einsum('ls,mnsl->mn', P, eri) - 0.5 * np.einsum('ls,mlsn->mn', P, eri)
     E_rhf = float(0.5 * np.sum(P * (H + F)) + enuc)
     # Full CI: singlet configuration state functions in the orthonormal RHF orbitals
     # (1 = occupied, 2 = virtual): |1 1|, |2 2| and the open-shell singlet (1 2).
     h = C.T @ H @ C
-    g = np.einsum('pi,qj,rk,sl,pqrs->ijkl', C, C, C, C, eri)
+    g = np.einsum('pi,qj,rk,sl,pqrs->ijkl', C, C, C, C, eri, optimize=True)
     M = np.empty((3, 3))
     M[0, 0] = 2.0 * h[0, 0] + g[0, 0, 0, 0]
     M[1, 1] = 2.0 * h[1, 1] + g[1, 1, 1, 1]
@@ -247,7 +245,7 @@ def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
     # grid R = k h. The domain is widened (inner wall moved in, outer wall moved out) until
     # the five lowest levels no longer change, so diffuse states are not cut off.
     mu = massA * massB / (massA + massB) * 1822.888486209
-    h = 0.02
+    h = 0.03
     cache = {}
 
     def V(k):
@@ -266,7 +264,7 @@ def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
         E = np.linalg.eigvalsh(T + np.diag(Vd))
         return Vd, E[E < 0.0]
 
-    domains = [(18, 800), (12, 1200), (8, 1800), (5, 2700)]   # [0.36, 16], [0.24, 24], ...
+    domains = [(12, 533), (9, 667), (6, 900), (4, 1200)]     # [0.36, 16], [0.27, 20], [0.18, 27], [0.12, 36]
     bound = None
     for k_lo, k_hi in domains:
         Vd, cur = solve(k_lo, k_hi)

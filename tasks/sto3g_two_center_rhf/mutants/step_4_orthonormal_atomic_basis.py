@@ -33,7 +33,7 @@ def fci_energy(ZA, ZB, zetaA, zetaB, R):
         P_new = 2.0 * np.outer(C[:, 0], C[:, 0])
         change = np.max(np.abs(P_new - P))
         P = P_new
-        if change < 1e-14:
+        if change < 1e-11:          # the energy error is quadratic in the density error
             break
     F = H + np.einsum('ls,mnsl->mn', P, eri) - 0.5 * np.einsum('ls,mlsn->mn', P, eri)
     E_rhf = float(0.5 * np.sum(P * (H + F)) + enuc)

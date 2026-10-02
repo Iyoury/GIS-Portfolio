@@ -10,7 +10,7 @@ from scipy.integrate import quad as _t_quad
 #   (no orbitals, no configuration state functions);
 # - dissociation limit: one-centre integrals by adaptive radial quadrature of the
 #   Gaussian expansion (no closed forms);
-# - levels: Numerov shooting with node counting and bisection on a fine grid.
+# - levels: finite differences on three fine grids, extrapolated twice by Richardson.
 _T_A = np.array([0.109818, 0.405771, 2.22766])
 _T_D = np.array([0.444635, 0.535328, 0.154329])
 _T_CM = 219474.6313632
@@ -104,7 +104,17 @@ def _t_atom(Z, zeta):
     return s, t + v, j
 
 
+_T_LIMIT_CACHE = {}
+
+
 def _t_limit(ZA, ZB, za, zb):
+    key = (ZA, ZB, za, zb)
+    if key not in _T_LIMIT_CACHE:
+        _T_LIMIT_CACHE[key] = _t_limit_raw(ZA, ZB, za, zb)
+    return _T_LIMIT_CACHE[key]
+
+
+def _t_limit_raw(ZA, ZB, za, zb):
     # lowest separated-fragment arrangement and the product of the fragment charges
     sA, hA, jA = _t_atom(ZA, za)
     sB, hB, jB = _t_atom(ZB, zb)
@@ -114,49 +124,23 @@ def _t_limit(ZA, ZB, za, zb):
 
 
 def _t_numerov_levels(ZA, ZB, za, zb, mA, mB, nlev=5, h=0.004, r0=0.25, r1=22.0):
-    # Numerov on step h and 2h, Richardson-extrapolated (error O(h**4))
-    e_inf = _t_limit(ZA, ZB, za, zb)[0]
-    R = np.arange(r0, r1 + 0.5 * h, h)
-    V = _t_curve(ZA, ZB, za, zb, R) - e_inf
-    fine = _t_numerov(R, V, mA, mB, h, nlev)
-    coarse = _t_numerov(R[::2], V[::2], mA, mB, 2 * h, nlev)
-    return fine + (fine - coarse) / 15.0
-
-
-def _t_numerov(R, V, mA, mB, h, nlev):
+    # second-order finite differences of the radial equation on steps h, h/2 and h/4
+    # (tridiagonal eigenproblems, Dirichlet walls), extrapolated twice by Richardson (error O(h**6))
+    from scipy.linalg import eigh_tridiagonal as _t_eigt
     mu = mA * mB / (mA + mB) * _T_ME
-    c = h * h / 12.0 * 2 * mu
-
-    def nodes(E):
-        # renormalized Numerov (ratio form) from the inner wall; number of sign changes
-        k = c * (E - V)
-        w = 1 + k
-        ratio = 0.0
-        count = 0
-        U = 1e-30
-        y_prev, y = 0.0, 1e-30
-        for i in range(1, R.size - 1):
-            y_next = ((12 - 10 * w[i]) * y - w[i - 1] * y_prev) / w[i + 1]
-            if y_next * y < 0:
-                count += 1
-            if abs(y_next) > 1e100:
-                y_next *= 1e-100
-                y *= 1e-100
-            y_prev, y = y, y_next
-        return count
-
+    e_inf = _t_limit(ZA, ZB, za, zb)[0]
+    R = np.arange(r0, r1 + 0.125 * h, 0.25 * h)
+    V = _t_curve(ZA, ZB, za, zb, R) - e_inf
     out = []
-    lo_all = float(np.min(V))
-    for v in range(nlev):
-        lo, hi = lo_all, 0.0
-        for _ in range(46):
-            mid = 0.5 * (lo + hi)
-            if nodes(mid) > v:
-                hi = mid
-            else:
-                lo = mid
-        out.append(0.5 * (lo + hi))
-    return np.array(out) * _T_CM
+    for k in (4, 2, 1):
+        step = 0.25 * h * k
+        Vk = V[k::k][:-1]                              # interior points of the coarser grid
+        diag = 1.0 / (mu * step * step) + Vk
+        off = np.full(Vk.size - 1, -0.5 / (mu * step * step))
+        out.append(_t_eigt(diag, off, select="i", select_range=(0, nlev - 1), eigvals_only=True))
+    r1_ = (4.0 * out[1] - out[0]) / 3.0
+    r2_ = (4.0 * out[2] - out[1]) / 3.0
+    return (16.0 * r2_ - r1_) / 15.0 * _T_CM
 
 
 _T_MH, _T_MD, _T_MHE = 1.00782503207, 2.01410177812, 4.00260325413

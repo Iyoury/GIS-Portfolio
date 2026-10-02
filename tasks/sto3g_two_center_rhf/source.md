@@ -99,3 +99,15 @@ in the 8-function basis STO-3G 1s + one Cartesian p shell per atom.
   to a solution 0.06-0.33 hartree too high for diffuse p shells, and the lowest eigenvalue
   of the full product space is a triplet 2e-7 hartree below the singlet at R = 10. The
   full-CI oracles of steps 4 and 5 were also restricted to singlet functions.
+
+## Version 8 changes
+
+Step 1: the stated and tested relative tolerance is 1e-11 (a 1e-12 tolerance left no room
+for a result perturbed at the 1e-12 level). Step 5 runtime cut from about 270 s to about
+70 s: the integrals of steps 2 and 3 are evaluated in one vectorized pass (identical results
+to 1e-15), the SCF of step 4 stops at a density change of 1e-11 (energies identical to
+4e-15), the sinc-DVR step is 0.03 bohr (levels within 3e-9 cm^-1 of the 0.02 bohr grid on
+the hardest test cases) with the domain widened [0.36, 16] -> [0.27, 20] -> ..., and the
+test oracle for the levels uses second-order finite differences on steps 0.004, 0.002 and
+0.001 bohr with two Richardson extrapolations (tridiagonal eigenproblems) instead of
+Numerov shooting in pure Python.

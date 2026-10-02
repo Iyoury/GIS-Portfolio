@@ -33,14 +33,14 @@ def fci_energy(ZA, ZB, zetaA, zetaB, R):
         P_new = 2.0 * np.outer(C[:, 0], C[:, 0])
         change = np.max(np.abs(P_new - P))
         P = P_new
-        if change < 1e-14:
+        if change < 1e-11:          # the energy error is quadratic in the density error
             break
     F = H + np.einsum('ls,mnsl->mn', P, eri) - 0.5 * np.einsum('ls,mlsn->mn', P, eri)
     E_rhf = float(0.5 * np.sum(P * (H + F)) + enuc)
     # Full CI: singlet configuration state functions in the orthonormal RHF orbitals
     # (1 = occupied, 2 = virtual): |1 1|, |2 2| and the open-shell singlet (1 2).
     h = C.T @ H @ C
-    g = np.einsum('pi,qj,rk,sl,pqrs->ijkl', C, C, C, C, eri)
+    g = np.einsum('pi,qj,rk,sl,pqrs->ijkl', C, C, C, C, eri, optimize=True)
     M = np.empty((3, 3))
     M[0, 0] = 2.0 * h[0, 0] + g[0, 0, 0, 0]
     M[1, 1] = 2.0 * h[1, 1] + g[1, 1, 1, 1]

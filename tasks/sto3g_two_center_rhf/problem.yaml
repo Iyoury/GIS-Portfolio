@@ -58,7 +58,7 @@ sub_steps:
         F_n(t) = integral from u = 0 to 1 of u**(2n) exp(-t * u**2) du,   t >= 0, n = 0, 1, 2, ...
       They appear in every Coulomb integral over Gaussian functions; integrals over functions
       with angular momentum need F_n for several n at the same argument. Write a function that
-      returns F_0(t), ..., F_(n_max)(t) together, each with a relative error below 1e-12, for
+      returns F_0(t), ..., F_(n_max)(t) together, each with a relative error below 1e-11, for
       every integer n_max from 0 to 16 and every t from 0 to 1e6 (including t = 0, very small t,
       and the whole range in between). The input t is a float or a numpy array of any shape;
       return a float numpy array of shape np.shape(t) + (n_max + 1,), with F[..., n] = F_n(t).
@@ -74,7 +74,7 @@ sub_steps:
 
           Output:
             F: float numpy array of shape np.shape(t) + (n_max + 1,), F[..., n] = F_n(t).
-               Relative error below 1e-12 for every entry; F_n(0) = 1 / (2n + 1).
+               Relative error below 1e-11 for every entry; F_n(0) = 1 / (2n + 1).
 
           Raises:
             ValueError if n_max is not an integer in [0, 16], or if any t is negative, not finite
