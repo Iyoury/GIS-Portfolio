@@ -259,3 +259,49 @@ def array_criterion(ics, rs, theta0, v_crit):
     s_v = float(sum(2.0 * ck * rk * _g_diffusion(j_star / ck, tk) for ck, rk, tk in zip(c, r, th)))
     result = (j_star, r_diff, s_v)
     return result
+
+
+def rcsj_voltage(i, theta, beta_c):
+    '''Stationary dc voltage and differential resistance of a noisy junction with capacitance (RCSJ).'''
+    # Other route: the Kramers equation in Hermite functions centred at the overdamped mean
+    # velocity (shifted basis, so the truncated system differs from an expansion about v = 0),
+    # solved by a matrix continued fraction; dv/di from a five-point stencil.
+    i = float(i)
+    theta = float(theta)
+    beta_c = float(beta_c)
+    if not (np.isfinite(i) and np.isfinite(theta) and np.isfinite(beta_c)):
+        raise ValueError("inputs must be finite")
+    if abs(i) > 2.5 or not (0.1 <= theta <= 2.0) or not (beta_c == 0.0 or 0.1 <= beta_c <= 2.0):
+        raise ValueError("need |i| <= 2.5, 0.1 <= theta <= 2 and beta_c = 0 or 0.1 <= beta_c <= 2")
+    if beta_c == 0.0:
+        return mean_voltage(i, theta)
+    vth = np.sqrt(theta / beta_c)
+    gam = 1.0 / beta_c
+    P, N = 105, 190
+    ps = np.arange(-P, P + 1)
+    M = ps.size
+
+    def velocity(x):
+        if x == 0.0:
+            return 0.0
+        v0 = _g_velocity(x, theta)[0]          # overdamped mean velocity as the centre
+        D = np.diag(vth * 1j * ps)
+        Fm = np.diag(np.full(M, (x - v0) / beta_c, dtype=complex))
+        Fm += np.diag(np.full(M - 1, -1.0 / (2j * beta_c)), -1) + np.diag(np.full(M - 1, 1.0 / (2j * beta_c)), 1)
+        Dh = D - Fm / vth
+        V0 = np.diag(v0 * 1j * ps)
+        S = np.zeros((M, M), complex)
+        for n in range(N, 0, -1):
+            S = -np.linalg.solve(gam * n * np.eye(M) + V0 + np.sqrt(n + 1) * D @ S, np.sqrt(n) * Dh)
+        Q = V0 + D @ S
+        rows = [k for k in range(M) if k != P]
+        c0 = np.zeros(M, complex)
+        c0[P] = 1.0
+        c0[rows] = np.linalg.solve(Q[np.ix_(rows, rows)], -Q[np.ix_(rows, [P])][:, 0])
+        return float(v0 + vth * (S @ c0)[P].real)
+
+    h = 1e-3
+    r_d = (-velocity(i + 2 * h) + 8 * velocity(i + h) - 8 * velocity(i - h) + velocity(i - 2 * h)) / (12 * h)
+    result = (velocity(i), float(r_d))
+    return result
+

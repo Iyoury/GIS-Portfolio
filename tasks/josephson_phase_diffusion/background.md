@@ -60,3 +60,16 @@ criterion, which then depends on temperature and on the criterion itself. The ze
 frequency voltage noise of each junction follows from its phase diffusion: the
 accumulated phase is (2e / hbar) times the time integral of the voltage, and the reduced
 time of junction k runs at the rate 2 e I_ck R_k / hbar.
+
+## Junctions with capacitance
+
+A real junction also has a capacitance C, which gives the phase a mass: the RCSJ model
+beta_c phi'' + phi' + sin(phi) = i + noise, with the Stewart-McCumber parameter
+beta_c = 2 e I_c R**2 C / hbar. Without noise and for beta_c of order one or larger, a locked
+and a running state coexist over a range of bias (hysteresis, retrapping current). With
+noise the stationary state is unique: its distribution of phase and phase velocity solves a
+Kramers equation, and the dc voltage is its mean velocity. There is no closed formula; the
+standard exact numerical route expands the velocity dependence in Hermite functions and the
+phase dependence in Fourier modes and solves the resulting hierarchy by matrix continued
+fractions (Risken; Vollmer and Risken). The overdamped Ambegaokar-Halperin result is the
+limit beta_c -> 0.

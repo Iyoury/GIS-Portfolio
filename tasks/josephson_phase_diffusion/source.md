@@ -18,8 +18,14 @@
 - S. Lifson and J. L. Jackson, "On the self-diffusion of ions in a polyelectrolyte
   solution", Journal of Chemical Physics 36, 2410-2414 (1962). Diffusion in an untilted
   periodic potential.
-- H. Risken, The Fokker-Planck Equation, 2nd ed. (Springer, 1989), chapter 11. Brownian
-  motion in periodic potentials, matrix continued fractions.
+- H. Risken, The Fokker-Planck Equation, 2nd ed. (Springer, 1989), chapters 10 and 11.
+  Kramers equation, Brinkman hierarchy, Brownian motion in periodic potentials, matrix
+  continued fractions.
+- H. D. Vollmer and H. Risken, "Eigenvalues and their connection to transition rates for
+  the Fokker-Planck equation with a periodic potential", Zeitschrift fur Physik B 52,
+  259-266 (1983). Noisy underdamped junction (RCSJ) by matrix continued fractions.
+- W. C. Stewart, Applied Physics Letters 12, 277 (1968), and D. E. McCumber, Journal of
+  Applied Physics 39, 3113 (1968). The RCSJ model and the parameter beta_c.
 
 The combination of steps (exact voltage and differential resistance, effective phase
 diffusion, location of the giant-diffusion peak, inversion of the voltage for the noise
@@ -70,3 +76,17 @@ relative 1e-11 beyond the voltage at theta = 0.02 or 50 returns that endpoint; f
 raises ValueError) and is tested on both sides (1e-12 accepted, 1e-9 rejected). Step 5: the
 validation tests cover 2-D arrays, empty arrays, a NaN entry, a zero resistance, theta0 / c_k
 above 50 and v_crit = 0, and three more computed-value cases were added.
+
+## Version 5 changes (difficulty increase)
+
+New final step 6: exact stationary voltage and differential resistance of the noisy
+junction with capacitance (RCSJ), |i| <= 2.5, 0.1 <= theta <= 2, beta_c = 0 or 0.1 to 2.
+The reference solves the Kramers equation in Hermite functions (velocity) and Fourier
+modes (phase) by a matrix continued fraction over the Hermite index (N = 160, |p| <= 100);
+it is converged to 6e-9 relative against N = 260, |p| <= 140 on 36 random points of the
+whole range. The test oracle expands in Hermite functions centred at a different velocity
+v0 = 0.6 i (a different truncated system) with N = 220, |p| <= 110; the two agree to 6e-10
+relative over a 112-point grid of the range. The second solution centres the basis at the
+overdamped mean velocity. A sparse direct solve of the same hierarchy and a continued
+fraction over the Fourier index were tried and rejected: both lose accuracy in the running
+state at weak noise and strong inertia. Step 1 also tests the endpoint i = -10.

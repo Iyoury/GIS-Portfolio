@@ -31,36 +31,30 @@ problem_description_main: |-
   initial phase. We compute the exact mean voltage and differential resistance, the
   effective phase diffusion, the bias at which phase diffusion is largest, the noise
   temperature inferred from a measured voltage (with its thermometric sensitivity), and the criterion current, differential
-  resistance and voltage noise of a series array of different junctions. Unless stated
+  resistance and voltage noise of a series array of different junctions, and finally the
+  exact voltage of a junction with capacitance (inertia), where no closed formula exists. Unless stated
   otherwise, currents are in units of I_c, voltages in units of I_c R and theta is
   dimensionless; the valid model ranges are |i| <= 10 and 0.02 <= theta <= 50.
 
 problem_io: |-
-  def array_criterion(ics, rs, theta0, v_crit):
-      '''Criterion current, differential resistance and voltage noise of a series junction array.
+  def rcsj_voltage(i, theta, beta_c):
+      '''Stationary dc voltage and differential resistance of a noisy junction with capacitance (RCSJ).
 
       Inputs:
-        ics: 1-D array of critical currents c_k in units of I_0, finite, > 0,
-             max(ics) / min(ics) <= 5.
-        rs: 1-D array of the same length, normal resistances r_k in units of R_0, finite, > 0.
-        theta0: float, k_B T / E_J0 with E_J0 = hbar I_0 / (2 e); every theta0 / c_k must
-                lie in [0.02, 50].
-        v_crit: float, voltage criterion in units of I_0 R_0,
-                0 < v_crit <= 0.5 * sum(c_k * r_k).
+        i: float, reduced bias current I / I_c, |i| <= 2.5.
+        theta: float, noise strength k_B T / E_J, 0.1 <= theta <= 2.
+        beta_c: float, Stewart-McCumber parameter 2 e I_c R**2 C / hbar; beta_c == 0
+                (overdamped, no capacitance) or 0.1 <= beta_c <= 2.
 
       Output:
-        (j_star, r_diff, s_v): tuple of three Python floats.
-          j_star: bias current (units of I_0) at which the mean array voltage equals v_crit.
-          r_diff: differential resistance dV/dJ of the array at j_star (units of R_0).
-          s_v: lim_{t->inf} Var(int_0^t V dt') / t at j_star, the zero-frequency (two-sided)
-               voltage noise, in units of (hbar / 2e) I_0 R_0.
-          Relative errors below 1e-9 (j_star) and 1e-8 (r_diff, s_v).
+        (v, r_d): tuple of two Python floats.
+          v: mean phase velocity lim <phi(tau)> / tau = <V> / (I_c R) in the stationary state,
+             relative error below 1e-7 (v = 0.0 exactly at i = 0).
+          r_d: differential resistance dv/di (units of R), relative error below 1e-5.
 
       Raises:
-        ValueError if ics and rs are not 1-D arrays of the same nonzero length, if an entry
-        is not finite and positive, if max(ics) / min(ics) > 5, if theta0 is not finite and
-        positive or a ratio theta0 / c_k is outside [0.02, 50], or if v_crit is not in
-        (0, 0.5 * sum(c_k * r_k)].
+        ValueError if an input is not finite, if |i| > 2.5, if theta is outside [0.1, 2], or
+        if beta_c is neither 0 nor in [0.1, 2].
       '''
 
 general_tests: tests/general.py
@@ -68,12 +62,12 @@ general_tests: tests/general.py
 second_solution: second_solution.py
 
 mutants:
-  - name: whole_task_common_noise_strength
-    description: "Gives every junction of the array the noise strength theta0 instead of theta0 / c_k (the Josephson energy is proportional to the critical current), so the criterion current, resistance and noise of arrays with different junctions are wrong."
-    file: mutants/whole_task_common_noise_strength.py
+  - name: whole_task_velocity_noise_not_scaled
+    description: "In the junction with capacitance the velocity noise is taken as theta / beta_c instead of theta / beta_c**2 (thermal velocity sqrt(theta) instead of sqrt(theta / beta_c)), so the stationary distribution and the voltage are wrong."
+    file: mutants/whole_task_velocity_noise_not_scaled.py
 
 # On a new version of an uploaded task only, what kind of edit it is.
-edit_label: grading_fix
+edit_label: difficulty_increase
 
 sub_steps:
   - step_number: 1
@@ -404,3 +398,82 @@ sub_steps:
       - name: squared_voltage_scale
         description: "Scales each junction's phase diffusion by (c_k r_k)**2 and ignores that each junction has its own reduced time unit."
         file: mutants/step_5_squared_voltage_scale.py
+
+  - step_number: 6
+    scaffold: steps/step_6.py
+    solution: solution/step_6.py
+    tests: tests/step_6.py
+    step_description_prompt: |-
+      Add the junction capacitance C (RCSJ model). The phase now obeys
+
+        (hbar C / 2e) d2phi/dt2 + (hbar / 2e R) dphi/dt + I_c sin(phi) = I + I_N(t),
+
+      with the same Johnson noise current I_N of the resistor. In the reduced time tau of the
+      model this is
+
+        beta_c d2phi/dtau2 + dphi/dtau = i - sin(phi) + xi(tau),  <xi(tau) xi(tau')> = 2 theta delta(tau - tau'),
+
+      with the Stewart-McCumber parameter beta_c = 2 e I_c R**2 C / hbar. The phase is now a
+      Brownian particle with mass beta_c in the tilted washboard, and its state is the pair
+      (phi, dphi/dtau). Without noise and for beta_c of order one or larger the current-voltage
+      curve is hysteretic (a locked and a running state coexist); with noise the stationary state
+      is unique and the dc voltage is its mean phase velocity. Compute that stationary
+      v = lim <phi(tau)> / tau exactly (no Kramers, small-noise or small-beta_c approximation) and
+      the differential resistance r_d = dv/di. beta_c = 0 is the overdamped junction of
+      mean_voltage (step 1). v is odd and r_d is even in i; at i = 0 return v = 0.0 exactly.
+
+      Inputs: i (float, |i| <= 2.5), theta (float, 0.1 <= theta <= 2) and beta_c (float, either
+      exactly 0 or 0.1 <= beta_c <= 2). Return the tuple (v, r_d) of two Python floats, v with a
+      relative error below 1e-7 and r_d with a relative error below 1e-5.
+      Errors: raise ValueError if an input is not finite, if |i| > 2.5, if theta is outside
+      [0.1, 2], or if beta_c is neither 0 nor in [0.1, 2].
+    function_header: |-
+      def rcsj_voltage(i, theta, beta_c):
+          '''Stationary dc voltage and differential resistance of a noisy junction with capacitance (RCSJ).
+
+          Inputs:
+            i: float, reduced bias current I / I_c, |i| <= 2.5.
+            theta: float, noise strength k_B T / E_J, 0.1 <= theta <= 2.
+            beta_c: float, Stewart-McCumber parameter 2 e I_c R**2 C / hbar; beta_c == 0
+                    (overdamped, no capacitance) or 0.1 <= beta_c <= 2.
+
+          Output:
+            (v, r_d): tuple of two Python floats.
+              v: mean phase velocity lim <phi(tau)> / tau = <V> / (I_c R) in the stationary state,
+                 relative error below 1e-7 (v = 0.0 exactly at i = 0).
+              r_d: differential resistance dv/di (units of R), relative error below 1e-5.
+
+          Raises:
+            ValueError if an input is not finite, if |i| > 2.5, if theta is outside [0.1, 2], or
+            if beta_c is neither 0 nor in [0.1, 2].
+          '''
+    return_line: return result
+    step_background: |-
+      The probability density W(phi, v) of phase and phase velocity obeys a Kramers (Klein-Kramers)
+      equation, a Fokker-Planck equation in two variables with no closed-form stationary solution
+      for the periodic potential. In the running state the velocity distribution is centred near
+      v = i and is narrow, of thermal width sqrt(theta / beta_c); in the locked state it is centred
+      at v = 0. Solutions that represent the velocity dependence on a fixed grid or in a basis
+      must be converged in both the velocity and the phase resolution, which is hardest for large
+      beta_c, weak noise and strong bias (Risken, chapter 11, matrix continued fractions; Vollmer
+      and Risken for the noisy RCSJ junction). As beta_c -> 0 the result goes to the
+      Ambegaokar-Halperin voltage of step 1.
+    n_test_cases: 4
+    contract:
+      quantity: "Exact stationary mean voltage and differential resistance of an underdamped (RCSJ) Josephson junction with thermal noise."
+      assumptions: "RCSJ model with Johnson noise of the shunt resistor, stationary state of the Kramers equation, no small-noise or small-capacitance approximation; beta_c = 0 is the overdamped model of step 1."
+      result_kind: exact
+      valid_input_ranges: "|i| <= 2.5, 0.1 <= theta <= 2, beta_c = 0 or 0.1 <= beta_c <= 2."
+      units: "v in units of I_c R, r_d in units of R."
+      output_shape: "Tuple of two Python floats."
+      step_dependencies: [1]
+    mutants:
+      - name: no_inertia
+        description: "Ignores the capacitance and returns the overdamped voltage of step 1 for every beta_c."
+        file: mutants/step_6_no_inertia.py
+      - name: velocity_noise_not_scaled
+        description: "Takes the thermal velocity as sqrt(theta) instead of sqrt(theta / beta_c)."
+        file: mutants/step_6_velocity_noise_not_scaled.py
+      - name: missing_thermal_velocity
+        description: "Reads the mean velocity from the first Hermite coefficient without the thermal-velocity scale."
+        file: mutants/step_6_missing_thermal_velocity.py

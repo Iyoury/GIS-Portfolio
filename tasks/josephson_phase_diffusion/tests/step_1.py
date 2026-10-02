@@ -89,7 +89,7 @@ for _t_th in (0.02, 0.1, 1.0, 40.0):
     assert _t_rel(out[1], _t_lin) < 1e-8, (_t_th, out, _t_lin)
 
 # --- test case 3: reversed bias, strong bias and very strong noise; noiseless and ohmic bounds ---
-for _t_i, _t_th in ((-0.7, 0.15), (-4.0, 0.05), (10.0, 0.02), (7.5, 50.0), (-1.0, 0.02)):
+for _t_i, _t_th in ((-0.7, 0.15), (-4.0, 0.05), (10.0, 0.02), (7.5, 50.0), (-1.0, 0.02), (-10.0, 0.5)):
     out = mean_voltage(_t_i, _t_th)
     _t_v, _t_dv = _t_cf(_t_i, _t_th, want_D=False)
     assert _t_rel(out[0], _t_v) < 1e-9, (_t_i, _t_th, out, _t_v)

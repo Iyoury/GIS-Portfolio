@@ -106,10 +106,35 @@ def _t_check_rcsj(i, theta, beta_c):
     return out
 
 
-# --- test case 0: intermediate inertia and noise, positive and negative bias ---
-_t_check_rcsj(0.9, 0.2, 1.0)
-_t_check_rcsj(-0.4, 0.15, 1.5)
+# --- test case 0: strong inertia and weak noise (beta_c = 2, theta = 0.1): locked, mixed and
+# running regimes, where the noiseless junction would be hysteretic ---
+_t_o = _t_check_rcsj(0.7, 0.1, 2.0)
+_t_check_rcsj(1.0, 0.1, 2.0)
+_t_r = _t_check_rcsj(2.5, 0.1, 2.0)
+assert np.sqrt(2.5 ** 2 - 1.0) < _t_r[0] < 2.5
 
-# --- test case 1: strong inertia near the critical current, and strong noise ---
-_t_check_rcsj(1.1, 0.12, 1.8)
-_t_check_rcsj(1.6, 1.0, 0.5)
+# --- test case 1: weak inertia (beta_c = 0.1), reversed bias, and the overdamped limit beta_c = 0,
+# which is the junction of step 1 (independent continued fraction of the overdamped equation) ---
+_t_check_rcsj(-1.3, 0.5, 0.1)
+_t_o = rcsj_voltage(0.8, 0.3, 0.0)
+_t_v, _t_dv = _t_cf(0.8, 0.3, want_D=False)
+assert _t_rel(_t_o[0], _t_v) < 1e-7 and _t_rel(_t_o[1], _t_dv) < 1e-5, (_t_o, _t_v, _t_dv)
+# inertia changes the current-voltage curve: beta_c = 0.1 differs from the overdamped value
+assert abs(rcsj_voltage(0.8, 0.3, 0.1)[0] / _t_v - 1.0) > 1e-3
+
+# --- test case 2: thermally activated slips (exponentially small voltage), zero bias, strong noise ---
+_t_check_rcsj(0.05, 0.1, 2.0)
+_t_z = rcsj_voltage(0.0, 0.5, 1.0)
+assert _t_z[0] == 0.0
+assert abs(_t_z[1] / _t_kramers(0.0, 0.5, 1.0)[1] - 1.0) < 1e-5
+_t_check_rcsj(-2.5, 2.0, 2.0)
+_t_check_rcsj(1.2, 2.0, 0.1)
+
+# --- test case 3: inputs outside the stated ranges raise ValueError ---
+for _t_bad in ((0.5, 0.3, 0.05), (2.6, 0.3, 1.0), (0.5, 0.09, 1.0)):
+    try:
+        rcsj_voltage(*_t_bad)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("rcsj_voltage%r must raise ValueError" % (_t_bad,))
