@@ -166,10 +166,11 @@ def _t_mean(psi, a, ratio, h_med):
     return hs - sol.y[1, -1]
 
 
-# --- test case 0: psi = 0 against the closed-form median and the quadrature of the closed form ---
-for _t_a, _t_rate in ((100.0, 1.0), (400.0, 1e3)):
-    ratio = 1e9 / _t_rate
-    out = switching_field_statistics(0.0, _t_a, 1e9, _t_rate)
+# --- test case 0: psi = 0 against the closed-form median and the quadrature of the closed form,
+# including two corners of the domain (a = 40 with f0 / rate = 1e13, a = 1000 with 1e5) ---
+for _t_a, _t_f0, _t_rate in ((100.0, 1e9, 1.0), (400.0, 1e9, 1e3), (40.0, 1e13, 1.0), (1000.0, 1e5, 1.0)):
+    ratio = _t_f0 / _t_rate
+    out = switching_field_statistics(0.0, _t_a, _t_f0, _t_rate)
     assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(v, float) for v in out)
     assert abs(out[0] - _t_median0(_t_a, ratio)) < 1e-9, (out, _t_median0(_t_a, ratio))
     assert abs(out[1] - _t_mean0(_t_a, ratio)) < 1e-9, (out, _t_mean0(_t_a, ratio))
@@ -184,8 +185,28 @@ out = switching_field_statistics(1.2, 400.0, 1e9, 1e3)
 assert abs(_t_median_step(out[0], 1.2, 400.0, 1e6)) < 1e-9, out
 assert abs(out[1] - _t_mean(1.2, 400.0, 1e6, out[0])) < 1e-9, out
 
-# --- test case 3: bad angle, a, f0 or rate raises ValueError ---
-for _t_bad in ((-0.1, 100.0, 1e9, 1.0), (1.7, 100.0, 1e9, 1.0), (0.5, 0.0, 1e9, 1.0), (0.5, float("nan"), 1e9, 1.0), (0.5, 100.0, -1.0, 1.0), (0.5, 100.0, 1e9, 0.0)):
+# --- test case 3: psi = pi/2: the two minima are mirror images with the same magnetization and
+# merge at h = 1, so the particle hops almost at once; with f0 / rate = 1e5 the median is
+# near 1 - ln 2 / 1e5 and the mean near 1 - 1e-5 ---
+def _t_I90(h, a):
+    # psi = pi/2, 0 <= h < 1: barriers (1 - h)**2 / 2 and (1 + h)**2 / 2, integral in closed form
+    from scipy.special import erf
+    return 0.5 * np.sqrt(np.pi / a) * (erf(np.sqrt(a) * (1.0 - h)) + _t_erfc(np.sqrt(a) * (1.0 + h))
+                                      - _t_erfc(2.0 * np.sqrt(a)))
+
+
+from scipy.optimize import brentq as _t_brentq
+_t_lo = 1.0 - 200.0 / 1e5         # P < exp(-150) below this field
+_t_hm90 = _t_brentq(lambda x: 1e5 * _t_I90(x, 40.0) - np.log(2.0), _t_lo, 1.0, xtol=1e-15, rtol=1e-15)
+_t_mean90 = 1.0 - _t_quad(lambda x: np.exp(-1e5 * _t_I90(x, 40.0)), _t_lo, 1.0, points=[_t_hm90],
+                          epsabs=1e-15, epsrel=1e-13, limit=500)[0]
+out = switching_field_statistics(np.pi / 2, 40.0, 1e9, 1e4)
+assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(v, float) for v in out)
+assert abs(out[0] - _t_hm90) < 1e-9 and abs(out[1] - _t_mean90) < 1e-9, (out, _t_hm90, _t_mean90)
+assert abs(out[0] - (1.0 - np.log(2.0) / 1e5)) < 1e-8 and abs(out[1] - (1.0 - 1e-5)) < 1e-8, out
+
+# --- test case 4: bad angle, a, f0 or rate, or a or f0 / rate outside the domain, raises ValueError ---
+for _t_bad in ((-0.1, 100.0, 1e9, 1.0), (1.7, 100.0, 1e9, 1.0), (0.5, float("nan"), 1e9, 1.0), (0.5, 100.0, -1.0, 1.0), (0.5, 100.0, 1e9, 0.0), (0.5, 39.0, 1e9, 1.0), (0.5, 1001.0, 1e9, 1.0), (0.5, 100.0, 1e4, 1.0), (0.5, 100.0, 1e13, 0.5)):
     try:
         switching_field_statistics(*_t_bad)
     except ValueError:

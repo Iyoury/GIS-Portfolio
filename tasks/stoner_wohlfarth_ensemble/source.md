@@ -79,3 +79,22 @@ integral relaxation time tau_int of Brown's axially symmetric Fokker-Planck equa
   where a smooth starting vector converges instead to an intrawell mode of the deep well.
 
 Version 4: the sigma = 0 checks of step 6 use 1e-9 instead of 1e-12 (inside the stated 1e-8; a 1e-12 bound left no room for a result perturbed at the 1e-12 level).
+
+Version 5 (content-check fixes):
+- Steps 3-5: the domain 40 <= a <= 1000, 1e5 <= f0 / rate <= 1e13 is now enforced (ValueError
+  outside it) and stated in the prompts and docstrings. In it f0 / rate * int Gamma / f0 over
+  (-h_sw, h_sw) is at least about 430 for every psi (checked on a psi grid at a = 1000,
+  f0 / rate = 1e5), so the survival probability always crosses 1/2 inside (-h_sw, h_sw) and the
+  median is a proper root; the tests cover all four corners of the domain.
+- psi = pi/2: h_sw = 1 is taken exactly (cos(pi/2) = 6e-17 in floating point would put it 2e-11
+  below 1, which matters for f0 / rate up to 1e13); quadrature nodes that round onto +-h_sw are
+  moved one ulp inside. New closed-form tests at psi = pi/2 (barriers (1 -+ h)^2 / 2) in steps 3
+  and 4, and an ensemble with a particle at psi = pi/2 and one with a zero weight in step 5.
+- Step 2 returns numpy float scalars for a scalar h (tested with isinstance(..., np.floating));
+  the near-edge fields are 1.1e-3 inside the range, where the 1e-10 accuracy is promised.
+- Step 1 is tested exactly at |h + h_sw| = 1e-3 (psi = 0, h = -0.999 and -1.001).
+- Step 3 is tested at h = +-h_sw exactly (psi = 0 and pi/2).
+- Step 5: fewer invalid-input entries, three new computed cases.
+- Step 6: the whole computation (panel construction, inverse iteration, Rayleigh quotient,
+  Garanin's tau_int) is in the body of brown_relaxation; h = -0.9 is tested against the oracle
+  and against h = +0.9; the docstring gives the units as 1/tau_N and tau_N, respectively.

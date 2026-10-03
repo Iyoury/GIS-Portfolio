@@ -5,29 +5,47 @@ from scipy.integrate import solve_ivp
 import mpmath as mp
 
 
-_s6_C = np.polynomial.chebyshev
+def brown_relaxation(sigma, h):
+    '''Exact thermal relaxation of one particle with its field along the easy axis (Brown's equation).
 
+    Inputs:
+      sigma: float, K V / (k_B T), 0 <= sigma <= 60.
+      h: float, reduced field H / H_K along the easy axis, -0.9 <= h <= 0.9.
 
-def _s6_panels(sigma, h, K=None, d=24, iters=300):
+    Output:
+      (lam1, tau_int): tuple of two Python floats, in units of 1/tau_N and tau_N, respectively.
+        lam1: smallest nonzero eigenvalue of the Fokker-Planck operator (relaxation rate times
+              tau_N), relative error below 1e-8.
+        tau_int: integral relaxation time of z = cos(theta) divided by tau_N,
+                 int_0^inf C(t) dt / C(0) with C(t) = <z(t) z(0)> - <z>**2 in equilibrium,
+                 relative error below 1e-8.
+
+    Raises:
+      ValueError if sigma or h is not finite, if sigma is outside [0, 60] or if |h| > 0.9.
+    '''
+    sigma = float(sigma)
+    h = float(h)
+    if not (np.isfinite(sigma) and np.isfinite(h)):
+        raise ValueError("sigma and h must be finite")
+    if not (0.0 <= sigma <= 60.0) or abs(h) > 0.9:
+        raise ValueError("need 0 <= sigma <= 60 and |h| <= 0.9")
     # piecewise Chebyshev representation in theta (z = cos theta); every panel keeps its own
     # relative accuracy, so the exponentially different well weights are resolved
+    C = np.polynomial.chebyshev
     h = abs(h)                     # the problem is symmetric under z -> -z, h -> -h
-    if K is None:
-        K = int(30 + 1.5 * sigma)
+    K, d, iters = int(30 + 1.5 * sigma), 24, 300
     edges = np.linspace(0.0, np.pi, K + 1)
     xk = np.cos(np.pi * (np.arange(d + 1) + 0.5) / (d + 1))[::-1]      # Chebyshev points in [-1, 1]
     a, b = edges[:-1, None], edges[1:, None]
     TH = 0.5 * (a + b) + 0.5 * (b - a) * xk[None, :]                   # (K, d+1)
     half = 0.5 * (b - a)[:, 0]
-    V = _s6_C.chebvander(xk, d)
+    V = C.chebvander(xk, d)
     Vinv = np.linalg.inv(V)
     shift = sigma + 2 * sigma * abs(h)
     Z = np.cos(TH)
     lw = sigma * Z * Z + 2 * sigma * h * Z - shift          # log w
     W = np.exp(lw)
     S = np.sin(TH)
-    T1 = _s6_C.chebval(1.0, np.eye(d + 1))                       # T_k(1)
-    Tm1 = _s6_C.chebval(-1.0, np.eye(d + 1))
 
     def cum_from_right(vals):
         # int_theta^{pi} f dtheta at every node
@@ -35,9 +53,9 @@ def _s6_panels(sigma, h, K=None, d=24, iters=300):
         out = np.empty_like(vals)
         acc = 0.0
         for k in range(K - 1, -1, -1):
-            ci = _s6_C.chebint(coef[k], lbnd=1) * half[k]        # = -int_x^1 on the panel
-            out[k] = acc - _s6_C.chebval(xk, ci)
-            acc = acc + (-_s6_C.chebval(-1.0, ci))
+            ci = C.chebint(coef[k], lbnd=1) * half[k]        # = -int_x^1 on the panel
+            out[k] = acc - C.chebval(xk, ci)
+            acc = acc + (-C.chebval(-1.0, ci))
         return out, acc
 
     def cum_from_left(vals):
@@ -45,9 +63,9 @@ def _s6_panels(sigma, h, K=None, d=24, iters=300):
         out = np.empty_like(vals)
         acc = 0.0
         for k in range(K):
-            ci = _s6_C.chebint(coef[k], lbnd=-1) * half[k]
-            out[k] = acc + _s6_C.chebval(xk, ci)
-            acc = acc + _s6_C.chebval(1.0, ci)
+            ci = C.chebint(coef[k], lbnd=-1) * half[k]
+            out[k] = acc + C.chebval(xk, ci)
+            acc = acc + C.chebval(1.0, ci)
         return out, acc
 
     def total(vals):
@@ -71,6 +89,8 @@ def _s6_panels(sigma, h, K=None, d=24, iters=300):
     # mostly in the shallow well, whose Boltzmann weight can be far below rounding relative to the
     # deep one, so a smooth start such as g = z has no usable component along it
     g = project(np.where(Z < -h, 1.0, 0.0) + 1e-3 * Z)
+    # inverse iteration on the Sturm-Liouville form: solve d/dz[(1 - z^2) w dg_new/dz] = -2 w g
+    # by two cumulative integrals, with the Rayleigh quotient of the new iterate as lam1
     lam_old = None
     for it in range(iters):
         F = flux(W * g * S)                                  # int_{-1}^{z} w g dz
@@ -92,35 +112,7 @@ def _s6_panels(sigma, h, K=None, d=24, iters=300):
     # integral from z = -1 is a sum over the shallow side only and is accurate
     Q, _ = cum_from_right(W * (Z - zbar) * S)
     tau = 2.0 * total(Q * Q / (S * W)) / total(W * (Z - zbar) ** 2 * S)
-    return lam, tau
-
-
-def brown_relaxation(sigma, h):
-    '''Exact thermal relaxation of one particle with its field along the easy axis (Brown's equation).
-
-    Inputs:
-      sigma: float, K V / (k_B T), 0 <= sigma <= 60.
-      h: float, reduced field H / H_K along the easy axis, -0.9 <= h <= 0.9.
-
-    Output:
-      (lam1, tau_int): tuple of two Python floats, in units of tau_N and 1/tau_N as below.
-        lam1: smallest nonzero eigenvalue of the Fokker-Planck operator (relaxation rate times
-              tau_N), relative error below 1e-8.
-        tau_int: integral relaxation time of z = cos(theta) divided by tau_N,
-                 int_0^inf C(t) dt / C(0) with C(t) = <z(t) z(0)> - <z>**2 in equilibrium,
-                 relative error below 1e-8.
-
-    Raises:
-      ValueError if sigma or h is not finite, if sigma is outside [0, 60] or if |h| > 0.9.
-    '''
-    sigma = float(sigma)
-    h = float(h)
-    if not (np.isfinite(sigma) and np.isfinite(h)):
-        raise ValueError("sigma and h must be finite")
-    if not (0.0 <= sigma <= 60.0) or abs(h) > 0.9:
-        raise ValueError("need 0 <= sigma <= 60 and |h| <= 0.9")
     # MUTANT: time unit taken from dW/dt = d/dz[...] (factor 1/2 of Brown's equation dropped)
-    lam1, tau_int = _s6_panels(sigma, h)
-    lam1, tau_int = 2.0 * lam1, 0.5 * tau_int
-    result = (float(lam1), float(tau_int))
+    lam, tau = 2.0 * lam, 0.5 * tau
+    result = (float(lam), float(tau))
     return result

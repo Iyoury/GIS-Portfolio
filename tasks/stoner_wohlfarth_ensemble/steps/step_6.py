@@ -13,7 +13,7 @@ def brown_relaxation(sigma, h):
       h: float, reduced field H / H_K along the easy axis, -0.9 <= h <= 0.9.
 
     Output:
-      (lam1, tau_int): tuple of two Python floats, in units of tau_N and 1/tau_N as below.
+      (lam1, tau_int): tuple of two Python floats, in units of 1/tau_N and tau_N, respectively.
         lam1: smallest nonzero eigenvalue of the Fokker-Planck operator (relaxation rate times
               tau_N), relative error below 1e-8.
         tau_int: integral relaxation time of z = cos(theta) divided by tau_N,

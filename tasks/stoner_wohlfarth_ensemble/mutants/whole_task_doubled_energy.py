@@ -28,7 +28,8 @@ def branch_magnetization(h, psi):
         raise ValueError("h must be finite and psi must be between 0 and pi/2")
     # Switching field: e' = 0 and e'' = 0 together give the astroid
     # h_sw = (cos(psi)**(2/3) + sin(psi)**(2/3))**(-3/2).
-    h_sw = (np.cos(psi) ** (2.0 / 3.0) + np.sin(psi) ** (2.0 / 3.0)) ** -1.5
+    # cos(pi/2) is 6e-17 in floating point, which alone would put h_sw 2e-11 below 1
+    h_sw = 1.0 if psi == 0.5 * np.pi else (np.cos(psi) ** (2.0 / 3.0) + np.sin(psi) ** (2.0 / 3.0)) ** -1.5
     if h < -h_sw:
         # After the jump: theta -> theta + pi maps the energy at field h onto the
         # energy at field -h, and at -h > h_sw only one minimum is left.
@@ -65,7 +66,8 @@ def escape_barriers(h, psi):
       psi: float, angle in radians between the field axis and the easy axis, 0 <= psi <= pi/2.
 
     Output:
-      (low, high): two values with the shape of np.asarray(h). low <= high are
+      (low, high): two values with the shape of np.asarray(h), numpy float scalars for a
+      scalar h. low <= high are
       e(theta_max) - e(theta_min) for the two energy maxima, theta_min being the original
       minimum of the descending branch. Absolute error below 1e-10 when
       h_sw(psi) - |h| >= 1e-3.
@@ -80,7 +82,8 @@ def escape_barriers(h, psi):
         raise ValueError("psi must be between 0 and pi/2")
     if not np.all(np.isfinite(h_arr)):
         raise ValueError("h must be finite")
-    h_sw = (np.cos(psi) ** (2.0 / 3.0) + np.sin(psi) ** (2.0 / 3.0)) ** -1.5
+    # cos(pi/2) is 6e-17 in floating point, which alone would put h_sw 2e-11 below 1
+    h_sw = 1.0 if psi == 0.5 * np.pi else (np.cos(psi) ** (2.0 / 3.0) + np.sin(psi) ** (2.0 / 3.0)) ** -1.5
     if np.any(np.abs(h_arr) >= h_sw):
         raise ValueError("both energy minima exist only for |h| < h_sw(psi)")
     x = h_arr.ravel()
@@ -117,8 +120,8 @@ def escape_barriers(h, psi):
     e_min = 0.5 * np.sin(th_min) ** 2 - x * np.cos(th_min - psi)
     e_max = 0.5 * np.sin(maxima) ** 2 - x[:, None] * np.cos(maxima - psi)
     barriers = np.sort(e_max - e_min[:, None], axis=1)
-    low = barriers[:, 0].reshape(h_arr.shape)
-    high = barriers[:, 1].reshape(h_arr.shape)
+    low = barriers[:, 0].reshape(h_arr.shape)[()]
+    high = barriers[:, 1].reshape(h_arr.shape)[()]
     return low, high
 
 
@@ -128,17 +131,19 @@ def survival_probability(h, psi, a, f0, rate):
     Inputs:
       h: float, reduced field reached by the descending sweep.
       psi: float, easy-axis angle in radians, 0 <= psi <= pi/2.
-      a: float, thermal stability ratio K V / (k_B T), > 0.
+      a: float, thermal stability ratio K V / (k_B T), 40 <= a <= 1000.
       f0: float, attempt frequency in 1/s, > 0.
-      rate: float, sweep rate |dh/dt| in units of H_K per second, > 0.
+      rate: float, sweep rate |dh/dt| in units of H_K per second, > 0, with
+            1e5 <= f0 / rate <= 1e13.
 
     Output:
       P: float in [0, 1], P = 1 for h >= h_sw(psi) and P = 0 for h <= -h_sw(psi).
          Absolute error below 1e-10.
 
     Raises:
-      ValueError if psi is outside [0, pi/2], if h is not finite, or if a, f0 or rate
-      is not a positive finite number.
+      ValueError if psi is outside [0, pi/2], if h is not finite, if a, f0 or rate is
+      not a positive finite number, if a is outside [40, 1000] or if f0 / rate is
+      outside [1e5, 1e13].
     '''
     h = float(h)
     psi = float(psi)
@@ -147,7 +152,10 @@ def survival_probability(h, psi, a, f0, rate):
     for name, value in (("a", a), ("f0", f0), ("rate", rate)):
         if not (np.isfinite(value) and value > 0.0):
             raise ValueError("%s must be a positive finite number" % name)
-    h_sw = (np.cos(psi) ** (2.0 / 3.0) + np.sin(psi) ** (2.0 / 3.0)) ** -1.5
+    if not (40.0 <= a <= 1000.0 and 1e5 <= f0 / rate <= 1e13):
+        raise ValueError("need 40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13")
+    # cos(pi/2) is 6e-17 in floating point, which alone would put h_sw 2e-11 below 1
+    h_sw = 1.0 if psi == 0.5 * np.pi else (np.cos(psi) ** (2.0 / 3.0) + np.sin(psi) ** (2.0 / 3.0)) ** -1.5
     if h >= h_sw:
         P = 1.0           # only the original minimum exists: no escape so far
         return P
@@ -157,6 +165,8 @@ def survival_probability(h, psi, a, f0, rate):
 
     def rate_over_f0(x):
         # both escape routes; dE / (k_B T) = 2 K V Delta_e / (k_B T) = 2 a Delta_e
+        # quadrature nodes can round onto +-h_sw, where the barriers take their limits
+        x = float(np.clip(x, -np.nextafter(h_sw, 0.0), np.nextafter(h_sw, 0.0)))
         low, high = escape_barriers(x, psi)
         return float(np.exp(-2.0 * a * low) + np.exp(-2.0 * a * high))
 
@@ -173,17 +183,18 @@ def switching_field_statistics(psi, a, f0, rate):
 
     Inputs:
       psi: float, easy-axis angle in radians, 0 <= psi <= pi/2.
-      a: float, thermal stability ratio K V / (k_B T), > 0.
+      a: float, thermal stability ratio K V / (k_B T), 40 <= a <= 1000.
       f0: float, attempt frequency in 1/s, > 0.
-      rate: float, sweep rate |dh/dt| in units of H_K per second, > 0.
+      rate: float, sweep rate |dh/dt| in units of H_K per second, > 0, with
+            1e5 <= f0 / rate <= 1e13.
 
     Output:
       (h_median, h_mean): tuple of two floats, the median and the mean of the field at
       which the particle leaves its original minimum. Absolute errors below 1e-9.
 
     Raises:
-      ValueError if psi is outside [0, pi/2] or if a, f0 or rate is not a positive
-      finite number.
+      ValueError if psi is outside [0, pi/2], if a, f0 or rate is not a positive finite
+      number, if a is outside [40, 1000] or if f0 / rate is outside [1e5, 1e13].
     '''
     psi = float(psi)
     if not (0.0 <= psi <= 0.5 * np.pi):
@@ -191,10 +202,15 @@ def switching_field_statistics(psi, a, f0, rate):
     for name, value in (("a", a), ("f0", f0), ("rate", rate)):
         if not (np.isfinite(value) and value > 0.0):
             raise ValueError("%s must be a positive finite number" % name)
-    h_sw = (np.cos(psi) ** (2.0 / 3.0) + np.sin(psi) ** (2.0 / 3.0)) ** -1.5
+    if not (40.0 <= a <= 1000.0 and 1e5 <= f0 / rate <= 1e13):
+        raise ValueError("need 40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13")
+    # cos(pi/2) is 6e-17 in floating point, which alone would put h_sw 2e-11 below 1
+    h_sw = 1.0 if psi == 0.5 * np.pi else (np.cos(psi) ** (2.0 / 3.0) + np.sin(psi) ** (2.0 / 3.0)) ** -1.5
     lam = f0 / rate
 
     def gamma_over_f0(x):
+        # quadrature nodes can round onto +-h_sw, where the barriers take their limits
+        x = float(np.clip(x, -np.nextafter(h_sw, 0.0), np.nextafter(h_sw, 0.0)))
         low, high = escape_barriers(x, psi)
         return float(np.exp(-2.0 * a * low) + np.exp(-2.0 * a * high))
 
@@ -239,9 +255,10 @@ def ensemble_switching(psis, weights, a, f0, rate):
       psis: 1-D array of easy-axis angles in radians, each in [0, pi/2].
       weights: 1-D array of the same length, nonnegative, not all zero (normalized by
                their sum).
-      a: float, thermal stability ratio K V / (k_B T), > 0.
+      a: float, thermal stability ratio K V / (k_B T), 40 <= a <= 1000.
       f0: float, attempt frequency in 1/s, > 0.
-      rate: float, sweep rate |dh/dt| in units of H_K per second, > 0.
+      rate: float, sweep rate |dh/dt| in units of H_K per second, > 0, with
+            1e5 <= f0 / rate <= 1e13.
 
     Output:
       (h_c, h_half): tuple of two floats, absolute errors below 1e-8.
@@ -251,7 +268,8 @@ def ensemble_switching(psis, weights, a, f0, rate):
     Raises:
       ValueError if psis and weights are not 1-D arrays of the same nonzero length, if
       a psi is outside [0, pi/2], if a weight is negative or not finite, if the weights
-      add up to zero, or if a, f0 or rate is not a positive finite number.
+      add up to zero, if a, f0 or rate is not a positive finite number, if a is outside
+      [40, 1000] or if f0 / rate is outside [1e5, 1e13].
     '''
     psis = np.asarray(psis, dtype=float)
     weights = np.asarray(weights, dtype=float)
@@ -264,6 +282,8 @@ def ensemble_switching(psis, weights, a, f0, rate):
     for name, value in (("a", a), ("f0", f0), ("rate", rate)):
         if not (np.isfinite(value) and value > 0.0):
             raise ValueError("%s must be a positive finite number" % name)
+    if not (40.0 <= a <= 1000.0 and 1e5 <= f0 / rate <= 1e13):
+        raise ValueError("need 40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13")
     w = weights / weights.sum()
 
     def ensemble_state(x):
@@ -285,29 +305,49 @@ def ensemble_switching(psis, weights, a, f0, rate):
     return result
 
 
-_s6_C = np.polynomial.chebyshev
+def brown_relaxation(sigma, h):
+    '''Exact thermal relaxation of one particle with its field along the easy axis (Brown's equation).
 
+    Inputs:
+      sigma: float, K V / (k_B T), 0 <= sigma <= 60.
+      h: float, reduced field H / H_K along the easy axis, -0.9 <= h <= 0.9.
 
-def _s6_panels(sigma, h, K=None, d=24, iters=300):
+    Output:
+      (lam1, tau_int): tuple of two Python floats, in units of 1/tau_N and tau_N, respectively.
+        lam1: smallest nonzero eigenvalue of the Fokker-Planck operator (relaxation rate times
+              tau_N), relative error below 1e-8.
+        tau_int: integral relaxation time of z = cos(theta) divided by tau_N,
+                 int_0^inf C(t) dt / C(0) with C(t) = <z(t) z(0)> - <z>**2 in equilibrium,
+                 relative error below 1e-8.
+
+    Raises:
+      ValueError if sigma or h is not finite, if sigma is outside [0, 60] or if |h| > 0.9.
+    '''
+    sigma = float(sigma)
+    h = float(h)
+    if not (np.isfinite(sigma) and np.isfinite(h)):
+        raise ValueError("sigma and h must be finite")
+    if not (0.0 <= sigma <= 60.0) or abs(h) > 0.9:
+        raise ValueError("need 0 <= sigma <= 60 and |h| <= 0.9")
+    # MUTANT: barrier energy taken as 2 sigma (1 - z^2 - 2 h z) (E = 2 K V e read as K V e times 2)
+    sigma = 2.0 * sigma
     # piecewise Chebyshev representation in theta (z = cos theta); every panel keeps its own
     # relative accuracy, so the exponentially different well weights are resolved
+    C = np.polynomial.chebyshev
     h = abs(h)                     # the problem is symmetric under z -> -z, h -> -h
-    if K is None:
-        K = int(30 + 1.5 * sigma)
+    K, d, iters = int(30 + 1.5 * sigma), 24, 300
     edges = np.linspace(0.0, np.pi, K + 1)
     xk = np.cos(np.pi * (np.arange(d + 1) + 0.5) / (d + 1))[::-1]      # Chebyshev points in [-1, 1]
     a, b = edges[:-1, None], edges[1:, None]
     TH = 0.5 * (a + b) + 0.5 * (b - a) * xk[None, :]                   # (K, d+1)
     half = 0.5 * (b - a)[:, 0]
-    V = _s6_C.chebvander(xk, d)
+    V = C.chebvander(xk, d)
     Vinv = np.linalg.inv(V)
     shift = sigma + 2 * sigma * abs(h)
     Z = np.cos(TH)
     lw = sigma * Z * Z + 2 * sigma * h * Z - shift          # log w
     W = np.exp(lw)
     S = np.sin(TH)
-    T1 = _s6_C.chebval(1.0, np.eye(d + 1))                       # T_k(1)
-    Tm1 = _s6_C.chebval(-1.0, np.eye(d + 1))
 
     def cum_from_right(vals):
         # int_theta^{pi} f dtheta at every node
@@ -315,9 +355,9 @@ def _s6_panels(sigma, h, K=None, d=24, iters=300):
         out = np.empty_like(vals)
         acc = 0.0
         for k in range(K - 1, -1, -1):
-            ci = _s6_C.chebint(coef[k], lbnd=1) * half[k]        # = -int_x^1 on the panel
-            out[k] = acc - _s6_C.chebval(xk, ci)
-            acc = acc + (-_s6_C.chebval(-1.0, ci))
+            ci = C.chebint(coef[k], lbnd=1) * half[k]        # = -int_x^1 on the panel
+            out[k] = acc - C.chebval(xk, ci)
+            acc = acc + (-C.chebval(-1.0, ci))
         return out, acc
 
     def cum_from_left(vals):
@@ -325,9 +365,9 @@ def _s6_panels(sigma, h, K=None, d=24, iters=300):
         out = np.empty_like(vals)
         acc = 0.0
         for k in range(K):
-            ci = _s6_C.chebint(coef[k], lbnd=-1) * half[k]
-            out[k] = acc + _s6_C.chebval(xk, ci)
-            acc = acc + _s6_C.chebval(1.0, ci)
+            ci = C.chebint(coef[k], lbnd=-1) * half[k]
+            out[k] = acc + C.chebval(xk, ci)
+            acc = acc + C.chebval(1.0, ci)
         return out, acc
 
     def total(vals):
@@ -351,6 +391,8 @@ def _s6_panels(sigma, h, K=None, d=24, iters=300):
     # mostly in the shallow well, whose Boltzmann weight can be far below rounding relative to the
     # deep one, so a smooth start such as g = z has no usable component along it
     g = project(np.where(Z < -h, 1.0, 0.0) + 1e-3 * Z)
+    # inverse iteration on the Sturm-Liouville form: solve d/dz[(1 - z^2) w dg_new/dz] = -2 w g
+    # by two cumulative integrals, with the Rayleigh quotient of the new iterate as lam1
     lam_old = None
     for it in range(iters):
         F = flux(W * g * S)                                  # int_{-1}^{z} w g dz
@@ -372,34 +414,5 @@ def _s6_panels(sigma, h, K=None, d=24, iters=300):
     # integral from z = -1 is a sum over the shallow side only and is accurate
     Q, _ = cum_from_right(W * (Z - zbar) * S)
     tau = 2.0 * total(Q * Q / (S * W)) / total(W * (Z - zbar) ** 2 * S)
-    return lam, tau
-
-
-def brown_relaxation(sigma, h):
-    '''Exact thermal relaxation of one particle with its field along the easy axis (Brown's equation).
-
-    Inputs:
-      sigma: float, K V / (k_B T), 0 <= sigma <= 60.
-      h: float, reduced field H / H_K along the easy axis, -0.9 <= h <= 0.9.
-
-    Output:
-      (lam1, tau_int): tuple of two Python floats, in units of tau_N and 1/tau_N as below.
-        lam1: smallest nonzero eigenvalue of the Fokker-Planck operator (relaxation rate times
-              tau_N), relative error below 1e-8.
-        tau_int: integral relaxation time of z = cos(theta) divided by tau_N,
-                 int_0^inf C(t) dt / C(0) with C(t) = <z(t) z(0)> - <z>**2 in equilibrium,
-                 relative error below 1e-8.
-
-    Raises:
-      ValueError if sigma or h is not finite, if sigma is outside [0, 60] or if |h| > 0.9.
-    '''
-    sigma = float(sigma)
-    h = float(h)
-    if not (np.isfinite(sigma) and np.isfinite(h)):
-        raise ValueError("sigma and h must be finite")
-    if not (0.0 <= sigma <= 60.0) or abs(h) > 0.9:
-        raise ValueError("need 0 <= sigma <= 60 and |h| <= 0.9")
-    # MUTANT: barrier energy taken as 2 sigma (1 - z^2 - 2 h z) (E = 2 K V e read as K V e times 2)
-    lam1, tau_int = _s6_panels(2.0 * sigma, h)
-    result = (float(lam1), float(tau_int))
+    result = (float(lam), float(tau))
     return result

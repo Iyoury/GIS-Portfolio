@@ -12,9 +12,10 @@ def ensemble_switching(psis, weights, a, f0, rate):
       psis: 1-D array of easy-axis angles in radians, each in [0, pi/2].
       weights: 1-D array of the same length, nonnegative, not all zero (normalized by
                their sum).
-      a: float, thermal stability ratio K V / (k_B T), > 0.
+      a: float, thermal stability ratio K V / (k_B T), 40 <= a <= 1000.
       f0: float, attempt frequency in 1/s, > 0.
-      rate: float, sweep rate |dh/dt| in units of H_K per second, > 0.
+      rate: float, sweep rate |dh/dt| in units of H_K per second, > 0, with
+            1e5 <= f0 / rate <= 1e13.
 
     Output:
       (h_c, h_half): tuple of two floats, absolute errors below 1e-8.
@@ -24,7 +25,8 @@ def ensemble_switching(psis, weights, a, f0, rate):
     Raises:
       ValueError if psis and weights are not 1-D arrays of the same nonzero length, if
       a psi is outside [0, pi/2], if a weight is negative or not finite, if the weights
-      add up to zero, or if a, f0 or rate is not a positive finite number.
+      add up to zero, if a, f0 or rate is not a positive finite number, if a is outside
+      [40, 1000] or if f0 / rate is outside [1e5, 1e13].
     '''
     psis = np.asarray(psis, dtype=float)
     weights = np.asarray(weights, dtype=float)
@@ -37,6 +39,8 @@ def ensemble_switching(psis, weights, a, f0, rate):
     for name, value in (("a", a), ("f0", f0), ("rate", rate)):
         if not (np.isfinite(value) and value > 0.0):
             raise ValueError("%s must be a positive finite number" % name)
+    if not (40.0 <= a <= 1000.0 and 1e5 <= f0 / rate <= 1e13):
+        raise ValueError("need 40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13")
     w = weights / weights.sum()
 
     def ensemble_state(x):

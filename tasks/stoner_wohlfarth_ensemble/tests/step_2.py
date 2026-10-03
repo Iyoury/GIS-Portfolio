@@ -100,7 +100,7 @@ def _t_barriers(h, psi):
 # --- test case 0: at zero field both barriers are 1/2 for every angle ---
 for _t_p in (0.0, 0.4, np.pi / 4, 1.3, np.pi / 2):
     low, high = escape_barriers(0.0, _t_p)
-    assert np.shape(low) == () and np.shape(high) == ()
+    assert isinstance(low, np.floating) and isinstance(high, np.floating), (type(low), type(high))
     assert abs(float(low) - 0.5) < 1e-10 and abs(float(high) - 0.5) < 1e-10, (_t_p, low, high)
 
 # --- test case 1: closed forms at psi = 0 and psi = pi/2 ---
@@ -123,10 +123,10 @@ for _t_p in (0.2, np.pi / 6, np.pi / 4, 1.0, 1.4):
         t_lo, t_hi = _t_barriers(h[idx], _t_p)
         assert abs(low[idx] - t_lo) < 1e-10 and abs(high[idx] - t_hi) < 1e-10, (_t_p, h[idx])
 
-# --- test case 3: fields 1e-3 inside both ends of the range ---
+# --- test case 3: fields just inside both ends of the accurate range (h_sw - |h| >= 1e-3) ---
 for _t_p in (0.1, np.pi / 6, np.pi / 4, 1.2):
     _t_hs = _t_fold(_t_p)[0]
-    for x in (-_t_hs + 1e-3, _t_hs - 1e-3):
+    for x in (-_t_hs + 1.1e-3, _t_hs - 1.1e-3):
         low, high = escape_barriers(x, _t_p)
         t_lo, t_hi = _t_barriers(x, _t_p)
         assert abs(float(low) - t_lo) < 1e-10 and abs(float(high) - t_hi) < 1e-10, (_t_p, x)

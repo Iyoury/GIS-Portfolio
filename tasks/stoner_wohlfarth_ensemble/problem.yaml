@@ -42,7 +42,7 @@ problem_io: |-
         h: float, reduced field H / H_K along the easy axis, -0.9 <= h <= 0.9.
 
       Output:
-        (lam1, tau_int): tuple of two Python floats, in units of tau_N and 1/tau_N as below.
+        (lam1, tau_int): tuple of two Python floats, in units of 1/tau_N and tau_N, respectively.
           lam1: smallest nonzero eigenvalue of the Fokker-Planck operator (relaxation rate times
                 tau_N), relative error below 1e-8.
           tau_int: integral relaxation time of z = cos(theta) divided by tau_N,
@@ -155,7 +155,8 @@ sub_steps:
             psi: float, angle in radians between the field axis and the easy axis, 0 <= psi <= pi/2.
 
           Output:
-            (low, high): two values with the shape of np.asarray(h). low <= high are
+            (low, high): two values with the shape of np.asarray(h), numpy float scalars for a
+            scalar h. low <= high are
             e(theta_max) - e(theta_min) for the two energy maxima, theta_min being the original
             minimum of the descending branch. Absolute error below 1e-10 when
             h_sw(psi) - |h| >= 1e-3.
@@ -177,7 +178,7 @@ sub_steps:
       result_kind: exact
       valid_input_ranges: 0 <= psi <= pi/2; |h| < h_sw(psi), accuracy required for h_sw(psi) - |h| >= 1e-3.
       units: Units of 2 K V (reduced energy).
-      output_shape: Tuple of two floats or two float arrays with the shape of np.asarray(h).
+      output_shape: Tuple of two numpy float arrays with the shape of np.asarray(h), or two numpy float scalars for a scalar h.
       step_dependencies: []
     mutants:
       - name: barrier_from_global_minimum
@@ -200,10 +201,12 @@ sub_steps:
       the constant rate `rate`, in units of H_K per second.
 
       Return the probability that the particle is still in its original minimum when the
-      field reaches h, as a Python float with an absolute error below 1e-10. The model is
-      meant for 40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13.
-      Errors: raise ValueError if psi is outside [0, pi/2], if h is not finite, or if a,
-      f0 or rate is not a positive finite number.
+      field reaches h, as a Python float with an absolute error below 1e-10. The domain is
+      40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13 (bounds included); there the particle has
+      left with a probability far above 1/2 before its original minimum disappears.
+      Errors: raise ValueError if psi is outside [0, pi/2], if h is not finite, if a, f0 or
+      rate is not a positive finite number, if a is outside [40, 1000] or if f0 / rate is
+      outside [1e5, 1e13].
     function_header: |-
       def survival_probability(h, psi, a, f0, rate):
           '''Probability that a particle has not left its original minimum when the sweep reaches h.
@@ -211,17 +214,19 @@ sub_steps:
           Inputs:
             h: float, reduced field reached by the descending sweep.
             psi: float, easy-axis angle in radians, 0 <= psi <= pi/2.
-            a: float, thermal stability ratio K V / (k_B T), > 0.
+            a: float, thermal stability ratio K V / (k_B T), 40 <= a <= 1000.
             f0: float, attempt frequency in 1/s, > 0.
-            rate: float, sweep rate |dh/dt| in units of H_K per second, > 0.
+            rate: float, sweep rate |dh/dt| in units of H_K per second, > 0, with
+                  1e5 <= f0 / rate <= 1e13.
 
           Output:
             P: float in [0, 1], P = 1 for h >= h_sw(psi) and P = 0 for h <= -h_sw(psi).
                Absolute error below 1e-10.
 
           Raises:
-            ValueError if psi is outside [0, pi/2], if h is not finite, or if a, f0 or rate
-            is not a positive finite number.
+            ValueError if psi is outside [0, pi/2], if h is not finite, if a, f0 or rate is
+            not a positive finite number, if a is outside [40, 1000] or if f0 / rate is
+            outside [1e5, 1e13].
           '''
     return_line: return P
     step_background: |-
@@ -231,7 +236,7 @@ sub_steps:
       almost all switching happens in a narrow field window well before the
       zero-temperature switching field (Sharrock 1994); slower sweeps and higher
       temperatures switch at smaller fields.
-    n_test_cases: 5
+    n_test_cases: 6
     contract:
       quantity: Survival probability of the original minimum during a descending field sweep with thermally activated escape.
       assumptions: Arrhenius escape over both maxima with attempt frequency f0, no back jumps, no escape outside the astroid, certain switching when the original minimum vanishes, constant sweep rate.
@@ -255,26 +260,31 @@ sub_steps:
       it leaves its original minimum; it is a random variable.
       Return the tuple (h_median, h_mean) of two Python floats: h_median is the field at
       which the particle has left with probability 1/2, and h_mean is the mean switching
-      field. Give both with an absolute error below 1e-9.
-      Errors: raise ValueError if psi is outside [0, pi/2] or if a, f0 or rate is not a
-      positive finite number.
+      field. Give both with an absolute error below 1e-9. The domain is that of step 3,
+      40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13, for every psi in [0, pi/2] including both
+      end points; in it the survival probability falls below 1/2 before -h_sw(psi), so the
+      median is a field inside (-h_sw, h_sw).
+      Errors: raise ValueError if psi is outside [0, pi/2], if a, f0 or rate is not a
+      positive finite number, if a is outside [40, 1000] or if f0 / rate is outside
+      [1e5, 1e13].
     function_header: |-
       def switching_field_statistics(psi, a, f0, rate):
           '''Median and mean switching field of one particle in the descending sweep.
 
           Inputs:
             psi: float, easy-axis angle in radians, 0 <= psi <= pi/2.
-            a: float, thermal stability ratio K V / (k_B T), > 0.
+            a: float, thermal stability ratio K V / (k_B T), 40 <= a <= 1000.
             f0: float, attempt frequency in 1/s, > 0.
-            rate: float, sweep rate |dh/dt| in units of H_K per second, > 0.
+            rate: float, sweep rate |dh/dt| in units of H_K per second, > 0, with
+                  1e5 <= f0 / rate <= 1e13.
 
           Output:
             (h_median, h_mean): tuple of two floats, the median and the mean of the field at
             which the particle leaves its original minimum. Absolute errors below 1e-9.
 
           Raises:
-            ValueError if psi is outside [0, pi/2] or if a, f0 or rate is not a positive
-            finite number.
+            ValueError if psi is outside [0, pi/2], if a, f0 or rate is not a positive finite
+            number, if a is outside [40, 1000] or if f0 / rate is outside [1e5, 1e13].
           '''
     return_line: return result
     step_background: |-
@@ -282,7 +292,7 @@ sub_steps:
       because the escape rate rises steeply as the field falls. Sharrock-type formulas
       give the median only approximately; here it must follow from the full field
       dependence of both barriers.
-    n_test_cases: 4
+    n_test_cases: 5
     contract:
       quantity: Median and mean of the random switching field of one particle under thermally activated escape.
       assumptions: Same model as step 3.
@@ -313,10 +323,13 @@ sub_steps:
       Return the tuple (h_c, h_half) of two Python floats: h_c is the dynamic coercive
       field, the ensemble magnetization being zero at h = -h_c, and h_half is defined by
       half of the total weight having left its original minimum at h = -h_half. Give both
-      with an absolute error below 1e-8.
+      with an absolute error below 1e-8. Angles may be anywhere in [0, pi/2], end points
+      included, and single weights may be zero (such a particle does not count); a, f0 and
+      rate have the domain of step 3, 40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13.
       Errors: raise ValueError if psis and weights are not 1-D arrays of the same nonzero
       length, if a psi is outside [0, pi/2], if a weight is negative or not finite, if the
-      weights add up to zero, or if a, f0 or rate is not a positive finite number.
+      weights add up to zero, if a, f0 or rate is not a positive finite number, if a is
+      outside [40, 1000] or if f0 / rate is outside [1e5, 1e13].
     function_header: |-
       def ensemble_switching(psis, weights, a, f0, rate):
           '''Dynamic coercive field and half-switching field of an ensemble during the sweep.
@@ -325,9 +338,10 @@ sub_steps:
             psis: 1-D array of easy-axis angles in radians, each in [0, pi/2].
             weights: 1-D array of the same length, nonnegative, not all zero (normalized by
                      their sum).
-            a: float, thermal stability ratio K V / (k_B T), > 0.
+            a: float, thermal stability ratio K V / (k_B T), 40 <= a <= 1000.
             f0: float, attempt frequency in 1/s, > 0.
-            rate: float, sweep rate |dh/dt| in units of H_K per second, > 0.
+            rate: float, sweep rate |dh/dt| in units of H_K per second, > 0, with
+                  1e5 <= f0 / rate <= 1e13.
 
           Output:
             (h_c, h_half): tuple of two floats, absolute errors below 1e-8.
@@ -337,7 +351,8 @@ sub_steps:
           Raises:
             ValueError if psis and weights are not 1-D arrays of the same nonzero length, if
             a psi is outside [0, pi/2], if a weight is negative or not finite, if the weights
-            add up to zero, or if a, f0 or rate is not a positive finite number.
+            add up to zero, if a, f0 or rate is not a positive finite number, if a is outside
+            [40, 1000] or if f0 / rate is outside [1e5, 1e13].
           '''
     return_line: return result
     step_background: |-
@@ -345,12 +360,12 @@ sub_steps:
       rotation of the magnetization inside both minima. It therefore differs from the
       half-switching field. Both fall as the sweep gets slower or the temperature higher
       (dynamic coercivity).
-    n_test_cases: 3
+    n_test_cases: 6
     contract:
       quantity: Dynamic coercive field and half-switching field of a weighted ensemble of Stoner-Wohlfarth particles with thermally activated switching.
       assumptions: Same model as step 3 for every particle; independent particles; expected magnetization from the survival probabilities.
       result_kind: exact
-      valid_input_ranges: Angles in [0, pi/2) with at least one below pi/2; 40 <= a <= 1000; 1e5 <= f0 / rate <= 1e13.
+      valid_input_ranges: Angles in [0, pi/2]; nonnegative weights, not all zero; 40 <= a <= 1000; 1e5 <= f0 / rate <= 1e13.
       units: Units of H_K.
       output_shape: Tuple of two Python floats.
       step_dependencies: [1, 3]
@@ -402,7 +417,7 @@ sub_steps:
             h: float, reduced field H / H_K along the easy axis, -0.9 <= h <= 0.9.
 
           Output:
-            (lam1, tau_int): tuple of two Python floats, in units of tau_N and 1/tau_N as below.
+            (lam1, tau_int): tuple of two Python floats, in units of 1/tau_N and tau_N, respectively.
               lam1: smallest nonzero eigenvalue of the Fokker-Planck operator (relaxation rate times
                     tau_N), relative error below 1e-8.
               tau_int: integral relaxation time of z = cos(theta) divided by tau_N,

@@ -13,7 +13,8 @@ def escape_barriers(h, psi):
       psi: float, angle in radians between the field axis and the easy axis, 0 <= psi <= pi/2.
 
     Output:
-      (low, high): two values with the shape of np.asarray(h). low <= high are
+      (low, high): two values with the shape of np.asarray(h), numpy float scalars for a
+      scalar h. low <= high are
       e(theta_max) - e(theta_min) for the two energy maxima, theta_min being the original
       minimum of the descending branch. Absolute error below 1e-10 when
       h_sw(psi) - |h| >= 1e-3.
@@ -28,7 +29,8 @@ def escape_barriers(h, psi):
         raise ValueError("psi must be between 0 and pi/2")
     if not np.all(np.isfinite(h_arr)):
         raise ValueError("h must be finite")
-    h_sw = (np.cos(psi) ** (2.0 / 3.0) + np.sin(psi) ** (2.0 / 3.0)) ** -1.5
+    # cos(pi/2) is 6e-17 in floating point, which alone would put h_sw 2e-11 below 1
+    h_sw = 1.0 if psi == 0.5 * np.pi else (np.cos(psi) ** (2.0 / 3.0) + np.sin(psi) ** (2.0 / 3.0)) ** -1.5
     if np.any(np.abs(h_arr) >= h_sw):
         raise ValueError("both energy minima exist only for |h| < h_sw(psi)")
     x = h_arr.ravel()
@@ -65,6 +67,6 @@ def escape_barriers(h, psi):
     e_min = 0.5 * np.sin(th_min) ** 2 - x * np.cos(th_min - psi)
     e_max = 0.5 * np.sin(maxima) ** 2 - x[:, None] * np.cos(maxima - psi)
     barriers = np.sort(e_max - e_min[:, None], axis=1)
-    low = barriers[:, 0].reshape(h_arr.shape)
-    high = barriers[:, 1].reshape(h_arr.shape)
+    low = barriers[:, 0].reshape(h_arr.shape)[()]
+    high = barriers[:, 1].reshape(h_arr.shape)[()]
     return low, high

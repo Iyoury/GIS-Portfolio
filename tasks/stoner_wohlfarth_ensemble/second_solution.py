@@ -70,7 +70,8 @@ def escape_barriers(h, psi):
       psi: float, angle in radians between the field axis and the easy axis, 0 <= psi <= pi/2.
 
     Output:
-      (low, high): two values with the shape of np.asarray(h). low <= high are
+      (low, high): two values with the shape of np.asarray(h), numpy float scalars for a
+      scalar h. low <= high are
       e(theta_max) - e(theta_min) for the two energy maxima, theta_min being the original
       minimum of the descending branch. Absolute error below 1e-10 when
       h_sw(psi) - |h| >= 1e-3.
@@ -109,6 +110,8 @@ def escape_barriers(h, psi):
     def original_minimum(x):
         if psi == 0.0:
             return 0.0
+        if psi == 0.5 * np.pi:
+            return np.arcsin(x)          # e' = cos(t) (sin(t) - x): no bracketing near h = 1
         fold = -0.5 * np.pi if psi == 0.5 * np.pi else -np.arctan(np.tan(psi) ** (1.0 / 3.0))
         lo = fold + 1e-13
         if slope(lo, x) >= 0.0:
@@ -123,12 +126,17 @@ def escape_barriers(h, psi):
         e_orig = energy(t_orig, x)
         found = []
         for start, stop in ((t_orig, t_other), (t_other, t_orig + 2.0 * np.pi)):
-            gap = 1e-9 * (stop - start)
-            t_max = brentq(slope, start + gap, stop - gap, args=(x,), xtol=1e-15, rtol=1e-15)
+            if psi == 0.5 * np.pi:
+                # the maxima are the zeros of cos(t); near h = 1 they are too close to the
+                # minima for a bracket
+                t_max = 0.5 * np.pi if start == t_orig else 1.5 * np.pi
+            else:
+                gap = 1e-9 * (stop - start)
+                t_max = brentq(slope, start + gap, stop - gap, args=(x,), xtol=1e-15, rtol=1e-15)
             found.append(energy(t_max, x) - e_orig)
         low[i], high[i] = min(found), max(found)
-    low = low.reshape(h_arr.shape)
-    high = high.reshape(h_arr.shape)
+    low = low.reshape(h_arr.shape)[()]
+    high = high.reshape(h_arr.shape)[()]
     return low, high
 
 
@@ -138,17 +146,19 @@ def survival_probability(h, psi, a, f0, rate):
     Inputs:
       h: float, reduced field reached by the descending sweep.
       psi: float, easy-axis angle in radians, 0 <= psi <= pi/2.
-      a: float, thermal stability ratio K V / (k_B T), > 0.
+      a: float, thermal stability ratio K V / (k_B T), 40 <= a <= 1000.
       f0: float, attempt frequency in 1/s, > 0.
-      rate: float, sweep rate |dh/dt| in units of H_K per second, > 0.
+      rate: float, sweep rate |dh/dt| in units of H_K per second, > 0, with
+            1e5 <= f0 / rate <= 1e13.
 
     Output:
       P: float in [0, 1], P = 1 for h >= h_sw(psi) and P = 0 for h <= -h_sw(psi).
          Absolute error below 1e-10.
 
     Raises:
-      ValueError if psi is outside [0, pi/2], if h is not finite, or if a, f0 or rate
-      is not a positive finite number.
+      ValueError if psi is outside [0, pi/2], if h is not finite, if a, f0 or rate is
+      not a positive finite number, if a is outside [40, 1000] or if f0 / rate is
+      outside [1e5, 1e13].
     '''
     # Other method: the escape integral I(h) = int_h^h_sw Gamma / f0 from an ODE run (DOP853)
     # downwards from h_sw, instead of a quadrature.
@@ -159,6 +169,8 @@ def survival_probability(h, psi, a, f0, rate):
     for name, value in (("a", a), ("f0", f0), ("rate", rate)):
         if not (np.isfinite(value) and value > 0.0):
             raise ValueError("%s must be a positive finite number" % name)
+    if not (40.0 <= a <= 1000.0 and 1e5 <= f0 / rate <= 1e13):
+        raise ValueError("need 40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13")
     if psi == 0.0 or psi == 0.5 * np.pi:
         h_sw = 1.0
     else:
@@ -177,6 +189,9 @@ def survival_probability(h, psi, a, f0, rate):
     lam = f0 / rate
 
     def rhs(x, y):
+        if psi == 0.5 * np.pi:
+            # both minima and a maximum merge at h = 1: the rate tends to f0 there, not to 0
+            x = min(x, np.nextafter(h_sw, 0.0))
         if abs(x) >= h_sw:
             return [0.0]
         low, high = escape_barriers(x, psi)
@@ -201,17 +216,18 @@ def switching_field_statistics(psi, a, f0, rate):
 
     Inputs:
       psi: float, easy-axis angle in radians, 0 <= psi <= pi/2.
-      a: float, thermal stability ratio K V / (k_B T), > 0.
+      a: float, thermal stability ratio K V / (k_B T), 40 <= a <= 1000.
       f0: float, attempt frequency in 1/s, > 0.
-      rate: float, sweep rate |dh/dt| in units of H_K per second, > 0.
+      rate: float, sweep rate |dh/dt| in units of H_K per second, > 0, with
+            1e5 <= f0 / rate <= 1e13.
 
     Output:
       (h_median, h_mean): tuple of two floats, the median and the mean of the field at
       which the particle leaves its original minimum. Absolute errors below 1e-9.
 
     Raises:
-      ValueError if psi is outside [0, pi/2] or if a, f0 or rate is not a positive
-      finite number.
+      ValueError if psi is outside [0, pi/2], if a, f0 or rate is not a positive finite
+      number, if a is outside [40, 1000] or if f0 / rate is outside [1e5, 1e13].
     '''
     # Other method: one ODE run from h_sw downwards for I(h) = int_h^h_sw Gamma / f0 and for
     # K(h) = int_h^h_sw P, with dense output; median by bisection on P = exp(-(f0/rate) I).
@@ -221,6 +237,8 @@ def switching_field_statistics(psi, a, f0, rate):
     for name, value in (("a", a), ("f0", f0), ("rate", rate)):
         if not (np.isfinite(value) and value > 0.0):
             raise ValueError("%s must be a positive finite number" % name)
+    if not (40.0 <= a <= 1000.0 and 1e5 <= f0 / rate <= 1e13):
+        raise ValueError("need 40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13")
     if psi == 0.0 or psi == 0.5 * np.pi:
         h_sw = 1.0
     else:
@@ -232,6 +250,9 @@ def switching_field_statistics(psi, a, f0, rate):
     lam = f0 / rate
 
     def rhs(x, y):
+        if psi == 0.5 * np.pi:
+            # both minima and a maximum merge at h = 1: the rate tends to f0 there, not to 0
+            x = min(x, np.nextafter(h_sw, 0.0))
         if abs(x) >= h_sw:
             g = 0.0
         else:
@@ -267,9 +288,10 @@ def ensemble_switching(psis, weights, a, f0, rate):
       psis: 1-D array of easy-axis angles in radians, each in [0, pi/2].
       weights: 1-D array of the same length, nonnegative, not all zero (normalized by
                their sum).
-      a: float, thermal stability ratio K V / (k_B T), > 0.
+      a: float, thermal stability ratio K V / (k_B T), 40 <= a <= 1000.
       f0: float, attempt frequency in 1/s, > 0.
-      rate: float, sweep rate |dh/dt| in units of H_K per second, > 0.
+      rate: float, sweep rate |dh/dt| in units of H_K per second, > 0, with
+            1e5 <= f0 / rate <= 1e13.
 
     Output:
       (h_c, h_half): tuple of two floats, absolute errors below 1e-8.
@@ -279,7 +301,8 @@ def ensemble_switching(psis, weights, a, f0, rate):
     Raises:
       ValueError if psis and weights are not 1-D arrays of the same nonzero length, if
       a psi is outside [0, pi/2], if a weight is negative or not finite, if the weights
-      add up to zero, or if a, f0 or rate is not a positive finite number.
+      add up to zero, if a, f0 or rate is not a positive finite number, if a is outside
+      [40, 1000] or if f0 / rate is outside [1e5, 1e13].
     '''
     # Other method: one ODE with dense output per particle for the escape integral, then
     # bisection on the ensemble magnetization and on the switched weight.
@@ -294,6 +317,8 @@ def ensemble_switching(psis, weights, a, f0, rate):
     for name, value in (("a", a), ("f0", f0), ("rate", rate)):
         if not (np.isfinite(value) and value > 0.0):
             raise ValueError("%s must be a positive finite number" % name)
+    if not (40.0 <= a <= 1000.0 and 1e5 <= f0 / rate <= 1e13):
+        raise ValueError("need 40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13")
     w = weights / weights.sum()
     lam = f0 / rate
 
@@ -313,6 +338,9 @@ def ensemble_switching(psis, weights, a, f0, rate):
         h_sw = fold_field(psi)
 
         def rhs(x, y, psi=psi, h_sw=h_sw):
+            if psi == 0.5 * np.pi:
+                # both minima and a maximum merge at h = 1: the rate tends to f0 there, not to 0
+                x = min(x, np.nextafter(h_sw, 0.0))
             if abs(x) >= h_sw:
                 return [0.0]
             low, high = escape_barriers(x, psi)

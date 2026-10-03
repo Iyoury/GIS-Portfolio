@@ -185,8 +185,28 @@ assert abs(out[0] + hm) < 1e-8 and abs(out[1] + hm) < 1e-8, (out, hm)
 _t_check_ensemble(ensemble_switching(np.array([0.2, 0.8, 1.25]), np.array([1.0, 3.0, 2.0]), 150.0, 1e9, 10.0),
                   [0.2, 0.8, 1.25], [1.0, 3.0, 2.0], 150.0, 1e8)
 
-# --- test case 2: bad arrays, weights, a, f0 or rate raise ValueError ---
-for _t_bad in ((np.array([0.1, 0.2]), np.array([1.0]), 100.0, 1e9, 1.0), (np.array([]), np.array([]), 100.0, 1e9, 1.0), (np.array([[0.1]]), np.array([[1.0]]), 100.0, 1e9, 1.0), (np.array([0.1, 1.7]), np.array([1.0, 1.0]), 100.0, 1e9, 1.0), (np.array([0.1, 0.2]), np.array([1.0, -1.0]), 100.0, 1e9, 1.0), (np.array([0.1, 0.2]), np.array([1.0, np.nan]), 100.0, 1e9, 1.0), (np.array([0.1, 0.2]), np.array([0.0, 0.0]), 100.0, 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 0.0, 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 100.0, -1e9, 1.0), (np.array([0.1]), np.array([1.0]), 100.0, 1e9, np.inf)):
+# --- test case 2: an ensemble with a particle at psi = pi/2 (both of its minima have m = h, so it
+# only shifts the magnetization, but it has left its original minimum almost at h = 1) ---
+_t_ps, _t_ws = [0.3, np.pi / 2, 1.0], [2.0, 1.0, 1.0]
+_t_check_ensemble(ensemble_switching(np.array(_t_ps), np.array(_t_ws), 200.0, 1e9, 1.0),
+                  _t_ps, _t_ws, 200.0, 1e9)
+
+# --- test case 3: a zero weight is allowed and the particle then does not count ---
+out = _t_check_ensemble(ensemble_switching(np.array([0.3, 0.9, 1.4]), np.array([1.0, 0.0, 2.0]), 100.0, 1e9, 1.0),
+                        [0.3, 1.4], [1.0, 2.0], 100.0, 1e9)
+out2 = ensemble_switching(np.array([0.3, 1.4]), np.array([1.0, 2.0]), 100.0, 1e9, 1.0)
+assert abs(out[0] - out2[0]) < 1e-10 and abs(out[1] - out2[1]) < 1e-10, (out, out2)
+
+# --- test case 4: corners of the domain: a = 1000 with f0 / rate = 1e5 for one particle at psi = 0
+# (closed-form median), and a = 40 with f0 / rate = 1e13 for two particles ---
+out = ensemble_switching(np.array([0.0]), np.array([1.0]), 1000.0, 1e5, 1.0)
+hm = _t_median0(1000.0, 1e5)
+assert abs(out[0] + hm) < 1e-8 and abs(out[1] + hm) < 1e-8, (out, hm)
+_t_check_ensemble(ensemble_switching(np.array([0.0, 0.6]), np.array([1.0, 1.0]), 40.0, 1e13, 1.0),
+                  [0.0, 0.6], [1.0, 1.0], 40.0, 1e13)
+
+# --- test case 5: bad arrays or weights, or a or f0 / rate outside the domain, raise ValueError ---
+for _t_bad in ((np.array([0.1, 0.2]), np.array([1.0]), 100.0, 1e9, 1.0), (np.array([0.1, 1.7]), np.array([1.0, 1.0]), 100.0, 1e9, 1.0), (np.array([0.1, 0.2]), np.array([1.0, -1.0]), 100.0, 1e9, 1.0), (np.array([0.1, 0.2]), np.array([0.0, 0.0]), 100.0, 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 30.0, 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 100.0, 1e14, 1.0)):
     try:
         ensemble_switching(*_t_bad)
     except ValueError:

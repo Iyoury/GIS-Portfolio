@@ -129,6 +129,8 @@ _t_check6(25.0, -0.15)
 # here the slow mode lives in a well whose Boltzmann weight is ~exp(-216) of the deep one ---
 _t_o = _t_check6(60.0, 0.9)
 assert _t_o[1] * _t_o[0] < 0.1, _t_o
+_t_om = _t_check6(60.0, -0.9)
+assert _t_rel(_t_o[0], _t_om[0]) < 1e-9 and _t_rel(_t_o[1], _t_om[1]) < 1e-9, (_t_o, _t_om)
 _t_check6(30.0, 0.75)
 _t_check6(20.0, -0.5)
 _t_check6(5.0, 0.3)
