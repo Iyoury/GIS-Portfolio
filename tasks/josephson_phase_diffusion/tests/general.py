@@ -97,8 +97,18 @@ def _t_kramers(i, theta, beta_c):
     return f(i), d
 
 
-def _t_check_rcsj(i, theta, beta_c):
+def _t_timed(i, theta, beta_c):
+    # the prompt requires every call to finish within 30 s on one CPU core
+    import time as _t_time
+    start = _t_time.perf_counter()
     out = rcsj_voltage(i, theta, beta_c)
+    elapsed = _t_time.perf_counter() - start
+    assert elapsed <= 30.0, ("rcsj_voltage took %.1f s" % elapsed, i, theta, beta_c)
+    return out
+
+
+def _t_check_rcsj(i, theta, beta_c):
+    out = _t_timed(i, theta, beta_c)
     assert isinstance(out, tuple) and len(out) == 2 and all(type(x) is float for x in out), out
     v, dv = _t_kramers(i, theta, beta_c)
     assert abs(out[0] - v) <= 1e-7 * abs(v) + 1e-12, (i, theta, beta_c, out, v)

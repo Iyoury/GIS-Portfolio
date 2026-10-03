@@ -433,7 +433,7 @@ sub_steps:
       Inputs: i (float, |i| <= 2.5), theta (float, 0.1 <= theta <= 2) and beta_c (float, either
       exactly 0 or 0.1 <= beta_c <= 2). Return the tuple (v, r_d) of two Python floats, v with an
       error below 1e-7 * |v| + 1e-12 and r_d with a relative error below 1e-5. Each call must
-      finish within 30 s on one CPU core (the tests make about 15 calls).
+      finish within 30 s on one CPU core.
       Errors: raise ValueError if an input is not finite, if |i| > 2.5, if theta is outside
       [0.1, 2], or if beta_c is neither 0 nor in [0.1, 2].
     function_header: |-

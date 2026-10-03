@@ -120,4 +120,5 @@ Step 6 now states three things the tests rely on: (1) the tolerance on v is
 accuracy near 1e-16 that the prompt did not announce); (2) in the bistable range the required
 v is the average over the unique stationary distribution, not the voltage of the running or
 locked branch, which a finite time integration started in one branch does not reach; (3) a
-time budget of 30 s per call (the reference needs about 0.25 s).
+time budget of 30 s per call (the reference needs about 0.25 s), asserted on every call
+in the step 6 and whole-task tests.

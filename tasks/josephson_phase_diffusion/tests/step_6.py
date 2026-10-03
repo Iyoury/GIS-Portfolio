@@ -97,8 +97,18 @@ def _t_kramers(i, theta, beta_c):
     return f(i), d
 
 
-def _t_check_rcsj(i, theta, beta_c):
+def _t_timed(i, theta, beta_c):
+    # the prompt requires every call to finish within 30 s on one CPU core
+    import time as _t_time
+    start = _t_time.perf_counter()
     out = rcsj_voltage(i, theta, beta_c)
+    elapsed = _t_time.perf_counter() - start
+    assert elapsed <= 30.0, ("rcsj_voltage took %.1f s" % elapsed, i, theta, beta_c)
+    return out
+
+
+def _t_check_rcsj(i, theta, beta_c):
+    out = _t_timed(i, theta, beta_c)
     assert isinstance(out, tuple) and len(out) == 2 and all(type(x) is float for x in out), out
     v, dv = _t_kramers(i, theta, beta_c)
     assert abs(out[0] - v) <= 1e-7 * abs(v) + 1e-12, (i, theta, beta_c, out, v)
@@ -116,15 +126,15 @@ assert np.sqrt(2.5 ** 2 - 1.0) < _t_r[0] < 2.5
 # --- test case 1: weak inertia (beta_c = 0.1), reversed bias, and the overdamped limit beta_c = 0,
 # which is the junction of step 1 (independent continued fraction of the overdamped equation) ---
 _t_check_rcsj(-1.3, 0.5, 0.1)
-_t_o = rcsj_voltage(0.8, 0.3, 0.0)
+_t_o = _t_timed(0.8, 0.3, 0.0)
 _t_v, _t_dv = _t_cf(0.8, 0.3, want_D=False)
 assert _t_rel(_t_o[0], _t_v) < 1e-7 and _t_rel(_t_o[1], _t_dv) < 1e-5, (_t_o, _t_v, _t_dv)
 # inertia changes the current-voltage curve: beta_c = 0.1 differs from the overdamped value
-assert abs(rcsj_voltage(0.8, 0.3, 0.1)[0] / _t_v - 1.0) > 1e-3
+assert abs(_t_timed(0.8, 0.3, 0.1)[0] / _t_v - 1.0) > 1e-3
 
 # --- test case 2: thermally activated slips (exponentially small voltage), zero bias, strong noise ---
 _t_check_rcsj(0.05, 0.1, 2.0)
-_t_z = rcsj_voltage(0.0, 0.5, 1.0)
+_t_z = _t_timed(0.0, 0.5, 1.0)
 assert _t_z[0] == 0.0
 assert abs(_t_z[1] / _t_kramers(0.0, 0.5, 1.0)[1] - 1.0) < 1e-5
 _t_check_rcsj(-2.5, 2.0, 2.0)
