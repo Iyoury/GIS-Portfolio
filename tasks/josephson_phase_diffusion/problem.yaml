@@ -49,7 +49,7 @@ problem_io: |-
       Output:
         (v, r_d): tuple of two Python floats.
           v: mean phase velocity lim <phi(tau)> / tau = <V> / (I_c R) in the stationary state,
-             relative error below 1e-7 (v = 0.0 exactly at i = 0).
+             error below 1e-7 * |v| + 1e-12 (v = 0.0 exactly at i = 0).
           r_d: differential resistance dv/di (units of R), relative error below 1e-5.
 
       Raises:
@@ -422,9 +422,18 @@ sub_steps:
       the differential resistance r_d = dv/di. beta_c = 0 is the overdamped junction of
       mean_voltage (step 1). v is odd and r_d is even in i; at i = 0 return v = 0.0 exactly.
 
+      In the bistable range (strong inertia and weak noise, for example beta_c = 2, theta = 0.1,
+      i = 0.7) a junction started in the running state stays there for a time that grows
+      exponentially as theta decreases, while the stationary state is dominated by the locked
+      state: the required v is the average over the unique stationary distribution of
+      (phi, dphi/dtau), not the voltage of either branch, and a finite time integration does not
+      reach it. Below the critical current at weak noise v can be very small (of order 1e-9 at
+      i = 0.05, theta = 0.1, beta_c = 2).
+
       Inputs: i (float, |i| <= 2.5), theta (float, 0.1 <= theta <= 2) and beta_c (float, either
-      exactly 0 or 0.1 <= beta_c <= 2). Return the tuple (v, r_d) of two Python floats, v with a
-      relative error below 1e-7 and r_d with a relative error below 1e-5.
+      exactly 0 or 0.1 <= beta_c <= 2). Return the tuple (v, r_d) of two Python floats, v with an
+      error below 1e-7 * |v| + 1e-12 and r_d with a relative error below 1e-5. Each call must
+      finish within 30 s on one CPU core (the tests make about 15 calls).
       Errors: raise ValueError if an input is not finite, if |i| > 2.5, if theta is outside
       [0.1, 2], or if beta_c is neither 0 nor in [0.1, 2].
     function_header: |-
@@ -440,7 +449,7 @@ sub_steps:
           Output:
             (v, r_d): tuple of two Python floats.
               v: mean phase velocity lim <phi(tau)> / tau = <V> / (I_c R) in the stationary state,
-                 relative error below 1e-7 (v = 0.0 exactly at i = 0).
+                 error below 1e-7 * |v| + 1e-12 (v = 0.0 exactly at i = 0).
               r_d: differential resistance dv/di (units of R), relative error below 1e-5.
 
           Raises:

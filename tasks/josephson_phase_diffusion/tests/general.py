@@ -101,7 +101,7 @@ def _t_check_rcsj(i, theta, beta_c):
     out = rcsj_voltage(i, theta, beta_c)
     assert isinstance(out, tuple) and len(out) == 2 and all(type(x) is float for x in out), out
     v, dv = _t_kramers(i, theta, beta_c)
-    assert abs(out[0] - v) <= 1e-7 * abs(v), (i, theta, beta_c, out, v)
+    assert abs(out[0] - v) <= 1e-7 * abs(v) + 1e-12, (i, theta, beta_c, out, v)
     assert abs(out[1] / dv - 1.0) < 1e-5, (i, theta, beta_c, out, dv)
     return out
 

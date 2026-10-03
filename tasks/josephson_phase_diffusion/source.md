@@ -112,3 +112,12 @@ a central difference for dv/di.
 Step 6 test comment corrected to the truncation actually used by the oracle (N = 150,
 |p| <= 72, central difference). Step 4: the accepted endpoint-tolerance cases also check
 kappa against the independent kappa at the endpoint.
+
+## Version 9 changes
+
+Step 6 now states three things the tests rely on: (1) the tolerance on v is
+1e-7 * |v| + 1e-12 (a purely relative 1e-7 on voltages of order 1e-9 demanded an absolute
+accuracy near 1e-16 that the prompt did not announce); (2) in the bistable range the required
+v is the average over the unique stationary distribution, not the voltage of the running or
+locked branch, which a finite time integration started in one branch does not reach; (3) a
+time budget of 30 s per call (the reference needs about 0.25 s).
