@@ -1,0 +1,444 @@
+# problem.yaml: one per task folder. File paths are relative to this folder.
+
+domain: materials
+
+required_dependencies: |-
+  import numpy as np
+  from scipy.optimize import brentq
+  from scipy.integrate import quad
+  from scipy.integrate import solve_ivp
+  import mpmath as mp
+
+problem_description_main: |-
+  The Stoner-Wohlfarth model describes a small magnetic particle that is a single
+  domain. Its magnetization has a fixed length M_s and can only turn. The particle has
+  one easy axis (uniaxial anisotropy constant K) and volume V. A field H is applied
+  along an axis that makes an angle psi with the easy axis, 0 <= psi <= pi/2. Let theta
+  be the angle of the magnetization from the easy axis, in the plane of the easy axis
+  and the field, measured in the same sense as psi. In reduced units h = H / H_K, with
+  H_K = 2K / (mu0 M_s), the energy of the particle is E(theta) = 2 K V e(theta) with
+
+    e(theta) = (1/2) sin(theta)**2 - h cos(theta - psi).
+
+  A negative h means the field points the other way along the same axis. At zero
+  temperature the magnetization stays in a local minimum of e and follows it while the
+  field changes slowly, until that minimum disappears; then it jumps to the other
+  minimum, which gives hysteresis. At a temperature T > 0 it can also leave its minimum
+  earlier, by thermal activation over an energy barrier. We follow particles during a
+  descending field sweep, from a very large positive field down at a constant rate, and
+  compute the zero-temperature branch, the energy barriers, the probability that a
+  particle has not switched yet, the statistics of its switching field and the dynamic
+  coercive field of a small ensemble. The last step replaces the Arrhenius picture by the exact
+  relaxation of a particle whose field lies along its easy axis: the slowest relaxation rate
+  and the integral relaxation time from Brown's Fokker-Planck equation for the magnetization
+  direction. All fields are in units of H_K and all magnetizations in units of M_s.
+
+problem_io: |-
+  def brown_relaxation(sigma, h):
+      '''Exact thermal relaxation of one particle with its field along the easy axis (Brown's equation).
+
+      Inputs:
+        sigma: float, K V / (k_B T), 0 <= sigma <= 60.
+        h: float, reduced field H / H_K along the easy axis, -0.9 <= h <= 0.9.
+
+      Output:
+        (lam1, tau_int): tuple of two Python floats, in units of tau_N and 1/tau_N as below.
+          lam1: smallest nonzero eigenvalue of the Fokker-Planck operator (relaxation rate times
+                tau_N), relative error below 1e-8.
+          tau_int: integral relaxation time of z = cos(theta) divided by tau_N,
+                   int_0^inf C(t) dt / C(0) with C(t) = <z(t) z(0)> - <z>**2 in equilibrium,
+                   relative error below 1e-8.
+
+      Raises:
+        ValueError if sigma or h is not finite, if sigma is outside [0, 60] or if |h| > 0.9.
+      '''
+
+general_tests: tests/general.py
+
+second_solution: second_solution.py
+
+mutants:
+  - name: whole_task_doubled_energy
+    description: "Uses 2 sigma instead of sigma as the barrier scale in Brown's equation (the energy is K V (1 - z^2 - 2 h z), not twice that), so both relaxation quantities of the last step are wrong."
+    file: mutants/whole_task_doubled_energy.py
+
+# On a new version of an uploaded task only, what kind of edit it is.
+edit_label: difficulty_increase
+
+sub_steps:
+  - step_number: 1
+    scaffold: steps/step_1.py
+    solution: solution/step_1.py
+    tests: tests/step_1.py
+    step_description_prompt: |-
+      Zero temperature. Return the magnetization component along the field,
+      m = cos(theta - psi), on the descending branch of one particle at field h (h may be
+      positive or negative). The particle starts at a very large positive field, where
+      theta is close to psi, and the field is lowered slowly to h. The magnetization stays
+      in its local energy minimum (not the global minimum) until that minimum disappears
+      at the field h = -h_sw(psi), where it merges with a maximum (e'(theta) = 0 and
+      e''(theta) = 0 at the same angle). After that it is in the other minimum. At psi = 0
+      and at psi = pi/2 the merging is degenerate; there h_sw = 1. The function must work
+      for every psi in [0, pi/2], including the two end points.
+
+      Inputs: h (float) and psi (float, radians, 0 <= psi <= pi/2). Return m as a Python
+      float with an absolute error below 1e-10 for every h with |h + h_sw(psi)| >= 1e-3;
+      closer to the jump no accuracy is required.
+      Errors: raise ValueError if psi is outside [0, pi/2] or h is not finite.
+    function_header: |-
+      def branch_magnetization(h, psi):
+          '''Magnetization along the field on the zero-temperature descending branch of one particle.
+
+          Inputs:
+            h: float, reduced field along the field axis (negative means reversed field).
+            psi: float, angle in radians between the field axis and the easy axis, 0 <= psi <= pi/2.
+
+          Output:
+            m: float, cos(theta - psi), where theta is the magnetization angle (from the easy
+               axis) of the state reached when the field comes down from large positive values
+               to h, the particle staying in its local energy minimum until that minimum
+               disappears at h = -h_sw(psi). Absolute error below 1e-10 when
+               |h + h_sw(psi)| >= 1e-3.
+
+          Raises:
+            ValueError if psi is outside [0, pi/2] or h is not finite.
+          '''
+    return_line: return m
+    step_background: |-
+      Eliminating theta from e' = 0 and e'' = 0 gives a closed curve in the plane of the
+      field components along and across the easy axis, the Stoner-Wohlfarth astroid.
+      Inside it there are two energy minima, outside only one. The curve is symmetric
+      under exchanging the two components, so h_sw(psi) = h_sw(pi/2 - psi), and h_sw is
+      smallest, 0.5, at psi = pi/4. The map theta -> theta + pi turns the energy at field
+      h into the energy at field -h. For psi > pi/4 the component m already becomes
+      negative before the jump.
+    n_test_cases: 5
+    contract:
+      quantity: Component of the reduced magnetization along the field on the zero-temperature descending hysteresis branch.
+      assumptions: Quasi-static field change, the particle follows its local minimum until it vanishes, no thermal jumps.
+      result_kind: exact
+      valid_input_ranges: Any real h with |h + h_sw(psi)| >= 1e-3; 0 <= psi <= pi/2.
+      units: Units of M_s.
+      output_shape: One Python float in [-1, 1].
+      step_dependencies: []
+    mutants:
+      - name: global_minimum
+        description: Puts the particle in the global energy minimum instead of the local minimum it follows.
+        file: mutants/step_1_global_minimum.py
+      - name: wrong_astroid_power
+        description: Uses the outer power -2/3 instead of -3/2 in the switching field, so the particle jumps at the wrong field.
+        file: mutants/step_1_wrong_astroid_power.py
+
+  - step_number: 2
+    scaffold: steps/step_2.py
+    solution: solution/step_2.py
+    tests: tests/step_2.py
+    step_description_prompt: |-
+      For fields where both energy minima exist, |h| < h_sw(psi), a particle on the
+      descending branch sits in its original minimum, the one followed from large positive
+      fields (branch_magnetization, step 1). To leave it, the magnetization must pass over
+      one of the two energy maxima of e(theta) on the circle. Return the two reduced
+      barriers, Delta_e = e(theta_max) - e(theta_min) from the original minimum over each
+      of the two maxima, as a tuple (low, high) with low <= high.
+
+      h may be a float or a numpy array of any shape. Return two values with the shape of
+      np.asarray(h) (float numpy arrays, or numpy floats for a plain number), each entry
+      with an absolute error below 1e-10 whenever h_sw(psi) - |h| >= 1e-3.
+      Errors: raise ValueError if psi is outside [0, pi/2], if any h is not finite, or if
+      any h has |h| >= h_sw(psi) (only one minimum exists there).
+    function_header: |-
+      def escape_barriers(h, psi):
+          '''Reduced energy barriers that keep a particle in its original minimum.
+
+          Inputs:
+            h: float or numpy array (any shape), reduced field with |h| < h_sw(psi).
+            psi: float, angle in radians between the field axis and the easy axis, 0 <= psi <= pi/2.
+
+          Output:
+            (low, high): two values with the shape of np.asarray(h). low <= high are
+            e(theta_max) - e(theta_min) for the two energy maxima, theta_min being the original
+            minimum of the descending branch. Absolute error below 1e-10 when
+            h_sw(psi) - |h| >= 1e-3.
+
+          Raises:
+            ValueError if psi is outside [0, pi/2], if any h is not finite, or if any
+            |h| >= h_sw(psi).
+          '''
+    return_line: return low, high
+    step_background: |-
+      Inside the astroid, e(theta) has exactly two minima and two maxima on the circle,
+      and they alternate, so each maximum separates the two minima. At h = 0 both
+      barriers are 1/2 (the energy K V of the hard axis). When h approaches -h_sw(psi) the
+      original minimum merges with one maximum and the lower barrier goes to zero.
+    n_test_cases: 5
+    contract:
+      quantity: The two reduced energy barriers between the original minimum of the descending branch and the two energy maxima.
+      assumptions: Same model as step 1; both minima exist.
+      result_kind: exact
+      valid_input_ranges: 0 <= psi <= pi/2; |h| < h_sw(psi), accuracy required for h_sw(psi) - |h| >= 1e-3.
+      units: Units of 2 K V (reduced energy).
+      output_shape: Tuple of two floats or two float arrays with the shape of np.asarray(h).
+      step_dependencies: []
+    mutants:
+      - name: barrier_from_global_minimum
+        description: Measures the barriers from the deepest minimum instead of the original minimum the particle occupies.
+        file: mutants/step_2_barrier_from_global_minimum.py
+
+  - step_number: 3
+    scaffold: steps/step_3.py
+    solution: solution/step_3.py
+    tests: tests/step_3.py
+    step_description_prompt: |-
+      Thermal activation. While both minima exist, a particle in its original minimum
+      jumps over energy maximum k (k = 1, 2) at the rate f0 * exp(-dE_k / (k_B T)), where
+      dE_k is that barrier in joules (the energy E at the maximum minus E at the original
+      minimum, see escape_barriers, step 2) and f0 is the attempt frequency in 1/s; the
+      two escape routes add. The thermal stability ratio is a = K V / (k_B T). There are no
+      jumps while only the original minimum exists and no jumps back once the particle has
+      left, and the particle has surely left once the original minimum disappears
+      (h <= -h_sw(psi)). The field starts at a very large positive value and decreases at
+      the constant rate `rate`, in units of H_K per second.
+
+      Return the probability that the particle is still in its original minimum when the
+      field reaches h, as a Python float with an absolute error below 1e-10. The model is
+      meant for 40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13.
+      Errors: raise ValueError if psi is outside [0, pi/2], if h is not finite, or if a,
+      f0 or rate is not a positive finite number.
+    function_header: |-
+      def survival_probability(h, psi, a, f0, rate):
+          '''Probability that a particle has not left its original minimum when the sweep reaches h.
+
+          Inputs:
+            h: float, reduced field reached by the descending sweep.
+            psi: float, easy-axis angle in radians, 0 <= psi <= pi/2.
+            a: float, thermal stability ratio K V / (k_B T), > 0.
+            f0: float, attempt frequency in 1/s, > 0.
+            rate: float, sweep rate |dh/dt| in units of H_K per second, > 0.
+
+          Output:
+            P: float in [0, 1], P = 1 for h >= h_sw(psi) and P = 0 for h <= -h_sw(psi).
+               Absolute error below 1e-10.
+
+          Raises:
+            ValueError if psi is outside [0, pi/2], if h is not finite, or if a, f0 or rate
+            is not a positive finite number.
+          '''
+    return_line: return P
+    step_background: |-
+      This is the Neel-Brown picture of thermal switching: escape is a Poisson process
+      whose rate depends on the field, and time and field are tied by the constant sweep
+      rate. The rate grows by many orders of magnitude as the lower barrier shrinks, so
+      almost all switching happens in a narrow field window well before the
+      zero-temperature switching field (Sharrock 1994); slower sweeps and higher
+      temperatures switch at smaller fields.
+    n_test_cases: 5
+    contract:
+      quantity: Survival probability of the original minimum during a descending field sweep with thermally activated escape.
+      assumptions: Arrhenius escape over both maxima with attempt frequency f0, no back jumps, no escape outside the astroid, certain switching when the original minimum vanishes, constant sweep rate.
+      result_kind: exact
+      valid_input_ranges: 0 <= psi <= pi/2; any real h; 40 <= a <= 1000; 1e5 <= f0 / rate <= 1e13.
+      units: Probability (dimensionless).
+      output_shape: One Python float in [0, 1].
+      step_dependencies: [2]
+    mutants:
+      - name: lower_route_only
+        description: Keeps only the escape over the lower barrier and drops the second route.
+        file: mutants/step_3_lower_route_only.py
+
+  - step_number: 4
+    scaffold: steps/step_4.py
+    solution: solution/step_4.py
+    tests: tests/step_4.py
+    step_description_prompt: |-
+      In the sweep of survival_probability (step 3), with the escape rate built from
+      escape_barriers (step 2), the switching field of one particle is the field at which
+      it leaves its original minimum; it is a random variable.
+      Return the tuple (h_median, h_mean) of two Python floats: h_median is the field at
+      which the particle has left with probability 1/2, and h_mean is the mean switching
+      field. Give both with an absolute error below 1e-9.
+      Errors: raise ValueError if psi is outside [0, pi/2] or if a, f0 or rate is not a
+      positive finite number.
+    function_header: |-
+      def switching_field_statistics(psi, a, f0, rate):
+          '''Median and mean switching field of one particle in the descending sweep.
+
+          Inputs:
+            psi: float, easy-axis angle in radians, 0 <= psi <= pi/2.
+            a: float, thermal stability ratio K V / (k_B T), > 0.
+            f0: float, attempt frequency in 1/s, > 0.
+            rate: float, sweep rate |dh/dt| in units of H_K per second, > 0.
+
+          Output:
+            (h_median, h_mean): tuple of two floats, the median and the mean of the field at
+            which the particle leaves its original minimum. Absolute errors below 1e-9.
+
+          Raises:
+            ValueError if psi is outside [0, pi/2] or if a, f0 or rate is not a positive
+            finite number.
+          '''
+    return_line: return result
+    step_background: |-
+      The switching field is spread over a narrow window; its distribution is skewed
+      because the escape rate rises steeply as the field falls. Sharrock-type formulas
+      give the median only approximately; here it must follow from the full field
+      dependence of both barriers.
+    n_test_cases: 4
+    contract:
+      quantity: Median and mean of the random switching field of one particle under thermally activated escape.
+      assumptions: Same model as step 3.
+      result_kind: exact
+      valid_input_ranges: 0 <= psi <= pi/2; 40 <= a <= 1000; 1e5 <= f0 / rate <= 1e13.
+      units: Units of H_K.
+      output_shape: Tuple of two Python floats.
+      step_dependencies: [2]
+    mutants:
+      - name: wrong_mean_formula
+        description: Takes the mean switching field as the integral of the survival probability minus h_sw instead of h_sw minus that integral.
+        file: mutants/step_4_wrong_mean_formula.py
+
+  - step_number: 5
+    scaffold: steps/step_5.py
+    solution: solution/step_5.py
+    tests: tests/step_5.py
+    step_description_prompt: |-
+      Now take an ensemble of non-interacting particles with the same a, f0 and rate and
+      easy axes at the angles psis[i], with weights weights[i] (the weights are normalized
+      by their sum), all following the sweep of step 3. A particle that is still in its
+      original minimum has the field-axis magnetization of that minimum
+      (branch_magnetization, step 1); a particle that has left it sits in the other energy
+      minimum and has the field-axis magnetization of that minimum. The ensemble
+      magnetization is the weighted mean of the expected field-axis magnetizations of the
+      particles, with the probabilities of survival_probability (step 3).
+
+      Return the tuple (h_c, h_half) of two Python floats: h_c is the dynamic coercive
+      field, the ensemble magnetization being zero at h = -h_c, and h_half is defined by
+      half of the total weight having left its original minimum at h = -h_half. Give both
+      with an absolute error below 1e-8.
+      Errors: raise ValueError if psis and weights are not 1-D arrays of the same nonzero
+      length, if a psi is outside [0, pi/2], if a weight is negative or not finite, if the
+      weights add up to zero, or if a, f0 or rate is not a positive finite number.
+    function_header: |-
+      def ensemble_switching(psis, weights, a, f0, rate):
+          '''Dynamic coercive field and half-switching field of an ensemble during the sweep.
+
+          Inputs:
+            psis: 1-D array of easy-axis angles in radians, each in [0, pi/2].
+            weights: 1-D array of the same length, nonnegative, not all zero (normalized by
+                     their sum).
+            a: float, thermal stability ratio K V / (k_B T), > 0.
+            f0: float, attempt frequency in 1/s, > 0.
+            rate: float, sweep rate |dh/dt| in units of H_K per second, > 0.
+
+          Output:
+            (h_c, h_half): tuple of two floats, absolute errors below 1e-8.
+              h_c: the ensemble magnetization is zero at h = -h_c during the sweep.
+              h_half: half of the total weight has left its original minimum at h = -h_half.
+
+          Raises:
+            ValueError if psis and weights are not 1-D arrays of the same nonzero length, if
+            a psi is outside [0, pi/2], if a weight is negative or not finite, if the weights
+            add up to zero, or if a, f0 or rate is not a positive finite number.
+          '''
+    return_line: return result
+    step_background: |-
+      The coercive field mixes two effects: particles that have switched, and reversible
+      rotation of the magnetization inside both minima. It therefore differs from the
+      half-switching field. Both fall as the sweep gets slower or the temperature higher
+      (dynamic coercivity).
+    n_test_cases: 3
+    contract:
+      quantity: Dynamic coercive field and half-switching field of a weighted ensemble of Stoner-Wohlfarth particles with thermally activated switching.
+      assumptions: Same model as step 3 for every particle; independent particles; expected magnetization from the survival probabilities.
+      result_kind: exact
+      valid_input_ranges: Angles in [0, pi/2) with at least one below pi/2; 40 <= a <= 1000; 1e5 <= f0 / rate <= 1e13.
+      units: Units of H_K.
+      output_shape: Tuple of two Python floats.
+      step_dependencies: [1, 3]
+    mutants:
+      - name: athermal_particles
+        description: Uses the zero-temperature branch for every particle (no thermal escape before -h_sw).
+        file: mutants/step_5_athermal_particles.py
+
+  - step_number: 6
+    scaffold: steps/step_6.py
+    solution: solution/step_6.py
+    tests: tests/step_6.py
+    step_description_prompt: |-
+      Leave the Arrhenius rate with its assumed attempt frequency f0 and treat thermal switching
+      exactly for one particle whose field is along its easy axis (psi = 0). With
+      z = cos(theta), the distribution W(z, t) of the magnetization direction (normalized,
+      int_{-1}^{1} W dz = 1) obeys Brown's Fokker-Planck equation, which for this axially
+      symmetric case reads
+
+        2 tau_N dW/dt = d/dz [ (1 - z**2) ( dW/dz + W d(beta E)/dz ) ],
+        beta E(z) = sigma (1 - z**2 - 2 h z),
+
+      with sigma = K V / (k_B T) (the a of the earlier steps), h = H / H_K along the easy axis and
+      tau_N the free-diffusion time of the magnetization (its value does not matter here; all
+      times are in units of tau_N). Its stationary solution is the Boltzmann distribution
+      exp(-beta E) / Z. Compute
+
+        lam1: the smallest nonzero eigenvalue of this Fokker-Planck operator, i.e. the slowest
+              relaxation rate of any initial distribution towards equilibrium, in units of 1/tau_N;
+        tau_int: the integral relaxation time of z, int_0^inf C(t) dt / C(0) with the equilibrium
+              correlation function C(t) = <z(t) z(0)> - <z>**2, in units of tau_N.
+
+      At sigma = 0 both equal 1. For large sigma lam1 is exponentially small (about 1e-24 at
+      sigma = 60, h = 0) and must still have the stated relative accuracy. In a strong field one
+      well holds only a tiny part of the equilibrium probability (a relative Boltzmann weight near
+      exp(-4 sigma |h|), about 1e-94 at sigma = 60, |h| = 0.9), yet the slowest mode can live in
+      it, and tau_int then differs from 1 / lam1 by orders of magnitude.
+
+      Inputs: sigma (float, 0 <= sigma <= 60) and h (float, -0.9 <= h <= 0.9). Return the tuple
+      (lam1, tau_int) of two Python floats, each with a relative error below 1e-8.
+      Errors: raise ValueError if sigma or h is not finite, if sigma is outside [0, 60] or if
+      |h| > 0.9.
+    function_header: |-
+      def brown_relaxation(sigma, h):
+          '''Exact thermal relaxation of one particle with its field along the easy axis (Brown's equation).
+
+          Inputs:
+            sigma: float, K V / (k_B T), 0 <= sigma <= 60.
+            h: float, reduced field H / H_K along the easy axis, -0.9 <= h <= 0.9.
+
+          Output:
+            (lam1, tau_int): tuple of two Python floats, in units of tau_N and 1/tau_N as below.
+              lam1: smallest nonzero eigenvalue of the Fokker-Planck operator (relaxation rate times
+                    tau_N), relative error below 1e-8.
+              tau_int: integral relaxation time of z = cos(theta) divided by tau_N,
+                       int_0^inf C(t) dt / C(0) with C(t) = <z(t) z(0)> - <z>**2 in equilibrium,
+                       relative error below 1e-8.
+
+          Raises:
+            ValueError if sigma or h is not finite, if sigma is outside [0, 60] or if |h| > 0.9.
+          '''
+    return_line: return result
+    step_background: |-
+      Brown (1963) derived the Fokker-Planck equation for the magnetization of a single-domain
+      particle; for an axially symmetric potential it reduces to one variable z = cos(theta). Its
+      eigenvalues are the relaxation rates; the smallest nonzero one is the switching rate, which
+      Brown's high-barrier formula approximates by (2 / sqrt(pi)) sigma**1.5 exp(-sigma) at h = 0.
+      The integral relaxation time weights all modes by their contribution to z; at strong fields
+      the intrawell modes of the deep well dominate it (Coffey, Kalmykov and Garanin). Matrix
+      methods in Legendre polynomials and integral formulas with Boltzmann weights are both used;
+      in double precision a plain matrix eigensolver cannot resolve an eigenvalue 1e-24 next to
+      eigenvalues of order 100, and representations that mix the two wells lose the shallow one.
+    n_test_cases: 6
+    contract:
+      quantity: "Smallest nonzero eigenvalue and integral relaxation time of Brown's Fokker-Planck equation for a uniaxial particle with its field along the easy axis."
+      assumptions: "Axially symmetric Brown equation in z = cos(theta), beta E = sigma (1 - z^2 - 2 h z), time in units of tau_N; exact, no high-barrier approximation."
+      result_kind: exact
+      valid_input_ranges: "0 <= sigma <= 60, -0.9 <= h <= 0.9."
+      units: "lam1 in 1/tau_N, tau_int in tau_N."
+      output_shape: "Tuple of two Python floats (lam1, tau_int)."
+      step_dependencies: []
+    mutants:
+      - name: brown_asymptote
+        description: "Uses Brown's high-barrier formula for lam1 and 1 / lam1 for tau_int."
+        file: mutants/step_6_brown_asymptote.py
+      - name: tau_from_slowest_mode
+        description: "Takes tau_int as 1 / lam1, ignoring the intrawell modes that dominate it in strong fields."
+        file: mutants/step_6_tau_from_slowest_mode.py
+      - name: missing_half
+        description: "Drops the factor 2 tau_N of Brown's equation, so lam1 is doubled and tau_int halved."
+        file: mutants/step_6_missing_half.py
