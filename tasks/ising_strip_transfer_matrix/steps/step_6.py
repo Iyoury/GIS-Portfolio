@@ -10,12 +10,13 @@ def critical_exponents(L):
 
     Output:
       dict with exactly the keys "x_sigma", "x_energy", "beta_over_nu", "gamma_over_nu", "y_h"
-      and "c", each a float within 1e-4 of its formula. With Tc = 2 / ln(1 + sqrt(2)),
-      r = ln((L+1) / L) and every quantity taken at T = Tc:
-        x_sigma = L / (2 pi xi_spin(L)), x_energy = L / (2 pi xi_energy(L));
-        beta_over_nu = ln(m_L / m_(L+1)) / r;
-        gamma_over_nu = ln(chi_(L+1) / chi_L) / r;
-        y_h = ln(H_edge(L) / H_edge(L+1)) / r;
-        c from f_W = f_inf - pi c Tc / (6 W**2) + d / W**4, solved exactly for W = L, L+1, L+2.
+      and "c", each a float within 1e-4 of the value defined in the prompt. Every quantity is
+      taken at T = Tc = 2 / ln(1 + sqrt(2)):
+        x_sigma, x_energy: scaling dimensions from Cardy's relation (correlation length
+          W / (2 pi x) on a periodic strip of width W) at the single width L;
+        beta_over_nu, gamma_over_nu, y_h: two-width effective exponents of the power laws
+          m_W ~ W**(-beta/nu), chi_W ~ W**(gamma/nu), H_edge(W) ~ W**(-y_h) between W = L, L+1;
+        c: central charge from f_W = f_inf - pi c Tc / (6 W**2) + d / W**4 held exactly for
+          W = L, L+1, L+2.
     '''
     raise NotImplementedError

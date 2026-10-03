@@ -314,20 +314,25 @@ sub_steps:
     tests: tests/step_6.py
     step_description_prompt: |-
       Combine strips at the exact critical temperature Tc = 2 / ln(1 + sqrt(2)) into
-      finite-size estimates. Every quantity below is taken at T = Tc, and r = ln((L+1) / L).
+      finite-size estimates. Every quantity below is taken at T = Tc.
 
-        x_sigma = L / (2 pi xi_spin(L)) and x_energy = L / (2 pi xi_energy(L)), with the
-          lengths from strip_lengths (step 2);
-        beta_over_nu = ln(m_L / m_(L+1)) / r, with m from strip_magnetization (step 3);
-        gamma_over_nu = ln(chi_(L+1) / chi_L) / r, with chi from strip_susceptibility (step 4);
-        y_h = ln(H_edge(L) / H_edge(L+1)) / r, with H_edge from lee_yang_edge (step 5);
-        c: write f_W = f_inf - pi * c * Tc / (6 * W**2) + d / W**4 for W = L, L+1 and L+2,
-          with f_W from strip_lengths (step 2), and solve the three equations exactly for
-          f_inf, c and d.
+        x_sigma and x_energy: the scaling dimensions of the spin and of the energy that follow
+          from Cardy's relation for a periodic strip at criticality (the correlation length of an
+          operator of scaling dimension x on a strip of width W is W / (2 pi x)), applied to the
+          single width L, with xi_spin(L) and xi_energy(L) from strip_lengths (step 2);
+        beta_over_nu, gamma_over_nu and y_h: the two-width effective exponents obtained by
+          requiring the finite-size power laws m_W ~ W**(-beta/nu) (m from strip_magnetization,
+          step 3), chi_W ~ W**(gamma/nu) (chi from strip_susceptibility, step 4) and
+          H_edge(W) ~ W**(-y_h) (H_edge from lee_yang_edge, step 5) to hold exactly between the
+          widths W = L and W = L + 1;
+        c: the central charge from the conformal finite-size law of the free energy per spin,
+          f_W = f_inf - pi c Tc / (6 W**2) + d / W**4 with three unknowns f_inf, c and d, required
+          to hold exactly for the three widths W = L, L + 1 and L + 2 (f_W from strip_lengths,
+          step 2).
 
       Return a dict with exactly the keys "x_sigma", "x_energy", "beta_over_nu",
-      "gamma_over_nu", "y_h" and "c", each a Python float within 1e-4 of the value of its
-      formula, for every integer L from 3 to 7.
+      "gamma_over_nu", "y_h" and "c", each a Python float within 1e-4 of the value defined
+      above, for every integer L from 3 to 7.
     function_header: |-
       def critical_exponents(L):
           '''Finite-size estimates of critical exponents and of the central charge at the exact Tc.
@@ -337,13 +342,14 @@ sub_steps:
 
           Output:
             dict with exactly the keys "x_sigma", "x_energy", "beta_over_nu", "gamma_over_nu", "y_h"
-            and "c", each a float within 1e-4 of its formula. With Tc = 2 / ln(1 + sqrt(2)),
-            r = ln((L+1) / L) and every quantity taken at T = Tc:
-              x_sigma = L / (2 pi xi_spin(L)), x_energy = L / (2 pi xi_energy(L));
-              beta_over_nu = ln(m_L / m_(L+1)) / r;
-              gamma_over_nu = ln(chi_(L+1) / chi_L) / r;
-              y_h = ln(H_edge(L) / H_edge(L+1)) / r;
-              c from f_W = f_inf - pi c Tc / (6 W**2) + d / W**4, solved exactly for W = L, L+1, L+2.
+            and "c", each a float within 1e-4 of the value defined in the prompt. Every quantity is
+            taken at T = Tc = 2 / ln(1 + sqrt(2)):
+              x_sigma, x_energy: scaling dimensions from Cardy's relation (correlation length
+                W / (2 pi x) on a periodic strip of width W) at the single width L;
+              beta_over_nu, gamma_over_nu, y_h: two-width effective exponents of the power laws
+                m_W ~ W**(-beta/nu), chi_W ~ W**(gamma/nu), H_edge(W) ~ W**(-y_h) between W = L, L+1;
+              c: central charge from f_W = f_inf - pi c Tc / (6 W**2) + d / W**4 held exactly for
+                W = L, L+1, L+2.
           '''
     return_line: return result
     step_background: |-
@@ -384,7 +390,8 @@ sub_steps:
         chi = dm/dh at fixed T, the susceptibility (units 1/J), with relative accuracy 1e-5;
         c = -T d2f/dT2 at fixed h, the specific heat (units k_B), with relative accuracy 1e-5.
 
-      Return the tuple (f, m, chi, c) of four Python floats. Near Tc in the weakest fields the
+      Return the tuple (f, m, chi, c) of four Python floats; each call must finish within 60 s
+      on one CPU core. Near Tc in the weakest fields the
       bulk correlation length is many lattice spacings, so strips of any width that can be
       diagonalized are far from these limits, and the response functions are large and vary
       quickly with T and h.

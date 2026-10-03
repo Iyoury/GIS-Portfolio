@@ -89,3 +89,9 @@ range (h from 0.005 instead of 0.02, so the correlation length near Tc is about 
 long). The free energy needs the correctly normalized per-site partition function of the
 infinite-lattice method, and chi = dm/dh and c = -T d2f/dT2 need converged derivatives to
 1e-5 relative. Targets from CTMRG at bond dimension 28, cross-checked with VUMPS.
+
+Version 8: step 7 states a time budget of 60 s per call (the reference needs at most about
+15 s), asserted on every call in the step 7 and whole-task tests; two rollout attempts had
+timed out on step 7 without a stated budget. Step 6 states the scaling laws (Cardy's relation,
+finite-size power laws between two widths, the conformal law of the free energy for three
+widths) instead of the final estimator formulas; the expected values are unchanged.

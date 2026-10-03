@@ -1,7 +1,19 @@
+import time as _t_time
+
+
+def _t_timed(T, h):
+    # the prompt requires every call to finish within 60 s on one CPU core
+    start = _t_time.perf_counter()
+    out = bulk_thermodynamics(T, h)
+    elapsed = _t_time.perf_counter() - start
+    assert elapsed <= 60.0, ("bulk_thermodynamics took %.1f s" % elapsed, T, h)
+    return out
+
+
 # --- test case 0: exact Tc, weakest field: largest correlation length ---
 import numpy as np
 
-out = bulk_thermodynamics(2.0 / np.log(1.0 + np.sqrt(2.0)), 0.005)
+out = _t_timed(2.0 / np.log(1.0 + np.sqrt(2.0)), 0.005)
 assert isinstance(out, tuple) and len(out) == 4 and all(type(x) is float for x in out), out
 f, m, chi, c = out
 assert abs(f - (-2.1129520308985383)) < 1e-10, f
@@ -12,7 +24,7 @@ assert abs(c / 1.6888219521953 - 1.0) < 1e-5, c
 # --- test case 1: above Tc, weak field: susceptibility peak region ---
 import numpy as np
 
-out = bulk_thermodynamics(2.4, 0.01)
+out = _t_timed(2.4, 0.01)
 assert isinstance(out, tuple) and len(out) == 4 and all(type(x) is float for x in out), out
 f, m, chi, c = out
 assert abs(f - (-2.159232093634584)) < 1e-10, f
@@ -23,7 +35,7 @@ assert abs(c / 1.6439292454428767 - 1.0) < 1e-5, c
 # --- test case 2: below Tc, weakest field ---
 import numpy as np
 
-out = bulk_thermodynamics(2.1, 0.005)
+out = _t_timed(2.1, 0.005)
 assert isinstance(out, tuple) and len(out) == 4 and all(type(x) is float for x in out), out
 f, m, chi, c = out
 assert abs(f - (-2.0731964092038884)) < 1e-10, f
@@ -34,7 +46,7 @@ assert abs(c / 0.9303023081108641 - 1.0) < 1e-5, c
 # --- test case 3: above Tc, weakest field, small magnetization ---
 import numpy as np
 
-out = bulk_thermodynamics(2.6, 0.005)
+out = _t_timed(2.6, 0.005)
 assert isinstance(out, tuple) and len(out) == 4 and all(type(x) is float for x in out), out
 f, m, chi, c = out
 assert abs(f - (-2.2438619104244353)) < 1e-10, f
@@ -45,7 +57,7 @@ assert abs(c / 0.7226708601463608 - 1.0) < 1e-5, c
 # --- test case 4: upper ends of the T and h ranges ---
 import numpy as np
 
-out = bulk_thermodynamics(3.0, 0.2)
+out = _t_timed(3.0, 0.2)
 assert isinstance(out, tuple) and len(out) == 4 and all(type(x) is float for x in out), out
 f, m, chi, c = out
 assert abs(f - (-2.510941028682692)) < 1e-10, f
@@ -56,7 +68,7 @@ assert abs(c / 0.9086788254064615 - 1.0) < 1e-5, c
 # --- test case 5: lower end of T, strongest field ---
 import numpy as np
 
-out = bulk_thermodynamics(2.0, 0.2)
+out = _t_timed(2.0, 0.2)
 assert isinstance(out, tuple) and len(out) == 4 and all(type(x) is float for x in out), out
 f, m, chi, c = out
 assert abs(f - (-2.238272302396574)) < 1e-10, f
