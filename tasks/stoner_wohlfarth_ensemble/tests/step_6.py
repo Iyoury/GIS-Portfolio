@@ -110,7 +110,7 @@ def _t_check6(sigma, h):
 # the slowest mode is P_1(z) with rate exactly 1/tau_N, and tau_int = tau_N ---
 for _t_h in (0.0, 0.6):
     _t_o = _t_check6(0.0, _t_h)
-    assert abs(_t_o[0] - 1.0) < 1e-12 and abs(_t_o[1] - 1.0) < 1e-12, _t_o
+    assert abs(_t_o[0] - 1.0) < 1e-9 and abs(_t_o[1] - 1.0) < 1e-9, _t_o
 
 # --- test case 1: zero field, moderate to high barriers; at sigma = 60 Brown's high-barrier
 # asymptote (2 / sqrt(pi)) sigma**1.5 exp(-sigma) is reached within a few percent ---

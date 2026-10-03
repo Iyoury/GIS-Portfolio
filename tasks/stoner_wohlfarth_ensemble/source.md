@@ -77,3 +77,5 @@ integral relaxation time tau_int of Brown's axially symmetric Fokker-Planck equa
   lam1 = 1, tau_int = 1 at sigma = 0; Brown's asymptote is approached at sigma = 60; a third
   check by symmetric finite differences reproduces lam1 = 5.150415 at sigma = 60, h = 0.9,
   where a smooth starting vector converges instead to an intrawell mode of the deep well.
+
+Version 4: the sigma = 0 checks of step 6 use 1e-9 instead of 1e-12 (inside the stated 1e-8; a 1e-12 bound left no room for a result perturbed at the 1e-12 level).
