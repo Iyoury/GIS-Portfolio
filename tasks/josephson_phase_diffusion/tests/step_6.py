@@ -65,8 +65,8 @@ def _t_rel(x, y):
 
 # Independent target for the junction with capacitance: the same Kramers equation expanded
 # in Hermite functions CENTRED AT A DIFFERENT VELOCITY v0 = 0.6 i (another basis, so another
-# truncated system), with a larger truncation (N = 220 Hermite, |p| <= 110 Fourier modes),
-# solved by its own matrix continued fraction. dv/di from a five-point stencil (h = 1e-3).
+# truncated system), with a larger truncation (N = 150 Hermite, |p| <= 72 Fourier modes),
+# solved by its own matrix continued fraction. dv/di from a central difference (h = 1e-4).
 def _t_kramers_v(i, theta, beta_c, N=150, P=72):
     v0 = 0.6 * i
     vth = np.sqrt(theta / beta_c)

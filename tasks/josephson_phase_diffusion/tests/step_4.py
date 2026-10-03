@@ -117,9 +117,11 @@ _t_check_temp(0.4, 0.06, _t_v_bessel(0.4, 0.06))
 _t_v02 = _t_cf(0.9, 0.02, want_D=False)[0]
 _t_o = noise_temperature(0.9, _t_v02 * (1.0 - 0.9e-11))
 assert _t_rel(_t_o[0], 0.02) < 1e-7, _t_o
+assert _t_rel(_t_o[1], _t_kappa(0.9, 0.02)) < 1e-6, _t_o      # with the kappa of the endpoint
 _t_v50 = _t_cf(0.7, 50.0, want_D=False)[0]
 _t_o = noise_temperature(0.7, _t_v50 * (1.0 + 0.9e-11))
 assert _t_rel(_t_o[0], 50.0) < 1e-7, _t_o
+assert _t_rel(_t_o[1], _t_kappa(0.7, 50.0)) < 1e-6, _t_o
 for _t_bad in ((0.9, _t_v02 * (1.0 - 1.1e-11)), (0.7, _t_v50 * (1.0 + 1.1e-11))):
     try:
         noise_temperature(*_t_bad)

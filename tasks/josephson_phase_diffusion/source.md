@@ -106,3 +106,9 @@ by differentiating the continued-fraction recursion (agrees with finite differen
 their own accuracy), so one call takes about 0.25 s instead of 7 s. The test oracle uses
 N = 150, |p| <= 72 in the shifted basis (unchanged to 5e-9 against N = 220, |p| <= 110) and
 a central difference for dv/di.
+
+## Version 8 changes
+
+Step 6 test comment corrected to the truncation actually used by the oracle (N = 150,
+|p| <= 72, central difference). Step 4: the accepted endpoint-tolerance cases also check
+kappa against the independent kappa at the endpoint.
