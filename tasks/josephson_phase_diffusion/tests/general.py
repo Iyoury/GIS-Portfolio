@@ -67,7 +67,7 @@ def _t_rel(x, y):
 # in Hermite functions CENTRED AT A DIFFERENT VELOCITY v0 = 0.6 i (another basis, so another
 # truncated system), with a larger truncation (N = 220 Hermite, |p| <= 110 Fourier modes),
 # solved by its own matrix continued fraction. dv/di from a five-point stencil (h = 1e-3).
-def _t_kramers_v(i, theta, beta_c, N=220, P=110):
+def _t_kramers_v(i, theta, beta_c, N=150, P=72):
     v0 = 0.6 * i
     vth = np.sqrt(theta / beta_c)
     gam = 1.0 / beta_c
@@ -91,9 +91,9 @@ def _t_kramers_v(i, theta, beta_c, N=220, P=110):
 
 
 def _t_kramers(i, theta, beta_c):
-    h = 1e-3
+    h = 1e-4
     f = lambda x: _t_kramers_v(x, theta, beta_c)
-    d = (-f(i + 2 * h) + 8 * f(i + h) - 8 * f(i - h) + f(i - 2 * h)) / (12 * h)
+    d = (f(i + h) - f(i - h)) / (2 * h)
     return f(i), d
 
 

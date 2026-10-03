@@ -267,7 +267,7 @@ def rcsj_voltage(i, theta, beta_c):
     '''Stationary dc voltage and differential resistance of a noisy junction with capacitance (RCSJ).'''
     # Other route: the Kramers equation in Hermite functions centred at the overdamped mean
     # velocity (shifted basis, so the truncated system differs from an expansion about v = 0),
-    # solved by a matrix continued fraction; dv/di from a five-point stencil.
+    # solved by a matrix continued fraction; dv/di from a central difference.
     i = float(i)
     theta = float(theta)
     beta_c = float(beta_c)
@@ -279,7 +279,7 @@ def rcsj_voltage(i, theta, beta_c):
         return mean_voltage(i, theta)
     vth = np.sqrt(theta / beta_c)
     gam = 1.0 / beta_c
-    P, N = 105, 190
+    P, N = 64, 130
     ps = np.arange(-P, P + 1)
     M = ps.size
 
@@ -302,8 +302,8 @@ def rcsj_voltage(i, theta, beta_c):
         c0[rows] = np.linalg.solve(Q[np.ix_(rows, rows)], -Q[np.ix_(rows, [P])][:, 0])
         return float(v0 + vth * (S @ c0)[P].real)
 
-    h = 1e-3
-    r_d = (-velocity(i + 2 * h) + 8 * velocity(i + h) - 8 * velocity(i - h) + velocity(i - 2 * h)) / (12 * h)
+    h = 1e-4
+    r_d = (velocity(i + h) - velocity(i - h)) / (2 * h)
     result = (velocity(i), float(r_d))
     return result
 

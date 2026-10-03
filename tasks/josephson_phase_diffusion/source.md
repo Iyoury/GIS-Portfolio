@@ -82,9 +82,9 @@ above 50 and v_crit = 0, and three more computed-value cases were added.
 New final step 6: exact stationary voltage and differential resistance of the noisy
 junction with capacitance (RCSJ), |i| <= 2.5, 0.1 <= theta <= 2, beta_c = 0 or 0.1 to 2.
 The reference solves the Kramers equation in Hermite functions (velocity) and Fourier
-modes (phase) by a matrix continued fraction over the Hermite index (N = 160, |p| <= 100);
-it is converged to 6e-9 relative against N = 260, |p| <= 140 on 36 random points of the
-whole range. The test oracle expands in Hermite functions centred at a different velocity
+modes (phase) by a matrix continued fraction over the Hermite index (N = 110, |p| <= 56),
+with dv/di carried analytically through the same recursion; it is converged to 2e-9
+relative against N = 260, |p| <= 140 on 29 points of the range (random and corners). The test oracle expands in Hermite functions centred at a different velocity
 v0 = 0.6 i (a different truncated system) with N = 220, |p| <= 110; the two agree to 6e-10
 relative over a 112-point grid of the range. The second solution centres the basis at the
 overdamped mean velocity. A sparse direct solve of the same hierarchy and a continued
@@ -97,3 +97,12 @@ Step 4: the endpoint tolerance is applied exactly as stated, as a relative diffe
 voltage to the endpoint voltage (no longer through ln v), and is tested just around the
 cutoff at both endpoints (0.9e-11 accepted, 1.1e-11 rejected). Step 6: non-finite input,
 i = -2.6, theta = 2.01 and beta_c = 2.01 are tested as ValueError. Step 2: i = -10.01 too.
+
+## Version 7 changes
+
+Step 6 runtime cut from about 150 s to under 15 s: the reference truncation is N = 110,
+|p| <= 56 (converged to 2e-9 relative, tolerance 1e-7) and dv/di is computed analytically
+by differentiating the continued-fraction recursion (agrees with finite differences to
+their own accuracy), so one call takes about 0.25 s instead of 7 s. The test oracle uses
+N = 150, |p| <= 72 in the shifted basis (unchanged to 5e-9 against N = 220, |p| <= 110) and
+a central difference for dv/di.

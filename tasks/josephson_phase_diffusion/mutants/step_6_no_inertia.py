@@ -3,7 +3,7 @@ import mpmath as mp
 from scipy.optimize import brentq
 
 
-def _s6_velocity(i, theta, beta_c, N=160, P=100):
+def _s6_velocity(i, theta, beta_c, N=110, P=56):
     # Stationary Kramers equation for x = phi and v = dphi/dtau,
     #   dW/dtau = -v dW/dx - d/dv[(f(x) - gam v) W] + gam vth**2 d2W/dv2,
     # f = (i - sin x) / beta_c, gam = 1 / beta_c, vth**2 = theta / beta_c, expanded as
@@ -11,6 +11,9 @@ def _s6_velocity(i, theta, beta_c, N=160, P=100):
     # Brinkman hierarchy: sqrt(n+1) D c_{n+1} + sqrt(n) Dh c_{n-1} + gam n c_n = 0 with
     # D = vth d/dx, Dh = vth d/dx - f / vth; solved by the matrix continued fraction
     # c_n = S_n c_{n-1} (Risken, ch. 11). Mean velocity <v> = vth c_1,0 / c_0,0.
+    # The derivative with respect to i is carried through the same recursion:
+    # A_n S_n = -B_n with A_n = gam n + sqrt(n+1) D S_{n+1}, B_n = sqrt(n) Dh, dDh/di = -1/(beta_c vth),
+    # so dS_n = -A_n^{-1} (dB_n + sqrt(n+1) D dS_{n+1} S_n). Returns (v, dv/di).
     vth = np.sqrt(theta / beta_c)
     gam = 1.0 / beta_c
     ps = np.arange(-P, P + 1)
@@ -19,18 +22,30 @@ def _s6_velocity(i, theta, beta_c, N=160, P=100):
     F = np.diag(np.full(M, i / beta_c, dtype=complex))
     F += np.diag(np.full(M - 1, -1.0 / (2j * beta_c)), -1) + np.diag(np.full(M - 1, 1.0 / (2j * beta_c)), 1)
     Dh = D - F / vth
+    dDh = -np.eye(M) / (beta_c * vth)
     S = np.zeros((M, M), complex)
+    dS = np.zeros((M, M), complex)
     eye = np.eye(M)
     for n in range(N, 0, -1):
-        S = -np.linalg.solve(gam * n * eye + np.sqrt(n + 1) * D @ S, np.sqrt(n) * Dh)
+        A = gam * n * eye + np.sqrt(n + 1) * D @ S
+        S_new = -np.linalg.solve(A, np.sqrt(n) * Dh)
+        dS = -np.linalg.solve(A, np.sqrt(n) * dDh + np.sqrt(n + 1) * D @ dS @ S_new)
+        S = S_new
     # n = 0 equation D c_1 = D S_1 c_0 = 0 (its p = 0 row is empty) plus c_00 = 1 / (2 pi)
     Q = D @ S
+    dQ = D @ dS
     rows = np.array([k for k in range(M) if k != P])
+    Qr = Q[np.ix_(rows, rows)]
     c0 = np.zeros(M, complex)
     c0[P] = 1.0 / (2.0 * np.pi)
-    c0[rows] = np.linalg.solve(Q[np.ix_(rows, rows)], -Q[rows, P] / (2.0 * np.pi))
+    c0[rows] = np.linalg.solve(Qr, -Q[rows, P] / (2.0 * np.pi))
+    dc0 = np.zeros(M, complex)
+    dc0[rows] = np.linalg.solve(Qr, -(dQ @ c0)[rows])
     c1 = S @ c0
-    return float(vth * (c1[P] / c0[P]).real)
+    dc1 = dS @ c0 + S @ dc0
+    v = float(vth * (c1[P] / c0[P]).real)
+    dv = float(vth * (dc1[P] / c0[P]).real)
+    return v, dv
 
 
 def rcsj_voltage(i, theta, beta_c):
@@ -62,17 +77,12 @@ def rcsj_voltage(i, theta, beta_c):
     # MUTANT: the capacitance is ignored; every junction is treated as overdamped
     result = mean_voltage(i, theta)
     return result
-    sign = 1.0 if i >= 0.0 else -1.0
     a = abs(i)
-    v = 0.0 if a == 0.0 else sign * _s6_velocity(a, theta, beta_c)
-    # dv/di (even in i) by Richardson-extrapolated central differences of the exact velocity
-    hstep = 2e-3
-
-    def vel(x):
-        return np.sign(x) * _s6_velocity(abs(x), theta, beta_c) if x != 0.0 else 0.0
-
-    d1 = (vel(a + hstep) - vel(a - hstep)) / (2.0 * hstep)
-    d2 = (vel(a + 2.0 * hstep) - vel(a - 2.0 * hstep)) / (4.0 * hstep)
-    r_d = (4.0 * d1 - d2) / 3.0
+    if a == 0.0:
+        # v is odd in i: v(0) = 0 exactly; dv/di from the same continued fraction at i = 0
+        v, r_d = 0.0, _s6_velocity(0.0, theta, beta_c)[1]
+    else:
+        v, r_d = _s6_velocity(a, theta, beta_c)
+        v = v if i > 0.0 else -v                     # v is odd, r_d is even in i
     result = (float(v), float(r_d))
     return result
