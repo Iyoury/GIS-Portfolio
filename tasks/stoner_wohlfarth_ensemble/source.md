@@ -98,3 +98,6 @@ Version 5 (content-check fixes):
 - Step 6: the whole computation (panel construction, inverse iteration, Rayleigh quotient,
   Garanin's tau_int) is in the body of brown_relaxation; h = -0.9 is tested against the oracle
   and against h = +0.9; the docstring gives the units as 1/tau_N and tau_N, respectively.
+- Step 5 (v5 follow-up): the ValueError test now covers every invalid input named in the prompt
+  (equal-shaped 2-D arrays, empty arrays, infinite and NaN weights, rate = 0, negative f0, NaN a,
+  infinite rate) next to the domain bounds.

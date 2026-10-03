@@ -205,8 +205,10 @@ assert abs(out[0] + hm) < 1e-8 and abs(out[1] + hm) < 1e-8, (out, hm)
 _t_check_ensemble(ensemble_switching(np.array([0.0, 0.6]), np.array([1.0, 1.0]), 40.0, 1e13, 1.0),
                   [0.0, 0.6], [1.0, 1.0], 40.0, 1e13)
 
-# --- test case 5: bad arrays or weights, or a or f0 / rate outside the domain, raise ValueError ---
-for _t_bad in ((np.array([0.1, 0.2]), np.array([1.0]), 100.0, 1e9, 1.0), (np.array([0.1, 1.7]), np.array([1.0, 1.0]), 100.0, 1e9, 1.0), (np.array([0.1, 0.2]), np.array([1.0, -1.0]), 100.0, 1e9, 1.0), (np.array([0.1, 0.2]), np.array([0.0, 0.0]), 100.0, 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 30.0, 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 100.0, 1e14, 1.0)):
+# --- test case 5: every invalid input of the prompt raises ValueError: arrays that are not 1-D of the
+# same nonzero length, a psi outside [0, pi/2], a negative or nonfinite weight, weights adding up to
+# zero, a, f0 or rate not positive and finite, a or f0 / rate outside the domain ---
+for _t_bad in ((np.array([0.1, 0.2]), np.array([1.0]), 100.0, 1e9, 1.0), (np.array([[0.1, 0.2]]), np.array([[1.0, 1.0]]), 100.0, 1e9, 1.0), (np.array([]), np.array([]), 100.0, 1e9, 1.0), (np.array([0.1, 0.2]), np.array([1.0, np.inf]), 100.0, 1e9, 1.0), (np.array([0.1, 0.2]), np.array([1.0, np.nan]), 100.0, 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 100.0, 1e9, 0.0), (np.array([0.1]), np.array([1.0]), 100.0, -1e9, 1.0), (np.array([0.1]), np.array([1.0]), float("nan"), 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 100.0, 1e9, np.inf), (np.array([0.1, 1.7]), np.array([1.0, 1.0]), 100.0, 1e9, 1.0), (np.array([0.1, 0.2]), np.array([1.0, -1.0]), 100.0, 1e9, 1.0), (np.array([0.1, 0.2]), np.array([0.0, 0.0]), 100.0, 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 30.0, 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 100.0, 1e14, 1.0)):
     try:
         ensemble_switching(*_t_bad)
     except ValueError:
