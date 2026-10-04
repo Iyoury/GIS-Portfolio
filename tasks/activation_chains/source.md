@@ -41,8 +41,8 @@ Checks used while building the task:
   flux) agrees with the reference to about 1e-14.
 - Standard methods fail the tests:
   - scipy.linalg.expm and the Bateman sum in double precision both fail step 1;
-  - squaring the diagonal in scaling and squaring (instead of resetting it) loses about 5e-5 on the
-    238U series.
+  - squaring the diagonal in scaling and squaring (instead of resetting it) loses the amounts on the
+    238U series completely.
 - The gold-monitor response: d ln A / d ln phi for 198Au after 5 d of irradiation and 1 d of cooling
   is 0.96 at 1e13, 0.65 at 1e14, and 0 near 1.6e15 (burnup maximum); 199Au rises with slope at least
   1.1 on [1e-2, 1e15].
