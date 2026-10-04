@@ -115,3 +115,5 @@ science and the test cases are unchanged:
 - step 5: 1e-8 to 1e-6;
 - step 6: 1e-8 to 1e-6 relative.
 Every mutant still fails by many orders of magnitude more than the new bounds.
+
+Version 9: step 5 also rejects a negative psi, a = 1001 and f0 / rate = 1e4 (the lower and upper bounds that were not yet tested).
