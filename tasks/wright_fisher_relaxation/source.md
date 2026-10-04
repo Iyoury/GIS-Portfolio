@@ -89,3 +89,6 @@ Version 5: the v4 rollouts (5/8) lost credit only on one step-6 check, the eigen
 far tail of the N = 400, s = 0.5, v = 0.1 distribution (qsd[0] about 4e-221). The requirement was
 already covered by the general accuracy rule; the prompt now states it explicitly, with that case and
 the size of its tail, and says that every tail entry is checked against (qsd Q)_j = rho qsd_j.
+
+Version 6: the step-6 sentence on the far tail is a behavioral requirement only (each tail entry
+must itself have a relative error below 1e-8); it no longer describes how the tests check it.

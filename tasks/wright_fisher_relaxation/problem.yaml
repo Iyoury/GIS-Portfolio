@@ -371,9 +371,8 @@ sub_steps:
              numpy array of shape (N,). Every entry whose exact value is positive and at least 1e-250 must
              have a relative error below 1e-8; every other entry must lie within 1e-250 of its exact value.
              This includes the far tail: for N = 400, s = 0.5, v = 0.1 the entries at small i are many
-             orders of magnitude below the bulk (qsd[0] is about 4e-221), and each of them is checked
-             against the eigenvector equation (qsd Q)_j = rho qsd_j to 1e-8 relative, not only the sum
-             or the largest entries.
+             orders of magnitude below the bulk (qsd[0] is about 4e-221), and each of these entries must
+             itself have a relative error below 1e-8.
       Return the tuple (rate, qsd). Each call must finish within 20 s on one CPU core.
       Inputs: N (integer, 1 <= N <= 400), s (-0.5 <= s <= 0.5), v (1e-12 <= v <= 0.1).
       Errors: raise ValueError if N is not an integer (bool and float are not accepted) or is outside
