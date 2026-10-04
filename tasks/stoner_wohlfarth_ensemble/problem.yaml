@@ -405,7 +405,8 @@ sub_steps:
       it, and tau_int then differs from 1 / lam1 by orders of magnitude.
 
       Inputs: sigma (float, 0 <= sigma <= 60) and h (float, -0.9 <= h <= 0.9). Return the tuple
-      (lam1, tau_int) of two Python floats, each with a relative error below 1e-8.
+      (lam1, tau_int) of two Python floats, each with a relative error below 1e-8. Each call must
+      finish within 30 s on one CPU core (the hardest cases, sigma = 60 with |h| = 0.9, included).
       Errors: raise ValueError if sigma or h is not finite, if sigma is outside [0, 60] or if
       |h| > 0.9.
     function_header: |-

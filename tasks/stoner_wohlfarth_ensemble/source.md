@@ -101,3 +101,7 @@ Version 5 (content-check fixes):
 - Step 5 (v5 follow-up): the ValueError test now covers every invalid input named in the prompt
   (equal-shaped 2-D arrays, empty arrays, infinite and NaN weights, rate = 0, negative f0, NaN a,
   infinite rate) next to the domain bounds.
+
+Version 7: step 6 states a time budget (each call within 30 s on one CPU core; the reference takes
+about 1.2 s at sigma = 60, |h| = 0.9 and the second solution about the same), and the step-6 and
+general tests assert it on every checked call.

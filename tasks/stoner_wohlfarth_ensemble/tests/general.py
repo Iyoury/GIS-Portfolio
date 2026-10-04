@@ -1,3 +1,4 @@
+import time as _t_time
 import numpy as np
 import mpmath as _t_mp
 
@@ -97,7 +98,11 @@ def _t_rel(x, y):
 
 
 def _t_check6(sigma, h):
+    # the prompt requires every call to finish within 30 s on one CPU core
+    start = _t_time.perf_counter()
     out = brown_relaxation(sigma, h)
+    elapsed = _t_time.perf_counter() - start
+    assert elapsed <= 30.0, ("brown_relaxation took %.1f s" % elapsed, sigma, h)
     assert isinstance(out, tuple) and len(out) == 2 and all(type(x) is float for x in out), out
     lam, tau = (float(x) for x in _t_brown(sigma, h))
     assert _t_rel(out[0], lam) < 1e-8, (sigma, h, out, lam)
