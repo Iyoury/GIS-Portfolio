@@ -127,6 +127,14 @@ for _t_end, _t_in in ((1e8, 1.0 + 5e-10), (1e13, 1.0 - 5e-10)):
         act = _t_f * _t_activity(1, _t_end, 5 * _T_DAY, _T_DAY, *_T_DATA)
         got = monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, act, 1e8, 1e13)
         assert _t_rel(got, _t_end) < 1e-11, (got, _t_end, _t_f)
+    # just beyond the tolerance, outside the interval (|ln| = 2e-9 > 1e-9): no flux in the interval
+    _t_out = np.exp(-2e-9) if _t_end == 1e8 else np.exp(2e-9)
+    _t_raised = False
+    try:
+        monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, _t_out * _t_activity(1, _t_end, 5 * _T_DAY, _T_DAY, *_T_DATA), 1e8, 1e13)
+    except ValueError:
+        _t_raised = True
+    assert _t_raised, ("activity 2e-9 outside the end at %g must raise ValueError" % _t_end)
 
 # --- test case 4: an activity outside [A(flux_lo), A(flux_hi)] raises ValueError ---
 for _t_act in (_t_activity(1, 1e7, 5 * _T_DAY, _T_DAY, *_T_DATA), _t_activity(1, 1e14, 5 * _T_DAY, _T_DAY, *_T_DATA)):

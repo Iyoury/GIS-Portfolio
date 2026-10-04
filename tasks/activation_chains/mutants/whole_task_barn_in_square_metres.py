@@ -50,7 +50,8 @@ def chain_inventory(lam, n0, t):
     # The Bateman sum over exp(-lam_i t) / prod(lam_l - lam_i) cancels catastrophically for close decay
     # constants and is undefined for equal ones; a dense expm is accurate only relative to the largest entry.
     rmax = lam.max()
-    s = max(0, int(np.ceil(np.log2(t * rmax / 0.5))))
+    # t * rmax can underflow to 0 for tiny positive rate and time: no halving is needed then
+    s = 0 if t * rmax <= 0.5 else int(np.ceil(np.log2(t * rmax / 0.5)))
     tau = t / 2.0 ** s
     c = tau * rmax
     B = np.diag(c - tau * lam)
@@ -141,10 +142,8 @@ def network_inventory(lam, branching, source, n0, t):
     # off-diagonal entries of A are >= 0). On an acyclic network exp(t A) has the diagonal exp(-removal t)
     # exactly; it is reset at every squaring level so that its rounding is never doubled s times.
     rmax = removal.max()
-    if rmax == 0.0:
-        s = 0
-    else:
-        s = max(0, int(np.ceil(np.log2(t * rmax / 0.5))))
+    # t * rmax can underflow to 0 for tiny positive rate and time: no halving is needed then
+    s = 0 if t * rmax <= 0.5 else int(np.ceil(np.log2(t * rmax / 0.5)))
     tau = t / 2.0 ** s
     c = tau * rmax
     B = tau * rates + np.diag(c - tau * removal)

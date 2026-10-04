@@ -114,3 +114,9 @@ Version 7 (advisory fixes after the v6 rollouts):
   - step 3: burnup at sigma = 100 b, flux 1e18, 6e6 s.
 - Step 2 rejects an empty network, a scalar source and a 2-D n0.
 - Step 3 rejects a scalar sigma, a branching matrix that is not n x n, and an n0 of the wrong length.
+
+Version 8 (content-check fixes):
+- Steps 1-2: the number of halvings is 0 whenever t * max(lam) <= 0.5. The logarithm is no longer
+  taken of a product that underflows to 0 (lam = 1e-300, t = 1e-300), and that case is now tested.
+- Step 4: activities 2e-9 (in |ln|) outside A(flux_lo) and A(flux_hi) must raise ValueError,
+  next to the accepted 5e-10 cases.

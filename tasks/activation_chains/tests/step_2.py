@@ -133,6 +133,8 @@ _t_check(network_inventory(lam, B, q, n0, 0.0), n0, n0.sum())
 _t_check(network_inventory(np.array([1e10]), np.zeros((1, 1)), np.zeros(1), np.array([2.0]), 1e-9), [2.0 * np.exp(-10.0)], 2.0)
 _t_check(network_inventory(np.array([0.0]), np.zeros((1, 1)), np.array([3.0]), np.array([1.0]), 1e20), [1.0 + 3e20], 1.0 + 3e20)
 _t_check(network_inventory(np.array([0.0]), np.zeros((1, 1)), np.array([1e80]), np.zeros(1), 1e20), [1e100], 1e100)
+# tiny positive rate and time whose product underflows to 0
+_t_check(network_inventory(np.array([1e-300]), np.zeros((1, 1)), np.zeros(1), np.array([1.0]), 1e-300), [1.0], 1.0)
 lam = np.geomspace(1e-6, 1e6, 30)
 B = np.diag(np.ones(29), -1)
 n0 = np.r_[1.0, np.zeros(29)]

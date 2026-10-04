@@ -107,6 +107,8 @@ lam = np.geomspace(1e-6, 1e6, 30)
 n0 = np.r_[1.0, np.zeros(29)]
 _t_check(chain_inventory(lam, n0, 50.0), _t_bateman(lam, n0, 50.0), 1.0)
 _t_check(chain_inventory(np.array([0.3, 2.0]), np.zeros(2), 10.0), [0.0, 0.0], 0.0)
+# tiny positive rate and time whose product underflows to 0: the inventory is unchanged
+_t_check(chain_inventory(np.array([1e-300, 0.0]), np.array([1.0, 0.0]), 1e-300), [1.0, 0.0], 1.0)
 _t_check(chain_inventory(np.array([0.3, 0.0]), np.array([1e100, 0.0]), 2.0), [1e100 * np.exp(-0.6), -1e100 * np.expm1(-0.6)], 1e100)
 
 # --- test case 6: bad shapes, decay constants, amounts or times raise ValueError ---
