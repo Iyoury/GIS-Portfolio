@@ -235,7 +235,8 @@ sub_steps:
       E_rhf (closed-shell restricted Hartree-Fock): both electrons occupy the same spatial
       orbital psi = c_0 phi_0 + c_1 phi_1 with c^T S c = 1, one with spin up and one with spin
       down; E_rhf is the lowest expectation value of the electronic Hamiltonian over such
-      single Slater determinants.
+      single Slater determinants (the global minimum over all such orbitals: in a stretched or
+      asymmetric molecule the energy has a second, higher local minimum).
       Add the nuclear repulsion ZA * ZB / R to both and return the tuple (E_fci, E_rhf) of two
       Python floats in hartree, each with an absolute error below 1e-9.
     function_header: |-
@@ -263,7 +264,7 @@ sub_steps:
       fixed 50 percent ionic weight for H2 and goes to a wrong limit, while full CI dissociates
       correctly; Szabo and Ostlund give -1.1373 (full CI) and -1.1167 hartree (RHF) for H2 at
       R = 1.4 bohr with zeta = 1.24.
-    n_test_cases: 5
+    n_test_cases: 6
     contract:
       quantity: "Full-CI and closed-shell RHF total energies of two electrons in the two-function STO-3G basis."
       assumptions: "Non-orthogonal basis of steps 2-3, singlet ground state, variational RHF, point-charge nuclear repulsion ZA ZB / R."
@@ -274,11 +275,14 @@ sub_steps:
       step_dependencies: [2, 3]
     mutants:
       - name: full_exchange
-        description: "Builds the Fock matrix with the full exchange term K instead of K/2, so E_rhf is wrong."
+        description: "Uses the full exchange term K instead of K/2 in the closed-shell energy (E = 2h + 2J - 2K), so E_rhf is wrong."
         file: mutants/step_4_full_exchange.py
       - name: orthonormal_atomic_basis
         description: "Builds the configuration-interaction matrix directly from the atomic-function integrals as if the basis were orthonormal (overlap ignored)."
         file: mutants/step_4_orthonormal_atomic_basis.py
+      - name: single_start_scf
+        description: "Takes E_rhf from one self-consistent-field run started from the core-Hamiltonian guess, which settles on the higher closed-shell branch of stretched asymmetric molecules."
+        file: mutants/step_4_single_start_scf.py
 
   - step_number: 5
     scaffold: steps/step_5.py

@@ -49,7 +49,10 @@ def _t_one(ZA, ZB, za, zb, R):
             pot = np.zeros(9)
             for C in range(2):
                 e = np.abs(P - cen[C])
-                inner = np.sum(_T_TW * _T_TN ** 2 * np.exp(-p[:, None] * (e[:, None] * _T_TN) ** 2), axis=1) * e ** 2
+                # (1/e) int_0^e s^2 exp(-p s^2) ds, the integrand being negligible beyond s = 9 / sqrt(p)
+                top = np.minimum(e, 9.0 / np.sqrt(p))
+                inner = np.sum(_T_TW * _T_TN ** 2 * np.exp(-p[:, None] * (top[:, None] * _T_TN) ** 2),
+                               axis=1) * top ** 3 / np.where(e > 0, e, 1.0)
                 pot -= chg[C] * 4 * np.pi * (inner + np.exp(-p * e ** 2) / (2 * p))
             S[m, n] = np.sum(w * ov)
             H[m, n] = np.sum(w * (ke + kab * pot))
@@ -112,11 +115,17 @@ def _t_energy(ZA, ZB, za, zb, R):
         c = v / np.sqrt(v @ S @ v)
         return 2.0 * (c @ H @ c) + np.einsum("i,j,k,l,ijkl->", c, c, c, c, G)
 
-    grid = np.linspace(-0.5 * np.pi, 0.5 * np.pi, 361)
-    i0 = int(np.argmin([e(t) for t in grid]))
-    res = minimize_scalar(e, bounds=(grid[max(i0 - 1, 0)], grid[min(i0 + 1, 360)]),
-                          method="bounded", options={"xatol": 1e-12})
-    return float(res.fun) + ZA * ZB / R
+    # the energy can have several local minima (one closed-shell branch on each atom when the molecule
+    # is stretched or asymmetric): every local minimum of a fine scan over the whole period is refined
+    grid = np.linspace(-0.5 * np.pi, 0.5 * np.pi, 2001)
+    vals = np.array([e(t) for t in grid])
+    best = np.inf
+    for i in range(len(grid)):
+        if vals[i] <= vals[i - 1] and vals[i] <= vals[(i + 1) % len(grid)]:
+            res = minimize_scalar(e, bounds=(grid[i] - (grid[1] - grid[0]), grid[i] + (grid[1] - grid[0])),
+                                  method="bounded", options={"xatol": 1e-13})
+            best = min(best, float(res.fun))
+    return best + ZA * ZB / R
 
 
 # Independent full-CI target: lowest eigenvalue of the two-electron Hamiltonian in the
@@ -151,8 +160,7 @@ assert abs(E_rhf + 1.1167) < 2e-4 and abs(E_fci + 1.1373) < 2e-4
 # --- test case 1: HeH+ at R = 1.4632 (Szabo and Ostlund RHF: -2.8607) and stretched to 3.0 ---
 E_fci, E_rhf = _t_check((2.0, 1.0, 2.0925, 1.24, 1.4632))
 assert abs(E_rhf + 2.8607) < 2e-4
-_t_check((2.0, 1.0, 2.0925, 1.24, 3.0))
-
+assert _t_check((2.0, 1.0, 2.0925, 1.24, 3.0)) is not None
 # --- test case 2: H2 stretched to 6 bohr: RHF keeps half ionic character and fails, full CI
 # goes to two hydrogen atoms (2 x -0.466582 hartree in this basis) ---
 E_fci, E_rhf = _t_check((1.0, 1.0, 1.24, 1.24, 6.0))
@@ -160,11 +168,18 @@ assert E_rhf - E_fci > 0.1
 assert abs(E_fci + 0.933164) < 2e-3
 
 # --- test case 3: unequal exponents, compressed bond and an ion-pair-like curve ---
-_t_check((1.0, 1.0, 1.0, 1.5, 0.8))
-_t_check((1.0, 1.0, 1.24, 2.69, 1.05))
-_t_check((1.5, 1.5, 2.0, 1.24, 2.5))
+assert _t_check((1.0, 1.0, 1.0, 1.5, 0.8)) is not None
+assert _t_check((1.0, 1.0, 1.24, 2.69, 1.05)) is not None
+assert _t_check((1.5, 1.5, 2.0, 1.24, 2.5)) is not None
 
 # --- test case 4: H2 is bound in both methods and full CI is never above RHF ---
 E1 = _t_check((1.0, 1.0, 1.24, 1.24, 1.4))
 E5 = fci_energy(1.0, 1.0, 1.24, 1.24, 5.0)
 assert E5[0] > E1[0] and E5[1] > E1[1] and E5[0] <= E5[1] + 1e-12
+
+# --- test case 5: stretched, asymmetric molecules with two closed-shell branches (both electrons near A
+# or both near B): RHF is the lower of them. A self-consistent-field run from the core-Hamiltonian guess
+# settles here on the higher branch, 2.07 to 2.61 hartree above the global minimum ---
+for _t_args in ((1.5, 1.5, 2.0, 3.0, 10.0), (2.0, 1.0, 3.0, 2.0, 6.0), (2.0, 1.0, 3.0, 2.0, 20.0)):
+    E_fci, E_rhf = _t_check(_t_args)
+    assert E_fci <= E_rhf + 1e-12, (_t_args, E_fci, E_rhf)

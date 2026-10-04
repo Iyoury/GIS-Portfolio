@@ -117,3 +117,25 @@ Numerov shooting in pure Python.
 Step 5 also tests HeH+ with the centres swapped (ZA = 1, ZB = 2), whose limit has both
 electrons on atom B. Step 6 wording: the spatial symmetry of the full-CI ground state is
 stated as a consequence of the singlet spin function.
+
+Version 10 (reviewer's correction):
+- Step 4 RHF reference replaced. The single self-consistent-field run from the core-Hamiltonian guess
+  missed the global minimum at 115 of 960 points of the stated domain (charges 1-3, exponents
+  0.5-3, R 0.3-30). It settled on the higher closed-shell branch of stretched asymmetric molecules,
+  up to 2.6 hartree too high.
+  - The reference now writes every normalized orbital as X (cos t, sin t), with X = S^(-1/2), scans
+    the whole period and refines every local minimum of the scan.
+  - It agrees with the test oracle and the second solution to 1e-12 on all 960 points.
+- The old solver is kept as the mutant step_4_single_start_scf.
+- New step-4 test case 5: three stretched asymmetric molecules where single-start SCF lands 2.07 to
+  2.61 hartree too high.
+- The prompt now says explicitly that E_rhf is the global minimum and that a second, higher local
+  minimum exists.
+- Test oracles:
+  - The RHF oracle refines every local minimum of a 2001-point scan, not only the best grid point.
+  - The nuclear-attraction quadrature of the step 2-4 tests (and of the second solution) now
+    integrates only over [0, min(e, 9 / sqrt(p))]. The fixed 80-point rule on [0, e] missed the
+    narrow peak of tight functions far from a nucleus, giving errors of 6e-9 at R = 30, zeta = 3.
+    The reference was right there, as checked against the closed erf form in mpmath.
+- Test metadata: every test case block now holds its own assert statements. Helper calls are
+  asserted, and the error cases use an explicit raised flag. The step-4 n_test_cases is 6.

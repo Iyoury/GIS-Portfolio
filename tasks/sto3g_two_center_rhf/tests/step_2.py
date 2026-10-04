@@ -49,7 +49,10 @@ def _t_one(ZA, ZB, za, zb, R):
             pot = np.zeros(9)
             for C in range(2):
                 e = np.abs(P - cen[C])
-                inner = np.sum(_T_TW * _T_TN ** 2 * np.exp(-p[:, None] * (e[:, None] * _T_TN) ** 2), axis=1) * e ** 2
+                # (1/e) int_0^e s^2 exp(-p s^2) ds, the integrand being negligible beyond s = 9 / sqrt(p)
+                top = np.minimum(e, 9.0 / np.sqrt(p))
+                inner = np.sum(_T_TW * _T_TN ** 2 * np.exp(-p[:, None] * (top[:, None] * _T_TN) ** 2),
+                               axis=1) * top ** 3 / np.where(e > 0, e, 1.0)
                 pot -= chg[C] * 4 * np.pi * (inner + np.exp(-p * e ** 2) / (2 * p))
             S[m, n] = np.sum(w * ov)
             H[m, n] = np.sum(w * (ke + kab * pot))
@@ -122,18 +125,16 @@ assert abs(S[0, 1] - 0.4508) < 1e-4 and abs(H[0, 0] + 2.6527) < 1e-4
 assert abs(H[0, 1] + 1.3472) < 1e-4 and abs(H[1, 1] + 1.7318) < 1e-4
 
 # --- test case 2: H2, zeta = 1.0, R = 2.0 ---
-_t_check(sto3g_one_electron(1.0, 1.0, 1.0, 1.0, 2.0), (1.0, 1.0, 1.0, 1.0, 2.0))
-
+assert _t_check(sto3g_one_electron(1.0, 1.0, 1.0, 1.0, 2.0), (1.0, 1.0, 1.0, 1.0, 2.0)) is not None
 # --- test case 3: HeH+ stretched to R = 3.0 ---
-_t_check(sto3g_one_electron(2.0, 1.0, 2.0925, 1.24, 3.0), (2.0, 1.0, 2.0925, 1.24, 3.0))
-
+assert _t_check(sto3g_one_electron(2.0, 1.0, 2.0925, 1.24, 3.0), (2.0, 1.0, 2.0925, 1.24, 3.0)) is not None
 # --- test case 4: non-positive distance, charge or exponent raises ValueError ---
 for _t_bad in ((1.0, 1.0, 1.24, 1.24, 0.0), (1.0, 1.0, 1.24, 1.24, -1.0),
                (0.0, 1.0, 1.24, 1.24, 1.4), (1.0, 0.0, 1.24, 1.24, 1.4),
                (1.0, 1.0, 0.0, 1.24, 1.4), (1.0, 1.0, 1.24, 0.0, 1.4), (1.0, 1.0, 1.24, -1.0, 1.4)):
+    _t_raised = False
     try:
         sto3g_one_electron(*_t_bad)
     except ValueError:
-        pass
-    else:
-        raise AssertionError("sto3g_one_electron%r must raise ValueError" % (_t_bad,))
+        _t_raised = True
+    assert _t_raised, "sto3g_one_electron%r must raise ValueError" % (_t_bad,)

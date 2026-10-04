@@ -220,15 +220,13 @@ _t_s = fci_energy(1.0, 1.0, 1.24, 1.24, 1.4)
 assert _t_o[0] < _t_s[0] - 1e-3 and _t_o[1] < _t_s[1] - 1e-4 and _t_o[0] < _t_o[1]
 
 # --- test case 1: HeH+ near its minimum, different p exponents on the two atoms ---
-_t_check_pol((2.0, 1.0, 2.0925, 1.24, 0.8, 1.1, 1.4632))
-
+assert _t_check_pol((2.0, 1.0, 2.0925, 1.24, 0.8, 1.1, 1.4632)) is not None
 # --- test case 2: cases where the orbital with the lowest Fock eigenvalue is NOT the RHF
 # ground state (a diffuse p shell): the RHF energy is the lowest closed-shell determinant ---
-_t_check_pol((1.0, 1.0, 1.24, 1.24, 0.1, 5.0, 10.0))
-_t_check_pol((1.561, 1.97, 2.952, 2.904, 1.704, 0.831, 2.986))
-
+assert _t_check_pol((1.0, 1.0, 1.24, 1.24, 0.1, 5.0, 10.0)) is not None
+assert _t_check_pol((1.561, 1.97, 2.952, 2.904, 1.704, 0.831, 2.986)) is not None
 # --- test case 3: ends of the ranges (Z = 3 and 1, zeta = 3 and 0.5, alpha = 5 and 0.1,
 # R = 0.3 and 10) and non-integer charges ---
-_t_check_pol((3.0, 1.0, 3.0, 0.5, 5.0, 0.1, 0.3))
-_t_check_pol((1.0, 3.0, 0.5, 3.0, 0.1, 5.0, 10.0))
-_t_check_pol((2.639, 2.367, 2.468, 0.979, 2.308, 0.211, 1.091))
+assert _t_check_pol((3.0, 1.0, 3.0, 0.5, 5.0, 0.1, 0.3)) is not None
+assert _t_check_pol((1.0, 3.0, 0.5, 3.0, 0.1, 5.0, 10.0)) is not None
+assert _t_check_pol((2.639, 2.367, 2.468, 0.979, 2.308, 0.211, 1.091)) is not None

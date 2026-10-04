@@ -160,35 +160,31 @@ lev = _t_check_levels((1.0, 1.0, 1.24, 1.24, _T_MH, _T_MH))
 assert 4000.0 < lev[1] - lev[0] < 6000.0              # fundamental near the minimal-basis value
 
 # --- test case 1: HeH+; the lowest separated arrangement is He + H+ (both electrons on He) ---
-_t_check_levels((2.0, 1.0, 2.0925, 1.24, _T_MHE, _T_MH))
+assert _t_check_levels((2.0, 1.0, 2.0925, 1.24, _T_MHE, _T_MH)) is not None
 # the same molecule with the centres swapped: now both electrons end on B (the limit H+ + He)
-_t_check_levels((1.0, 2.0, 1.24, 2.0925, _T_MH, _T_MHE))
-
+assert _t_check_levels((1.0, 2.0, 1.24, 2.0925, _T_MH, _T_MHE)) is not None
 # --- test case 2: ion-pair dissociation H- + H+ (attractive -1/R tail): the full-CI energy at
 # 60 bohr is still 1/60 hartree (about 3658 cm^-1) below the true limit ---
-_t_check_levels((1.0, 1.0, 1.24, 2.69, _T_MH, _T_MH))
-
+assert _t_check_levels((1.0, 1.0, 1.24, 2.69, _T_MH, _T_MH)) is not None
 # --- test case 3: fragments with charges 0.5 and 0.5 (repulsive +0.25/R tail) ---
-_t_check_levels((1.5, 1.5, 2.0, 1.24, 3.0, 3.0))
-
+assert _t_check_levels((1.5, 1.5, 2.0, 1.24, 3.0, 3.0)) is not None
 # --- test case 4: isotopes on the same curve (D2), heavier nuclei and lower, denser levels ---
 lev_d = _t_check_levels((1.0, 1.0, 1.24, 1.24, _T_MD, _T_MD))
 assert lev_d[0] < lev[0] and lev_d[1] - lev_d[0] < lev[1] - lev[0]
 
 # --- test case 5: ends of the allowed ranges: zeta = 0.8 (shallow, wide well) and zeta = 3
 # (tight well at small R), both with the heaviest nuclei 10 u, and the lightest nuclei 1 u ---
-_t_check_levels((1.0, 1.0, 0.8, 0.8, 10.0, 10.0))
-_t_check_levels((1.0, 1.0, 3.0, 3.0, 10.0, 10.0))
-_t_check_levels((1.0, 1.0, 1.24, 1.24, 1.0, 1.0))
-
+assert _t_check_levels((1.0, 1.0, 0.8, 0.8, 10.0, 10.0)) is not None
+assert _t_check_levels((1.0, 1.0, 3.0, 3.0, 10.0, 10.0)) is not None
+assert _t_check_levels((1.0, 1.0, 1.24, 1.24, 1.0, 1.0)) is not None
 # --- test case 6: no five bound levels (He2 2+ only has a metastable well above He+ + He+),
 # or a mass that is not finite or outside [1, 10] u, raise ValueError ---
 for _t_bad in ((2.0, 2.0, 2.0925, 2.0925, _T_MHE, _T_MHE), (1.0, 1.0, 1.24, 1.24, np.nan, _T_MH),
                (1.0, 1.0, 1.24, 1.24, _T_MH, np.inf), (1.0, 1.0, 1.24, 1.24, 10.5, _T_MH),
                (1.0, 1.0, 1.24, 1.24, 0.5, _T_MH)):
+    _t_raised = False
     try:
         vibrational_levels(*_t_bad)
     except ValueError:
-        pass
-    else:
-        raise AssertionError("vibrational_levels%r must raise ValueError" % (_t_bad,))
+        _t_raised = True
+    assert _t_raised, "vibrational_levels%r must raise ValueError" % (_t_bad,)

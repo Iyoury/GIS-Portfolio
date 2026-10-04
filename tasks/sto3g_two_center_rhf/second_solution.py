@@ -94,8 +94,12 @@ def sto3g_one_electron(ZA, ZB, zetaA, zetaB, R):
                 e_dist = np.abs(center_p - centers[C])
                 # integral over space of exp(-p |r-P|^2) / |r - C|: inside the sphere through C the
                 # shell average of 1/|r - C| is 1/e_dist, outside it is 1/s (that part is exact)
+                # (1/e) int_0^e s^2 exp(-p s^2) ds over [0, min(e, 9 / sqrt(p))]: beyond that the integrand is
+                # negligible, and a fixed rule on all of [0, e] misses the narrow peak of a tight function
+                top = np.minimum(e_dist, 9.0 / np.sqrt(p))
                 inner = np.sum(t_wts[None, :] * t_nodes[None, :] ** 2
-                               * np.exp(-p[:, None] * (e_dist[:, None] * t_nodes[None, :]) ** 2), axis=1) * e_dist ** 2
+                               * np.exp(-p[:, None] * (top[:, None] * t_nodes[None, :]) ** 2), axis=1) \
+                    * top ** 3 / np.where(e_dist > 0, e_dist, 1.0)
                 pot -= charges[C] * 4.0 * np.pi * (inner + np.exp(-p * e_dist ** 2) / (2.0 * p))
             S[m, n] = np.sum(w * over)
             H[m, n] = np.sum(w * (kin + k_ab * pot))
@@ -192,13 +196,17 @@ def fci_energy(ZA, ZB, zetaA, zetaB, R):
         c = v / np.sqrt(v @ S @ v)
         return 2.0 * (c @ H @ c) + np.einsum('i,j,k,l,ijkl->', c, c, c, c, eri)
 
-    grid = np.linspace(-0.5 * np.pi, 0.5 * np.pi, 721)
+    # several local minima are possible (one closed-shell branch per atom): refine every local minimum
+    # of a fine periodic scan and keep the lowest
+    grid = np.linspace(-0.5 * np.pi, 0.5 * np.pi, 1441)[:-1]
     vals = np.array([energy(t) for t in grid])
-    i0 = int(np.argmin(vals))
-    lo = grid[max(i0 - 1, 0)]
-    hi = grid[min(i0 + 1, len(grid) - 1)]
-    res = minimize_scalar(energy, bounds=(lo, hi), method='bounded', options={'xatol': 1e-12})
-    E_rhf = float(res.fun + ZA * ZB / R)
+    step = grid[1] - grid[0]
+    best = np.inf
+    for i in np.where((vals <= np.roll(vals, 1)) & (vals <= np.roll(vals, -1)))[0]:
+        res = minimize_scalar(energy, bounds=(grid[i] - step, grid[i] + step), method='bounded',
+                              options={'xatol': 1e-13})
+        best = min(best, float(res.fun))
+    E_rhf = float(best + ZA * ZB / R)
     s_val, s_vec = np.linalg.eigh(S)
     X = s_vec @ np.diag(s_val ** -0.5) @ s_vec.T          # Loewdin orbitals, still localized
     h = X.T @ H @ X

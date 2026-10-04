@@ -27,28 +27,24 @@ def _t_check(n_max, t):
 
 
 # --- test case 0: t = 0 (F_n = 1/(2n+1)) and tiny t, all orders up to 16 ---
-_t_check(16, 0.0)
-_t_check(16, 1e-14)
-_t_check(16, 3e-9)
-
+assert _t_check(16, 0.0) is not None
+assert _t_check(16, 1e-14) is not None
+assert _t_check(16, 3e-9) is not None
 # --- test case 1: small and intermediate t, where the upward recursion from F_0 loses all
 # accuracy for high orders ---
 for _t_t in (1e-4, 0.07, 0.9, 3.3, 11.0):
-    _t_check(16, _t_t)
-
+    assert _t_check(16, _t_t) is not None
 # --- test case 2: the range around n + 25 and large t up to 1e6 ---
 for _t_t in (25.5, 40.9, 41.1, 87.0, 640.0, 1.2e4, 1e6):
-    _t_check(16, _t_t)
-
+    assert _t_check(16, _t_t) is not None
 # --- test case 3: arrays of any shape, lower orders, and n_max = 0 ---
-_t_check(4, np.array([[0.0, 0.2, 7.5], [33.0, 150.0, 2.5e3]]))
-_t_check(0, np.array([1e-12, 0.5, 19.0, 1e5]))
-
+assert _t_check(4, np.array([[0.0, 0.2, 7.5], [33.0, 150.0, 2.5e3]])) is not None
+assert _t_check(0, np.array([1e-12, 0.5, 19.0, 1e5])) is not None
 # --- test case 4: invalid order or argument raises ValueError ---
 for _t_bad in ((17, 1.0), (-1, 1.0), (2.5, 1.0), (4, -1e-3), (4, float("nan")), (4, 2e6)):
+    _t_raised = False
     try:
         boys_function(*_t_bad)
     except ValueError:
-        pass
-    else:
-        raise AssertionError("boys_function%r must raise ValueError" % (_t_bad,))
+        _t_raised = True
+    assert _t_raised, "boys_function%r must raise ValueError" % (_t_bad,)
