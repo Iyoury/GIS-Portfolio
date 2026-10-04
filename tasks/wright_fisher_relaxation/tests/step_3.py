@@ -43,7 +43,7 @@ def _t_check(pi, target):
         if b >= 1e-250:
             assert _t_rel(a, b) < 1e-8, (a, b)
         else:
-            assert abs(a) <= 1e-250, (a, b)
+            assert abs(a - b) <= 1e-250, (a, b)
 
 
 import time as _t_time

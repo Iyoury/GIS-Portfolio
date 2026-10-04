@@ -37,7 +37,8 @@ def _t_check_entries(P, N, s, u, v, rows, dps=50):
                 if t >= _t_mp.mpf("1e-250"):
                     assert abs(P[i, j] - t) <= 1e-10 * t, (N, s, u, v, i, j, P[i, j], float(t))
                 else:
-                    assert abs(P[i, j]) <= 1e-250, (N, s, u, v, i, j, P[i, j])
+                    # within 1e-250 of the exact value (the difference taken in extended precision)
+                    assert abs(_t_mp.mpf(float(P[i, j])) - t) <= _t_mp.mpf("1e-250"), (N, s, u, v, i, j, P[i, j])
 
 
 # --- test case 0: one individual: P = [[1 - v, v], [u, 1 - u]] whatever s ---
