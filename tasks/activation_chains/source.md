@@ -137,9 +137,20 @@ Version 10 (content-check fixes):
   least 1e-250 of the initial atoms at flux_lo, the range where step 3 promises relative accuracy.
   Otherwise ValueError. This excludes the case where the per-atom product fraction underflows
   (t_irr = 1e-300 with n0 = 1e100), which is tested as a ValueError.
-- Step 4 end rule: the prompt says the logarithms are evaluated in floating point, so activities
-  within about 1e-12 (in ln) of the 1e-9 tolerance may go either way and are not tested. The
-  tests use 0.999e-9 (end returned) and 1.01e-9 (ValueError).
+- Step 4 end rule: the tests use the activities closest to |ln| = 1e-9 from inside (1e-9 - 1e-14,
+  a few rounding units of the logarithms; end returned, at both ends and on both sides) and
+  1.01e-9 outside (ValueError).
 - Step 4 new tests: a round trip at slope 0.52 (flux 1.547e14 on the gold monitor), and the
   precedence of flux_lo when both end activities are within the tolerance.
 - Steps 1-3 test exp(-575), about 8e-250, just inside the relative-accuracy range.
+
+## Version 11
+
+- Step 4 end rule tested at the boundary itself: on both sides of both ends, the activity closest to
+  |ln(activity / A(end))| = 1e-9 from inside (within 1e-14) returns the end, so a cutoff anywhere
+  measurably below 1e-9 fails. The prompt no longer says which activities are used in the tests.
+- Step 4 domain check done on the atoms in separate logarithms, ln x[k] >= ln 1e-250 + ln sum(n0),
+  since 1e-250 * lam[k] * sum(n0) underflows to 0 for small lam[k] (then -inf >= -inf passed). The
+  prompt states that the rule holds in that case; a new test with lam[k] = 1e-75 and a two-capture
+  product holding 5e-267 of the atoms at flux_lo raises ValueError (the v10 reference returned flux_hi).
+  ln A is formed as ln lam[k] + ln x[k] so that lam[k] * x[k] cannot underflow.

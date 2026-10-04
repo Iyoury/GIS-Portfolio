@@ -132,11 +132,17 @@ for _t_end, _t_in in ((1e8, 1.0 + 5e-10), (1e13, 1.0 - 5e-10)):
         act = _t_f * _t_activity(1, _t_end, 5 * _T_DAY, _T_DAY, *_T_DATA)
         got = monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, act, 1e8, 1e13)
         assert _t_rel(got, _t_end) < 1e-11, (got, _t_end, _t_f)
-    # at the bound on both sides (|ln| = 0.999e-9) the end is returned
+    # at the bound on both sides: the activities closest to |ln(activity / A(end))| = 1e-9 from inside
+    # (|ln| = 1e-9 - 1e-14, a few rounding units of the logarithms) give the end
     _t_a = _t_activity(1, _t_end, 5 * _T_DAY, _T_DAY, *_T_DATA)
-    for _t_f in (np.exp(0.999e-9), np.exp(-0.999e-9)):
-        got = monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, _t_f * _t_a, 1e8, 1e13)
-        assert _t_rel(got, _t_end) < 1e-11, (got, _t_end, _t_f)
+    for _t_sgn in (1, -1):
+        with _t_mp.workdps(50):
+            _t_x = float(_t_mp.mpf(_t_a) * _t_mp.exp(_t_sgn * (_t_mp.mpf("1e-9") - _t_mp.mpf("1e-14"))))
+            while abs(_t_mp.log(_t_mp.mpf(_t_x) / _t_mp.mpf(_t_a))) > _t_mp.mpf("1e-9") - _t_mp.mpf("1e-14"):
+                _t_x = float(np.nextafter(_t_x, _t_a))
+            assert abs(_t_mp.log(_t_mp.mpf(_t_x) / _t_mp.mpf(_t_a))) > _t_mp.mpf("1e-9") - _t_mp.mpf("2e-14")
+        got = monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, _t_x, 1e8, 1e13)
+        assert _t_rel(got, _t_end) < 1e-11, (got, _t_end, _t_sgn)
     # just beyond the tolerance, outside the interval (|ln| = 1.01e-9 > 1e-9): no flux in the interval
     _t_raised = False
     try:
@@ -193,6 +199,16 @@ try:
 except ValueError:
     _t_raised = True
 assert _t_raised, "A(flux_lo) below 1e-250 lam[k] sum(n0) must raise ValueError"
+# the same with a tiny lam[k] = 1e-75, for which 1e-250 * lam[k] * sum(n0) underflows to 0: two successive
+# captures give x[2] = (sigma phi t)**2 / 2 of the target atoms, about 5e-267 at flux_lo = 1e-2 (below
+# 1e-250) and 5e-227 at flux_hi = 1e18; the activity is the one at flux_hi
+_t_raised = False
+try:
+    monitor_flux(np.array([0.0, 0.0, 1e-75]), np.zeros((3, 3)), np.array([1e7, 1e7, 0.0]), np.array([1, 2, -1]),
+                 np.array([1.0, 0.0, 0.0]), 1e-114, 0.0, 2, 1e-75 * 0.5 * (1e-17 * 1e18 * 1e-114) ** 2, 1e-2, 1e18)
+except ValueError:
+    _t_raised = True
+assert _t_raised, "A(flux_lo) below 1e-250 lam[k] sum(n0) with a tiny lam[k] must raise ValueError"
 # nuclide data rejected by step 3: a positive cross section below 1e-6 b (its rate would underflow)
 _t_raised = False
 try:

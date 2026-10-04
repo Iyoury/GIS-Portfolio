@@ -283,13 +283,14 @@ def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activi
     # Other method: bisection on ln(flux) down to a bracket of 1e-6, then secant steps on ln A.
     def log_activity(y):
         x = activation_inventory(lam, branching, sigma, capture_to, n0, [(t_irr, float(np.exp(y))), (t_cool, 0.0)])
-        return float(np.log(lam_arr[k] * x[k])) if x[k] > 0.0 else -np.inf
+        return float(np.log(lam_arr[k]) + np.log(x[k])) if x[k] > 0.0 else -np.inf
 
     target = np.log(activity)
     a, b = np.log(flux_lo), np.log(flux_hi)
     fa, fb = log_activity(a) - target, log_activity(b) - target
-    floor = np.log(1e-250 * lam_arr[k] * float(np.sum(n0))) if np.sum(n0) > 0 else np.inf
-    if not fa + target >= floor:
+    x_lo = activation_inventory(lam, branching, sigma, capture_to, n0, [(t_irr, flux_lo), (t_cool, 0.0)])[k]
+    s0 = float(np.sum(n0))
+    if not (s0 > 0.0 and x_lo > 0.0 and np.log(x_lo) - np.log(s0) >= -250.0 * np.log(10.0)):
         raise ValueError("A(flux_lo) is below 1e-250 * lam[k] * sum(n0)")
     if abs(fa) <= 1e-9:
         return float(flux_lo)

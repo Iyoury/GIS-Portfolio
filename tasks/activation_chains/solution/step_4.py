@@ -53,7 +53,7 @@ def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activi
     def log_activity(log_flux):
         flux = np.exp(log_flux)
         x = activation_inventory(lam, branching, sigma, capture_to, n0, [(t_irr, flux), (t_cool, 0.0)])
-        return np.log(lam_arr[k] * x[k]) if x[k] > 0.0 else -np.inf
+        return np.log(lam_arr[k]) + np.log(x[k]) if x[k] > 0.0 else -np.inf    # lam * x may underflow
 
     # The activity of a product made by m successive captures grows like flux**m at low flux, and burnup
     # of the target and of the product bends it over at high flux; on the interval it is increasing, so
@@ -64,8 +64,11 @@ def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activi
     f_lo, f_hi = log_activity(lo) - target, log_activity(hi) - target
     # domain: at flux_lo the measured nuclide must hold at least 1e-250 of the initial atoms (the range in
     # which step 3 promises relative accuracy); below it the activity is not determined well enough
-    floor = np.log(1e-250 * lam_arr[k] * float(np.sum(n0))) if np.sum(n0) > 0 else np.inf
-    if not f_lo + target >= floor:
+    # A(flux_lo) >= 1e-250 lam[k] sum(n0) is x[k] >= 1e-250 sum(n0); compare the atoms in separate
+    # logarithms, since 1e-250 * lam[k] * sum(n0) itself can underflow to 0 for a small lam[k]
+    x_lo = activation_inventory(lam, branching, sigma, capture_to, n0, [(t_irr, flux_lo), (t_cool, 0.0)])[k]
+    s0 = float(np.sum(n0))
+    if not (s0 > 0.0 and x_lo > 0.0 and np.log(x_lo) >= np.log(1e-250) + np.log(s0)):
         raise ValueError("A(flux_lo) is below 1e-250 * lam[k] * sum(n0)")
     # the interval is closed: an activity within a relative 1e-9 of an end value, on either side, gives
     # that end; otherwise it must lie strictly between the two end values

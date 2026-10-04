@@ -299,12 +299,11 @@ sub_steps:
       The result must have a relative error below 1e-8 wherever d ln A / d ln phi >= 0.5 at the solution.
       This includes activities as small as 1e-11 Bq. The interval is closed, with a two-sided tolerance
       at its ends: if |ln(activity / A(flux_lo))| <= 1e-9 return flux_lo, else if
-      |ln(activity / A(flux_hi))| <= 1e-9 return flux_hi (on either side of the end value). The two
-      logarithms are evaluated in floating point, so an activity within about 1e-12 (in ln) of the
-      tolerance itself may land on either side and is not used in the tests. Positive cross sections
+      |ln(activity / A(flux_hi))| <= 1e-9 return flux_hi (on either side of the end value). Positive cross sections
       are at least 1e-6 b. Domain: at flux_lo the measured nuclide must hold at least 1e-250 of the
       initial atoms, A(flux_lo) >= 1e-250 * lam[k] * sum(n0) (the range in which step 3 is accurate);
-      otherwise raise ValueError.
+      otherwise raise ValueError. This holds as well when lam[k] is so small that 1e-250 * lam[k] *
+      sum(n0) is below the smallest positive double.
       Inputs:
         lam, sigma, n0: 1-D, length n with 1 <= n <= 30; 0 <= lam <= 1e10 per s, sigma = 0 or 1e-6 <= sigma <= 1e7 b,
                         n0 >= 0 with sum(n0) <= 1e100; all finite.
