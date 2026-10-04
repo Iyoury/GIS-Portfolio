@@ -72,6 +72,8 @@ for N, s, s2, u, v in ((400, 0.5, -1.0 / 3.0, 1e-12, 1e-12), (250, 0.25, -0.2, 1
     b = substitution_times(N, s2, v, u)
     _t_check(a, (b[1], b[0]))
 assert substitution_times(400, 0.5, 1e-12, 1e-12)[1] > 1e100
+# N = 400, s = 0.5, u = v = 1e-12: both times against independent targets: plain Gaussian elimination with partial pivoting in mpmath at 400 digits, run once
+_t_check(substitution_times(400, 0.5, 1e-12, 1e-12), (float("4291404419.48431774984735370533"), float("8.68501178089203024655547514684e+149")))
 
 # --- test case 3: rare mutations: the population waits about 1 / (N v p_fix(1 copy)) generations in
 # i = 0; for N = 20, s = 0.3, u = v = 1e-12 the hitting time differs from that only through the short

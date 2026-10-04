@@ -72,3 +72,15 @@ Version 3 (difficulty increase, the quick probe solved v2 three times out of thr
   reference needs well under 2 s; extended-precision linear algebra at N = 400 does not fit.
 - The prompts and background no longer describe the numerical remedy: no state reduction, no
   remark on dense eigensolvers or on diagonal entries close to 1.
+
+Version 4 (content-check fixes):
+- Independent N = 400 targets, computed once by plain Gaussian elimination with partial pivoting in
+  mpmath at 400 digits (transition matrix built from mpmath binomials). They are written into the
+  tests and compared at 1e-8 relative; the reference agrees with them to about 1e-13:
+  - step 2: all four outputs for s = -1/3, i0 = 1 (p_fix about 3e-141) and for s = 0.5, i0 = 399;
+  - step 3: 18 entries of pi for s = 0.5, u = v = 1e-12, from the largest down to about 6e-150;
+  - step 5: t_up and t_down (about 8.7e149) for s = 0.5, u = v = 1e-12;
+  - step 6: the rate (about 2.3e-246) and 15 entries of the distribution for s = -0.5, v = 1e-9,
+    including its tail between 1e-250 and 1e-240.
+- Steps 1 and 3: entries whose exact value is below 1e-250 are compared with that exact value
+  (|got - exact| <= 1e-250), as the prompts state.
