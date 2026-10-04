@@ -184,7 +184,11 @@ def activation_inventory(lam, branching, sigma, capture_to, n0, history):
     if np.any(np.diag(branching) != 0.0) or np.any(branching.sum(axis=0) > 1.0 + 1e-12):
         raise ValueError("branching needs a zero diagonal and column sums at most 1 + 1e-12")
     steps = []
-    for item in history:
+    try:
+        items = list(history)
+    except TypeError:
+        raise ValueError("history must be a sequence of (duration, flux) pairs")
+    for item in items:
         try:
             duration, flux = (float(v) for v in item)
         except (TypeError, ValueError):
@@ -249,8 +253,9 @@ def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activi
 
     Raises:
       ValueError for nuclide data as in step 3, for times, k, activity or flux bounds outside these
-      ranges, or if activity lies outside [A(flux_lo), A(flux_hi)] by more than a relative 1e-9
-      (an activity within a relative 1e-9 of an end value gives that end of the interval).
+      ranges, or if activity lies outside [A(flux_lo), A(flux_hi)] by more than a relative 1e-9.
+      An activity with |ln(activity / A(end))| <= 1e-9 for an end of the interval, on either side of
+      it, gives that end.
     '''
     t_irr, t_cool, activity = float(t_irr), float(t_cool), float(activity)
     flux_lo, flux_hi = float(flux_lo), float(flux_hi)
@@ -275,12 +280,12 @@ def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activi
     target = np.log(activity)
     a, b = np.log(flux_lo), np.log(flux_hi)
     fa, fb = log_activity(a) - target, log_activity(b) - target
-    if fa > 1e-9 or fb < -1e-9:
-        raise ValueError("the activity is not reached for a flux in [flux_lo, flux_hi]")
-    if fa >= 0.0:
+    if abs(fa) <= 1e-9:
         return float(flux_lo)
-    if fb <= 0.0:
+    if abs(fb) <= 1e-9:
         return float(flux_hi)
+    if fa > 0.0 or fb < 0.0:
+        raise ValueError("the activity is not reached for a flux in [flux_lo, flux_hi]")
     while b - a > 1e-6:
         mid = 0.5 * (a + b)
         fm = log_activity(mid) - target

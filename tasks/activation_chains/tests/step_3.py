@@ -131,12 +131,18 @@ _t_check(x, [2.0 * np.exp(-10.0)], 2.0)
 x = activation_inventory(np.array([1e10 - 10.0, 0.0]), np.zeros((2, 2)), np.array([1e7, 0.0]), np.array([1, -1]),
                          np.array([1.0, 0.0]), [(1e-10, 1e18)])
 _t_check(x, [np.exp(-1.0), 1e-9 * -np.expm1(-1.0)], 1.0)
+# an empty history with a branching column sum exactly at the bound 1 + 1e-12, and capture links of
+# nuclides without cross section (sigma = 0, so no edge even though capture_to forms a loop), give n0 back
+_t_check(activation_inventory(np.array([1.0, 0.0]), np.array([[0.0, 0.0], [1.0 + 1e-12, 0.0]]), np.zeros(2),
+                              np.array([-1, -1]), np.array([1.0, 2.0]), []), [1.0, 2.0], 3.0)
+_t_check(activation_inventory(np.array([1e-3, 0.0]), np.zeros((2, 2)), np.zeros(2), np.array([1, 0]),
+                              np.array([1.0, 2.0]), []), [1.0, 2.0], 3.0)
 # 30 nuclides with an empty history give n0 back
 n0 = np.linspace(1.0, 3.0, 30)
 _t_check(activation_inventory(np.full(30, 1e-3), np.diag(np.ones(29), -1), np.zeros(30), np.full(30, -1), n0, []), n0, n0.sum())
 
 # --- test case 5: a capture loop, capture onto itself or out of range, sigma above 1e7 b, branching with a column
-# sum of 1.2 (even with an empty history), lam above 1e10, 31 nuclides, a NaN cross section, a bad history entry,
+# sum of 1.2 or a nonzero diagonal (even with an empty history), a history that is not a sequence, lam above 1e10, 31 nuclides, a NaN cross section, a bad history entry,
 # an infinite or too long duration, a too large flux, or a too large combined rate raise ValueError ---
 _t_loop = np.zeros((2, 2))
 _t_loop[0, 1] = 1.0
@@ -155,7 +161,9 @@ for _t_bad in ((np.array([0.0, 1.0]), _t_loop, np.array([5.0, 0.0]), np.array([1
                (np.array([2e10, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), []),
                (np.full(31, 1e-3), np.zeros((31, 31)), np.zeros(31), np.full(31, -1), np.ones(31), []),
                (np.array([0.0, 1.0]), np.zeros((2, 2)), np.array([np.nan, 0.0]), np.array([1, -1]), np.ones(2), [(1.0, 1e10)]),
-               (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), [(np.inf, 0.0)])):
+               (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), [(np.inf, 0.0)]),
+               (np.array([1.0, 1.0]), np.array([[0.5, 0.0], [0.5, 0.0]]), np.zeros(2), np.array([-1, -1]), np.ones(2), []),
+               (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), None)):
     try:
         activation_inventory(*_t_bad)
     except ValueError:

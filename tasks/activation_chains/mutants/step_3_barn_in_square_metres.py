@@ -49,7 +49,11 @@ def activation_inventory(lam, branching, sigma, capture_to, n0, history):
     if np.any(np.diag(branching) != 0.0) or np.any(branching.sum(axis=0) > 1.0 + 1e-12):
         raise ValueError("branching needs a zero diagonal and column sums at most 1 + 1e-12")
     steps = []
-    for item in history:
+    try:
+        items = list(history)
+    except TypeError:
+        raise ValueError("history must be a sequence of (duration, flux) pairs")
+    for item in items:
         try:
             duration, flux = (float(v) for v in item)
         except (TypeError, ValueError):
@@ -85,5 +89,7 @@ def activation_inventory(lam, branching, sigma, capture_to, n0, history):
         total = lam + capture_rate
         with np.errstate(invalid="ignore", divide="ignore"):
             frac = np.where(total > 0.0, (branching * lam[None, :] + capture * capture_rate[None, :]) / total, 0.0)
+        # a column sum of the data at the bound 1 + 1e-12 must not be pushed above it by rounding
+        frac = frac / np.maximum(1.0, frac.sum(axis=0) / (1.0 + 1e-12))[None, :]
         x = network_inventory(total, frac, np.zeros(n), x, duration)
     return x

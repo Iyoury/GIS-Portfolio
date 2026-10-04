@@ -119,10 +119,13 @@ _t_co = (np.array([0.0, np.log(2.0) / (10.467 * 60.0), np.log(2.0) / (5.2714 * 3
 _t_roundtrip(2, 1e11, 1e9, 1e9, 1e6, 1e13, _t_co)
 _t_simple = (np.array([0.0, 1e-3]), np.zeros((2, 2)), np.array([1.0, 0.0]), np.array([1, -1]), np.array([1e20, 0.0]))
 _t_roundtrip(1, 1e17, 1e3, 10.0, 1e14, 1e18, _t_simple)
-# the interval is closed: the activities at flux_lo and at flux_hi give back those ends
-for _t_end in (1e8, 1e13):
-    got = monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, _t_activity(1, _t_end, 5 * _T_DAY, _T_DAY, *_T_DATA), 1e8, 1e13)
-    assert _t_rel(got, _t_end) < 1e-8, (got, _t_end)
+# the interval is closed with a two-sided tolerance: activities equal to A(flux_lo) or A(flux_hi), or
+# 5e-10 inside them (whose exact roots are about 5e-10 away from the ends), give back those ends
+for _t_end, _t_in in ((1e8, 1.0 + 5e-10), (1e13, 1.0 - 5e-10)):
+    for _t_f in (1.0, _t_in):
+        act = _t_f * _t_activity(1, _t_end, 5 * _T_DAY, _T_DAY, *_T_DATA)
+        got = monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, act, 1e8, 1e13)
+        assert _t_rel(got, _t_end) < 1e-11, (got, _t_end, _t_f)
 
 # --- test case 4: an activity outside [A(flux_lo), A(flux_hi)] raises ValueError ---
 for _t_act in (_t_activity(1, 1e7, 5 * _T_DAY, _T_DAY, *_T_DATA), _t_activity(1, 1e14, 5 * _T_DAY, _T_DAY, *_T_DATA)):

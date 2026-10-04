@@ -139,6 +139,10 @@ B = np.zeros((3, 3))
 B[1, 0], B[2, 0] = 0.5, 0.5 + 5e-13
 x = network_inventory(np.array([1.0, 0.0, 0.0]), B, np.zeros(3), np.array([1.0, 0.0, 0.0]), 2.0)
 _t_check(x, [np.exp(-2.0), 0.5 * -np.expm1(-2.0), (0.5 + 5e-13) * -np.expm1(-2.0)], 1.0)
+B = np.zeros((2, 2))
+B[1, 0] = 1.0 + 1e-12                       # exactly at the accepted bound
+x = network_inventory(np.array([1.0, 0.0]), B, np.zeros(2), np.array([1.0, 0.0]), 2.0)
+_t_check(x, [np.exp(-2.0), (1.0 + 1e-12) * -np.expm1(-2.0)], 1.0)
 _t_check(network_inventory(np.array([1.0, 0.5]), np.array([[0.0, 0.0], [1.0, 0.0]]), np.zeros(2), np.zeros(2), 3.0), [0.0, 0.0], 0.0)
 
 # --- test case 5: a cycle, a nonzero diagonal, a column sum above 1 + 1e-12, 31 nuclides, negative production or a bad time

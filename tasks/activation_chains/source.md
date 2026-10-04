@@ -72,3 +72,16 @@ Version 3 (content-check fixes):
 - Step 4 now states the step-3 data contract (types, shapes, ranges, acyclicity) itself.
 - Step 4 makes the interval explicitly closed: an activity within a relative 1e-9 of A(flux_lo) or
   A(flux_hi) gives that end. This is tested at both ends.
+
+Version 4 (content-check fixes):
+- Step 4: the end rule is two-sided and checked before the bracket. If
+  |ln(activity / A(flux_lo))| <= 1e-9 the result is flux_lo, else if the same holds at flux_hi it is
+  flux_hi; on either side of the end value. Tested at both ends with activities equal to the end
+  values and 5e-10 inside them.
+- Step 2 tests a branching column summing exactly to the float 1 + 1e-12 (accepted).
+- Step 3:
+  - accepts the same bound with an empty history;
+  - rejects a nonzero diagonal with an empty history;
+  - ignores capture links of nuclides without cross section (a zero-sigma capture loop is accepted);
+  - turns a history that is not a sequence (None) into ValueError;
+  - rescales the period fractions so that rounding cannot push a column at the bound above it.

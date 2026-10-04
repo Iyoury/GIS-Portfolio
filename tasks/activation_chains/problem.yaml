@@ -47,8 +47,9 @@ problem_io: |-
 
       Raises:
         ValueError for nuclide data as in step 3, for times, k, activity or flux bounds outside these
-        ranges, or if activity lies outside [A(flux_lo), A(flux_hi)] by more than a relative 1e-9
-        (an activity within a relative 1e-9 of an end value gives that end of the interval).
+        ranges, or if activity lies outside [A(flux_lo), A(flux_hi)] by more than a relative 1e-9.
+        An activity with |ln(activity / A(end))| <= 1e-9 for an end of the interval, on either side of
+        it, gives that end.
       '''
 
 general_tests: tests/general.py
@@ -228,7 +229,7 @@ sub_steps:
         - branching violates the conditions of step 2;
         - the combined network has a cycle (edges i -> j where branching[j, i] > 0, or where sigma[i] > 0
           and capture_to[i] = j);
-        - a history entry is not a pair of numbers in range;
+        - history is not a sequence, or an entry is not a pair of numbers in range;
         - lam[i] + sigma[i] * 1e-24 * flux exceeds 1e10 per s in some period.
     function_header: |-
       def activation_inventory(lam, branching, sigma, capture_to, n0, history):
@@ -291,8 +292,9 @@ sub_steps:
       product bends A over at high flux.
 
       The result must have a relative error below 1e-8 wherever d ln A / d ln phi >= 0.5 at the solution.
-      This includes activities as small as 1e-11 Bq. The interval is closed: an activity equal to
-      A(flux_lo) or A(flux_hi) to within a relative 1e-9 gives flux_lo or flux_hi.
+      This includes activities as small as 1e-11 Bq. The interval is closed, with a two-sided tolerance
+      at its ends: if |ln(activity / A(flux_lo))| <= 1e-9 return flux_lo, else if
+      |ln(activity / A(flux_hi))| <= 1e-9 return flux_hi (on either side of the end value).
       Inputs:
         lam, sigma, n0: 1-D, length n with 1 <= n <= 30; 0 <= lam <= 1e10 per s, 0 <= sigma <= 1e7 b,
                         n0 >= 0; all finite.
@@ -337,8 +339,9 @@ sub_steps:
 
           Raises:
             ValueError for nuclide data as in step 3, for times, k, activity or flux bounds outside these
-            ranges, or if activity lies outside [A(flux_lo), A(flux_hi)] by more than a relative 1e-9
-            (an activity within a relative 1e-9 of an end value gives that end of the interval).
+            ranges, or if activity lies outside [A(flux_lo), A(flux_hi)] by more than a relative 1e-9.
+            An activity with |ln(activity / A(end))| <= 1e-9 for an end of the interval, on either side of
+            it, gives that end.
           '''
     return_line: return flux
     step_background: |-

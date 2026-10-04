@@ -206,7 +206,11 @@ def activation_inventory(lam, branching, sigma, capture_to, n0, history):
     if np.any(np.diag(branching) != 0.0) or np.any(branching.sum(axis=0) > 1.0 + 1e-12):
         raise ValueError("branching needs a zero diagonal and column sums at most 1 + 1e-12")
     steps = []
-    for item in history:
+    try:
+        items = list(history)
+    except TypeError:
+        raise ValueError("history must be a sequence of (duration, flux) pairs")
+    for item in items:
         try:
             duration, flux = (float(v) for v in item)
         except (TypeError, ValueError):
@@ -242,6 +246,8 @@ def activation_inventory(lam, branching, sigma, capture_to, n0, history):
         total = lam + capture_rate
         with np.errstate(invalid="ignore", divide="ignore"):
             frac = np.where(total > 0.0, (branching * lam[None, :] + capture * capture_rate[None, :]) / total, 0.0)
+        # a column sum of the data at the bound 1 + 1e-12 must not be pushed above it by rounding
+        frac = frac / np.maximum(1.0, frac.sum(axis=0) / (1.0 + 1e-12))[None, :]
         x = network_inventory(total, frac, np.zeros(n), x, duration)
     return x
 
@@ -272,8 +278,9 @@ def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activi
 
     Raises:
       ValueError for nuclide data as in step 3, for times, k, activity or flux bounds outside these
-      ranges, or if activity lies outside [A(flux_lo), A(flux_hi)] by more than a relative 1e-9
-      (an activity within a relative 1e-9 of an end value gives that end of the interval).
+      ranges, or if activity lies outside [A(flux_lo), A(flux_hi)] by more than a relative 1e-9.
+      An activity with |ln(activity / A(end))| <= 1e-9 for an end of the interval, on either side of
+      it, gives that end.
     '''
     t_irr, t_cool, activity = float(t_irr), float(t_cool), float(activity)
     flux_lo, flux_hi = float(flux_lo), float(flux_hi)
@@ -302,13 +309,14 @@ def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activi
     lo, hi = np.log(flux_lo), np.log(flux_hi)
     target = np.log(activity)
     f_lo, f_hi = log_activity(lo) - target, log_activity(hi) - target
-    # the interval is closed: an activity equal to an end value (to a relative 1e-9) gives that end
-    if f_lo > 1e-9 or f_hi < -1e-9:
-        raise ValueError("the activity is not reached for a flux in [flux_lo, flux_hi]")
-    if f_lo >= 0.0:
+    # the interval is closed: an activity within a relative 1e-9 of an end value, on either side, gives
+    # that end; otherwise it must lie strictly between the two end values
+    if abs(f_lo) <= 1e-9:
         return float(flux_lo)
-    if f_hi <= 0.0:
+    if abs(f_hi) <= 1e-9:
         return float(flux_hi)
+    if f_lo > 0.0 or f_hi < 0.0:
+        raise ValueError("the activity is not reached for a flux in [flux_lo, flux_hi]")
     root = brentq(lambda y: log_activity(y) - target, lo, hi, xtol=1e-14, rtol=1e-15, maxiter=200)
     flux = float(np.exp(root))
     return flux
