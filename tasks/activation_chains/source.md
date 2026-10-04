@@ -105,3 +105,12 @@ Version 6 (content-check fixes):
   - sum(n0) <= 1e100 in steps 1, 3 and 4;
   - sum(n0) + t * sum(source) <= 1e100 in step 2.
   Each bound is stated, enforced (ValueError), and tested at the bound and above it.
+
+Version 7 (advisory fixes after the v6 rollouts):
+- Steps 1-3 test a positive exact amount below the 1e-250 S threshold: exp(-600), about 3e-261, is
+  checked with the absolute rule.
+  - step 1: pure decay;
+  - step 2: pure decay in a network;
+  - step 3: burnup at sigma = 100 b, flux 1e18, 6e6 s.
+- Step 2 rejects an empty network, a scalar source and a 2-D n0.
+- Step 3 rejects a scalar sigma, a branching matrix that is not n x n, and an n0 of the wrong length.

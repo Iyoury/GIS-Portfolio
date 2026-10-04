@@ -61,8 +61,8 @@ def _t_network(lam, branching, source, n0, t):
 
 # --- test case 0: one nuclide with constant production: n0 exp(-lam t) + q (1 - exp(-lam t)) / lam,
 # also when lam t is far below rounding (then about n0 + q t), when production dominates, and pure decay
-# down to exp(-550), about 1e-239 ---
-for _t_lam, _t_q, _t_n0, _t_t in ((0.5, 3.0, 1.0, 2.0), (1e-10, 7.0, 0.0, 1e-5), (2.0, 1e6, 1e-3, 1e3), (0.0, 2.0, 1.0, 10.0), (1.0, 0.0, 1.0, 550.0)):
+# down to exp(-550), about 1e-239, and exp(-600), about 3e-261 (below 1e-250 S: absolute rule) ---
+for _t_lam, _t_q, _t_n0, _t_t in ((0.5, 3.0, 1.0, 2.0), (1e-10, 7.0, 0.0, 1e-5), (2.0, 1e6, 1e-3, 1e3), (0.0, 2.0, 1.0, 10.0), (1.0, 0.0, 1.0, 550.0), (1.0, 0.0, 1.0, 600.0)):
     x = network_inventory(np.array([_t_lam]), np.zeros((1, 1)), np.array([_t_q]), np.array([_t_n0]), _t_t)
     with _t_mp.workdps(50):
         L = _t_mp.mpf(_t_lam)
@@ -147,7 +147,7 @@ x = network_inventory(np.array([1.0, 0.0]), B, np.zeros(2), np.array([1.0, 0.0])
 _t_check(x, [np.exp(-2.0), (1.0 + 1e-12) * -np.expm1(-2.0)], 1.0)
 _t_check(network_inventory(np.array([1.0, 0.5]), np.array([[0.0, 0.0], [1.0, 0.0]]), np.zeros(2), np.zeros(2), 3.0), [0.0, 0.0], 0.0)
 
-# --- test case 5: a cycle, a nonzero diagonal, a column sum above 1 + 1e-12, 31 nuclides, sum(n0) + t sum(source) above 1e100, negative production or a bad time
+# --- test case 5: a cycle, a nonzero diagonal, a column sum above 1 + 1e-12, 31 nuclides, an empty network, a scalar source or a 2-D n0, sum(n0) + t sum(source) above 1e100, negative production or a bad time
 # raise ValueError ---
 _t_cyc = np.array([[0.0, 1.0], [1.0, 0.0]])
 _t_diag = np.array([[0.5, 0.0], [0.5, 0.0]])
@@ -155,7 +155,7 @@ _t_over = np.array([[0.0, 0.0], [1.2, 0.0]])
 _t_ok = np.array([[0.0, 0.0], [1.0, 0.0]])
 for _t_bad in ((np.ones(2), _t_cyc, np.zeros(2), np.ones(2), 1.0), (np.ones(2), _t_diag, np.zeros(2), np.ones(2), 1.0),
                (np.ones(2), _t_over, np.zeros(2), np.ones(2), 1.0), (np.ones(2), _t_ok, np.array([0.0, -1.0]), np.ones(2), 1.0),
-               (np.ones(2), _t_ok, np.zeros(2), np.ones(2), float("nan")), (np.array([2e10, 1.0]), _t_ok, np.zeros(2), np.ones(2), 1.0), (np.ones(2), _t_ok, np.zeros(2), np.ones(2), 2e20), (np.ones(2), np.array([[0.0, 0.0], [1.0 + 1e-9, 0.0]]), np.zeros(2), np.ones(2), 1.0), (np.ones(31), np.zeros((31, 31)), np.zeros(31), np.ones(31), 1.0), (np.zeros(1), np.zeros((1, 1)), np.array([1e90]), np.zeros(1), 1e20), (np.zeros(1), np.zeros((1, 1)), np.array([1e81]), np.zeros(1), 1e20), (np.ones(2), np.zeros((3, 3)), np.zeros(2), np.ones(2), 1.0)):
+               (np.ones(2), _t_ok, np.zeros(2), np.ones(2), float("nan")), (np.array([2e10, 1.0]), _t_ok, np.zeros(2), np.ones(2), 1.0), (np.ones(2), _t_ok, np.zeros(2), np.ones(2), 2e20), (np.ones(2), np.array([[0.0, 0.0], [1.0 + 1e-9, 0.0]]), np.zeros(2), np.ones(2), 1.0), (np.ones(31), np.zeros((31, 31)), np.zeros(31), np.ones(31), 1.0), (np.array([]), np.zeros((0, 0)), np.array([]), np.array([]), 1.0), (np.ones(2), _t_ok, np.array(0.5), np.ones(2), 1.0), (np.ones(2), _t_ok, np.zeros(2), np.ones((2, 1)), 1.0), (np.zeros(1), np.zeros((1, 1)), np.array([1e90]), np.zeros(1), 1e20), (np.zeros(1), np.zeros((1, 1)), np.array([1e81]), np.zeros(1), 1e20), (np.ones(2), np.zeros((3, 3)), np.zeros(2), np.ones(2), 1.0)):
     try:
         network_inventory(*_t_bad)
     except ValueError:
