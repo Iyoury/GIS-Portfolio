@@ -97,7 +97,8 @@ for N, s, v, dps in ((20, -0.5, 1e-12, 200), (25, 0.3, 1e-3, 120), (16, 0.5, 0.1
     assert _t_rel(rate, t_rate) < 1e-8, (N, s, v, rate, t_rate)
     _t_check_vec(q, t_q)
 
-# --- test case 3: N = 400 with strong selection against A: the absorption rate is about 1e-246. Two exact
+# --- test case 3: N = 400 with strong selection against A (absorption rate about 1e-246), and for A (tail of the
+# distribution down to about 4e-221 at i = 0, as stated in the prompt). Two exact
 # identities with the matrix in double precision (only sums of nonnegative terms): (q Q)_j = (1 - rate) q_j
 # for every j, and rate = sum_i q_i P[i, N] ---
 for N, s, v in ((400, -0.5, 1e-9), (400, 0.5, 0.1), (300, -0.2, 1e-12)):

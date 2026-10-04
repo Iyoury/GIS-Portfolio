@@ -84,3 +84,8 @@ Version 4 (content-check fixes):
     including its tail between 1e-250 and 1e-240.
 - Steps 1 and 3: entries whose exact value is below 1e-250 are compared with that exact value
   (|got - exact| <= 1e-250), as the prompts state.
+
+Version 5: the v4 rollouts (5/8) lost credit only on one step-6 check, the eigenvector equation at the
+far tail of the N = 400, s = 0.5, v = 0.1 distribution (qsd[0] about 4e-221). The requirement was
+already covered by the general accuracy rule; the prompt now states it explicitly, with that case and
+the size of its tail, and says that every tail entry is checked against (qsd Q)_j = rho qsd_j.
