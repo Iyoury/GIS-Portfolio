@@ -17,7 +17,7 @@ def switching_field_statistics(psi, a, f0, rate):
 
     Output:
       (h_median, h_mean): tuple of two floats, the median and the mean of the field at
-      which the particle leaves its original minimum. Absolute errors below 1e-9.
+      which the particle leaves its original minimum. Absolute errors below 1e-7.
 
     Raises:
       ValueError if psi is outside [0, pi/2], if a, f0 or rate is not a positive finite

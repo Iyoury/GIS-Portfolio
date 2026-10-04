@@ -16,7 +16,7 @@ def branch_magnetization(h, psi):
       m: float, cos(theta - psi), where theta is the magnetization angle (from the easy
          axis) of the state reached when the field comes down from large positive values
          to h, the particle staying in its local energy minimum until that minimum
-         disappears at h = -h_sw(psi). Absolute error below 1e-10 when
+         disappears at h = -h_sw(psi). Absolute error below 1e-8 when
          |h + h_sw(psi)| >= 1e-3.
 
     Raises:

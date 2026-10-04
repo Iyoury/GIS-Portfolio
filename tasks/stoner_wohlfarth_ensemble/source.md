@@ -105,3 +105,13 @@ Version 5 (content-check fixes):
 Version 7: step 6 states a time budget (each call within 30 s on one CPU core; the reference takes
 about 1.2 s at sigma = 60, |h| = 0.9 and the second solution about the same), and the step-6 and
 general tests assert it on every checked call.
+
+Version 8: v7 reached 1/8 with 3 of 8 attempts cut by the time limit. Failures were spread over
+all six steps and were mostly numerical-method misses while chasing 1e-10. The required
+accuracies are relaxed by a factor of 100, everywhere at once (prompts, docstrings and tests); the
+science and the test cases are unchanged:
+- steps 1-3: 1e-10 to 1e-8 absolute;
+- step 4: 1e-9 to 1e-7;
+- step 5: 1e-8 to 1e-6;
+- step 6: 1e-8 to 1e-6 relative.
+Every mutant still fails by many orders of magnitude more than the new bounds.

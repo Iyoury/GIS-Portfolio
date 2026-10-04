@@ -18,7 +18,7 @@ def ensemble_switching(psis, weights, a, f0, rate):
             1e5 <= f0 / rate <= 1e13.
 
     Output:
-      (h_c, h_half): tuple of two floats, absolute errors below 1e-8.
+      (h_c, h_half): tuple of two floats, absolute errors below 1e-6.
         h_c: the ensemble magnetization is zero at h = -h_c during the sweep.
         h_half: half of the total weight has left its original minimum at h = -h_half.
 

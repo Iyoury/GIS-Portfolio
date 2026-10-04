@@ -79,32 +79,32 @@ def _t_m(h, psi):
 for _t_h, _t_p in ((2.0, 0.4), (0.0, 0.7), (-0.3, 0.35), (0.6, 1.3), (-0.2, 1.0)):
     m = branch_magnetization(_t_h, _t_p)
     assert isinstance(m, float)
-    assert abs(m - _t_m(_t_h, _t_p)) < 1e-10, (_t_h, _t_p, m)
+    assert abs(m - _t_m(_t_h, _t_p)) < 1e-8, (_t_h, _t_p, m)
 
 # --- test case 1: just before and just after the jump at h = -h_sw(psi) ---
 for _t_p in (0.2, np.pi / 6, np.pi / 4, 1.0, 1.4):
     _t_hs = _t_fold(_t_p)[0]
     m_before = branch_magnetization(-_t_hs + 1.5e-3, _t_p)
     m_after = branch_magnetization(-_t_hs - 1.5e-3, _t_p)
-    assert abs(m_before - _t_m(-_t_hs + 1.5e-3, _t_p)) < 1e-10, (_t_p, m_before)
-    assert abs(m_after - _t_m(-_t_hs - 1.5e-3, _t_p)) < 1e-10, (_t_p, m_after)
+    assert abs(m_before - _t_m(-_t_hs + 1.5e-3, _t_p)) < 1e-8, (_t_p, m_before)
+    assert abs(m_after - _t_m(-_t_hs - 1.5e-3, _t_p)) < 1e-8, (_t_p, m_after)
 
 # --- test case 2: the end points psi = 0 and psi = pi/2, and angles just inside them ---
 for _t_h, _t_p in ((-0.99, 0.0), (-1.01, 0.0), (0.5, np.pi / 2), (-0.5, np.pi / 2), (-0.9985, np.pi / 2),
                    (-1.2, np.pi / 2), (-0.99, 1e-9), (-1.01, 1e-9), (-0.99, np.pi / 2 - 1e-9),
                    (-1.01, np.pi / 2 - 1e-9)):
     m = branch_magnetization(_t_h, _t_p)
-    assert abs(m - _t_m(_t_h, _t_p)) < 1e-10, (_t_h, _t_p, m)
-assert abs(branch_magnetization(-0.99, 0.0) - 1.0) < 1e-10
-assert abs(branch_magnetization(-1.01, 0.0) + 1.0) < 1e-10
+    assert abs(m - _t_m(_t_h, _t_p)) < 1e-8, (_t_h, _t_p, m)
+assert abs(branch_magnetization(-0.99, 0.0) - 1.0) < 1e-8
+assert abs(branch_magnetization(-1.01, 0.0) + 1.0) < 1e-8
 # exactly at the edge of the accuracy statement, |h + h_sw| = 1e-3, on both sides of the jump
-assert abs(branch_magnetization(-0.999, 0.0) - 1.0) < 1e-10
-assert abs(branch_magnetization(-1.001, 0.0) + 1.0) < 1e-10
+assert abs(branch_magnetization(-0.999, 0.0) - 1.0) < 1e-8
+assert abs(branch_magnetization(-1.001, 0.0) + 1.0) < 1e-8
 
 # --- test case 3: hysteresis: the particle keeps a minimum that is not the global one ---
 for _t_h, _t_p in ((-0.3, 0.2), (-0.45, 1.2), (-0.6, 0.15), (-1.7, 0.9), (3.0, 1.1)):
     m = branch_magnetization(_t_h, _t_p)
-    assert abs(m - _t_m(_t_h, _t_p)) < 1e-10, (_t_h, _t_p, m)
+    assert abs(m - _t_m(_t_h, _t_p)) < 1e-8, (_t_h, _t_p, m)
 
 # --- test case 4: psi outside [0, pi/2] or a field that is not finite raises ValueError ---
 for _t_bad in ((0.3, -0.1), (0.3, 1.6), (float("nan"), 0.5), (float("inf"), 0.5)):

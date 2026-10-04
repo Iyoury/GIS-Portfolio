@@ -101,17 +101,17 @@ def _t_barriers(h, psi):
 for _t_p in (0.0, 0.4, np.pi / 4, 1.3, np.pi / 2):
     low, high = escape_barriers(0.0, _t_p)
     assert isinstance(low, np.floating) and isinstance(high, np.floating), (type(low), type(high))
-    assert abs(float(low) - 0.5) < 1e-10 and abs(float(high) - 0.5) < 1e-10, (_t_p, low, high)
+    assert abs(float(low) - 0.5) < 1e-8 and abs(float(high) - 0.5) < 1e-8, (_t_p, low, high)
 
 # --- test case 1: closed forms at psi = 0 and psi = pi/2 ---
 h = np.array([-0.9, -0.5, -0.1, 0.2, 0.7, 0.95])
 low, high = escape_barriers(h, 0.0)
 assert isinstance(low, np.ndarray) and low.shape == h.shape and high.shape == h.shape
-assert np.allclose(low, 0.5 * (1.0 + h) ** 2, rtol=0.0, atol=1e-10)
-assert np.allclose(high, 0.5 * (1.0 + h) ** 2, rtol=0.0, atol=1e-10)
+assert np.allclose(low, 0.5 * (1.0 + h) ** 2, rtol=0.0, atol=1e-8)
+assert np.allclose(high, 0.5 * (1.0 + h) ** 2, rtol=0.0, atol=1e-8)
 low, high = escape_barriers(h, np.pi / 2)
-assert np.allclose(low, 0.5 * (1.0 - np.abs(h)) ** 2, rtol=0.0, atol=1e-10)
-assert np.allclose(high, 0.5 * (1.0 + np.abs(h)) ** 2, rtol=0.0, atol=1e-10)
+assert np.allclose(low, 0.5 * (1.0 - np.abs(h)) ** 2, rtol=0.0, atol=1e-8)
+assert np.allclose(high, 0.5 * (1.0 + np.abs(h)) ** 2, rtol=0.0, atol=1e-8)
 
 # --- test case 2: other angles against the grid search, with a 2-D input ---
 for _t_p in (0.2, np.pi / 6, np.pi / 4, 1.0, 1.4):
@@ -121,7 +121,7 @@ for _t_p in (0.2, np.pi / 6, np.pi / 4, 1.0, 1.4):
     assert low.shape == (2, 3) and high.shape == (2, 3)
     for idx in np.ndindex(h.shape):
         t_lo, t_hi = _t_barriers(h[idx], _t_p)
-        assert abs(low[idx] - t_lo) < 1e-10 and abs(high[idx] - t_hi) < 1e-10, (_t_p, h[idx])
+        assert abs(low[idx] - t_lo) < 1e-8 and abs(high[idx] - t_hi) < 1e-8, (_t_p, h[idx])
 
 # --- test case 3: fields just inside both ends of the accurate range (h_sw - |h| >= 1e-3) ---
 for _t_p in (0.1, np.pi / 6, np.pi / 4, 1.2):
@@ -129,7 +129,7 @@ for _t_p in (0.1, np.pi / 6, np.pi / 4, 1.2):
     for x in (-_t_hs + 1.1e-3, _t_hs - 1.1e-3):
         low, high = escape_barriers(x, _t_p)
         t_lo, t_hi = _t_barriers(x, _t_p)
-        assert abs(float(low) - t_lo) < 1e-10 and abs(float(high) - t_hi) < 1e-10, (_t_p, x)
+        assert abs(float(low) - t_lo) < 1e-8 and abs(float(high) - t_hi) < 1e-8, (_t_p, x)
 
 # --- test case 4: a bad angle, a field that is not finite or |h| >= h_sw raises ValueError ---
 for _t_bad in ((0.0, -0.1), (0.0, 1.7), (float("nan"), 0.5), (0.6, np.pi / 4), (1.0, 0.0), (np.array([0.1, 0.6]), np.pi / 4), (np.array([0.1, np.inf]), 0.3)):

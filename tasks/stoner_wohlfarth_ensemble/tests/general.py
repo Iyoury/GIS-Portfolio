@@ -105,8 +105,8 @@ def _t_check6(sigma, h):
     assert elapsed <= 30.0, ("brown_relaxation took %.1f s" % elapsed, sigma, h)
     assert isinstance(out, tuple) and len(out) == 2 and all(type(x) is float for x in out), out
     lam, tau = (float(x) for x in _t_brown(sigma, h))
-    assert _t_rel(out[0], lam) < 1e-8, (sigma, h, out, lam)
-    assert _t_rel(out[1], tau) < 1e-8, (sigma, h, out, tau)
+    assert _t_rel(out[0], lam) < 1e-6, (sigma, h, out, lam)
+    assert _t_rel(out[1], tau) < 1e-6, (sigma, h, out, tau)
     return out
 
 

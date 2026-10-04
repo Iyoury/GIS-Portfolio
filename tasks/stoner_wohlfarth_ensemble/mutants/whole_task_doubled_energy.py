@@ -16,7 +16,7 @@ def branch_magnetization(h, psi):
       m: float, cos(theta - psi), where theta is the magnetization angle (from the easy
          axis) of the state reached when the field comes down from large positive values
          to h, the particle staying in its local energy minimum until that minimum
-         disappears at h = -h_sw(psi). Absolute error below 1e-10 when
+         disappears at h = -h_sw(psi). Absolute error below 1e-8 when
          |h + h_sw(psi)| >= 1e-3.
 
     Raises:
@@ -69,7 +69,7 @@ def escape_barriers(h, psi):
       (low, high): two values with the shape of np.asarray(h), numpy float scalars for a
       scalar h. low <= high are
       e(theta_max) - e(theta_min) for the two energy maxima, theta_min being the original
-      minimum of the descending branch. Absolute error below 1e-10 when
+      minimum of the descending branch. Absolute error below 1e-8 when
       h_sw(psi) - |h| >= 1e-3.
 
     Raises:
@@ -138,7 +138,7 @@ def survival_probability(h, psi, a, f0, rate):
 
     Output:
       P: float in [0, 1], P = 1 for h >= h_sw(psi) and P = 0 for h <= -h_sw(psi).
-         Absolute error below 1e-10.
+         Absolute error below 1e-8.
 
     Raises:
       ValueError if psi is outside [0, pi/2], if h is not finite, if a, f0 or rate is
@@ -190,7 +190,7 @@ def switching_field_statistics(psi, a, f0, rate):
 
     Output:
       (h_median, h_mean): tuple of two floats, the median and the mean of the field at
-      which the particle leaves its original minimum. Absolute errors below 1e-9.
+      which the particle leaves its original minimum. Absolute errors below 1e-7.
 
     Raises:
       ValueError if psi is outside [0, pi/2], if a, f0 or rate is not a positive finite
@@ -261,7 +261,7 @@ def ensemble_switching(psis, weights, a, f0, rate):
             1e5 <= f0 / rate <= 1e13.
 
     Output:
-      (h_c, h_half): tuple of two floats, absolute errors below 1e-8.
+      (h_c, h_half): tuple of two floats, absolute errors below 1e-6.
         h_c: the ensemble magnetization is zero at h = -h_c during the sweep.
         h_half: half of the total weight has left its original minimum at h = -h_half.
 
@@ -315,10 +315,10 @@ def brown_relaxation(sigma, h):
     Output:
       (lam1, tau_int): tuple of two Python floats, in units of 1/tau_N and tau_N, respectively.
         lam1: smallest nonzero eigenvalue of the Fokker-Planck operator (relaxation rate times
-              tau_N), relative error below 1e-8.
+              tau_N), relative error below 1e-6.
         tau_int: integral relaxation time of z = cos(theta) divided by tau_N,
                  int_0^inf C(t) dt / C(0) with C(t) = <z(t) z(0)> - <z>**2 in equilibrium,
-                 relative error below 1e-8.
+                 relative error below 1e-6.
 
     Raises:
       ValueError if sigma or h is not finite, if sigma is outside [0, 60] or if |h| > 0.9.

@@ -172,18 +172,18 @@ for _t_a, _t_f0, _t_rate in ((100.0, 1e9, 1.0), (400.0, 1e9, 1e3), (40.0, 1e13, 
     ratio = _t_f0 / _t_rate
     out = switching_field_statistics(0.0, _t_a, _t_f0, _t_rate)
     assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(v, float) for v in out)
-    assert abs(out[0] - _t_median0(_t_a, ratio)) < 1e-9, (out, _t_median0(_t_a, ratio))
-    assert abs(out[1] - _t_mean0(_t_a, ratio)) < 1e-9, (out, _t_mean0(_t_a, ratio))
+    assert abs(out[0] - _t_median0(_t_a, ratio)) < 1e-7, (out, _t_median0(_t_a, ratio))
+    assert abs(out[1] - _t_mean0(_t_a, ratio)) < 1e-7, (out, _t_mean0(_t_a, ratio))
 
 # --- test case 1: psi = pi/4: median by one Newton step, mean by a windowed quadrature ---
 out = switching_field_statistics(np.pi / 4, 100.0, 1e9, 1.0)
-assert abs(_t_median_step(out[0], np.pi / 4, 100.0, 1e9)) < 1e-9, out
-assert abs(out[1] - _t_mean(np.pi / 4, 100.0, 1e9, out[0])) < 1e-9, out
+assert abs(_t_median_step(out[0], np.pi / 4, 100.0, 1e9)) < 1e-7, out
+assert abs(out[1] - _t_mean(np.pi / 4, 100.0, 1e9, out[0])) < 1e-7, out
 
 # --- test case 2: a cold particle (a = 400) in a fast sweep (f0 / rate = 1e6) at psi = 1.2 ---
 out = switching_field_statistics(1.2, 400.0, 1e9, 1e3)
-assert abs(_t_median_step(out[0], 1.2, 400.0, 1e6)) < 1e-9, out
-assert abs(out[1] - _t_mean(1.2, 400.0, 1e6, out[0])) < 1e-9, out
+assert abs(_t_median_step(out[0], 1.2, 400.0, 1e6)) < 1e-7, out
+assert abs(out[1] - _t_mean(1.2, 400.0, 1e6, out[0])) < 1e-7, out
 
 # --- test case 3: psi = pi/2: the two minima are mirror images with the same magnetization and
 # merge at h = 1, so the particle hops almost at once; with f0 / rate = 1e5 the median is
@@ -202,8 +202,8 @@ _t_mean90 = 1.0 - _t_quad(lambda x: np.exp(-1e5 * _t_I90(x, 40.0)), _t_lo, 1.0, 
                           epsabs=1e-15, epsrel=1e-13, limit=500)[0]
 out = switching_field_statistics(np.pi / 2, 40.0, 1e9, 1e4)
 assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(v, float) for v in out)
-assert abs(out[0] - _t_hm90) < 1e-9 and abs(out[1] - _t_mean90) < 1e-9, (out, _t_hm90, _t_mean90)
-assert abs(out[0] - (1.0 - np.log(2.0) / 1e5)) < 1e-8 and abs(out[1] - (1.0 - 1e-5)) < 1e-8, out
+assert abs(out[0] - _t_hm90) < 1e-7 and abs(out[1] - _t_mean90) < 1e-7, (out, _t_hm90, _t_mean90)
+assert abs(out[0] - (1.0 - np.log(2.0) / 1e5)) < 2e-7 and abs(out[1] - (1.0 - 1e-5)) < 2e-7, out
 
 # --- test case 4: bad angle, a, f0 or rate, or a or f0 / rate outside the domain, raises ValueError ---
 for _t_bad in ((-0.1, 100.0, 1e9, 1.0), (1.7, 100.0, 1e9, 1.0), (0.5, float("nan"), 1e9, 1.0), (0.5, 100.0, -1.0, 1.0), (0.5, 100.0, 1e9, 0.0), (0.5, 39.0, 1e9, 1.0), (0.5, 1001.0, 1e9, 1.0), (0.5, 100.0, 1e4, 1.0), (0.5, 100.0, 1e13, 0.5)):
