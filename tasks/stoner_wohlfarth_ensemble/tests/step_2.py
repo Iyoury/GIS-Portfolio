@@ -131,8 +131,8 @@ for _t_p in (0.1, np.pi / 6, np.pi / 4, 1.2):
         t_lo, t_hi = _t_barriers(x, _t_p)
         assert abs(float(low) - t_lo) < 1e-8 and abs(float(high) - t_hi) < 1e-8, (_t_p, x)
 
-# --- test case 4: a bad angle, a field that is not finite or |h| >= h_sw raises ValueError ---
-for _t_bad in ((0.0, -0.1), (0.0, 1.7), (float("nan"), 0.5), (0.6, np.pi / 4), (1.0, 0.0), (np.array([0.1, 0.6]), np.pi / 4), (np.array([0.1, np.inf]), 0.3)):
+# --- test case 4: a bad angle, a field that is not finite or |h| >= h_sw (positive or negative h) raises ValueError ---
+for _t_bad in ((0.0, -0.1), (0.0, 1.7), (float("nan"), 0.5), (0.6, np.pi / 4), (1.0, 0.0), (np.array([0.1, 0.6]), np.pi / 4), (np.array([0.1, np.inf]), 0.3), (-1.0, 0.0), (np.array([0.1, -0.6]), np.pi / 4)):
     try:
         escape_barriers(*_t_bad)
     except ValueError:

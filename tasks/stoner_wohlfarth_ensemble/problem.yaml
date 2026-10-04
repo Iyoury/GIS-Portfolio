@@ -360,7 +360,7 @@ sub_steps:
       rotation of the magnetization inside both minima. It therefore differs from the
       half-switching field. Both fall as the sweep gets slower or the temperature higher
       (dynamic coercivity).
-    n_test_cases: 6
+    n_test_cases: 8
     contract:
       quantity: Dynamic coercive field and half-switching field of a weighted ensemble of Stoner-Wohlfarth particles with thermally activated switching.
       assumptions: Same model as step 3 for every particle; independent particles; expected magnetization from the survival probabilities.

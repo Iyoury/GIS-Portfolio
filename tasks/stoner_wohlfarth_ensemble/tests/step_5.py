@@ -205,7 +205,24 @@ assert abs(out[0] + hm) < 1e-6 and abs(out[1] + hm) < 1e-6, (out, hm)
 _t_check_ensemble(ensemble_switching(np.array([0.0, 0.6]), np.array([1.0, 1.0]), 40.0, 1e13, 1.0),
                   [0.0, 0.6], [1.0, 1.0], 40.0, 1e13)
 
-# --- test case 5: every invalid input of the prompt raises ValueError: arrays that are not 1-D of the
+# --- test case 5: one particle at psi = 0 over the domain: the magnetization is 2 P - 1, so h_c and h_half
+# are both minus the closed-form median switching field ---
+for _t_a, _t_ratio in ((60.0, 1e7), (150.0, 1e11), (300.0, 1e6), (800.0, 1e12)):
+    out = ensemble_switching(np.array([0.0]), np.array([1.0]), _t_a, _t_ratio, 1.0)
+    hm = _t_median0(_t_a, _t_ratio)
+    assert abs(out[0] + hm) < 1e-6, (_t_a, _t_ratio, out, hm)
+    assert abs(out[1] + hm) < 1e-6, (_t_a, _t_ratio, out, hm)
+
+# --- test case 6: dynamic coercivity of a two-particle ensemble: both fields fall as the sweep gets slower
+# (larger f0 / rate) and rise as the particles get more stable (larger a) ---
+_t_hc = [ensemble_switching(np.array([0.2, 0.7]), np.array([1.0, 1.0]), 150.0, r, 1.0) for r in (1e6, 1e9, 1e12)]
+assert _t_hc[0][0] > _t_hc[1][0] > _t_hc[2][0], _t_hc
+assert _t_hc[0][1] > _t_hc[1][1] > _t_hc[2][1], _t_hc
+_t_hot = ensemble_switching(np.array([0.2, 0.7]), np.array([1.0, 1.0]), 80.0, 1e9, 1.0)
+assert _t_hot[0] < _t_hc[1][0] and _t_hot[1] < _t_hc[1][1], (_t_hot, _t_hc[1])
+_t_check_ensemble(_t_hot, [0.2, 0.7], [1.0, 1.0], 80.0, 1e9)
+
+# --- test case 7: every invalid input of the prompt raises ValueError: arrays that are not 1-D of the
 # same nonzero length, a psi outside [0, pi/2], a negative or nonfinite weight, weights adding up to
 # zero, a, f0 or rate not positive and finite, a or f0 / rate outside the domain ---
 for _t_bad in ((np.array([0.1, 0.2]), np.array([1.0]), 100.0, 1e9, 1.0), (np.array([[0.1, 0.2]]), np.array([[1.0, 1.0]]), 100.0, 1e9, 1.0), (np.array([]), np.array([]), 100.0, 1e9, 1.0), (np.array([0.1, 0.2]), np.array([1.0, np.inf]), 100.0, 1e9, 1.0), (np.array([0.1, 0.2]), np.array([1.0, np.nan]), 100.0, 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 100.0, 1e9, 0.0), (np.array([0.1]), np.array([1.0]), 100.0, -1e9, 1.0), (np.array([0.1]), np.array([1.0]), float("nan"), 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 100.0, 1e9, np.inf), (np.array([0.1, 1.7]), np.array([1.0, 1.0]), 100.0, 1e9, 1.0), (np.array([0.1, 0.2]), np.array([1.0, -1.0]), 100.0, 1e9, 1.0), (np.array([0.1, 0.2]), np.array([0.0, 0.0]), 100.0, 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 30.0, 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 100.0, 1e14, 1.0), (np.array([-0.1]), np.array([1.0]), 100.0, 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 1001.0, 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 100.0, 1e4, 1.0)):

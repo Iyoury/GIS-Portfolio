@@ -117,3 +117,13 @@ science and the test cases are unchanged:
 Every mutant still fails by many orders of magnitude more than the new bounds.
 
 Version 9: step 5 also rejects a negative psi, a = 1001 and f0 / rate = 1e4 (the lower and upper bounds that were not yet tested).
+
+Version 10 (content-check fixes):
+- Step 5: two new computed test cases, so that the science outweighs the input validation:
+  - one particle at psi = 0 over four (a, f0/rate) pairs, where h_c = h_half = minus the
+    closed-form median;
+  - dynamic coercivity of a two-particle ensemble: both fields fall with slower sweeps and with
+    lower a, plus an oracle check of the hot case.
+- Step 2 rejects negative fields beyond -h_sw (h = -1 at psi = 0, an array with -0.6 at psi = pi/4).
+- Step 1: the near-jump checks use |h + h_sw| = 1.1e-3, safely inside the accurate range, instead
+  of the boundary value 1e-3.

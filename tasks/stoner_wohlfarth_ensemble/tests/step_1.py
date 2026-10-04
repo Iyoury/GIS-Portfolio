@@ -97,9 +97,9 @@ for _t_h, _t_p in ((-0.99, 0.0), (-1.01, 0.0), (0.5, np.pi / 2), (-0.5, np.pi / 
     assert abs(m - _t_m(_t_h, _t_p)) < 1e-8, (_t_h, _t_p, m)
 assert abs(branch_magnetization(-0.99, 0.0) - 1.0) < 1e-8
 assert abs(branch_magnetization(-1.01, 0.0) + 1.0) < 1e-8
-# exactly at the edge of the accuracy statement, |h + h_sw| = 1e-3, on both sides of the jump
-assert abs(branch_magnetization(-0.999, 0.0) - 1.0) < 1e-8
-assert abs(branch_magnetization(-1.001, 0.0) + 1.0) < 1e-8
+# just inside the accurate range on both sides of the jump, |h + h_sw| = 1.1e-3
+assert abs(branch_magnetization(-0.9989, 0.0) - 1.0) < 1e-8
+assert abs(branch_magnetization(-1.0011, 0.0) + 1.0) < 1e-8
 
 # --- test case 3: hysteresis: the particle keeps a minimum that is not the global one ---
 for _t_h, _t_p in ((-0.3, 0.2), (-0.45, 1.2), (-0.6, 0.15), (-1.7, 0.9), (3.0, 1.1)):
