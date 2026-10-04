@@ -120,6 +120,16 @@ _T_QSD400 = {0: 0.999999302861435190506938125996, 1: 0.0000006160475591430451587
 for _t_i, _t_v in _T_QSD400.items():
     assert _t_rel(q[_t_i], float(_t_v)) < 1e-8, (_t_i, q[_t_i], _t_v)
 
+# N = 400, s = 0.5, v = 0.1 against independent targets: inverse iteration shifted to 0.3987 on (I - Q)^T,
+# started from a uniform vector, Gaussian elimination with partial pivoting in mpmath at 400 digits, run
+# once: the rate and entries across the distribution, including the far tail at small i down to
+# qsd[0] = 4.36e-221, each to a relative 1e-8
+rate, q = _t_call(400, 0.5, 0.1)
+assert _t_rel(rate, float("0.39874421459453018995137100984")) < 1e-8, rate
+_T_QSD400B = {0: 4.35996225192430783099351247349e-221, 1: 6.3591219572463137166174683395e-219, 2: 4.70788040582526761899684622526e-217, 3: 2.35848128455072434856421303005e-215, 5: 2.78340036897309017194311395681e-212, 10: 1.01060258038901855401388063831e-205, 20: 4.94096205781198201744453919266e-195, 50: 1.26010619406620593530625210508e-170, 100: 3.88272205516395174725653092954e-139, 200: 1.39873448329188481207479606818e-87, 300: 2.73939514585415988893986524669e-42, 399: 0.536015992242755326500909938487}
+for _t_i, _t_v in _T_QSD400B.items():
+    assert _t_rel(q[_t_i], float(_t_v)) < 1e-8, (_t_i, q[_t_i], _t_v)
+
 # --- test case 4: N not an integer in [1, 400], or s, v not finite or out of range ---
 for _t_bad in ((0, 0.1, 0.01), (401, 0.1, 0.01), (5.0, 0.1, 0.01), (True, 0.1, 0.01), (10, 0.6, 0.01),
                (10, 0.1, 0.0), (10, 0.1, 0.2), (10, float("nan"), 0.01)):

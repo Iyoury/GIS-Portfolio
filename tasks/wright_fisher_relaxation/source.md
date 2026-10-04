@@ -92,3 +92,12 @@ the size of its tail, and says that every tail entry is checked against (qsd Q)_
 
 Version 6: the step-6 sentence on the far tail is a behavioral requirement only (each tail entry
 must itself have a relative error below 1e-8); it no longer describes how the tests check it.
+
+Version 7: the stated far-tail requirement of step 6 (N = 400, s = 0.5, v = 0.1, qsd[0] about 4e-221)
+is now checked against independent targets: inverse iteration on (I - Q)^T shifted to 0.3987, started
+from a uniform vector, Gaussian elimination with partial pivoting in mpmath at 400 digits, run once
+(converged to 1e-29 in every entry; the same result to 30 digits from a second start). The test asserts
+the rate and the entries i = 0, 1, 2, 3, 5, 10, 20, 50, 100, 200, 300, 399 to a relative 1e-8, so a
+solution that returns 0 (or any inaccurate value) in the tail fails. An unshifted inverse iteration from
+a uniform start had not converged in the tail after 200 iterations (qsd[0] stuck near 1e-85), which is
+why the shifted form is used for this target.
