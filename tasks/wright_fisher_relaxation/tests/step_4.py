@@ -61,7 +61,7 @@ _t_check(relaxation_rate(1, 0.4, 0.07, 1e-12), 0.07 + 1e-12)
 
 # --- test case 1: neutral drift: the eigenvalues are (1 - u - v)**k prod_{m < k} (1 - m / N), so the
 # gap is u + v exactly, here as small as 2e-12 next to eigenvalues of order 1 ---
-for N, u, v in ((300, 1e-12, 1e-12), (150, 0.03, 0.07), (400, 1e-12, 0.1), (60, 2e-9, 5e-11)):
+for N, u, v in ((300, 1e-12, 1e-12), (150, 0.03, 0.07), (400, 1e-12, 0.1), (60, 2e-9, 5e-11), (10, 0.1, 0.01)):
     _t_check(relaxation_rate(N, 0.0, u, v), u + v)
 
 # --- test case 2: selection, against extended precision ---

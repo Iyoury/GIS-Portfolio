@@ -47,3 +47,11 @@ Checks used while building the task:
   - np.linalg.solve for the passage times is off by 2e-5;
   - eig for the gap is off by 5e-3 at u + v = 2e-12;
   - the dense eigenvector for pi gives relative errors up to 1e10 on the small entries.
+
+Version 2 (content-check fixes):
+- Step 2 tests the smallest population N = 2 (neutral: p_fix = p_loss = 1/2, both conditional times 2
+  generations).
+- Step 4 tests u = 0.1 (neutral gap 0.11 for u = 0.1, v = 0.01).
+- Step 5 tests v = 0.1 (N = 1: t_up = 1 / v = 10, t_down = 1 / u = 20).
+- Step 4 prompt: the lambda_2**t decay is stated for a generic initial distribution (nonzero
+  component along the second eigenvector).

@@ -46,6 +46,7 @@ def _t_check(out, target):
 
 # --- test case 0: one individual: geometric waiting times 1 / v and 1 / u ---
 _t_check(substitution_times(1, -0.2, 0.05, 1e-12), (1e12, 20.0))
+_t_check(substitution_times(1, 0.0, 0.05, 0.1), (10.0, 20.0))
 
 # --- test case 1: against extended precision, including waits of 1e22 generations ---
 for N, s, u, v in ((20, -0.5, 1e-12, 1e-12), (30, 0.3, 1e-3, 1e-10), (25, 0.0, 1e-9, 1e-9), (12, 0.1, 0.1, 0.03)):

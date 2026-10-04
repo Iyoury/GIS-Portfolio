@@ -43,11 +43,16 @@ def _t_check(out, target, tol=1e-8):
         assert _t_rel(a, b) < tol, (out, target)
 
 
-# --- test case 0: neutral drift: p_fix = i0 / N exactly, also when p_loss is the small one ---
+# --- test case 0: neutral drift: p_fix = i0 / N exactly, also when p_loss is the small one, and N = 2 ---
 N = 300
 for i0 in (1, 150, 299):
     out = fixation_statistics(N, 0.0, i0)
     assert _t_rel(out[0], i0 / N) < 1e-8 and _t_rel(out[1], (N - i0) / N) < 1e-8, (i0, out)
+# smallest population, N = 2: from one copy the next generation has 0, 1 or 2 copies with probabilities
+# 1/4, 1/2, 1/4, so p_fix = p_loss = 1/2 and both conditional times are 1 / (1/2) = 2 generations
+out = fixation_statistics(2, 0.0, 1)
+for a, b in zip(out, (0.5, 0.5, 2.0, 2.0)):
+    assert _t_rel(a, b) < 1e-8, out
 
 # --- test case 1: strong selection against A (p_fix ~ 3e-18 from one copy) and for A (p_loss tiny),
 # all four quantities against extended precision ---

@@ -243,8 +243,9 @@ sub_steps:
       All eigenvalues of the transition matrix of step 1 (wf_transition_matrix) are real, positive and
       distinct when u, v > 0 (the binomial kernel with increasing p_mut is totally positive); the largest
       is 1 with left eigenvector the stationary distribution (step 3, stationary_distribution). The
-      distance to equilibrium of any initial distribution eventually decays like lambda_2**t, where
-      lambda_2 is the second largest eigenvalue. Return the relaxation rate gap = 1 - lambda_2 as a
+      distance to equilibrium of a generic initial distribution (one with a nonzero component along
+      the second eigenvector) eventually decays like lambda_2**t, where lambda_2 is the second largest
+      eigenvalue. Return the relaxation rate gap = 1 - lambda_2 as a
       Python float with a relative error below 1e-8. The gap can be as small as about 1e-12 (rare
       mutations, e.g. u = v = 1e-12 without selection) while the other eigenvalues of 1 - P are of
       order 1/N or larger; the stated relative accuracy is required there too.
