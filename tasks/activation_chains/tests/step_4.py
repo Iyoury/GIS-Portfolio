@@ -120,9 +120,10 @@ _t_roundtrip(2, 1e11, 1e9, 1e9, 1e6, 1e13, _t_co)
 _t_simple = (np.array([0.0, 1e-3]), np.zeros((2, 2)), np.array([1.0, 0.0]), np.array([1, -1]), np.array([1e20, 0.0]))
 _t_roundtrip(1, 1e17, 1e3, 10.0, 1e14, 1e18, _t_simple)
 # the interval is closed with a two-sided tolerance: activities equal to A(flux_lo) or A(flux_hi), or
-# 5e-10 inside them (whose exact roots are about 5e-10 away from the ends), give back those ends
+# 5e-10 inside them (whose exact roots are about 5e-10 away from the ends), or 5e-10 outside them, give
+# back those ends
 for _t_end, _t_in in ((1e8, 1.0 + 5e-10), (1e13, 1.0 - 5e-10)):
-    for _t_f in (1.0, _t_in):
+    for _t_f in (1.0, _t_in, 2.0 - _t_in):
         act = _t_f * _t_activity(1, _t_end, 5 * _T_DAY, _T_DAY, *_T_DATA)
         got = monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, act, 1e8, 1e13)
         assert _t_rel(got, _t_end) < 1e-11, (got, _t_end, _t_f)

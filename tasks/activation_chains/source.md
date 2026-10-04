@@ -85,3 +85,12 @@ Version 4 (content-check fixes):
   - ignores capture links of nuclides without cross section (a zero-sigma capture loop is accepted);
   - turns a history that is not a sequence (None) into ValueError;
   - rescales the period fractions so that rounding cannot push a column at the bound above it.
+
+Version 5 (content-check fixes):
+- Step 4 tests both sides of each end: activities 5e-10 outside A(flux_lo) and A(flux_hi) also give
+  the ends.
+- Step 3 requires history to be a list or tuple (ordered); None, a set and a generator are rejected.
+- Steps 1-3 test amounts of exp(-550), about 1e-239, near the bottom of the relative-accuracy range:
+  - step 1: pure decay;
+  - step 2: pure decay in a network;
+  - step 3: capture burnup at sigma = 1e7 b and 1e18 n / (cm^2 s) for 5.5e6 s.

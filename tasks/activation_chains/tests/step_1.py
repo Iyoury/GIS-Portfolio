@@ -57,8 +57,8 @@ _T_U238 = list(np.log(2.0) / np.array([4.468e9 * _T_YEAR, 24.10 * _T_DAY, 1.17 *
                                         26.8 * _T_MIN, 19.9 * _T_MIN, 164.3e-6, 22.2 * _T_YEAR, 5.012 * _T_DAY,
                                         138.376 * _T_DAY])) + [0.0]
 
-# --- test case 0: one nuclide: n0 exp(-lam t), down to 1e-217; a stable nuclide stays ---
-for _t_lam, _t_t in ((0.3, 2.0), (1e-9, 1e3), (5.0, 100.0), (0.0, 1e20)):
+# --- test case 0: one nuclide: n0 exp(-lam t), down to about 1e-239; a stable nuclide stays ---
+for _t_lam, _t_t in ((0.3, 2.0), (1e-9, 1e3), (5.0, 100.0), (1.0, 550.0), (0.0, 1e20)):
     x = chain_inventory(np.array([_t_lam]), np.array([2.5]), _t_t)
     _t_check(x, [2.5 * np.exp(-_t_lam * _t_t)], 2.5)
 

@@ -13,7 +13,7 @@ def activation_inventory(lam, branching, sigma, capture_to, n0, history):
       capture_to: 1-D integer array of n entries; capture_to[i] = index of the nuclide made by a capture
                   on nuclide i, or -1 if that product is not followed.
       n0: 1-D array of n initial numbers of atoms, nonnegative.
-      history: sequence of (duration, flux) pairs applied in order; duration in s (0 <= duration <= 1e12),
+      history: list or tuple of (duration, flux) pairs applied in order; duration in s (0 <= duration <= 1e12),
                flux in neutrons / (cm^2 s) (0 <= flux <= 1e18; flux 0 is a cooling period).
 
     Output:

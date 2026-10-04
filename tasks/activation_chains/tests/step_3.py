@@ -76,8 +76,8 @@ _T_CAP = np.array([1, 2, -1])
 _T_B = np.zeros((3, 3))
 _T_N0 = np.array([1e18, 0.0, 0.0])
 
-# --- test case 0: burnup of a stable target: n0 exp(-sigma phi t), down to exp(-200) ---
-for _t_flux, _t_t in ((1e13, 1e5), (1e17, 2e7), (2e17, 1e10)):
+# --- test case 0: burnup of a stable target: n0 exp(-sigma phi t), down to exp(-550), about 1e-239 ---
+for _t_flux, _t_t in ((1e13, 1e5), (1e17, 2e7), (2e17, 1e10), (1e18, 5.5e6)):
     x = activation_inventory(np.array([0.0]), np.zeros((1, 1)), np.array([100.0]), np.array([-1]), np.array([3.0]),
                              [(_t_t, _t_flux)])
     with _t_mp.workdps(40):
@@ -142,7 +142,7 @@ n0 = np.linspace(1.0, 3.0, 30)
 _t_check(activation_inventory(np.full(30, 1e-3), np.diag(np.ones(29), -1), np.zeros(30), np.full(30, -1), n0, []), n0, n0.sum())
 
 # --- test case 5: a capture loop, capture onto itself or out of range, sigma above 1e7 b, branching with a column
-# sum of 1.2 or a nonzero diagonal (even with an empty history), a history that is not a sequence, lam above 1e10, 31 nuclides, a NaN cross section, a bad history entry,
+# sum of 1.2 or a nonzero diagonal (even with an empty history), a history that is not a list or tuple (None, a set, a generator), lam above 1e10, 31 nuclides, a NaN cross section, a bad history entry,
 # an infinite or too long duration, a too large flux, or a too large combined rate raise ValueError ---
 _t_loop = np.zeros((2, 2))
 _t_loop[0, 1] = 1.0
@@ -163,7 +163,9 @@ for _t_bad in ((np.array([0.0, 1.0]), _t_loop, np.array([5.0, 0.0]), np.array([1
                (np.array([0.0, 1.0]), np.zeros((2, 2)), np.array([np.nan, 0.0]), np.array([1, -1]), np.ones(2), [(1.0, 1e10)]),
                (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), [(np.inf, 0.0)]),
                (np.array([1.0, 1.0]), np.array([[0.5, 0.0], [0.5, 0.0]]), np.zeros(2), np.array([-1, -1]), np.ones(2), []),
-               (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), None)):
+               (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), None),
+               (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), {(1.0, 0.0), (2.0, 0.0)}),
+               (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), ((1.0, 0.0) for _ in range(2)))):
     try:
         activation_inventory(*_t_bad)
     except ValueError:

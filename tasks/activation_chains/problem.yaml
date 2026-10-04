@@ -221,7 +221,7 @@ sub_steps:
                         n0 >= 0.
         branching: n x n, as in step 2.
         capture_to: integer array of length n.
-        history: a sequence of (duration, flux) pairs with 0 <= duration <= 1e12 s and
+        history: a list or tuple of (duration, flux) pairs, applied in order, with 0 <= duration <= 1e12 s and
                  0 <= flux <= 1e18.
       Errors: raise ValueError if:
         - the shapes or ranges above are violated, or a value is not finite;
@@ -229,7 +229,8 @@ sub_steps:
         - branching violates the conditions of step 2;
         - the combined network has a cycle (edges i -> j where branching[j, i] > 0, or where sigma[i] > 0
           and capture_to[i] = j);
-        - history is not a sequence, or an entry is not a pair of numbers in range;
+        - history is not a list or tuple (unordered or one-shot containers such as sets and generators
+          are rejected), or an entry is not a pair of numbers in range;
         - lam[i] + sigma[i] * 1e-24 * flux exceeds 1e10 per s in some period.
     function_header: |-
       def activation_inventory(lam, branching, sigma, capture_to, n0, history):
@@ -242,7 +243,7 @@ sub_steps:
             capture_to: 1-D integer array of n entries; capture_to[i] = index of the nuclide made by a capture
                         on nuclide i, or -1 if that product is not followed.
             n0: 1-D array of n initial numbers of atoms, nonnegative.
-            history: sequence of (duration, flux) pairs applied in order; duration in s (0 <= duration <= 1e12),
+            history: list or tuple of (duration, flux) pairs applied in order; duration in s (0 <= duration <= 1e12),
                      flux in neutrons / (cm^2 s) (0 <= flux <= 1e18; flux 0 is a cooling period).
 
           Output:
