@@ -1,0 +1,353 @@
+# problem.yaml: one per task folder. File paths are relative to this folder.
+
+domain: biology
+
+required_dependencies: |-
+  import numpy as np
+  from scipy.special import gammaln
+  from scipy.special import betaln
+  import mpmath as mp
+
+problem_description_main: |-
+  The Wright-Fisher model follows the number of copies of an allele A in a haploid population of
+  constant size N under selection, mutation and genetic drift. Each generation, selection (fitness
+  1 + s for A, 1 for a) and then mutation (A -> a with probability u, a -> A with probability v) change
+  the expected frequency, and the next generation is drawn by binomial sampling. This gives a Markov
+  chain on i = 0, ..., N. We build its transition matrix, then compute the fixation and loss of A
+  without mutation, the stationary distribution with mutation, the relaxation rate of the chain and
+  the mean waiting times between the two fixed states. Rare mutation rates (down to 1e-12) and strong
+  selection make the probabilities and rates of interest exponentially small, many orders of magnitude
+  below the rounding error of the quantities next to them, yet every result is required with a small
+  relative error.
+
+problem_io: |-
+  def substitution_times(N, s, u, v):
+      '''Mean waiting times between the two monomorphic states under selection, mutation and drift.
+
+      Inputs:
+        N: int, population size, 1 <= N <= 400.
+        s: float, selection coefficient of A, -0.5 <= s <= 0.5.
+        u: float, mutation probability A -> a per generation, 1e-12 <= u <= 0.1.
+        v: float, mutation probability a -> A per generation, 1e-12 <= v <= 0.1.
+
+      Output:
+        (t_up, t_down): tuple of two Python floats.
+          t_up: mean number of generations for a population with no copy of A (i = 0) to reach i = N
+                for the first time.
+          t_down: mean number of generations for a population fixed for A (i = N) to reach i = 0 for
+                  the first time.
+          Each with a relative error below 1e-8, however large (t_down is about 1e150 at
+          N = 400, s = 0.5, u = v = 1e-12).
+
+      Raises:
+        ValueError if N is not an integer in [1, 400], or if s, u or v is not finite or is outside its
+        range.
+      '''
+
+general_tests: tests/general.py
+
+second_solution: second_solution.py
+
+mutants:
+  - name: whole_task_mutation_before_selection
+    description: "Applies mutation before selection in the life cycle, so the transition matrix and every quantity built on it are wrong."
+    file: mutants/whole_task_mutation_before_selection.py
+
+sub_steps:
+  - step_number: 1
+    scaffold: steps/step_1.py
+    solution: solution/step_1.py
+    tests: tests/step_1.py
+    step_description_prompt: |-
+      Model. A haploid population of N individuals carries allele A or allele a; the state is the
+      number i = 0, ..., N of copies of A. One generation consists of selection, then mutation, then
+      random sampling of the next N individuals:
+        selection: A has fitness 1 + s and a has fitness 1, so the frequency p = i / N becomes
+                   p_sel = (1 + s) p / (1 + s p);
+        mutation:  A turns into a with probability u and a into A with probability v, so
+                   p_mut = (1 - u) p_sel + v (1 - p_sel);
+        sampling:  the next count j is binomial, P[i, j] = C(N, j) p_mut**j (1 - p_mut)**(N - j).
+      Without mutation (u = v = 0) the states 0 and N are absorbing.
+
+      Return the full transition matrix P as a float numpy array of shape (N + 1, N + 1). Every entry
+      whose exact value is at least 1e-250 must have a relative error below 1e-10, even when it is far
+      smaller than the other entries of its row (for example P[N, N - 1] = N u (1 - u)**(N - 1) for a
+      population fixed for A with u = 1e-12); entries whose exact value is below 1e-250 must lie within
+      1e-250 of it (0 is accepted).
+      Inputs: N (integer, 1 <= N <= 400), s (-0.5 <= s <= 0.5), u and v (0 <= u, v <= 0.1).
+      Errors: raise ValueError if N is not an integer (bool and float are not accepted) or is outside
+      [1, 400], or if s, u or v is not finite or is outside its range.
+    function_header: |-
+      def wf_transition_matrix(N, s, u, v):
+          '''One-generation transition matrix of the haploid Wright-Fisher model with selection and mutation.
+
+          Inputs:
+            N: int, population size, 1 <= N <= 400.
+            s: float, selection coefficient of allele A (fitness 1 + s against 1 for a), -0.5 <= s <= 0.5.
+            u: float, mutation probability A -> a per generation, 0 <= u <= 0.1.
+            v: float, mutation probability a -> A per generation, 0 <= v <= 0.1.
+
+          Output:
+            P: numpy array of shape (N + 1, N + 1), P[i, j] = probability that a population with i
+               copies of A has j copies in the next generation. Relative error below 1e-10 for every
+               entry whose exact value is at least 1e-250; smaller entries within 1e-250 of the exact value.
+
+          Raises:
+            ValueError if N is not an integer in [1, 400], or if s, u or v is not finite or is outside
+            its range.
+          '''
+    return_line: return P
+    step_background: |-
+      The Wright-Fisher model is the standard model of genetic drift in a population of constant size.
+      Selection and mutation act on the expected frequency, and drift is binomial sampling. The entries of
+      one row span many decades: for a fixed population with rare mutation almost all the probability
+      stays on the diagonal, and the rare off-diagonal entries are what later steps need.
+    n_test_cases: 5
+    contract:
+      quantity: "One-generation transition matrix of the haploid Wright-Fisher model with selection, then mutation, then binomial sampling."
+      assumptions: "Haploid population of constant size N, two alleles, genic selection with fitness 1 + s for A, life cycle selection then mutation then binomial sampling."
+      result_kind: exact
+      valid_input_ranges: "1 <= N <= 400 (integer); -0.5 <= s <= 0.5; 0 <= u, v <= 0.1."
+      units: "Probabilities (dimensionless)."
+      output_shape: "numpy float array of shape (N + 1, N + 1)."
+      step_dependencies: []
+    mutants:
+      - name: cancelled_complement
+        description: "Forms 1 - p_mut by subtraction, which loses the relative accuracy of the rare off-diagonal entries of fixed populations."
+        file: mutants/step_1_cancelled_complement.py
+      - name: mutation_before_selection
+        description: "Applies mutation before selection instead of selection before mutation."
+        file: mutants/step_1_mutation_before_selection.py
+
+  - step_number: 2
+    scaffold: steps/step_2.py
+    solution: solution/step_2.py
+    tests: tests/step_2.py
+    step_description_prompt: |-
+      Without mutation (u = v = 0) every population ends fixed for A (i = N) or for a (i = 0). Using the
+      transition matrix of wf_transition_matrix (step 1), compute for a population that starts with i0
+      copies of A:
+        p_fix:  the probability that A is eventually fixed;
+        p_loss: the probability that A is eventually lost;
+        t_fix:  the mean number of generations until fixation, conditional on fixation;
+        t_loss: the mean number of generations until loss, conditional on loss.
+      Return the tuple (p_fix, p_loss, t_fix, t_loss) of four Python floats, each with a relative error
+      below 1e-8. This holds for each of them separately: p_fix is about 3e-141 for N = 400, s = -1/3,
+      i0 = 1 (and smaller still for s closer to -0.5), p_loss is equally small for N = 400, s = 0.5,
+      i0 = N - 1, and the other probability is then 1 to within rounding.
+      Inputs: N (integer, 2 <= N <= 400), s (-0.5 <= s <= 0.5), i0 (integer, 1 <= i0 <= N - 1).
+      Errors: raise ValueError if N or i0 is not an integer (bool and float are not accepted), if N is
+      outside [2, 400], if i0 is outside [1, N - 1], or if s is not finite or is outside [-0.5, 0.5].
+    function_header: |-
+      def fixation_statistics(N, s, i0):
+          '''Fixation and loss of allele A under selection and drift, without mutation.
+
+          Inputs:
+            N: int, population size, 2 <= N <= 400.
+            s: float, selection coefficient of A, -0.5 <= s <= 0.5.
+            i0: int, initial number of copies of A, 1 <= i0 <= N - 1.
+
+          Output:
+            (p_fix, p_loss, t_fix, t_loss): tuple of four Python floats.
+              p_fix: probability that A is eventually fixed (i = N).
+              p_loss: probability that A is eventually lost (i = 0).
+              t_fix: mean number of generations until fixation, given that A is fixed.
+              t_loss: mean number of generations until loss, given that A is lost.
+              Each with a relative error below 1e-8, however small it is.
+
+          Raises:
+            ValueError if N is not an integer in [2, 400], if i0 is not an integer in [1, N - 1], or if s
+            is not finite or is outside [-0.5, 0.5].
+          '''
+    return_line: return result
+    step_background: |-
+      The fixation probability of a new mutation and the conditional fixation time are the basic
+      quantities of population genetics (Kimura 1962; Kimura and Ohta 1969). For a strongly deleterious
+      mutation the fixation probability is exponentially small in N s, and the conditional times follow
+      from the Doob h-transform of the absorbing chain.
+    n_test_cases: 4
+    contract:
+      quantity: "Fixation and loss probabilities and the conditional mean fixation and loss times of allele A without mutation."
+      assumptions: "Wright-Fisher chain of step 1 with u = v = 0; conditional times from the h-transformed chain."
+      result_kind: exact
+      valid_input_ranges: "2 <= N <= 400 (integer); -0.5 <= s <= 0.5; 1 <= i0 <= N - 1 (integer)."
+      units: "Probabilities (dimensionless) and generations."
+      output_shape: "Tuple of four Python floats."
+      step_dependencies: [1]
+    mutants:
+      - name: loss_by_complement
+        description: "Takes the loss probability as 1 - p_fix, which has no relative accuracy when p_loss is tiny."
+        file: mutants/step_2_loss_by_complement.py
+      - name: unconditional_times
+        description: "Reports the unconditional mean absorption time instead of the times conditional on fixation and on loss."
+        file: mutants/step_2_unconditional_times.py
+
+  - step_number: 3
+    scaffold: steps/step_3.py
+    solution: solution/step_3.py
+    tests: tests/step_3.py
+    step_description_prompt: |-
+      With both mutation rates positive the chain of step 1 (wf_transition_matrix) is irreducible and has
+      a unique stationary distribution pi, pi P = pi with sum(pi) = 1. Return pi as a float numpy array of
+      shape (N + 1,). Every entry whose exact value is at least 1e-250 must have a relative error below
+      1e-8; entries below 1e-250 must lie within 1e-250 of their exact value. Mutation rates down to
+      1e-12 and strong selection make pi span well over 100 decades, and the diagonal entries P[i, i] of
+      the fixed states are then 1 to within about N u or N v.
+      Inputs: N (integer, 1 <= N <= 400), s (-0.5 <= s <= 0.5), u and v (1e-12 <= u, v <= 0.1).
+      Errors: raise ValueError if N is not an integer (bool and float are not accepted) or is outside
+      [1, 400], or if s, u or v is not finite or is outside its range.
+    function_header: |-
+      def stationary_distribution(N, s, u, v):
+          '''Stationary distribution of the number of copies of A under selection, mutation and drift.
+
+          Inputs:
+            N: int, population size, 1 <= N <= 400.
+            s: float, selection coefficient of A, -0.5 <= s <= 0.5.
+            u: float, mutation probability A -> a per generation, 1e-12 <= u <= 0.1.
+            v: float, mutation probability a -> A per generation, 1e-12 <= v <= 0.1.
+
+          Output:
+            pi: numpy array of shape (N + 1,), pi[i] = stationary probability of i copies of A, summing to 1.
+                Relative error below 1e-8 for every entry whose exact value is at least 1e-250; smaller
+                entries within 1e-250 of the exact value.
+
+          Raises:
+            ValueError if N is not an integer in [1, 400], or if s, u or v is not finite or is outside its
+            range.
+          '''
+    return_line: return pi
+    step_background: |-
+      The mutation-selection-drift balance is described by the stationary distribution; in the diffusion
+      limit it is Wright's distribution, proportional to p**(2 N v - 1) (1 - p)**(2 N u - 1) exp(2 N s p).
+      With rare mutations it is concentrated on the two fixed states; the probabilities of the
+      intermediate states are many orders of magnitude smaller but still needed.
+    n_test_cases: 5
+    contract:
+      quantity: "Stationary distribution of the number of copies of A under mutation, selection and drift."
+      assumptions: "Wright-Fisher chain of step 1 with u, v > 0 (irreducible)."
+      result_kind: exact
+      valid_input_ranges: "1 <= N <= 400 (integer); -0.5 <= s <= 0.5; 1e-12 <= u, v <= 0.1."
+      units: "Probabilities (dimensionless)."
+      output_shape: "numpy float array of shape (N + 1,)."
+      step_dependencies: [1]
+    mutants:
+      - name: dense_eigenvector
+        description: "Takes pi from a dense eigensolver, whose small entries are pure rounding noise."
+        file: mutants/step_3_dense_eigenvector.py
+
+  - step_number: 4
+    scaffold: steps/step_4.py
+    solution: solution/step_4.py
+    tests: tests/step_4.py
+    step_description_prompt: |-
+      All eigenvalues of the transition matrix of step 1 (wf_transition_matrix) are real, positive and
+      distinct when u, v > 0 (the binomial kernel with increasing p_mut is totally positive); the largest
+      is 1 with left eigenvector the stationary distribution (step 3, stationary_distribution). The
+      distance to equilibrium of any initial distribution eventually decays like lambda_2**t, where
+      lambda_2 is the second largest eigenvalue. Return the relaxation rate gap = 1 - lambda_2 as a
+      Python float with a relative error below 1e-8. The gap can be as small as about 1e-12 (rare
+      mutations, e.g. u = v = 1e-12 without selection) while the other eigenvalues of 1 - P are of
+      order 1/N or larger; the stated relative accuracy is required there too.
+      Inputs: N (integer, 1 <= N <= 400), s (-0.5 <= s <= 0.5), u and v (1e-12 <= u, v <= 0.1).
+      Errors: raise ValueError if N is not an integer (bool and float are not accepted) or is outside
+      [1, 400], or if s, u or v is not finite or is outside its range.
+    function_header: |-
+      def relaxation_rate(N, s, u, v):
+          '''Rate of the slowest approach to the stationary distribution: 1 - lambda_2 of the transition matrix.
+
+          Inputs:
+            N: int, population size, 1 <= N <= 400.
+            s: float, selection coefficient of A, -0.5 <= s <= 0.5.
+            u: float, mutation probability A -> a per generation, 1e-12 <= u <= 0.1.
+            v: float, mutation probability a -> A per generation, 1e-12 <= v <= 0.1.
+
+          Output:
+            gap: Python float, 1 - lambda_2, where lambda_2 is the second largest eigenvalue of the
+                 transition matrix (all its eigenvalues are real, positive and distinct). Relative error
+                 below 1e-8, however small the gap is.
+
+          Raises:
+            ValueError if N is not an integer in [1, 400], or if s, u or v is not finite or is outside its
+            range.
+          '''
+    return_line: return gap
+    step_background: |-
+      The relaxation rate sets how long a population takes to forget its initial state. Without
+      selection the spectrum is known exactly (Feller 1951; Cannings 1974), and the gap is u + v. With
+      rare mutations the slow mode is the switching between the two fixed states. A dense eigensolver
+      resolves eigenvalues only to about 1e-16 times the norm of the matrix.
+    n_test_cases: 5
+    contract:
+      quantity: "Relaxation rate 1 - lambda_2 of the Wright-Fisher chain with mutation and selection."
+      assumptions: "Wright-Fisher chain of step 1 with u, v > 0; real positive spectrum."
+      result_kind: exact
+      valid_input_ranges: "1 <= N <= 400 (integer); -0.5 <= s <= 0.5; 1e-12 <= u, v <= 0.1."
+      units: "Per generation."
+      output_shape: "One Python float."
+      step_dependencies: [1, 3]
+    mutants:
+      - name: dense_eigenvalues
+        description: "Takes lambda_2 from a dense eigensolver, which gives the gap only to an absolute error of about 1e-16."
+        file: mutants/step_4_dense_eigenvalues.py
+      - name: neutral_gap
+        description: "Uses the neutral result u + v for every selection coefficient."
+        file: mutants/step_4_neutral_gap.py
+
+  - step_number: 5
+    scaffold: steps/step_5.py
+    solution: solution/step_5.py
+    tests: tests/step_5.py
+    step_description_prompt: |-
+      For the chain of step 1 (wf_transition_matrix) with both mutation rates positive, compute the mean
+      first-passage times between the two monomorphic states:
+        t_up:   the expected number of generations for a population without A (i = 0) to reach i = N for
+                the first time;
+        t_down: the expected number of generations for a population fixed for A (i = N) to reach i = 0
+                for the first time.
+      Return the tuple (t_up, t_down) of two Python floats, each with a relative error below 1e-8. With
+      rare mutations and strong selection one of them is astronomically large (t_down is about 1e150
+      generations at N = 400, s = 0.5, u = v = 1e-12) and must still have the stated accuracy.
+      Inputs: N (integer, 1 <= N <= 400), s (-0.5 <= s <= 0.5), u and v (1e-12 <= u, v <= 0.1).
+      Errors: raise ValueError if N is not an integer (bool and float are not accepted) or is outside
+      [1, 400], or if s, u or v is not finite or is outside its range.
+    function_header: |-
+      def substitution_times(N, s, u, v):
+          '''Mean waiting times between the two monomorphic states under selection, mutation and drift.
+
+          Inputs:
+            N: int, population size, 1 <= N <= 400.
+            s: float, selection coefficient of A, -0.5 <= s <= 0.5.
+            u: float, mutation probability A -> a per generation, 1e-12 <= u <= 0.1.
+            v: float, mutation probability a -> A per generation, 1e-12 <= v <= 0.1.
+
+          Output:
+            (t_up, t_down): tuple of two Python floats.
+              t_up: mean number of generations for a population with no copy of A (i = 0) to reach i = N
+                    for the first time.
+              t_down: mean number of generations for a population fixed for A (i = N) to reach i = 0 for
+                      the first time.
+              Each with a relative error below 1e-8, however large (t_down is about 1e150 at
+              N = 400, s = 0.5, u = v = 1e-12).
+
+          Raises:
+            ValueError if N is not an integer in [1, 400], or if s, u or v is not finite or is outside its
+            range.
+          '''
+    return_line: return result
+    step_background: |-
+      In the origin-fixation regime (rare mutations) the waiting time for a substitution is about
+      1 / (N v p_fix), with p_fix the fixation probability of one new copy (step 2). The exact mean
+      first-passage times include all the failed attempts and the duration of the sweeps.
+    n_test_cases: 5
+    contract:
+      quantity: "Mean first-passage times between the two monomorphic states (0 -> N and N -> 0)."
+      assumptions: "Wright-Fisher chain of step 1 with u, v > 0."
+      result_kind: exact
+      valid_input_ranges: "1 <= N <= 400 (integer); -0.5 <= s <= 0.5; 1e-12 <= u, v <= 0.1."
+      units: "Generations."
+      output_shape: "Tuple of two Python floats."
+      step_dependencies: [1]
+    mutants:
+      - name: dense_solve
+        description: "Solves (I - Q) t = 1 with a dense solver, whose diagonal 1 - P_ii has already lost the rare escape probabilities."
+        file: mutants/step_5_dense_solve.py
