@@ -1,0 +1,331 @@
+# problem.yaml: one per task folder. File paths are relative to this folder.
+
+domain: physics
+
+required_dependencies: |-
+  import numpy as np
+  from scipy.optimize import brentq
+  import mpmath as mp
+
+problem_description_main: |-
+  Radioactive nuclides decay into one another, and in a neutron flux they also capture neutrons and
+  turn into heavier nuclides. The number of atoms of every nuclide then obeys a linear system
+  dx/dt = A x (+ production), where A has the decay and capture rates off its diagonal and minus the
+  total removal rates on it. Its solution is the matrix exponential, which Bateman wrote as a sum of
+  exponentials for a linear chain. We compute inventories of decay chains, of branching networks with
+  constant production and of materials under an irradiation history with neutron capture. We then
+  invert a measured activation activity for the neutron flux, the analysis of a flux monitor. The
+  rates span many decades (from 1e-18 to 1e4 per second in the uranium series), and the amounts of
+  interest can be far below the rounding error of the largest ones. Every amount is required with a
+  small relative error, so neither the Bateman sum in double precision nor a dense matrix exponential
+  is good enough.
+
+problem_io: |-
+  def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activity, flux_lo, flux_hi):
+      '''Neutron flux from the measured activity of an activation product (flux-monitor analysis).
+
+      Inputs:
+        lam, branching, sigma, capture_to, n0: the nuclide data and initial atoms, as in
+             activation_inventory (step 3).
+        t_irr: irradiation time in s at a constant unknown flux, 0 < t_irr <= 1e9.
+        t_cool: cooling time in s without flux after the irradiation, 0 <= t_cool <= 1e9.
+        k: int, index of the measured nuclide, with lam[k] > 0.
+        activity: measured activity lam[k] * x[k] of nuclide k at the end of the cooling, in Bq, > 0.
+        flux_lo, flux_hi: the flux lies in [flux_lo, flux_hi], 1e-2 <= flux_lo < flux_hi <= 1e18, and the
+             caller guarantees that the activity A(flux) is strictly increasing on this interval.
+
+      Output:
+        flux: Python float, the flux in neutrons / (cm^2 s) with A(flux) = activity; relative error below
+              1e-8 wherever d ln A / d ln flux >= 0.5 at the solution.
+
+      Raises:
+        ValueError for nuclide data as in step 3, for times, k, activity or flux bounds outside these
+        ranges, or if activity is not between A(flux_lo) and A(flux_hi).
+      '''
+
+general_tests: tests/general.py
+
+second_solution: second_solution.py
+
+mutants:
+  - name: whole_task_barn_in_square_metres
+    description: "Converts capture cross sections from barns with 1e-28 (m^2) instead of 1e-24 (cm^2), so every capture rate is 1e4 times too small."
+    file: mutants/whole_task_barn_in_square_metres.py
+
+sub_steps:
+  - step_number: 1
+    scaffold: steps/step_1.py
+    solution: solution/step_1.py
+    tests: tests/step_1.py
+    step_description_prompt: |-
+      A linear decay chain has members 0, ..., n - 1. Member i decays with the constant lam[i] into member
+      i + 1, and the last member decays out of the chain (lam = 0 means stable). With dx/dt = M x,
+      M[i, i] = -lam[i] and M[i + 1, i] = lam[i], return x(t) = exp(t M) n0 for the initial numbers of
+      atoms n0 (any members may be populated).
+
+      Each entry of x not smaller than 1e-250 * sum(n0) must have a relative error below 1e-10, however
+      small it is compared with the other entries. Smaller entries must lie within 1e-250 * sum(n0) of the
+      exact value. Decay constants may be equal or nearly equal (relative differences down to 1e-13), and
+      they may span more than 20 decades in one chain.
+      Inputs: lam and n0, 1-D arrays of the same length n (1 <= n <= 30), with 0 <= lam[i] <= 1e10 and
+      n0 >= 0; t with 0 <= t <= 1e20 (lam and t in consistent units).
+      Errors: raise ValueError if lam and n0 are not 1-D arrays of the same length in [1, 30], if a decay
+      constant is negative, above 1e10 or not finite, if an initial amount is negative or not finite, or if
+      t is not finite or outside [0, 1e20].
+    function_header: |-
+      def chain_inventory(lam, n0, t):
+          '''Atoms of every member of a linear radioactive decay chain after a time t (Bateman problem).
+
+          Inputs:
+            lam: 1-D array of n decay constants (1 <= n <= 30), member i decays into member i + 1 at the
+                 rate lam[i]; the last member decays out of the chain. 0 <= lam[i] <= 1e10 (per unit of time).
+            n0: 1-D array of n initial numbers of atoms, nonnegative.
+            t: elapsed time, 0 <= t <= 1e20 (same unit of time).
+
+          Output:
+            x: numpy array of shape (n,), the numbers of atoms at time t. Relative error below 1e-10 for every
+               entry not smaller than 1e-250 * sum(n0); smaller entries within 1e-250 * sum(n0) of the exact value.
+
+          Raises:
+            ValueError if lam and n0 are not 1-D arrays of the same length between 1 and 30, if an entry of
+            lam is negative, above 1e10 or not finite, if an entry of n0 is negative or not finite, or if t
+            is not finite or outside [0, 1e20].
+          '''
+    return_line: return x
+    step_background: |-
+      Bateman (1910) solved the linear chain as x_k = n0 prod lam * sum_i exp(-lam_i t) /
+      prod_{l != i} (lam_l - lam_i). In floating point this sum cancels catastrophically when decay
+      constants are close, and it is undefined when two are equal. A dense matrix exponential is accurate
+      only relative to the largest entry. The exact solution is a positive combination of positive terms
+      (the off-diagonal entries of M are nonnegative), so methods that keep every operation nonnegative
+      can keep the relative accuracy of every entry.
+    n_test_cases: 6
+    contract:
+      quantity: "Numbers of atoms of the members of a linear radioactive decay chain after a time t."
+      assumptions: "Constant decay constants, first-order kinetics, the last member decays out of the chain."
+      result_kind: exact
+      valid_input_ranges: "1 <= n <= 30; 0 <= lam <= 1e10; n0 >= 0; 0 <= t <= 1e20."
+      units: "Atoms; lam and t in consistent units."
+      output_shape: "numpy float array of shape (n,)."
+      step_dependencies: []
+    mutants:
+      - name: float_bateman
+        description: "Evaluates the Bateman sum in double precision (equal constants split by 1e-9), which cancels for close decay constants."
+        file: mutants/step_1_float_bateman.py
+      - name: squared_diagonal
+        description: "Squares the diagonal together with the rest in scaling and squaring, which doubles its rounding error at every level."
+        file: mutants/step_1_squared_diagonal.py
+
+  - step_number: 2
+    scaffold: steps/step_2.py
+    solution: solution/step_2.py
+    tests: tests/step_2.py
+    step_description_prompt: |-
+      Generalize step 1 (chain_inventory) to a branching network with constant production.
+      - Nuclide i decays at the rate lam[i].
+      - A fraction branching[j, i] of its decays gives nuclide j. The column sums are at most 1; the rest
+        leaves the network.
+      - Nuclide i is also produced at the constant rate source[i] (atoms per unit time).
+
+      The equations are dx_j/dt = -lam[j] x_j + sum_i branching[j, i] lam[i] x_i + source[j]. Return
+      x(t) for the initial amounts n0.
+
+      The network given by the edges i -> j with branching[j, i] > 0 must be acyclic, as decay networks
+      are; the nuclides may be given in any order. Each entry of x not smaller than
+      1e-250 * (sum(n0) + t * sum(source)) must have a relative error below 1e-10; smaller entries must lie
+      within that bound of the exact value. This includes amounts that are reached only through
+      low-probability branches.
+      Inputs: lam, source, n0 (1-D, length n, 1 <= n <= 30), branching (n x n), t; all entries nonnegative
+      and finite, lam <= 1e10, 0 <= t <= 1e20.
+      Errors: raise ValueError if the shapes are wrong, if an entry is negative or not finite, if a decay
+      constant exceeds 1e10, if a diagonal entry of branching is nonzero or a column sum exceeds
+      1 + 1e-12, if the network has a cycle, or if t is not finite or outside [0, 1e20].
+    function_header: |-
+      def network_inventory(lam, branching, source, n0, t):
+          '''Atoms of every nuclide of a branching decay network with constant production after a time t.
+
+          Inputs:
+            lam: 1-D array of n decay constants (1 <= n <= 30), 0 <= lam[i] <= 1e10 (per unit of time).
+            branching: (n, n) array, branching[j, i] = fraction of the decays of nuclide i that give nuclide j;
+                       nonnegative, zero diagonal, column sums at most 1 (the rest leaves the network). The
+                       directed graph with an edge i -> j wherever branching[j, i] > 0 must be acyclic.
+            source: 1-D array of n constant production rates (atoms per unit of time), nonnegative.
+            n0: 1-D array of n initial numbers of atoms, nonnegative.
+            t: elapsed time, 0 <= t <= 1e20.
+
+          Output:
+            x: numpy array of shape (n,), the numbers of atoms at time t. Relative error below 1e-10 for every
+               entry not smaller than 1e-250 * (sum(n0) + t * sum(source)); smaller entries within that bound
+               of the exact value.
+
+          Raises:
+            ValueError if the arrays do not have these shapes (1 <= n <= 30), if an entry is negative or not
+            finite, if a decay constant exceeds 1e10, if a diagonal entry of branching is nonzero or a column
+            sum exceeds 1 + 1e-12, if the network has a cycle, or if t is not finite or outside [0, 1e20].
+          '''
+    return_line: return x
+    step_background: |-
+      Real decay schemes branch (for example 214Bi decays to 214Po and in 0.02 % of cases to 210Tl), and
+      nuclides are produced at constant rates in reactors, by cosmic rays or in accelerators. A source
+      approaches the saturation amount source / lam.
+    n_test_cases: 5
+    contract:
+      quantity: "Numbers of atoms in an acyclic branching decay network with constant production after a time t."
+      assumptions: "First-order decay with branching fractions, constant production rates, acyclic network."
+      result_kind: exact
+      valid_input_ranges: "1 <= n <= 30; nonnegative finite inputs; lam <= 1e10; column sums of branching <= 1; 0 <= t <= 1e20."
+      units: "Atoms; rates and t in consistent units."
+      output_shape: "numpy float array of shape (n,)."
+      step_dependencies: []
+    mutants:
+      - name: transposed_branching
+        description: "Reads branching[i, j] instead of branching[j, i] as the fraction of decays of i giving j."
+        file: mutants/step_2_transposed_branching.py
+      - name: squared_diagonal
+        description: "Squares the diagonal together with the rest in scaling and squaring."
+        file: mutants/step_2_squared_diagonal.py
+
+  - step_number: 3
+    scaffold: steps/step_3.py
+    solution: solution/step_3.py
+    tests: tests/step_3.py
+    step_description_prompt: |-
+      Neutron activation. A sample is irradiated according to a history of periods (duration in s,
+      neutron flux phi in neutrons / (cm^2 s)); a period with phi = 0 is cooling.
+      - During a period, nuclide i decays as in network_inventory (step 2), with constant lam[i] in 1/s
+        and the given branching fractions.
+      - It also captures neutrons at the rate sigma[i] * 1e-24 * phi, where sigma[i] is its
+        radiative-capture cross section in barns.
+      - A capture removes the atom (burnup) and makes nuclide capture_to[i], or a nuclide that is not
+        followed if capture_to[i] = -1.
+
+      Return the numbers of atoms at the end of the history for the initial amounts n0. Each entry not
+      smaller than 1e-250 * sum(n0) must have a relative error below 1e-10; smaller entries must lie
+      within that bound of the exact value. This includes products of several successive captures at low
+      flux.
+      Inputs:
+        lam, sigma, n0: 1-D, length n with 1 <= n <= 30; 0 <= lam <= 1e10 per s, 0 <= sigma <= 1e7 b,
+                        n0 >= 0.
+        branching: n x n, as in step 2.
+        capture_to: integer array of length n.
+        history: a sequence of (duration, flux) pairs with 0 <= duration <= 1e12 s and
+                 0 <= flux <= 1e18.
+      Errors: raise ValueError if:
+        - the shapes or ranges above are violated, or a value is not finite;
+        - capture_to is not an integer array with entries in [-1, n - 1], or capture_to[i] = i;
+        - branching violates the conditions of step 2;
+        - the combined network has a cycle (edges i -> j where branching[j, i] > 0, or where sigma[i] > 0
+          and capture_to[i] = j);
+        - a history entry is not a pair of numbers in range;
+        - lam[i] + sigma[i] * 1e-24 * flux exceeds 1e10 per s in some period.
+    function_header: |-
+      def activation_inventory(lam, branching, sigma, capture_to, n0, history):
+          '''Atoms of every nuclide after an irradiation history with neutron capture, decay and cooling.
+
+          Inputs:
+            lam: 1-D array of n decay constants in 1/s (1 <= n <= 30), 0 <= lam[i] <= 1e10.
+            branching: (n, n) array of decay branching fractions as in network_inventory (step 2).
+            sigma: 1-D array of n radiative-capture cross sections in barns (1 b = 1e-24 cm^2), 0 <= sigma[i] <= 1e7.
+            capture_to: 1-D integer array of n entries; capture_to[i] = index of the nuclide made by a capture
+                        on nuclide i, or -1 if that product is not followed.
+            n0: 1-D array of n initial numbers of atoms, nonnegative.
+            history: sequence of (duration, flux) pairs applied in order; duration in s (0 <= duration <= 1e12),
+                     flux in neutrons / (cm^2 s) (0 <= flux <= 1e18; flux 0 is a cooling period).
+
+          Output:
+            x: numpy array of shape (n,), the numbers of atoms at the end of the history. Relative error below
+               1e-10 for every entry not smaller than 1e-250 * sum(n0); smaller entries within that bound of the
+               exact value.
+
+          Raises:
+            ValueError for inputs outside these ranges or of the wrong shape, for a capture_to entry that is not
+            an integer in [-1, n - 1] or equals its own index, for branching as in step 2, or if the combined
+            decay and capture network (edges where branching[j, i] > 0 or sigma[i] > 0 and capture_to[i] = j)
+            has a cycle, or if lam[i] + sigma[i] * 1e-24 * flux exceeds 1e10 per s in some period.
+          '''
+    return_line: return x
+    step_background: |-
+      Neutron activation turns stable nuclides into radioactive ones. Its rate sigma * phi uses the cross
+      section in cm^2: 1 barn = 1e-24 cm^2, and fluxes are in neutrons per cm^2 per second. At high fluence
+      the target and the products are burnt up by further captures; 198Au, with a cross section of
+      25100 b, is a well-known case.
+    n_test_cases: 5
+    contract:
+      quantity: "Inventory of a sample after an irradiation history with neutron capture, burnup, decay and cooling."
+      assumptions: "Constant flux within each period, one-group capture cross sections in barns, capture product capture_to[i], acyclic combined network."
+      result_kind: exact
+      valid_input_ranges: "1 <= n <= 30; lam <= 1e10 per s; sigma <= 1e7 b; durations <= 1e12 s; fluxes <= 1e18 per cm^2 s."
+      units: "Atoms; s, barns, neutrons / (cm^2 s)."
+      output_shape: "numpy float array of shape (n,)."
+      step_dependencies: [2]
+    mutants:
+      - name: barn_in_square_metres
+        description: "Converts barns to m^2 (1e-28) although the flux is per cm^2."
+        file: mutants/step_3_barn_in_square_metres.py
+
+  - step_number: 4
+    scaffold: steps/step_4.py
+    solution: solution/step_4.py
+    tests: tests/step_4.py
+    step_description_prompt: |-
+      Flux-monitor analysis. A monitor sample with the nuclide data and initial amounts of
+      activation_inventory (step 3) is irradiated for t_irr seconds at an unknown constant flux phi and
+      then cooled for t_cool seconds. Afterwards the activity lam[k] * x[k] of nuclide k is measured.
+
+      Return phi such that the predicted activity A(phi) equals the measured one. The caller gives an
+      interval [flux_lo, flux_hi] on which A is strictly increasing. It is not proportional to phi: a
+      product of m successive captures grows like phi**m at low flux, and burnup of the target and of the
+      product bends A over at high flux.
+
+      The result must have a relative error below 1e-8 wherever d ln A / d ln phi >= 0.5 at the solution.
+      This includes activities as small as 1e-11 Bq.
+      Inputs: the nuclide data of step 3; 0 < t_irr <= 1e9 s and 0 <= t_cool <= 1e9 s; an integer k with
+      lam[k] > 0; activity > 0 (Bq); 1e-2 <= flux_lo < flux_hi <= 1e18.
+      Errors: raise ValueError for:
+        - nuclide data rejected by step 3;
+        - times out of range;
+        - k not an integer (bool is not accepted) or not the index of a radioactive nuclide;
+        - activity not positive and finite;
+        - flux bounds not finite or out of range;
+        - an activity outside [A(flux_lo), A(flux_hi)].
+    function_header: |-
+      def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activity, flux_lo, flux_hi):
+          '''Neutron flux from the measured activity of an activation product (flux-monitor analysis).
+
+          Inputs:
+            lam, branching, sigma, capture_to, n0: the nuclide data and initial atoms, as in
+                 activation_inventory (step 3).
+            t_irr: irradiation time in s at a constant unknown flux, 0 < t_irr <= 1e9.
+            t_cool: cooling time in s without flux after the irradiation, 0 <= t_cool <= 1e9.
+            k: int, index of the measured nuclide, with lam[k] > 0.
+            activity: measured activity lam[k] * x[k] of nuclide k at the end of the cooling, in Bq, > 0.
+            flux_lo, flux_hi: the flux lies in [flux_lo, flux_hi], 1e-2 <= flux_lo < flux_hi <= 1e18, and the
+                 caller guarantees that the activity A(flux) is strictly increasing on this interval.
+
+          Output:
+            flux: Python float, the flux in neutrons / (cm^2 s) with A(flux) = activity; relative error below
+                  1e-8 wherever d ln A / d ln flux >= 0.5 at the solution.
+
+          Raises:
+            ValueError for nuclide data as in step 3, for times, k, activity or flux bounds outside these
+            ranges, or if activity is not between A(flux_lo) and A(flux_hi).
+          '''
+    return_line: return flux
+    step_background: |-
+      Gold and cobalt foils are standard flux monitors. The 198Au or 60Co activity measured after the
+      irradiation gives the flux. At low fluence the activity is proportional to the flux, but burnup of a
+      large-cross-section product makes the response saturate and turn over. Second-order products such
+      as 199Au grow like phi**2.
+    n_test_cases: 5
+    contract:
+      quantity: "Neutron flux that reproduces a measured activation activity after irradiation and cooling."
+      assumptions: "Constant flux during the irradiation, none during cooling; A(phi) strictly increasing on the given interval."
+      result_kind: exact
+      valid_input_ranges: "Nuclide data of step 3; 0 < t_irr <= 1e9 s; 0 <= t_cool <= 1e9 s; 1e-2 <= flux_lo < flux_hi <= 1e18."
+      units: "Neutrons / (cm^2 s)."
+      output_shape: "One Python float."
+      step_dependencies: [3]
+    mutants:
+      - name: linear_response
+        description: "Assumes the activity is proportional to the flux and scales from its value at flux_lo."
+        file: mutants/step_4_linear_response.py
