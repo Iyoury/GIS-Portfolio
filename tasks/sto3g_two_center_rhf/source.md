@@ -139,3 +139,11 @@ Version 10 (reviewer's correction):
     The reference was right there, as checked against the closed erf form in mpmath.
 - Test metadata: every test case block now holds its own assert statements. Helper calls are
   asserted, and the error cases use an explicit raised flag. The step-4 n_test_cases is 6.
+
+Version 11 (content-check fixes):
+- Step 5 charge range 1 <= Z <= 2 (was 1 to 3). With a charge above 2 the separated fragments in
+  this basis repel each other and no curve holds five bound levels. A scan over 36 exponent pairs
+  at ZA = 3, ZB = 1 with 10 u nuclei found none, so an endpoint Z = 3 case with five levels does
+  not exist. The upper endpoint Z = 2 is exercised on both centres (HeH+ and its swap). Charges
+  outside [1, 2] or not finite now raise ValueError, stated and tested.
+- Step 1 rejects an array with one bad element (NaN, negative or above 1e6).

@@ -303,7 +303,7 @@ sub_steps:
       The masses are in unified atomic mass units; use exactly 1 u = 1822.888486209 electron
       masses and 1 hartree = 219474.6313632 cm^-1.
 
-      Inputs: ZA, ZB (1 <= Z <= 3, real numbers allowed), zetaA, zetaB (0.8 <= zeta <= 3) and
+      Inputs: ZA, ZB (1 <= Z <= 2, real numbers allowed), zetaA, zetaB (0.8 <= zeta <= 3) and
       massA, massB (u, 1 <= mass <= 10, endpoints included). Return a float numpy array of
       shape (5,) with the levels v = 0..4 in cm^-1 measured from E_inf (all negative), in
       increasing order, each with an absolute error below 0.01 cm^-1. Make sure the
@@ -311,15 +311,17 @@ sub_steps:
       converged for these five states for every allowed input; with heavy nuclei and tight
       exponents the well sits at small R, with light nuclei and weak binding the states
       reach far out.
-      Errors: raise ValueError if a mass is not finite or not in [1, 10] u, or if fewer
-      than five vibrational levels lie below E_inf (for example when the only well lies
-      above the dissociation limit).
+      Errors: raise ValueError if a charge is not finite or not in [1, 2], if a mass is not
+      finite or not in [1, 10] u, or if fewer than five vibrational levels lie below E_inf
+      (for example when the only well lies above the dissociation limit). (With a charge
+      above 2 the separated fragments in this basis repel each other and no curve holds five
+      bound levels, so the step is limited to 1 <= Z <= 2.)
     function_header: |-
       def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
           '''Lowest five vibrational levels (J = 0) on the full-CI potential curve, from the dissociation limit.
 
           Inputs:
-            ZA, ZB: float, nuclear charges, 1 <= Z <= 3.
+            ZA, ZB: float, nuclear charges, 1 <= Z <= 2.
             zetaA, zetaB: float, Slater exponents of the 1s functions on A and B, 0.8 <= zeta <= 3.
             massA, massB: float, nuclear masses in unified atomic mass units (u), 1 <= mass <= 10.
 
@@ -330,8 +332,8 @@ sub_steps:
                     0.01 cm^-1 for each level.
 
           Raises:
-            ValueError if a mass is not finite or not in [1, 10] u, or if fewer than five
-            bound vibrational levels lie below the dissociation limit.
+            ValueError if a charge is not finite or not in [1, 2], if a mass is not finite or not in
+            [1, 10] u, or if fewer than five bound vibrational levels lie below the dissociation limit.
           '''
     return_line: return levels
     step_background: |-
@@ -348,7 +350,7 @@ sub_steps:
       quantity: "Lowest five J = 0 vibrational levels on the full-CI potential curve, measured from the exact dissociation limit."
       assumptions: "Born-Oppenheimer curve from fci_energy, reduced mass of the nuclei, exact R -> infinity limit including charged-fragment (q_A q_B / R) tails, CODATA 2018 conversion factors given in the prompt."
       result_kind: exact
-      valid_input_ranges: "ZA, ZB from 1 to 3; zeta from 0.8 to 3; masses from 1 to 10 u; at least five bound levels."
+      valid_input_ranges: "ZA, ZB from 1 to 2; zeta from 0.8 to 3; masses from 1 to 10 u; at least five bound levels."
       units: "cm^-1 relative to the dissociation limit."
       output_shape: "Float numpy array of shape (5,), increasing."
       step_dependencies: [4]

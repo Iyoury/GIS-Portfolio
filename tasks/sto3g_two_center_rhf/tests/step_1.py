@@ -40,8 +40,9 @@ for _t_t in (25.5, 40.9, 41.1, 87.0, 640.0, 1.2e4, 1e6):
 # --- test case 3: arrays of any shape, lower orders, and n_max = 0 ---
 assert _t_check(4, np.array([[0.0, 0.2, 7.5], [33.0, 150.0, 2.5e3]])) is not None
 assert _t_check(0, np.array([1e-12, 0.5, 19.0, 1e5])) is not None
-# --- test case 4: invalid order or argument raises ValueError ---
-for _t_bad in ((17, 1.0), (-1, 1.0), (2.5, 1.0), (4, -1e-3), (4, float("nan")), (4, 2e6)):
+# --- test case 4: invalid order or argument (also one bad element inside an array) raises ValueError ---
+for _t_bad in ((17, 1.0), (-1, 1.0), (2.5, 1.0), (4, -1e-3), (4, float("nan")), (4, 2e6),
+               (4, np.array([0.2, np.nan, 1.0])), (4, np.array([0.2, -1.0])), (4, np.array([[1.0, 2e6]]))):
     _t_raised = False
     try:
         boys_function(*_t_bad)

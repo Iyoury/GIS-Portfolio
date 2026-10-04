@@ -231,6 +231,9 @@ def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
     # Other methods: the dissociation limit from one-centre integrals evaluated primitive pair
     # by primitive pair, V(R) sampled on Chebyshev nodes in ln R and interpolated, and the
     # radial equation solved by Chebyshev spectral collocation (no DVR, no shooting).
+    for z in (ZA, ZB):
+        if not (np.isfinite(z) and 1.0 <= z <= 2.0):
+            raise ValueError("nuclear charges must be finite and between 1 and 2")
     for m in (massA, massB):
         if not (np.isfinite(m) and 1.0 <= m <= 10.0):
             raise ValueError("nuclear masses must be finite and between 1 and 10 u")
