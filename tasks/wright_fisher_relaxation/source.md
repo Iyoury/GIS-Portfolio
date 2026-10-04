@@ -55,3 +55,20 @@ Version 2 (content-check fixes):
 - Step 5 tests v = 0.1 (N = 1: t_up = 1 / v = 10, t_down = 1 / u = 20).
 - Step 4 prompt: the lambda_2**t decay is stated for a generic initial distribution (nonzero
   component along the second eigenvector).
+
+Version 3 (difficulty increase, the quick probe solved v2 three times out of three):
+- New step 6: the quasi-stationary distribution and absorption rate with one-way mutation (u = 0). The
+  rate is down to about 1e-246 and is required to 1e-8 relative, with the distribution entrywise.
+  - Reference: inverse iteration for the left Perron vector with a subtraction-free LU of I - Q. Each
+    pivot is the sum of the remaining off-diagonal rates plus the accumulated absorption probability,
+    and the iteration stops when every entry has settled, not only the rate.
+  - Second solution: plain LU in mpmath with doubled precision.
+  - Tests:
+    - the neutral rate is exactly v, for any N (Feller-Cannings spectrum);
+    - extended-precision oracle;
+    - exact identities at N = 400: rate = sum_i q_i P[i, N] and (q Q)_j = (1 - rate) q_j;
+    - the general test links it to step 5: rate * t_up = 1 to 8e-11.
+- Steps 2-6 state a time budget of 20 s per call at N up to 400, asserted in the tests. The
+  reference needs well under 2 s; extended-precision linear algebra at N = 400 does not fit.
+- The prompts and background no longer describe the numerical remedy: no state reduction, no
+  remark on dense eigensolvers or on diagonal entries close to 1.

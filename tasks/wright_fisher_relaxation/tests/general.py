@@ -135,3 +135,38 @@ target = _t_absorbing(N, s)[0]
 assert all(_t_rel(a, b) < 1e-8 for a, b in zip(fs, target)), (fs, target)
 times = substitution_times(N, s, 1e-12, 1e-12)
 assert _t_rel(times[0], 1.0 / (N * 1e-12 * fs[0])) < 1e-8, (times, fs)
+
+
+def _t_qsd(N, s, v, dps):
+    # inverse iteration in extended precision on (I - Q)^T, Q the matrix restricted to i < N, plain LU
+    with _t_mp.workdps(dps):
+        P = _t_P(N, s, 0, v)
+        M = _t_mp.matrix(N, N)
+        for i in range(N):
+            for j in range(N):
+                M[j, i] = (1 if i == j else 0) - P[i, j]
+        x = _t_mp.matrix([_t_mp.mpf(1) / N] * N)
+        rate = None
+        for _ in range(3000):
+            y = _t_mp.lu_solve(M, x)
+            tot = sum(y)
+            new = 1 / tot
+            x_new = y / tot
+            done = rate is not None and all(abs(x_new[i] - x[i]) <= _t_mp.mpf(10) ** (-dps // 2) * x_new[i] for i in range(N))
+            x, rate = x_new, new
+            if done:
+                break
+        return float(rate), [float(a) for a in x]
+
+
+# --- test case 3: one-way mutation (u = 0) against strongly deleterious A: the quasi-stationary absorption
+# rate (about 1e-28) and distribution against extended precision; a population in that state fixes A after
+# 1 / rate generations on average, which matches t_up of step 5 with back mutation 1e-12 to about 1e-10 ---
+N, s, v = 20, -0.5, 1e-12
+rate, q = quasi_stationary(N, s, v)
+t_rate, t_q = _t_qsd(N, s, v, 200)
+assert _t_rel(rate, t_rate) < 1e-8, (rate, t_rate)
+for a, b in zip(q, t_q):
+    assert _t_rel(a, b) < 1e-8, (a, b)
+times = substitution_times(N, s, 1e-12, v)
+assert _t_rel(rate * times[0], 1.0) < 1e-8, (rate, times)

@@ -44,6 +44,19 @@ def _t_check(out, target):
     assert _t_rel(out[0], target[0]) < 1e-8 and _t_rel(out[1], target[1]) < 1e-8, (out, target)
 
 
+import time as _t_time
+_t_untimed_5 = substitution_times
+
+
+def substitution_times(*args):
+    # the prompt requires every call to finish within 20 s on one CPU core
+    start = _t_time.perf_counter()
+    out = _t_untimed_5(*args)
+    elapsed = _t_time.perf_counter() - start
+    assert elapsed <= 20.0, ("substitution_times took %.1f s" % elapsed, args)
+    return out
+
+
 # --- test case 0: one individual: geometric waiting times 1 / v and 1 / u ---
 _t_check(substitution_times(1, -0.2, 0.05, 1e-12), (1e12, 20.0))
 _t_check(substitution_times(1, 0.0, 0.05, 0.1), (10.0, 20.0))

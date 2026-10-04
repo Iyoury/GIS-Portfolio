@@ -43,6 +43,19 @@ def _t_check(out, target, tol=1e-8):
         assert _t_rel(a, b) < tol, (out, target)
 
 
+import time as _t_time
+_t_untimed_2 = fixation_statistics
+
+
+def fixation_statistics(*args):
+    # the prompt requires every call to finish within 20 s on one CPU core
+    start = _t_time.perf_counter()
+    out = _t_untimed_2(*args)
+    elapsed = _t_time.perf_counter() - start
+    assert elapsed <= 20.0, ("fixation_statistics took %.1f s" % elapsed, args)
+    return out
+
+
 # --- test case 0: neutral drift: p_fix = i0 / N exactly, also when p_loss is the small one, and N = 2 ---
 N = 300
 for i0 in (1, 150, 299):

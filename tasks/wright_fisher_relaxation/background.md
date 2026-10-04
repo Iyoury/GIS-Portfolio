@@ -39,14 +39,12 @@ neutral model, Feller and Cannings showed that the eigenvalues are
 (1 - u - v)**k prod_{m<k} (1 - m / N). The gap 1 - lambda_2 is then exactly u + v, the switching
 rate between the two fixed states, whatever N is.
 
-## Numerical issue
+## Quasi-stationary state
 
-All the interesting quantities are tiny or huge: fixation probabilities of 1e-240, stationary
-probabilities spanning 150 decades, relaxation rates of 1e-12 and waiting times of 1e250
-generations. They are fixed by off-diagonal transition probabilities of order N u or N v. In
-1 - P_ii these sit far below the rounding error of the diagonal entry, which is 1 to within N u.
-Dense linear algebra (LU with pivoting, QR eigensolvers) is backward stable only up to an error
-of about 1e-16 times the norm of the matrix. It therefore loses these quantities completely.
-Methods that work with the chain itself avoid this. State reduction (Grassmann, Taksar and Heyman
-1985) removes states one at a time and writes every escape probability as a sum of nonnegative
-terms, never as 1 - P_ii. Extended-precision arithmetic is the other way.
+With mutation in one direction only (a -> A, u = 0), fixation of A is permanent. Before that, a
+population settles into a quasi-stationary distribution (the Yaglom limit): the distribution of the
+allele count conditional on A not yet being fixed. It is the left Perron eigenvector of the
+transition matrix restricted to the states that are not fixed for A. Its eigenvalue rho gives the
+constant per-generation probability 1 - rho that a population in this state fixes A. When A is
+strongly deleterious this probability is exponentially small in N s, even though new copies of A
+keep arising by mutation.

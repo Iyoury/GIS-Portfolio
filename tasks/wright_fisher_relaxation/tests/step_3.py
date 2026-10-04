@@ -46,6 +46,19 @@ def _t_check(pi, target):
             assert abs(a) <= 1e-250, (a, b)
 
 
+import time as _t_time
+_t_untimed_3 = stationary_distribution
+
+
+def stationary_distribution(*args):
+    # the prompt requires every call to finish within 20 s on one CPU core
+    start = _t_time.perf_counter()
+    out = _t_untimed_3(*args)
+    elapsed = _t_time.perf_counter() - start
+    assert elapsed <= 20.0, ("stationary_distribution took %.1f s" % elapsed, args)
+    return out
+
+
 # --- test case 0: one individual: pi = (u, v) / (u + v), also with u = 1e-12 ---
 for _t_s, _t_u, _t_v in ((0.3, 0.1, 0.05), (-0.5, 1e-12, 0.1)):
     pi = stationary_distribution(1, _t_s, _t_u, _t_v)

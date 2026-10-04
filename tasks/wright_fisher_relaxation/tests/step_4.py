@@ -56,6 +56,19 @@ def _t_check(g, target):
     assert _t_rel(g, target) < 1e-8, (g, target)
 
 
+import time as _t_time
+_t_untimed_4 = relaxation_rate
+
+
+def relaxation_rate(*args):
+    # the prompt requires every call to finish within 20 s on one CPU core
+    start = _t_time.perf_counter()
+    out = _t_untimed_4(*args)
+    elapsed = _t_time.perf_counter() - start
+    assert elapsed <= 20.0, ("relaxation_rate took %.1f s" % elapsed, args)
+    return out
+
+
 # --- test case 0: one individual: the eigenvalues are 1 and 1 - u - v ---
 _t_check(relaxation_rate(1, 0.4, 0.07, 1e-12), 0.07 + 1e-12)
 
