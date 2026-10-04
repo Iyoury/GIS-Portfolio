@@ -10,7 +10,7 @@ def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activi
       lam: 1-D array of n decay constants in 1/s (1 <= n <= 30), 0 <= lam[i] <= 1e10.
       branching: (n, n) array, branching[j, i] = fraction of the decays of nuclide i that give nuclide j;
                  nonnegative, zero diagonal, column sums at most 1 + 1e-12.
-      sigma: 1-D array of n radiative-capture cross sections in barns, 0 <= sigma[i] <= 1e7.
+      sigma: 1-D array of n radiative-capture cross sections in barns, sigma[i] = 0 or 1e-6 <= sigma[i] <= 1e7.
       capture_to: 1-D integer array of n entries, the nuclide made by a capture on nuclide i, or -1 if
                   it is not followed; never i itself.
       n0: 1-D array of n initial numbers of atoms, nonnegative, sum(n0) <= 1e100.
@@ -37,7 +37,7 @@ def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activi
     flux_lo, flux_hi = float(flux_lo), float(flux_hi)
     if not (np.isfinite(t_irr) and 0.0 < t_irr <= 1e9 and np.isfinite(t_cool) and 0.0 <= t_cool <= 1e9):
         raise ValueError("need 0 < t_irr <= 1e9 s and 0 <= t_cool <= 1e9 s")
-    if not (np.isfinite(activity) and activity > 0.0):
+    if not (np.isfinite(activity) and activity > 0.0):      # 0 is rejected too
         raise ValueError("activity must be positive and finite")
     if not (np.isfinite(flux_lo) and np.isfinite(flux_hi) and 1e-2 <= flux_lo < flux_hi <= 1e18):
         raise ValueError("need 1e-2 <= flux_lo < flux_hi <= 1e18")

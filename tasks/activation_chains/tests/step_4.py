@@ -119,6 +119,9 @@ _t_co = (np.array([0.0, np.log(2.0) / (10.467 * 60.0), np.log(2.0) / (5.2714 * 3
 _t_roundtrip(2, 1e11, 1e9, 1e9, 1e6, 1e13, _t_co)
 _t_simple = (np.array([0.0, 1e-3]), np.zeros((2, 2)), np.array([1.0, 0.0]), np.array([1, -1]), np.array([1e20, 0.0]))
 _t_roundtrip(1, 1e17, 1e3, 10.0, 1e14, 1e18, _t_simple)
+# the smallest positive cross section, 1e-6 b, on the target
+_t_faint = (np.array([0.0, 1e-3]), np.zeros((2, 2)), np.array([1e-6, 0.0]), np.array([1, -1]), np.array([1e20, 0.0]))
+_t_roundtrip(1, 1e12, 1e3, 10.0, 1e6, 1e18, _t_faint)
 # the interval is closed with a two-sided tolerance: activities equal to A(flux_lo) or A(flux_hi), or
 # 5e-10 inside them (whose exact roots are about 5e-10 away from the ends), or 5e-10 outside them, give
 # back those ends
@@ -127,7 +130,19 @@ for _t_end, _t_in in ((1e8, 1.0 + 5e-10), (1e13, 1.0 - 5e-10)):
         act = _t_f * _t_activity(1, _t_end, 5 * _T_DAY, _T_DAY, *_T_DATA)
         got = monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, act, 1e8, 1e13)
         assert _t_rel(got, _t_end) < 1e-11, (got, _t_end, _t_f)
-    # just beyond the tolerance, outside the interval (|ln| = 2e-9 > 1e-9): no flux in the interval
+    # at the bound on both sides (|ln| = 0.999e-9) the end is returned
+    _t_a = _t_activity(1, _t_end, 5 * _T_DAY, _T_DAY, *_T_DATA)
+    for _t_f in (np.exp(0.999e-9), np.exp(-0.999e-9)):
+        got = monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, _t_f * _t_a, 1e8, 1e13)
+        assert _t_rel(got, _t_end) < 1e-11, (got, _t_end, _t_f)
+    # just beyond the tolerance, outside the interval (|ln| = 1.01e-9 > 1e-9): no flux in the interval
+    _t_raised = False
+    try:
+        monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, (np.exp(-1.01e-9) if _t_end == 1e8 else np.exp(1.01e-9)) * _t_a, 1e8, 1e13)
+    except ValueError:
+        _t_raised = True
+    assert _t_raised, ("activity 1.01e-9 outside the end at %g must raise ValueError" % _t_end)
+    # and 2e-9 outside
     _t_out = np.exp(-2e-9) if _t_end == 1e8 else np.exp(2e-9)
     _t_raised = False
     try:
@@ -153,10 +168,19 @@ for _t_args in ((0.0, _T_DAY, 1, _t_act, 1e8, 1e13), (5 * _T_DAY, -1.0, 1, _t_ac
                 (5 * _T_DAY, _T_DAY, 1, _t_act, 1e-3, 1e13), (2e9, _T_DAY, 1, _t_act, 1e8, 1e13),
                 (5 * _T_DAY, 2e9, 1, _t_act, 1e8, 1e13), (5 * _T_DAY, _T_DAY, -1, _t_act, 1e8, 1e13),
                 (5 * _T_DAY, _T_DAY, 3, _t_act, 1e8, 1e13), (5 * _T_DAY, _T_DAY, 1, float("nan"), 1e8, 1e13),
-                (5 * _T_DAY, _T_DAY, 1, _t_act, 1e8, 2e18)):
+                (5 * _T_DAY, _T_DAY, 1, _t_act, 1e8, 2e18), (5 * _T_DAY, _T_DAY, 1, 0.0, 1e8, 1e13),
+                (5 * _T_DAY, _T_DAY, 1, _t_act, 1e10, 1e10)):
     try:
         monitor_flux(*_T_DATA, *_t_args)
     except ValueError:
         pass
     else:
         raise AssertionError("monitor_flux must raise ValueError for %r" % (_t_args,))
+# nuclide data rejected by step 3: a positive cross section below 1e-6 b (its rate would underflow)
+_t_raised = False
+try:
+    monitor_flux(np.array([0.0, 1e-3]), np.zeros((2, 2)), np.array([1e-300, 0.0]), np.array([1, -1]),
+                 np.array([1e100, 0.0]), 1e3, 0.0, 1, 1.0, 1e6, 1e18)
+except ValueError:
+    _t_raised = True
+assert _t_raised, "a cross section of 1e-300 b must raise ValueError"

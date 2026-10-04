@@ -170,7 +170,7 @@ def activation_inventory(lam, branching, sigma, capture_to, n0, history):
     Inputs:
       lam: 1-D array of n decay constants in 1/s (1 <= n <= 30), 0 <= lam[i] <= 1e10.
       branching: (n, n) array of decay branching fractions as in network_inventory (step 2).
-      sigma: 1-D array of n radiative-capture cross sections in barns (1 b = 1e-24 cm^2), 0 <= sigma[i] <= 1e7.
+      sigma: 1-D array of n radiative-capture cross sections in barns (1 b = 1e-24 cm^2), sigma[i] = 0 or 1e-6 <= sigma[i] <= 1e7.
       capture_to: 1-D integer array of n entries; capture_to[i] = index of the nuclide made by a capture
                   on nuclide i, or -1 if that product is not followed.
       n0: 1-D array of n initial numbers of atoms, nonnegative, sum(n0) <= 1e100.
@@ -205,8 +205,8 @@ def activation_inventory(lam, branching, sigma, capture_to, n0, history):
     for name, arr in (("lam", lam), ("sigma", sigma), ("n0", n0), ("branching", branching)):
         if not (np.all(np.isfinite(arr)) and np.all(arr >= 0.0)):
             raise ValueError("%s must be finite and nonnegative" % name)
-    if np.any(lam > 1e10) or np.any(sigma > 1e7):
-        raise ValueError("need lam <= 1e10 and sigma <= 1e7 b")
+    if np.any(lam > 1e10) or np.any(sigma > 1e7) or np.any((sigma > 0.0) & (sigma < 1e-6)):
+        raise ValueError("need lam <= 1e10 and sigma = 0 or 1e-6 <= sigma <= 1e7 b")
     if n0.sum() > 1e100:
         raise ValueError("sum(n0) must not exceed 1e100")
     if np.any(np.diag(branching) != 0.0) or np.any(branching.sum(axis=0) > 1.0 + 1e-12):
@@ -264,7 +264,7 @@ def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activi
       lam: 1-D array of n decay constants in 1/s (1 <= n <= 30), 0 <= lam[i] <= 1e10.
       branching: (n, n) array, branching[j, i] = fraction of the decays of nuclide i that give nuclide j;
                  nonnegative, zero diagonal, column sums at most 1 + 1e-12.
-      sigma: 1-D array of n radiative-capture cross sections in barns, 0 <= sigma[i] <= 1e7.
+      sigma: 1-D array of n radiative-capture cross sections in barns, sigma[i] = 0 or 1e-6 <= sigma[i] <= 1e7.
       capture_to: 1-D integer array of n entries, the nuclide made by a capture on nuclide i, or -1 if
                   it is not followed; never i itself.
       n0: 1-D array of n initial numbers of atoms, nonnegative, sum(n0) <= 1e100.
@@ -291,7 +291,7 @@ def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activi
     flux_lo, flux_hi = float(flux_lo), float(flux_hi)
     if not (np.isfinite(t_irr) and 0.0 < t_irr <= 1e9 and np.isfinite(t_cool) and 0.0 <= t_cool <= 1e9):
         raise ValueError("need 0 < t_irr <= 1e9 s and 0 <= t_cool <= 1e9 s")
-    if not (np.isfinite(activity) and activity > 0.0):
+    if not (np.isfinite(activity) and activity > 0.0):      # 0 is rejected too
         raise ValueError("activity must be positive and finite")
     if not (np.isfinite(flux_lo) and np.isfinite(flux_hi) and 1e-2 <= flux_lo < flux_hi <= 1e18):
         raise ValueError("need 1e-2 <= flux_lo < flux_hi <= 1e18")

@@ -28,7 +28,7 @@ problem_io: |-
         lam: 1-D array of n decay constants in 1/s (1 <= n <= 30), 0 <= lam[i] <= 1e10.
         branching: (n, n) array, branching[j, i] = fraction of the decays of nuclide i that give nuclide j;
                    nonnegative, zero diagonal, column sums at most 1 + 1e-12.
-        sigma: 1-D array of n radiative-capture cross sections in barns, 0 <= sigma[i] <= 1e7.
+        sigma: 1-D array of n radiative-capture cross sections in barns, sigma[i] = 0 or 1e-6 <= sigma[i] <= 1e7.
         capture_to: 1-D integer array of n entries, the nuclide made by a capture on nuclide i, or -1 if
                     it is not followed; never i itself.
         n0: 1-D array of n initial numbers of atoms, nonnegative, sum(n0) <= 1e100.
@@ -219,7 +219,7 @@ sub_steps:
       max(1e-250 * S, 1e-300) of the exact value. This includes products of several successive captures
       at low flux. The branching matrix is checked as in step 2 even when the history is empty.
       Inputs:
-        lam, sigma, n0: 1-D, length n with 1 <= n <= 30; 0 <= lam <= 1e10 per s, 0 <= sigma <= 1e7 b,
+        lam, sigma, n0: 1-D, length n with 1 <= n <= 30; 0 <= lam <= 1e10 per s, sigma = 0 or 1e-6 <= sigma <= 1e7 b,
                         n0 >= 0 with sum(n0) <= 1e100.
         branching: n x n, as in step 2.
         capture_to: integer array of length n.
@@ -241,7 +241,7 @@ sub_steps:
           Inputs:
             lam: 1-D array of n decay constants in 1/s (1 <= n <= 30), 0 <= lam[i] <= 1e10.
             branching: (n, n) array of decay branching fractions as in network_inventory (step 2).
-            sigma: 1-D array of n radiative-capture cross sections in barns (1 b = 1e-24 cm^2), 0 <= sigma[i] <= 1e7.
+            sigma: 1-D array of n radiative-capture cross sections in barns (1 b = 1e-24 cm^2), sigma[i] = 0 or 1e-6 <= sigma[i] <= 1e7.
             capture_to: 1-D integer array of n entries; capture_to[i] = index of the nuclide made by a capture
                         on nuclide i, or -1 if that product is not followed.
             n0: 1-D array of n initial numbers of atoms, nonnegative, sum(n0) <= 1e100.
@@ -271,7 +271,7 @@ sub_steps:
       quantity: "Inventory of a sample after an irradiation history with neutron capture, burnup, decay and cooling."
       assumptions: "Constant flux within each period, one-group capture cross sections in barns, capture product capture_to[i], acyclic combined network."
       result_kind: exact
-      valid_input_ranges: "1 <= n <= 30; lam <= 1e10 per s; sigma <= 1e7 b; durations <= 1e12 s; fluxes <= 1e18 per cm^2 s."
+      valid_input_ranges: "1 <= n <= 30; lam <= 1e10 per s; sigma = 0 or 1e-6 to 1e7 b; durations <= 1e12 s; fluxes <= 1e18 per cm^2 s."
       units: "Atoms; s, barns, neutrons / (cm^2 s)."
       output_shape: "numpy float array of shape (n,)."
       step_dependencies: [2]
@@ -297,9 +297,10 @@ sub_steps:
       The result must have a relative error below 1e-8 wherever d ln A / d ln phi >= 0.5 at the solution.
       This includes activities as small as 1e-11 Bq. The interval is closed, with a two-sided tolerance
       at its ends: if |ln(activity / A(flux_lo))| <= 1e-9 return flux_lo, else if
-      |ln(activity / A(flux_hi))| <= 1e-9 return flux_hi (on either side of the end value).
+      |ln(activity / A(flux_hi))| <= 1e-9 return flux_hi (on either side of the end value). Positive
+      cross sections are at least 1e-6 b, so every capture rate is far above the floating-point range limit.
       Inputs:
-        lam, sigma, n0: 1-D, length n with 1 <= n <= 30; 0 <= lam <= 1e10 per s, 0 <= sigma <= 1e7 b,
+        lam, sigma, n0: 1-D, length n with 1 <= n <= 30; 0 <= lam <= 1e10 per s, sigma = 0 or 1e-6 <= sigma <= 1e7 b,
                         n0 >= 0 with sum(n0) <= 1e100; all finite.
         branching: n x n, nonnegative, zero diagonal, column sums at most 1 + 1e-12.
         capture_to: integer array of length n with entries in [-1, n - 1] and capture_to[i] != i; the
@@ -323,7 +324,7 @@ sub_steps:
             lam: 1-D array of n decay constants in 1/s (1 <= n <= 30), 0 <= lam[i] <= 1e10.
             branching: (n, n) array, branching[j, i] = fraction of the decays of nuclide i that give nuclide j;
                        nonnegative, zero diagonal, column sums at most 1 + 1e-12.
-            sigma: 1-D array of n radiative-capture cross sections in barns, 0 <= sigma[i] <= 1e7.
+            sigma: 1-D array of n radiative-capture cross sections in barns, sigma[i] = 0 or 1e-6 <= sigma[i] <= 1e7.
             capture_to: 1-D integer array of n entries, the nuclide made by a capture on nuclide i, or -1 if
                         it is not followed; never i itself.
             n0: 1-D array of n initial numbers of atoms, nonnegative, sum(n0) <= 1e100.

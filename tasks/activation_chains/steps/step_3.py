@@ -9,7 +9,7 @@ def activation_inventory(lam, branching, sigma, capture_to, n0, history):
     Inputs:
       lam: 1-D array of n decay constants in 1/s (1 <= n <= 30), 0 <= lam[i] <= 1e10.
       branching: (n, n) array of decay branching fractions as in network_inventory (step 2).
-      sigma: 1-D array of n radiative-capture cross sections in barns (1 b = 1e-24 cm^2), 0 <= sigma[i] <= 1e7.
+      sigma: 1-D array of n radiative-capture cross sections in barns (1 b = 1e-24 cm^2), sigma[i] = 0 or 1e-6 <= sigma[i] <= 1e7.
       capture_to: 1-D integer array of n entries; capture_to[i] = index of the nuclide made by a capture
                   on nuclide i, or -1 if that product is not followed.
       n0: 1-D array of n initial numbers of atoms, nonnegative, sum(n0) <= 1e100.

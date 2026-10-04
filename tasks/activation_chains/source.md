@@ -120,3 +120,14 @@ Version 8 (content-check fixes):
   taken of a product that underflows to 0 (lam = 1e-300, t = 1e-300), and that case is now tested.
 - Step 4: activities 2e-9 (in |ln|) outside A(flux_lo) and A(flux_hi) must raise ValueError,
   next to the accepted 5e-10 cases.
+
+Version 9 (content-check fixes):
+- Domain of the cross sections: sigma = 0 or 1e-6 <= sigma <= 1e7 b (steps 3-4). Every capture
+  rate sigma * 1e-24 * phi stays far above the floating-point underflow, so the promised flux
+  accuracy is achievable.
+  - Tested in step 3 with 1e-6 b (accepted) and 1e-7 b (rejected).
+  - Tested in step 4 with 1e-300 b (rejected) and a round trip on a 1e-6 b monitor.
+- Step 4:
+  - activity = 0 and flux_lo = flux_hi raise ValueError;
+  - the end tolerance is tested at |ln| = 0.999e-9 on both sides of each end (the end is
+    returned) and at 1.01e-9 outside (ValueError).

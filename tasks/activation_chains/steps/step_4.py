@@ -10,7 +10,7 @@ def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activi
       lam: 1-D array of n decay constants in 1/s (1 <= n <= 30), 0 <= lam[i] <= 1e10.
       branching: (n, n) array, branching[j, i] = fraction of the decays of nuclide i that give nuclide j;
                  nonnegative, zero diagonal, column sums at most 1 + 1e-12.
-      sigma: 1-D array of n radiative-capture cross sections in barns, 0 <= sigma[i] <= 1e7.
+      sigma: 1-D array of n radiative-capture cross sections in barns, sigma[i] = 0 or 1e-6 <= sigma[i] <= 1e7.
       capture_to: 1-D integer array of n entries, the nuclide made by a capture on nuclide i, or -1 if
                   it is not followed; never i itself.
       n0: 1-D array of n initial numbers of atoms, nonnegative, sum(n0) <= 1e100.
