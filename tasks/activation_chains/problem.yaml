@@ -63,9 +63,9 @@ sub_steps:
       M[i, i] = -lam[i] and M[i + 1, i] = lam[i], return x(t) = exp(t M) n0 for the initial numbers of
       atoms n0 (any members may be populated).
 
-      Each entry of x not smaller than 1e-250 * sum(n0) must have a relative error below 1e-10, however
-      small it is compared with the other entries. Smaller entries must lie within 1e-250 * sum(n0) of the
-      exact value. Decay constants may be equal or nearly equal (relative differences down to 1e-13), and
+      Let S = sum(n0). Every entry of x whose exact value is positive and at least 1e-250 * S must have
+      a relative error below 1e-10, however small it is compared with the other entries. Every other
+      entry, exact zeros included, must lie within max(1e-250 * S, 1e-300) of the exact value. Decay constants may be equal or nearly equal (relative differences down to 1e-13), and
       they may span more than 20 decades in one chain.
       Inputs: lam and n0, 1-D arrays of the same length n (1 <= n <= 30), with 0 <= lam[i] <= 1e10 and
       n0 >= 0; t with 0 <= t <= 1e20 (lam and t in consistent units).
@@ -83,8 +83,9 @@ sub_steps:
             t: elapsed time, 0 <= t <= 1e20 (same unit of time).
 
           Output:
-            x: numpy array of shape (n,), the numbers of atoms at time t. Relative error below 1e-10 for every
-               entry not smaller than 1e-250 * sum(n0); smaller entries within 1e-250 * sum(n0) of the exact value.
+            x: numpy array of shape (n,), the numbers of atoms at time t. With S = sum(n0): every entry whose
+               exact value is positive and at least 1e-250 * S has a relative error below 1e-10; every other
+               entry (exact zeros included) lies within max(1e-250 * S, 1e-300) of the exact value.
 
           Raises:
             ValueError if lam and n0 are not 1-D arrays of the same length between 1 and 30, if an entry of
@@ -99,7 +100,7 @@ sub_steps:
       only relative to the largest entry. The exact solution is a positive combination of positive terms
       (the off-diagonal entries of M are nonnegative), so methods that keep every operation nonnegative
       can keep the relative accuracy of every entry.
-    n_test_cases: 6
+    n_test_cases: 7
     contract:
       quantity: "Numbers of atoms of the members of a linear radioactive decay chain after a time t."
       assumptions: "Constant decay constants, first-order kinetics, the last member decays out of the chain."
@@ -123,18 +124,18 @@ sub_steps:
     step_description_prompt: |-
       Generalize step 1 (chain_inventory) to a branching network with constant production.
       - Nuclide i decays at the rate lam[i].
-      - A fraction branching[j, i] of its decays gives nuclide j. The column sums are at most 1; the rest
-        leaves the network.
+      - A fraction branching[j, i] of its decays gives nuclide j. The column sums are at most 1 (sums up
+        to 1 + 1e-12 are accepted as rounding of 1); the rest leaves the network.
       - Nuclide i is also produced at the constant rate source[i] (atoms per unit time).
 
       The equations are dx_j/dt = -lam[j] x_j + sum_i branching[j, i] lam[i] x_i + source[j]. Return
       x(t) for the initial amounts n0.
 
       The network given by the edges i -> j with branching[j, i] > 0 must be acyclic, as decay networks
-      are; the nuclides may be given in any order. Each entry of x not smaller than
-      1e-250 * (sum(n0) + t * sum(source)) must have a relative error below 1e-10; smaller entries must lie
-      within that bound of the exact value. This includes amounts that are reached only through
-      low-probability branches.
+      are; the nuclides may be given in any order. Let S = sum(n0) + t * sum(source). Every entry of x
+      whose exact value is positive and at least 1e-250 * S must have a relative error below 1e-10; every
+      other entry, exact zeros included, must lie within max(1e-250 * S, 1e-300) of the exact value.
+      This includes amounts that are reached only through low-probability branches.
       Inputs: lam, source, n0 (1-D, length n, 1 <= n <= 30), branching (n x n), t; all entries nonnegative
       and finite, lam <= 1e10, 0 <= t <= 1e20.
       Errors: raise ValueError if the shapes are wrong, if an entry is negative or not finite, if a decay
@@ -147,16 +148,18 @@ sub_steps:
           Inputs:
             lam: 1-D array of n decay constants (1 <= n <= 30), 0 <= lam[i] <= 1e10 (per unit of time).
             branching: (n, n) array, branching[j, i] = fraction of the decays of nuclide i that give nuclide j;
-                       nonnegative, zero diagonal, column sums at most 1 (the rest leaves the network). The
+                       nonnegative, zero diagonal, column sums at most 1 + 1e-12 (1 up to rounding; the rest
+                       leaves the network). The
                        directed graph with an edge i -> j wherever branching[j, i] > 0 must be acyclic.
             source: 1-D array of n constant production rates (atoms per unit of time), nonnegative.
             n0: 1-D array of n initial numbers of atoms, nonnegative.
             t: elapsed time, 0 <= t <= 1e20.
 
           Output:
-            x: numpy array of shape (n,), the numbers of atoms at time t. Relative error below 1e-10 for every
-               entry not smaller than 1e-250 * (sum(n0) + t * sum(source)); smaller entries within that bound
-               of the exact value.
+            x: numpy array of shape (n,), the numbers of atoms at time t. With S = sum(n0) + t * sum(source):
+               every entry whose exact value is positive and at least 1e-250 * S has a relative error below
+               1e-10; every other entry (exact zeros included) lies within max(1e-250 * S, 1e-300) of the exact
+               value.
 
           Raises:
             ValueError if the arrays do not have these shapes (1 <= n <= 30), if an entry is negative or not
@@ -168,7 +171,7 @@ sub_steps:
       Real decay schemes branch (for example 214Bi decays to 214Po and in 0.02 % of cases to 210Tl), and
       nuclides are produced at constant rates in reactors, by cosmic rays or in accelerators. A source
       approaches the saturation amount source / lam.
-    n_test_cases: 5
+    n_test_cases: 6
     contract:
       quantity: "Numbers of atoms in an acyclic branching decay network with constant production after a time t."
       assumptions: "First-order decay with branching fractions, constant production rates, acyclic network."
@@ -199,10 +202,11 @@ sub_steps:
       - A capture removes the atom (burnup) and makes nuclide capture_to[i], or a nuclide that is not
         followed if capture_to[i] = -1.
 
-      Return the numbers of atoms at the end of the history for the initial amounts n0. Each entry not
-      smaller than 1e-250 * sum(n0) must have a relative error below 1e-10; smaller entries must lie
-      within that bound of the exact value. This includes products of several successive captures at low
-      flux.
+      Return the numbers of atoms at the end of the history for the initial amounts n0. Let
+      S = sum(n0). Every entry whose exact value is positive and at least 1e-250 * S must have a relative
+      error below 1e-10; every other entry, exact zeros included, must lie within
+      max(1e-250 * S, 1e-300) of the exact value. This includes products of several successive captures
+      at low flux. The branching matrix is checked as in step 2 even when the history is empty.
       Inputs:
         lam, sigma, n0: 1-D, length n with 1 <= n <= 30; 0 <= lam <= 1e10 per s, 0 <= sigma <= 1e7 b,
                         n0 >= 0.
@@ -233,9 +237,10 @@ sub_steps:
                      flux in neutrons / (cm^2 s) (0 <= flux <= 1e18; flux 0 is a cooling period).
 
           Output:
-            x: numpy array of shape (n,), the numbers of atoms at the end of the history. Relative error below
-               1e-10 for every entry not smaller than 1e-250 * sum(n0); smaller entries within that bound of the
-               exact value.
+            x: numpy array of shape (n,), the numbers of atoms at the end of the history. With S = sum(n0):
+               every entry whose exact value is positive and at least 1e-250 * S has a relative error below
+               1e-10; every other entry (exact zeros included) lies within max(1e-250 * S, 1e-300) of the exact
+               value.
 
           Raises:
             ValueError for inputs outside these ranges or of the wrong shape, for a capture_to entry that is not
@@ -249,7 +254,7 @@ sub_steps:
       section in cm^2: 1 barn = 1e-24 cm^2, and fluxes are in neutrons per cm^2 per second. At high fluence
       the target and the products are burnt up by further captures; 198Au, with a cross section of
       25100 b, is a well-known case.
-    n_test_cases: 5
+    n_test_cases: 6
     contract:
       quantity: "Inventory of a sample after an irradiation history with neutron capture, burnup, decay and cooling."
       assumptions: "Constant flux within each period, one-group capture cross sections in barns, capture product capture_to[i], acyclic combined network."
@@ -316,7 +321,7 @@ sub_steps:
       irradiation gives the flux. At low fluence the activity is proportional to the flux, but burnup of a
       large-cross-section product makes the response saturate and turn over. Second-order products such
       as 199Au grow like phi**2.
-    n_test_cases: 5
+    n_test_cases: 6
     contract:
       quantity: "Neutron flux that reproduces a measured activation activity after irradiation and cooling."
       assumptions: "Constant flux during the irradiation, none during cooling; A(phi) strictly increasing on the given interval."

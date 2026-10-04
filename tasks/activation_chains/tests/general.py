@@ -44,10 +44,10 @@ def _t_check(x, target, scale):
     x = np.asarray(x)
     assert x.shape == (len(target),), x.shape
     for a, b in zip(x, target):
-        if b >= 1e-250 * scale:
+        if b > 0.0 and b >= 1e-250 * scale:
             assert _t_rel(a, b) < 1e-10, (a, b)
         else:
-            assert abs(a - b) <= 1e-250 * scale, (a, b)
+            assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)
 
 
 def _t_activation(lam, branching, sigma, capture_to, n0, history):

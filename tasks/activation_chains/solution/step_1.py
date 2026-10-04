@@ -13,8 +13,9 @@ def chain_inventory(lam, n0, t):
       t: elapsed time, 0 <= t <= 1e20 (same unit of time).
 
     Output:
-      x: numpy array of shape (n,), the numbers of atoms at time t. Relative error below 1e-10 for every
-         entry not smaller than 1e-250 * sum(n0); smaller entries within 1e-250 * sum(n0) of the exact value.
+      x: numpy array of shape (n,), the numbers of atoms at time t. With S = sum(n0): every entry whose
+         exact value is positive and at least 1e-250 * S has a relative error below 1e-10; every other
+         entry (exact zeros included) lies within max(1e-250 * S, 1e-300) of the exact value.
 
     Raises:
       ValueError if lam and n0 are not 1-D arrays of the same length between 1 and 30, if an entry of

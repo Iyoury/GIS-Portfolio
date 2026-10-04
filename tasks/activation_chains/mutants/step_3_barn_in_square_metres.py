@@ -17,9 +17,10 @@ def activation_inventory(lam, branching, sigma, capture_to, n0, history):
                flux in neutrons / (cm^2 s) (0 <= flux <= 1e18; flux 0 is a cooling period).
 
     Output:
-      x: numpy array of shape (n,), the numbers of atoms at the end of the history. Relative error below
-         1e-10 for every entry not smaller than 1e-250 * sum(n0); smaller entries within that bound of the
-         exact value.
+      x: numpy array of shape (n,), the numbers of atoms at the end of the history. With S = sum(n0):
+         every entry whose exact value is positive and at least 1e-250 * S has a relative error below
+         1e-10; every other entry (exact zeros included) lies within max(1e-250 * S, 1e-300) of the exact
+         value.
 
     Raises:
       ValueError for inputs outside these ranges or of the wrong shape, for a capture_to entry that is not
@@ -45,6 +46,8 @@ def activation_inventory(lam, branching, sigma, capture_to, n0, history):
             raise ValueError("%s must be finite and nonnegative" % name)
     if np.any(lam > 1e10) or np.any(sigma > 1e7):
         raise ValueError("need lam <= 1e10 and sigma <= 1e7 b")
+    if np.any(np.diag(branching) != 0.0) or np.any(branching.sum(axis=0) > 1.0 + 1e-12):
+        raise ValueError("branching needs a zero diagonal and column sums at most 1 + 1e-12")
     steps = []
     for item in history:
         try:

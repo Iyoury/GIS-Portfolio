@@ -44,10 +44,10 @@ def _t_check(x, target, scale):
     x = np.asarray(x)
     assert x.shape == (len(target),), x.shape
     for a, b in zip(x, target):
-        if b >= 1e-250 * scale:
+        if b > 0.0 and b >= 1e-250 * scale:
             assert _t_rel(a, b) < 1e-10, (a, b)
         else:
-            assert abs(a - b) <= 1e-250 * scale, (a, b)
+            assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)
 
 
 def _t_network(lam, branching, source, n0, t):
@@ -122,7 +122,26 @@ B[10, 9], B[n - 1, 9], B[11, n - 1] = 1.0 - 2e-4, 2e-4, 1.0
 n0 = np.r_[1.0, np.zeros(n - 1)]
 _t_check(network_inventory(lam, B, np.zeros(n), n0, 3e5 * _t_y), _t_network(lam, B, np.zeros(n), n0, 3e5 * _t_y), 1.0)
 
-# --- test case 4: a cycle, a nonzero diagonal, a column sum above 1, negative production or a bad time
+# --- test case 4: the ends of the domain: t = 0 returns n0, lam = 1e10, t = 1e20 with a stable nuclide
+# and production (n0 + q t), a 30-nuclide network, column sums up to 1 + 1e-12 accepted, and an
+# empty inventory without production (S = 0, all exact zeros) ---
+B = np.zeros((3, 3))
+B[1, 0], B[2, 1] = 1.0, 0.4
+lam, q, n0 = np.array([2.0, 1e-4, 0.0]), np.array([0.5, 0.0, 1.0]), np.array([1.0, 3.0, 0.0])
+_t_check(network_inventory(lam, B, q, n0, 0.0), n0, n0.sum())
+_t_check(network_inventory(np.array([1e10]), np.zeros((1, 1)), np.zeros(1), np.array([2.0]), 1e-9), [2.0 * np.exp(-10.0)], 2.0)
+_t_check(network_inventory(np.array([0.0]), np.zeros((1, 1)), np.array([3.0]), np.array([1.0]), 1e20), [1.0 + 3e20], 1.0 + 3e20)
+lam = np.geomspace(1e-6, 1e6, 30)
+B = np.diag(np.ones(29), -1)
+n0 = np.r_[1.0, np.zeros(29)]
+_t_check(network_inventory(lam, B, np.zeros(30), n0, 50.0), _t_bateman(lam, n0, 50.0), 1.0)
+B = np.zeros((3, 3))
+B[1, 0], B[2, 0] = 0.5, 0.5 + 5e-13
+x = network_inventory(np.array([1.0, 0.0, 0.0]), B, np.zeros(3), np.array([1.0, 0.0, 0.0]), 2.0)
+_t_check(x, [np.exp(-2.0), 0.5 * -np.expm1(-2.0), (0.5 + 5e-13) * -np.expm1(-2.0)], 1.0)
+_t_check(network_inventory(np.array([1.0, 0.5]), np.array([[0.0, 0.0], [1.0, 0.0]]), np.zeros(2), np.zeros(2), 3.0), [0.0, 0.0], 0.0)
+
+# --- test case 5: a cycle, a nonzero diagonal, a column sum above 1 + 1e-12, 31 nuclides, negative production or a bad time
 # raise ValueError ---
 _t_cyc = np.array([[0.0, 1.0], [1.0, 0.0]])
 _t_diag = np.array([[0.5, 0.0], [0.5, 0.0]])
@@ -130,7 +149,7 @@ _t_over = np.array([[0.0, 0.0], [1.2, 0.0]])
 _t_ok = np.array([[0.0, 0.0], [1.0, 0.0]])
 for _t_bad in ((np.ones(2), _t_cyc, np.zeros(2), np.ones(2), 1.0), (np.ones(2), _t_diag, np.zeros(2), np.ones(2), 1.0),
                (np.ones(2), _t_over, np.zeros(2), np.ones(2), 1.0), (np.ones(2), _t_ok, np.array([0.0, -1.0]), np.ones(2), 1.0),
-               (np.ones(2), _t_ok, np.zeros(2), np.ones(2), float("nan")), (np.array([2e10, 1.0]), _t_ok, np.zeros(2), np.ones(2), 1.0), (np.ones(2), _t_ok, np.zeros(2), np.ones(2), 2e20), (np.ones(2), np.zeros((3, 3)), np.zeros(2), np.ones(2), 1.0)):
+               (np.ones(2), _t_ok, np.zeros(2), np.ones(2), float("nan")), (np.array([2e10, 1.0]), _t_ok, np.zeros(2), np.ones(2), 1.0), (np.ones(2), _t_ok, np.zeros(2), np.ones(2), 2e20), (np.ones(2), np.array([[0.0, 0.0], [1.0 + 1e-9, 0.0]]), np.zeros(2), np.ones(2), 1.0), (np.ones(31), np.zeros((31, 31)), np.zeros(31), np.ones(31), 1.0), (np.ones(2), np.zeros((3, 3)), np.zeros(2), np.ones(2), 1.0)):
     try:
         network_inventory(*_t_bad)
     except ValueError:

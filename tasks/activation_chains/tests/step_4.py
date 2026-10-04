@@ -44,10 +44,10 @@ def _t_check(x, target, scale):
     x = np.asarray(x)
     assert x.shape == (len(target),), x.shape
     for a, b in zip(x, target):
-        if b >= 1e-250 * scale:
+        if b > 0.0 and b >= 1e-250 * scale:
             assert _t_rel(a, b) < 1e-10, (a, b)
         else:
-            assert abs(a - b) <= 1e-250 * scale, (a, b)
+            assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)
 
 
 def _t_activation(lam, branching, sigma, capture_to, n0, history):
@@ -109,7 +109,18 @@ for _t_flux in (1e4, 7.7e9):
 # slope d ln A / d ln flux is about 0.65 instead of 1 ---
 _t_roundtrip(1, 1e14, 5 * _T_DAY, _T_DAY, 1e13, 1.5e15, _T_DATA)
 
-# --- test case 3: an activity outside [A(flux_lo), A(flux_hi)] raises ValueError ---
+# --- test case 3: the ends of the domain: no cooling (t_cool = 0); t_irr = 1e9 s and t_cool = 1e9 s on
+# a cobalt monitor (60Co, 5.27 y); flux_hi = 1e18 on a monitor whose product (1e-3 per s, no capture)
+# keeps rising up to that flux ---
+_t_roundtrip(1, 2e11, 5 * _T_DAY, 0.0, 1e6, 1e15, _T_DATA)
+_t_co = (np.array([0.0, np.log(2.0) / (10.467 * 60.0), np.log(2.0) / (5.2714 * 3.15576e7), np.log(2.0) / (1.65 * 3600.0)]),
+         np.array([[0.0] * 4, [0.0] * 4, [0.0, 0.9975, 0.0, 0.0], [0.0] * 4]),
+         np.array([20.7, 0.0, 2.0, 0.0]), np.array([1, -1, 3, -1]), np.array([5e20, 0.0, 0.0, 0.0]))
+_t_roundtrip(2, 1e11, 1e9, 1e9, 1e6, 1e13, _t_co)
+_t_simple = (np.array([0.0, 1e-3]), np.zeros((2, 2)), np.array([1.0, 0.0]), np.array([1, -1]), np.array([1e20, 0.0]))
+_t_roundtrip(1, 1e17, 1e3, 10.0, 1e14, 1e18, _t_simple)
+
+# --- test case 4: an activity outside [A(flux_lo), A(flux_hi)] raises ValueError ---
 for _t_act in (_t_activity(1, 1e7, 5 * _T_DAY, _T_DAY, *_T_DATA), _t_activity(1, 1e14, 5 * _T_DAY, _T_DAY, *_T_DATA)):
     try:
         monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, _t_act, 1e8, 1e13)
@@ -118,12 +129,15 @@ for _t_act in (_t_activity(1, 1e7, 5 * _T_DAY, _T_DAY, *_T_DATA), _t_activity(1,
     else:
         raise AssertionError("monitor_flux must raise ValueError for activity %r" % _t_act)
 
-# --- test case 4: bad times, nuclide index, activity or flux bounds raise ValueError ---
+# --- test case 5: bad times, nuclide index, activity or flux bounds raise ValueError ---
 _t_act = _t_activity(1, 1e10, 5 * _T_DAY, _T_DAY, *_T_DATA)
 for _t_args in ((0.0, _T_DAY, 1, _t_act, 1e8, 1e13), (5 * _T_DAY, -1.0, 1, _t_act, 1e8, 1e13),
                 (5 * _T_DAY, _T_DAY, 0, _t_act, 1e8, 1e13), (5 * _T_DAY, _T_DAY, 1.0, _t_act, 1e8, 1e13), (5 * _T_DAY, _T_DAY, True, _t_act, 1e8, 1e13),
                 (5 * _T_DAY, _T_DAY, 1, -5.0, 1e8, 1e13), (5 * _T_DAY, _T_DAY, 1, _t_act, 1e13, 1e8),
-                (5 * _T_DAY, _T_DAY, 1, _t_act, 1e-3, 1e13)):
+                (5 * _T_DAY, _T_DAY, 1, _t_act, 1e-3, 1e13), (2e9, _T_DAY, 1, _t_act, 1e8, 1e13),
+                (5 * _T_DAY, 2e9, 1, _t_act, 1e8, 1e13), (5 * _T_DAY, _T_DAY, -1, _t_act, 1e8, 1e13),
+                (5 * _T_DAY, _T_DAY, 3, _t_act, 1e8, 1e13), (5 * _T_DAY, _T_DAY, 1, float("nan"), 1e8, 1e13),
+                (5 * _T_DAY, _T_DAY, 1, _t_act, 1e8, 2e18)):
     try:
         monitor_flux(*_T_DATA, *_t_args)
     except ValueError:

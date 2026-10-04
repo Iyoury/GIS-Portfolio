@@ -44,10 +44,10 @@ def _t_check(x, target, scale):
     x = np.asarray(x)
     assert x.shape == (len(target),), x.shape
     for a, b in zip(x, target):
-        if b >= 1e-250 * scale:
+        if b > 0.0 and b >= 1e-250 * scale:
             assert _t_rel(a, b) < 1e-10, (a, b)
         else:
-            assert abs(a - b) <= 1e-250 * scale, (a, b)
+            assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)
 
 
 def _t_activation(lam, branching, sigma, capture_to, n0, history):
@@ -109,7 +109,22 @@ a = activation_inventory(_T_LAM, _T_B, _T_SIG, _T_CAP, _T_N0, [(4e5, 3e12), (1e5
 b = activation_inventory(_T_LAM, _T_B, _T_SIG, _T_CAP, _T_N0, [(2e5, 3e12), (0.0, 1e15), (2e5, 3e12), (1e5, 0.0)])
 _t_check(a, b, 1e18)
 
-# --- test case 4: a capture loop, capture onto itself, a bad history entry or flux raise ValueError ---
+# --- test case 4: the ends of the domain: sigma = 1e7 b, flux = 1e18 (zero cross sections), a period of
+# 1e12 s, an empty history (returns n0), and an empty inventory (S = 0, all exact zeros) ---
+x = activation_inventory(np.array([0.0, 0.0]), np.zeros((2, 2)), np.array([1e7, 0.0]), np.array([1, -1]),
+                         np.array([2.0, 0.0]), [(1e6, 1e10)])
+e = np.exp(-0.1)
+_t_check(x, [2.0 * e, 2.0 * (1.0 - e)], 2.0)
+x = activation_inventory(np.array([1e-3, 0.0]), np.array([[0.0, 0.0], [1.0, 0.0]]), np.zeros(2), np.array([-1, -1]),
+                         np.array([1.0, 0.0]), [(2e3, 1e18)])
+_t_check(x, [np.exp(-2.0), -np.expm1(-2.0)], 1.0)
+x = activation_inventory(np.array([1e-12]), np.zeros((1, 1)), np.zeros(1), np.array([-1]), np.array([5.0]), [(1e12, 0.0)])
+_t_check(x, [5.0 * np.exp(-1.0)], 5.0)
+_t_check(activation_inventory(_T_LAM, _T_B, _T_SIG, _T_CAP, _T_N0, []), _T_N0, 1e18)
+_t_check(activation_inventory(_T_LAM, _T_B, _T_SIG, _T_CAP, np.zeros(3), [(1e5, 1e14)]), [0.0, 0.0, 0.0], 0.0)
+
+# --- test case 5: a capture loop, capture onto itself or out of range, sigma above 1e7 b, branching with a column
+# sum of 1.2 (even with an empty history), a bad history entry, duration or flux, or a too large rate raise ValueError ---
 _t_loop = np.zeros((2, 2))
 _t_loop[0, 1] = 1.0
 for _t_bad in ((np.array([0.0, 1.0]), _t_loop, np.array([5.0, 0.0]), np.array([1, -1]), np.ones(2), [(1.0, 1e10)]),
@@ -117,7 +132,13 @@ for _t_bad in ((np.array([0.0, 1.0]), _t_loop, np.array([5.0, 0.0]), np.array([1
                (np.array([0.0, 1.0]), np.zeros((2, 2)), np.array([5.0, 0.0]), np.array([1, -1]), np.ones(2), [(1.0,)]),
                (np.array([0.0, 1.0]), np.zeros((2, 2)), np.array([5.0, 0.0]), np.array([1, -1]), np.ones(2), [(1.0, -1e10)]),
                (np.array([0.0, 1.0]), np.zeros((2, 2)), np.array([5.0, 0.0]), np.array([1.0, -1.0]), np.ones(2), [(1.0, 1e10)]),
-               (np.array([1e10, 1.0]), np.zeros((2, 2)), np.array([1e7, 0.0]), np.array([1, -1]), np.ones(2), [(1.0, 1e18)])):
+               (np.array([1e10, 1.0]), np.zeros((2, 2)), np.array([1e7, 0.0]), np.array([1, -1]), np.ones(2), [(1.0, 1e18)]),
+               (np.array([0.0, 1.0]), np.zeros((2, 2)), np.array([2e7, 0.0]), np.array([1, -1]), np.ones(2), [(1.0, 1.0)]),
+               (np.array([0.0, 1.0]), np.zeros((2, 2)), np.array([5.0, 0.0]), np.array([-2, -1]), np.ones(2), [(1.0, 1e10)]),
+               (np.array([0.0, 1.0]), np.zeros((2, 2)), np.array([5.0, 0.0]), np.array([2, -1]), np.ones(2), [(1.0, 1e10)]),
+               (np.array([1.0, 1.0]), np.array([[0.0, 0.0], [1.2, 0.0]]), np.zeros(2), np.array([-1, -1]), np.ones(2), []),
+               (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), [(2e12, 0.0)]),
+               (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), [(1.0, 2e18)])):
     try:
         activation_inventory(*_t_bad)
     except ValueError:

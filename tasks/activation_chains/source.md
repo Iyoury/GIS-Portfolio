@@ -46,3 +46,18 @@ Checks used while building the task:
 - The gold-monitor response: d ln A / d ln phi for 198Au after 5 d of irradiation and 1 d of cooling
   is 0.96 at 1e13, 0.65 at 1e14, and 0 near 1.6e15 (burnup maximum); 199Au rises with slope at least
   1.1 on [1e-2, 1e15].
+
+Version 2 (content-check fixes):
+- Accuracy rule: the relative bound applies to exact entries that are positive and at least
+  1e-250 * S; every other entry, exact zeros included, must lie within max(1e-250 * S, 1e-300). This
+  covers S = 0 (an empty inventory), which is now tested in steps 1-3.
+- Branching column sums: one rule everywhere, at most 1 + 1e-12 (1 up to rounding). Step 2 tests a
+  sum of 1 + 5e-13 (accepted) and 1 + 1e-9 (rejected). Step 3 checks the branching matrix itself
+  before the history, so an empty history no longer skips the check.
+- New endpoint tests:
+  - step 1: t = 0, lam = 1e10, n = 30 (equal and distinct constants), 2-D and empty arrays;
+  - step 2: t = 0, t = 1e20, lam = 1e10, n = 30, n = 31;
+  - step 3: sigma = 1e7 and above, capture_to = -2 and n, flux = 1e18 and above, duration = 1e12
+    and above, an empty history;
+  - step 4: t_cool = 0, t_irr = t_cool = 1e9, flux_hi = 1e18, the times above 1e9, k = -1 and n,
+    a NaN activity.

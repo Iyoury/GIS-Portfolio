@@ -44,10 +44,10 @@ def _t_check(x, target, scale):
     x = np.asarray(x)
     assert x.shape == (len(target),), x.shape
     for a, b in zip(x, target):
-        if b >= 1e-250 * scale:
+        if b > 0.0 and b >= 1e-250 * scale:
             assert _t_rel(a, b) < 1e-10, (a, b)
         else:
-            assert abs(a - b) <= 1e-250 * scale, (a, b)
+            assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)
 
 
 _T_YEAR, _T_DAY, _T_MIN = 3.15576e7, 86400.0, 60.0
@@ -94,8 +94,22 @@ n0 = np.array([1.0, 2e-3, 0.5, 0.0, 1e-8, 3.0])
 for _t_t in (0.01, 1e3, 1e6):
     _t_check(chain_inventory(lam, n0, _t_t), _t_bateman(lam, n0, _t_t), n0.sum())
 
-# --- test case 5: bad shapes, decay constants, amounts or times raise ValueError ---
+# --- test case 5: the ends of the domain: t = 0 returns n0, lam = 1e10, a 30-member chain (with equal
+# and distinct decay constants), an empty inventory (S = 0, all exact zeros) ---
+lam = np.array([5.0, 1e-3, 7e2])
+n0 = np.array([1.0, 2.0, 0.5])
+_t_check(chain_inventory(lam, n0, 0.0), n0, n0.sum())
+_t_check(chain_inventory(np.array([1e10]), np.array([4.0]), 1e-9), [4.0 * np.exp(-10.0)], 4.0)
+x = chain_inventory(np.full(30, 1.0), np.r_[1.0, np.zeros(29)], 2.0)
+_t_check(x[:-1], [2.0 ** k / _t_fact(k) * np.exp(-2.0) for k in range(29)], 1.0)
+lam = np.geomspace(1e-6, 1e6, 30)
+n0 = np.r_[1.0, np.zeros(29)]
+_t_check(chain_inventory(lam, n0, 50.0), _t_bateman(lam, n0, 50.0), 1.0)
+_t_check(chain_inventory(np.array([0.3, 2.0]), np.zeros(2), 10.0), [0.0, 0.0], 0.0)
+
+# --- test case 6: bad shapes, decay constants, amounts or times raise ValueError ---
 for _t_bad in ((np.array([0.1, 0.2]), np.array([1.0]), 1.0), (np.zeros(31), np.ones(31), 1.0),
+               (np.zeros((2, 2)), np.ones((2, 2)), 1.0), (np.array([]), np.array([]), 1.0),
                (np.array([-0.1]), np.array([1.0]), 1.0), (np.array([2e10]), np.array([1.0]), 1.0),
                (np.array([0.1]), np.array([-1.0]), 1.0), (np.array([0.1]), np.array([1.0]), -1.0),
                (np.array([0.1]), np.array([1.0]), 2e20), (np.array([np.nan]), np.array([1.0]), 1.0)):
