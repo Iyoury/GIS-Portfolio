@@ -131,3 +131,15 @@ Version 9 (content-check fixes):
   - activity = 0 and flux_lo = flux_hi raise ValueError;
   - the end tolerance is tested at |ln| = 0.999e-9 on both sides of each end (the end is
     returned) and at 1.01e-9 outside (ValueError).
+
+Version 10 (content-check fixes):
+- Step 4 domain closed: A(flux_lo) >= 1e-250 * lam[k] * sum(n0), i.e. the measured nuclide holds at
+  least 1e-250 of the initial atoms at flux_lo, the range where step 3 promises relative accuracy.
+  Otherwise ValueError. This excludes the case where the per-atom product fraction underflows
+  (t_irr = 1e-300 with n0 = 1e100), which is tested as a ValueError.
+- Step 4 end rule: the prompt says the logarithms are evaluated in floating point, so activities
+  within about 1e-12 (in ln) of the 1e-9 tolerance may go either way and are not tested. The
+  tests use 0.999e-9 (end returned) and 1.01e-9 (ValueError).
+- Step 4 new tests: a round trip at slope 0.52 (flux 1.547e14 on the gold monitor), and the
+  precedence of flux_lo when both end activities are within the tolerance.
+- Steps 1-3 test exp(-575), about 8e-250, just inside the relative-accuracy range.

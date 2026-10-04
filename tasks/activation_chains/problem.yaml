@@ -47,7 +47,9 @@ problem_io: |-
 
       Raises:
         ValueError for nuclide data as in step 3, for times, k, activity or flux bounds outside these
-        ranges, or if activity lies outside [A(flux_lo), A(flux_hi)] by more than a relative 1e-9.
+        ranges, if A(flux_lo) < 1e-250 * lam[k] * sum(n0) (the measured nuclide must hold at least 1e-250
+        of the initial atoms at flux_lo), or if activity lies outside [A(flux_lo), A(flux_hi)] by more
+        than a relative 1e-9.
         An activity with |ln(activity / A(end))| <= 1e-9 for an end of the interval, on either side of
         it, gives that end.
       '''
@@ -297,8 +299,12 @@ sub_steps:
       The result must have a relative error below 1e-8 wherever d ln A / d ln phi >= 0.5 at the solution.
       This includes activities as small as 1e-11 Bq. The interval is closed, with a two-sided tolerance
       at its ends: if |ln(activity / A(flux_lo))| <= 1e-9 return flux_lo, else if
-      |ln(activity / A(flux_hi))| <= 1e-9 return flux_hi (on either side of the end value). Positive
-      cross sections are at least 1e-6 b, so every capture rate is far above the floating-point range limit.
+      |ln(activity / A(flux_hi))| <= 1e-9 return flux_hi (on either side of the end value). The two
+      logarithms are evaluated in floating point, so an activity within about 1e-12 (in ln) of the
+      tolerance itself may land on either side and is not used in the tests. Positive cross sections
+      are at least 1e-6 b. Domain: at flux_lo the measured nuclide must hold at least 1e-250 of the
+      initial atoms, A(flux_lo) >= 1e-250 * lam[k] * sum(n0) (the range in which step 3 is accurate);
+      otherwise raise ValueError.
       Inputs:
         lam, sigma, n0: 1-D, length n with 1 <= n <= 30; 0 <= lam <= 1e10 per s, sigma = 0 or 1e-6 <= sigma <= 1e7 b,
                         n0 >= 0 with sum(n0) <= 1e100; all finite.
@@ -315,6 +321,7 @@ sub_steps:
         - k not an integer (bool is not accepted) or not the index of a radioactive nuclide;
         - activity not positive and finite;
         - flux bounds not finite or out of range;
+        - A(flux_lo) < 1e-250 * lam[k] * sum(n0);
         - an activity outside [A(flux_lo), A(flux_hi)] by more than a relative 1e-9.
     function_header: |-
       def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activity, flux_lo, flux_hi):
@@ -343,7 +350,9 @@ sub_steps:
 
           Raises:
             ValueError for nuclide data as in step 3, for times, k, activity or flux bounds outside these
-            ranges, or if activity lies outside [A(flux_lo), A(flux_hi)] by more than a relative 1e-9.
+            ranges, if A(flux_lo) < 1e-250 * lam[k] * sum(n0) (the measured nuclide must hold at least 1e-250
+            of the initial atoms at flux_lo), or if activity lies outside [A(flux_lo), A(flux_hi)] by more
+            than a relative 1e-9.
             An activity with |ln(activity / A(end))| <= 1e-9 for an end of the interval, on either side of
             it, gives that end.
           '''

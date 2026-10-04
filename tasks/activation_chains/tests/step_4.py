@@ -108,6 +108,8 @@ for _t_flux in (1e4, 7.7e9):
 # --- test case 2: burnup of 198Au (25100 b) bends the activity over (maximum near 1.6e15): at 1e14 the
 # slope d ln A / d ln flux is about 0.65 instead of 1 ---
 _t_roundtrip(1, 1e14, 5 * _T_DAY, _T_DAY, 1e13, 1.5e15, _T_DATA)
+# near the edge of the accuracy statement: at 1.547e14 the slope d ln A / d ln flux is about 0.52
+_t_roundtrip(1, 1.547e14, 5 * _T_DAY, _T_DAY, 1e13, 1.5e15, _T_DATA)
 
 # --- test case 3: the ends of the domain: no cooling (t_cool = 0); t_irr = 1e9 s and t_cool = 1e9 s on
 # a cobalt monitor (60Co, 5.27 y); flux_hi = 1e18 on a monitor whose product (1e-3 per s, no capture)
@@ -176,6 +178,21 @@ for _t_args in ((0.0, _T_DAY, 1, _t_act, 1e8, 1e13), (5 * _T_DAY, -1.0, 1, _t_ac
         pass
     else:
         raise AssertionError("monitor_flux must raise ValueError for %r" % (_t_args,))
+# precedence of the ends: with bounds 1e-10 apart both end activities lie within the tolerance of
+# A(flux_lo); flux_lo is checked first and returned
+_t_lo = 1e10
+_t_hi = 1e10 * (1.0 + 1e-10)
+got = monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, _t_activity(1, _t_lo, 5 * _T_DAY, _T_DAY, *_T_DATA), _t_lo, _t_hi)
+assert _t_rel(got, _t_lo) < 1e-11, (got, _t_lo)
+# outside the domain: an irradiation of 1e-300 s leaves about 1e-330 of the target atoms in the product,
+# below 1e-250 sum(n0), so A(flux_lo) < 1e-250 lam[k] sum(n0)
+_t_raised = False
+try:
+    monitor_flux(np.array([0.0, 1.0]), np.zeros((2, 2)), np.array([1e-6, 0.0]), np.array([1, -1]),
+                 np.array([1e100, 0.0]), 1e-300, 0.0, 1, 1e-230, 1e-2, 1e18)
+except ValueError:
+    _t_raised = True
+assert _t_raised, "A(flux_lo) below 1e-250 lam[k] sum(n0) must raise ValueError"
 # nuclide data rejected by step 3: a positive cross section below 1e-6 b (its rate would underflow)
 _t_raised = False
 try:

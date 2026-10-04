@@ -29,7 +29,9 @@ def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activi
 
     Raises:
       ValueError for nuclide data as in step 3, for times, k, activity or flux bounds outside these
-      ranges, or if activity lies outside [A(flux_lo), A(flux_hi)] by more than a relative 1e-9.
+      ranges, if A(flux_lo) < 1e-250 * lam[k] * sum(n0) (the measured nuclide must hold at least 1e-250
+      of the initial atoms at flux_lo), or if activity lies outside [A(flux_lo), A(flux_hi)] by more
+      than a relative 1e-9.
       An activity with |ln(activity / A(end))| <= 1e-9 for an end of the interval, on either side of
       it, gives that end.
     '''
@@ -60,6 +62,11 @@ def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activi
     lo, hi = np.log(flux_lo), np.log(flux_hi)
     target = np.log(activity)
     f_lo, f_hi = log_activity(lo) - target, log_activity(hi) - target
+    # domain: at flux_lo the measured nuclide must hold at least 1e-250 of the initial atoms (the range in
+    # which step 3 promises relative accuracy); below it the activity is not determined well enough
+    floor = np.log(1e-250 * lam_arr[k] * float(np.sum(n0))) if np.sum(n0) > 0 else np.inf
+    if not f_lo + target >= floor:
+        raise ValueError("A(flux_lo) is below 1e-250 * lam[k] * sum(n0)")
     # the interval is closed: an activity within a relative 1e-9 of an end value, on either side, gives
     # that end; otherwise it must lie strictly between the two end values
     if abs(f_lo) <= 1e-9:
