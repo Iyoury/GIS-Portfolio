@@ -111,7 +111,7 @@ _t_roundtrip(1, 1e14, 5 * _T_DAY, _T_DAY, 1e13, 1.5e15, _T_DATA)
 
 # --- test case 3: the ends of the domain: no cooling (t_cool = 0); t_irr = 1e9 s and t_cool = 1e9 s on
 # a cobalt monitor (60Co, 5.27 y); flux_hi = 1e18 on a monitor whose product (1e-3 per s, no capture)
-# keeps rising up to that flux ---
+# keeps rising up to that flux; activities equal to A(flux_lo) and A(flux_hi) ---
 _t_roundtrip(1, 2e11, 5 * _T_DAY, 0.0, 1e6, 1e15, _T_DATA)
 _t_co = (np.array([0.0, np.log(2.0) / (10.467 * 60.0), np.log(2.0) / (5.2714 * 3.15576e7), np.log(2.0) / (1.65 * 3600.0)]),
          np.array([[0.0] * 4, [0.0] * 4, [0.0, 0.9975, 0.0, 0.0], [0.0] * 4]),
@@ -119,6 +119,10 @@ _t_co = (np.array([0.0, np.log(2.0) / (10.467 * 60.0), np.log(2.0) / (5.2714 * 3
 _t_roundtrip(2, 1e11, 1e9, 1e9, 1e6, 1e13, _t_co)
 _t_simple = (np.array([0.0, 1e-3]), np.zeros((2, 2)), np.array([1.0, 0.0]), np.array([1, -1]), np.array([1e20, 0.0]))
 _t_roundtrip(1, 1e17, 1e3, 10.0, 1e14, 1e18, _t_simple)
+# the interval is closed: the activities at flux_lo and at flux_hi give back those ends
+for _t_end in (1e8, 1e13):
+    got = monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, _t_activity(1, _t_end, 5 * _T_DAY, _T_DAY, *_T_DATA), 1e8, 1e13)
+    assert _t_rel(got, _t_end) < 1e-8, (got, _t_end)
 
 # --- test case 4: an activity outside [A(flux_lo), A(flux_hi)] raises ValueError ---
 for _t_act in (_t_activity(1, 1e7, 5 * _T_DAY, _T_DAY, *_T_DATA), _t_activity(1, 1e14, 5 * _T_DAY, _T_DAY, *_T_DATA)):

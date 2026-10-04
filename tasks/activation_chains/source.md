@@ -61,3 +61,14 @@ Version 2 (content-check fixes):
     and above, an empty history;
   - step 4: t_cool = 0, t_irr = t_cool = 1e9, flux_hi = 1e18, the times above 1e9, k = -1 and n,
     a NaN activity.
+
+Version 3 (content-check fixes):
+- Step 3 new tests:
+  - lam = 1e10 under no flux, and lam above 1e10 rejected;
+  - a combined rate of exactly 1e10 per s (lam = 1e10 - 10, capture rate 10 per s), with its
+    closed form;
+  - n = 30 with an empty history, and n = 31 rejected;
+  - a NaN cross section and an infinite duration rejected.
+- Step 4 now states the step-3 data contract (types, shapes, ranges, acyclicity) itself.
+- Step 4 makes the interval explicitly closed: an activity within a relative 1e-9 of A(flux_lo) or
+  A(flux_hi) gives that end. This is tested at both ends.

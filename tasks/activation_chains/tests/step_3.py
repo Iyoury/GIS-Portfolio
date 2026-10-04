@@ -110,7 +110,8 @@ b = activation_inventory(_T_LAM, _T_B, _T_SIG, _T_CAP, _T_N0, [(2e5, 3e12), (0.0
 _t_check(a, b, 1e18)
 
 # --- test case 4: the ends of the domain: sigma = 1e7 b, flux = 1e18 (zero cross sections), a period of
-# 1e12 s, an empty history (returns n0), and an empty inventory (S = 0, all exact zeros) ---
+# 1e12 s, an empty history (returns n0), an empty inventory (S = 0, all exact zeros), lam = 1e10, a combined
+# rate of exactly 1e10 per s, and 30 nuclides ---
 x = activation_inventory(np.array([0.0, 0.0]), np.zeros((2, 2)), np.array([1e7, 0.0]), np.array([1, -1]),
                          np.array([2.0, 0.0]), [(1e6, 1e10)])
 e = np.exp(-0.1)
@@ -122,9 +123,21 @@ x = activation_inventory(np.array([1e-12]), np.zeros((1, 1)), np.zeros(1), np.ar
 _t_check(x, [5.0 * np.exp(-1.0)], 5.0)
 _t_check(activation_inventory(_T_LAM, _T_B, _T_SIG, _T_CAP, _T_N0, []), _T_N0, 1e18)
 _t_check(activation_inventory(_T_LAM, _T_B, _T_SIG, _T_CAP, np.zeros(3), [(1e5, 1e14)]), [0.0, 0.0, 0.0], 0.0)
+# lam = 1e10 under no flux: n0 exp(-1e10 t)
+x = activation_inventory(np.array([1e10]), np.zeros((1, 1)), np.zeros(1), np.array([-1]), np.array([2.0]), [(1e-9, 0.0)])
+_t_check(x, [2.0 * np.exp(-10.0)], 2.0)
+# a combined rate of exactly 1e10 per s: lam = 1e10 - 10, sigma = 1e7 b at flux 1e18 (capture rate 10 per s)
+# into a stable product: target n0 exp(-1), product n0 (10 / 1e10) (1 - exp(-1))
+x = activation_inventory(np.array([1e10 - 10.0, 0.0]), np.zeros((2, 2)), np.array([1e7, 0.0]), np.array([1, -1]),
+                         np.array([1.0, 0.0]), [(1e-10, 1e18)])
+_t_check(x, [np.exp(-1.0), 1e-9 * -np.expm1(-1.0)], 1.0)
+# 30 nuclides with an empty history give n0 back
+n0 = np.linspace(1.0, 3.0, 30)
+_t_check(activation_inventory(np.full(30, 1e-3), np.diag(np.ones(29), -1), np.zeros(30), np.full(30, -1), n0, []), n0, n0.sum())
 
 # --- test case 5: a capture loop, capture onto itself or out of range, sigma above 1e7 b, branching with a column
-# sum of 1.2 (even with an empty history), a bad history entry, duration or flux, or a too large rate raise ValueError ---
+# sum of 1.2 (even with an empty history), lam above 1e10, 31 nuclides, a NaN cross section, a bad history entry,
+# an infinite or too long duration, a too large flux, or a too large combined rate raise ValueError ---
 _t_loop = np.zeros((2, 2))
 _t_loop[0, 1] = 1.0
 for _t_bad in ((np.array([0.0, 1.0]), _t_loop, np.array([5.0, 0.0]), np.array([1, -1]), np.ones(2), [(1.0, 1e10)]),
@@ -138,7 +151,11 @@ for _t_bad in ((np.array([0.0, 1.0]), _t_loop, np.array([5.0, 0.0]), np.array([1
                (np.array([0.0, 1.0]), np.zeros((2, 2)), np.array([5.0, 0.0]), np.array([2, -1]), np.ones(2), [(1.0, 1e10)]),
                (np.array([1.0, 1.0]), np.array([[0.0, 0.0], [1.2, 0.0]]), np.zeros(2), np.array([-1, -1]), np.ones(2), []),
                (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), [(2e12, 0.0)]),
-               (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), [(1.0, 2e18)])):
+               (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), [(1.0, 2e18)]),
+               (np.array([2e10, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), []),
+               (np.full(31, 1e-3), np.zeros((31, 31)), np.zeros(31), np.full(31, -1), np.ones(31), []),
+               (np.array([0.0, 1.0]), np.zeros((2, 2)), np.array([np.nan, 0.0]), np.array([1, -1]), np.ones(2), [(1.0, 1e10)]),
+               (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), [(np.inf, 0.0)])):
     try:
         activation_inventory(*_t_bad)
     except ValueError:

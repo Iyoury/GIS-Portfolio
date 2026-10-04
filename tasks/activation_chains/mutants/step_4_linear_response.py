@@ -7,8 +7,15 @@ def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activi
     '''Neutron flux from the measured activity of an activation product (flux-monitor analysis).
 
     Inputs:
-      lam, branching, sigma, capture_to, n0: the nuclide data and initial atoms, as in
-           activation_inventory (step 3).
+      lam: 1-D array of n decay constants in 1/s (1 <= n <= 30), 0 <= lam[i] <= 1e10.
+      branching: (n, n) array, branching[j, i] = fraction of the decays of nuclide i that give nuclide j;
+                 nonnegative, zero diagonal, column sums at most 1 + 1e-12.
+      sigma: 1-D array of n radiative-capture cross sections in barns, 0 <= sigma[i] <= 1e7.
+      capture_to: 1-D integer array of n entries, the nuclide made by a capture on nuclide i, or -1 if
+                  it is not followed; never i itself.
+      n0: 1-D array of n initial numbers of atoms, nonnegative.
+      All values finite; the combined decay and capture network must be acyclic, exactly as in
+      activation_inventory (step 3).
       t_irr: irradiation time in s at a constant unknown flux, 0 < t_irr <= 1e9.
       t_cool: cooling time in s without flux after the irradiation, 0 <= t_cool <= 1e9.
       k: int, index of the measured nuclide, with lam[k] > 0.
@@ -22,7 +29,8 @@ def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activi
 
     Raises:
       ValueError for nuclide data as in step 3, for times, k, activity or flux bounds outside these
-      ranges, or if activity is not between A(flux_lo) and A(flux_hi).
+      ranges, or if activity lies outside [A(flux_lo), A(flux_hi)] by more than a relative 1e-9
+      (an activity within a relative 1e-9 of an end value gives that end of the interval).
     '''
     t_irr, t_cool, activity = float(t_irr), float(t_cool), float(activity)
     flux_lo, flux_hi = float(flux_lo), float(flux_hi)
@@ -51,11 +59,12 @@ def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activi
     lo, hi = np.log(flux_lo), np.log(flux_hi)
     target = np.log(activity)
     f_lo, f_hi = log_activity(lo) - target, log_activity(hi) - target
-    if not (f_lo <= 0.0 <= f_hi):
+    # the interval is closed: an activity equal to an end value (to a relative 1e-9) gives that end
+    if f_lo > 1e-9 or f_hi < -1e-9:
         raise ValueError("the activity is not reached for a flux in [flux_lo, flux_hi]")
-    if f_lo == 0.0:
+    if f_lo >= 0.0:
         return float(flux_lo)
-    if f_hi == 0.0:
+    if f_hi <= 0.0:
         return float(flux_hi)
     # MUTANT: activity taken proportional to the flux from the value at flux_lo
     flux = float(flux_lo * np.exp(target - log_activity(lo)))
