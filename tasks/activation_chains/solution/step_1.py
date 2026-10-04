@@ -9,7 +9,7 @@ def chain_inventory(lam, n0, t):
     Inputs:
       lam: 1-D array of n decay constants (1 <= n <= 30), member i decays into member i + 1 at the
            rate lam[i]; the last member decays out of the chain. 0 <= lam[i] <= 1e10 (per unit of time).
-      n0: 1-D array of n initial numbers of atoms, nonnegative.
+      n0: 1-D array of n initial numbers of atoms, nonnegative, sum(n0) <= 1e100.
       t: elapsed time, 0 <= t <= 1e20 (same unit of time).
 
     Output:
@@ -19,8 +19,8 @@ def chain_inventory(lam, n0, t):
 
     Raises:
       ValueError if lam and n0 are not 1-D arrays of the same length between 1 and 30, if an entry of
-      lam is negative, above 1e10 or not finite, if an entry of n0 is negative or not finite, or if t
-      is not finite or outside [0, 1e20].
+      lam is negative, above 1e10 or not finite, if an entry of n0 is negative or not finite, if
+      sum(n0) > 1e100, or if t is not finite or outside [0, 1e20].
     '''
     lam = np.asarray(lam, dtype=float)
     n0 = np.asarray(n0, dtype=float)
@@ -30,6 +30,8 @@ def chain_inventory(lam, n0, t):
         raise ValueError("decay constants must lie in [0, 1e10]")
     if not (np.all(np.isfinite(n0)) and np.all(n0 >= 0.0)):
         raise ValueError("initial amounts must be finite and nonnegative")
+    if n0.sum() > 1e100:
+        raise ValueError("sum(n0) must not exceed 1e100")
     t = float(t)
     if not (np.isfinite(t) and 0.0 <= t <= 1e20):
         raise ValueError("need 0 <= t <= 1e20")

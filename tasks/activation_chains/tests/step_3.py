@@ -137,12 +137,19 @@ _t_check(activation_inventory(np.array([1.0, 0.0]), np.array([[0.0, 0.0], [1.0 +
                               np.array([-1, -1]), np.array([1.0, 2.0]), []), [1.0, 2.0], 3.0)
 _t_check(activation_inventory(np.array([1e-3, 0.0]), np.zeros((2, 2)), np.zeros(2), np.array([1, 0]),
                               np.array([1.0, 2.0]), []), [1.0, 2.0], 3.0)
+# a valid history given as a tuple, and initial amounts summing to 1e100
+hist = ((1e5, 1e14), (1e4, 0.0))
+_t_check(activation_inventory(_T_LAM, _T_B, _T_SIG, _T_CAP, _T_N0, hist),
+         _t_activation(_T_LAM, _T_B, _T_SIG, _T_CAP, _T_N0, list(hist)), 1e18)
+_t_check(activation_inventory(_T_LAM, _T_B, _T_SIG, _T_CAP, np.array([1e100, 0.0, 0.0]), [(1e5, 1e14)]),
+         _t_activation(_T_LAM, _T_B, _T_SIG, _T_CAP, np.array([1e100, 0.0, 0.0]), [(1e5, 1e14)]), 1e100)
 # 30 nuclides with an empty history give n0 back
 n0 = np.linspace(1.0, 3.0, 30)
 _t_check(activation_inventory(np.full(30, 1e-3), np.diag(np.ones(29), -1), np.zeros(30), np.full(30, -1), n0, []), n0, n0.sum())
 
 # --- test case 5: a capture loop, capture onto itself or out of range, sigma above 1e7 b, branching with a column
-# sum of 1.2 or a nonzero diagonal (even with an empty history), a history that is not a list or tuple (None, a set, a generator), lam above 1e10, 31 nuclides, a NaN cross section, a bad history entry,
+# sum of 1.2 or a nonzero diagonal (even with an empty history), a history that is not a list or tuple (None, a set, a generator) or has a non-numeric entry,
+# a capture loop with positive cross sections (even with an empty history), sum(n0) above 1e100, lam above 1e10, 31 nuclides, a NaN cross section, a bad history entry,
 # an infinite or too long duration, a too large flux, or a too large combined rate raise ValueError ---
 _t_loop = np.zeros((2, 2))
 _t_loop[0, 1] = 1.0
@@ -164,6 +171,9 @@ for _t_bad in ((np.array([0.0, 1.0]), _t_loop, np.array([5.0, 0.0]), np.array([1
                (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), [(np.inf, 0.0)]),
                (np.array([1.0, 1.0]), np.array([[0.5, 0.0], [0.5, 0.0]]), np.zeros(2), np.array([-1, -1]), np.ones(2), []),
                (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), None),
+               (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), [(1.0, "bad")]),
+               (np.array([0.0, 0.0]), np.zeros((2, 2)), np.array([5.0, 2.0]), np.array([1, 0]), np.ones(2), []),
+               (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.array([1e100, 1e99]), []),
                (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), {(1.0, 0.0), (2.0, 0.0)}),
                (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), ((1.0, 0.0) for _ in range(2)))):
     try:

@@ -31,7 +31,7 @@ problem_io: |-
         sigma: 1-D array of n radiative-capture cross sections in barns, 0 <= sigma[i] <= 1e7.
         capture_to: 1-D integer array of n entries, the nuclide made by a capture on nuclide i, or -1 if
                     it is not followed; never i itself.
-        n0: 1-D array of n initial numbers of atoms, nonnegative.
+        n0: 1-D array of n initial numbers of atoms, nonnegative, sum(n0) <= 1e100.
         All values finite; the combined decay and capture network must be acyclic, exactly as in
         activation_inventory (step 3).
         t_irr: irradiation time in s at a constant unknown flux, 0 < t_irr <= 1e9.
@@ -77,10 +77,10 @@ sub_steps:
       entry, exact zeros included, must lie within max(1e-250 * S, 1e-300) of the exact value. Decay constants may be equal or nearly equal (relative differences down to 1e-13), and
       they may span more than 20 decades in one chain.
       Inputs: lam and n0, 1-D arrays of the same length n (1 <= n <= 30), with 0 <= lam[i] <= 1e10 and
-      n0 >= 0; t with 0 <= t <= 1e20 (lam and t in consistent units).
+      n0 >= 0 with sum(n0) <= 1e100; t with 0 <= t <= 1e20 (lam and t in consistent units).
       Errors: raise ValueError if lam and n0 are not 1-D arrays of the same length in [1, 30], if a decay
-      constant is negative, above 1e10 or not finite, if an initial amount is negative or not finite, or if
-      t is not finite or outside [0, 1e20].
+      constant is negative, above 1e10 or not finite, if an initial amount is negative or not finite, if
+      sum(n0) > 1e100, or if t is not finite or outside [0, 1e20].
     function_header: |-
       def chain_inventory(lam, n0, t):
           '''Atoms of every member of a linear radioactive decay chain after a time t (Bateman problem).
@@ -88,7 +88,7 @@ sub_steps:
           Inputs:
             lam: 1-D array of n decay constants (1 <= n <= 30), member i decays into member i + 1 at the
                  rate lam[i]; the last member decays out of the chain. 0 <= lam[i] <= 1e10 (per unit of time).
-            n0: 1-D array of n initial numbers of atoms, nonnegative.
+            n0: 1-D array of n initial numbers of atoms, nonnegative, sum(n0) <= 1e100.
             t: elapsed time, 0 <= t <= 1e20 (same unit of time).
 
           Output:
@@ -98,8 +98,8 @@ sub_steps:
 
           Raises:
             ValueError if lam and n0 are not 1-D arrays of the same length between 1 and 30, if an entry of
-            lam is negative, above 1e10 or not finite, if an entry of n0 is negative or not finite, or if t
-            is not finite or outside [0, 1e20].
+            lam is negative, above 1e10 or not finite, if an entry of n0 is negative or not finite, if
+            sum(n0) > 1e100, or if t is not finite or outside [0, 1e20].
           '''
     return_line: return x
     step_background: |-
@@ -114,7 +114,7 @@ sub_steps:
       quantity: "Numbers of atoms of the members of a linear radioactive decay chain after a time t."
       assumptions: "Constant decay constants, first-order kinetics, the last member decays out of the chain."
       result_kind: exact
-      valid_input_ranges: "1 <= n <= 30; 0 <= lam <= 1e10; n0 >= 0; 0 <= t <= 1e20."
+      valid_input_ranges: "1 <= n <= 30; 0 <= lam <= 1e10; n0 >= 0, sum(n0) <= 1e100; 0 <= t <= 1e20."
       units: "Atoms; lam and t in consistent units."
       output_shape: "numpy float array of shape (n,)."
       step_dependencies: []
@@ -146,10 +146,11 @@ sub_steps:
       other entry, exact zeros included, must lie within max(1e-250 * S, 1e-300) of the exact value.
       This includes amounts that are reached only through low-probability branches.
       Inputs: lam, source, n0 (1-D, length n, 1 <= n <= 30), branching (n x n), t; all entries nonnegative
-      and finite, lam <= 1e10, 0 <= t <= 1e20.
+      and finite, lam <= 1e10, 0 <= t <= 1e20, sum(n0) + t * sum(source) <= 1e100.
       Errors: raise ValueError if the shapes are wrong, if an entry is negative or not finite, if a decay
       constant exceeds 1e10, if a diagonal entry of branching is nonzero or a column sum exceeds
-      1 + 1e-12, if the network has a cycle, or if t is not finite or outside [0, 1e20].
+      1 + 1e-12, if the network has a cycle, if t is not finite or outside [0, 1e20], or if
+      sum(n0) + t * sum(source) > 1e100.
     function_header: |-
       def network_inventory(lam, branching, source, n0, t):
           '''Atoms of every nuclide of a branching decay network with constant production after a time t.
@@ -162,7 +163,7 @@ sub_steps:
                        directed graph with an edge i -> j wherever branching[j, i] > 0 must be acyclic.
             source: 1-D array of n constant production rates (atoms per unit of time), nonnegative.
             n0: 1-D array of n initial numbers of atoms, nonnegative.
-            t: elapsed time, 0 <= t <= 1e20.
+            t: elapsed time, 0 <= t <= 1e20, with sum(n0) + t * sum(source) <= 1e100.
 
           Output:
             x: numpy array of shape (n,), the numbers of atoms at time t. With S = sum(n0) + t * sum(source):
@@ -173,7 +174,8 @@ sub_steps:
           Raises:
             ValueError if the arrays do not have these shapes (1 <= n <= 30), if an entry is negative or not
             finite, if a decay constant exceeds 1e10, if a diagonal entry of branching is nonzero or a column
-            sum exceeds 1 + 1e-12, if the network has a cycle, or if t is not finite or outside [0, 1e20].
+            sum exceeds 1 + 1e-12, if the network has a cycle, if t is not finite or outside [0, 1e20], or if
+            sum(n0) + t * sum(source) > 1e100.
           '''
     return_line: return x
     step_background: |-
@@ -218,7 +220,7 @@ sub_steps:
       at low flux. The branching matrix is checked as in step 2 even when the history is empty.
       Inputs:
         lam, sigma, n0: 1-D, length n with 1 <= n <= 30; 0 <= lam <= 1e10 per s, 0 <= sigma <= 1e7 b,
-                        n0 >= 0.
+                        n0 >= 0 with sum(n0) <= 1e100.
         branching: n x n, as in step 2.
         capture_to: integer array of length n.
         history: a list or tuple of (duration, flux) pairs, applied in order, with 0 <= duration <= 1e12 s and
@@ -242,7 +244,7 @@ sub_steps:
             sigma: 1-D array of n radiative-capture cross sections in barns (1 b = 1e-24 cm^2), 0 <= sigma[i] <= 1e7.
             capture_to: 1-D integer array of n entries; capture_to[i] = index of the nuclide made by a capture
                         on nuclide i, or -1 if that product is not followed.
-            n0: 1-D array of n initial numbers of atoms, nonnegative.
+            n0: 1-D array of n initial numbers of atoms, nonnegative, sum(n0) <= 1e100.
             history: list or tuple of (duration, flux) pairs applied in order; duration in s (0 <= duration <= 1e12),
                      flux in neutrons / (cm^2 s) (0 <= flux <= 1e18; flux 0 is a cooling period).
 
@@ -298,7 +300,7 @@ sub_steps:
       |ln(activity / A(flux_hi))| <= 1e-9 return flux_hi (on either side of the end value).
       Inputs:
         lam, sigma, n0: 1-D, length n with 1 <= n <= 30; 0 <= lam <= 1e10 per s, 0 <= sigma <= 1e7 b,
-                        n0 >= 0; all finite.
+                        n0 >= 0 with sum(n0) <= 1e100; all finite.
         branching: n x n, nonnegative, zero diagonal, column sums at most 1 + 1e-12.
         capture_to: integer array of length n with entries in [-1, n - 1] and capture_to[i] != i; the
                     combined decay and capture network must be acyclic (as in step 3).
@@ -324,7 +326,7 @@ sub_steps:
             sigma: 1-D array of n radiative-capture cross sections in barns, 0 <= sigma[i] <= 1e7.
             capture_to: 1-D integer array of n entries, the nuclide made by a capture on nuclide i, or -1 if
                         it is not followed; never i itself.
-            n0: 1-D array of n initial numbers of atoms, nonnegative.
+            n0: 1-D array of n initial numbers of atoms, nonnegative, sum(n0) <= 1e100.
             All values finite; the combined decay and capture network must be acyclic, exactly as in
             activation_inventory (step 3).
             t_irr: irradiation time in s at a constant unknown flux, 0 < t_irr <= 1e9.

@@ -13,7 +13,7 @@ def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activi
       sigma: 1-D array of n radiative-capture cross sections in barns, 0 <= sigma[i] <= 1e7.
       capture_to: 1-D integer array of n entries, the nuclide made by a capture on nuclide i, or -1 if
                   it is not followed; never i itself.
-      n0: 1-D array of n initial numbers of atoms, nonnegative.
+      n0: 1-D array of n initial numbers of atoms, nonnegative, sum(n0) <= 1e100.
       All values finite; the combined decay and capture network must be acyclic, exactly as in
       activation_inventory (step 3).
       t_irr: irradiation time in s at a constant unknown flux, 0 < t_irr <= 1e9.

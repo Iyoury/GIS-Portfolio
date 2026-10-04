@@ -94,3 +94,14 @@ Version 5 (content-check fixes):
   - step 1: pure decay;
   - step 2: pure decay in a network;
   - step 3: capture burnup at sigma = 1e7 b and 1e18 n / (cm^2 s) for 5.5e6 s.
+
+Version 6 (content-check fixes):
+- Step 3 new tests:
+  - a valid history given as a tuple;
+  - a history entry with a non-numeric value rejected;
+  - a capture loop with positive cross sections rejected even with an empty history;
+  - sum(n0) = 1e100 accepted and above rejected.
+- Domain bound on the amounts, so that every exact result is representable in double precision:
+  - sum(n0) <= 1e100 in steps 1, 3 and 4;
+  - sum(n0) + t * sum(source) <= 1e100 in step 2.
+  Each bound is stated, enforced (ValueError), and tested at the bound and above it.

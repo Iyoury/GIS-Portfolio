@@ -106,13 +106,14 @@ lam = np.geomspace(1e-6, 1e6, 30)
 n0 = np.r_[1.0, np.zeros(29)]
 _t_check(chain_inventory(lam, n0, 50.0), _t_bateman(lam, n0, 50.0), 1.0)
 _t_check(chain_inventory(np.array([0.3, 2.0]), np.zeros(2), 10.0), [0.0, 0.0], 0.0)
+_t_check(chain_inventory(np.array([0.3, 0.0]), np.array([1e100, 0.0]), 2.0), [1e100 * np.exp(-0.6), -1e100 * np.expm1(-0.6)], 1e100)
 
 # --- test case 6: bad shapes, decay constants, amounts or times raise ValueError ---
 for _t_bad in ((np.array([0.1, 0.2]), np.array([1.0]), 1.0), (np.zeros(31), np.ones(31), 1.0),
                (np.zeros((2, 2)), np.ones((2, 2)), 1.0), (np.array([]), np.array([]), 1.0),
                (np.array([-0.1]), np.array([1.0]), 1.0), (np.array([2e10]), np.array([1.0]), 1.0),
                (np.array([0.1]), np.array([-1.0]), 1.0), (np.array([0.1]), np.array([1.0]), -1.0),
-               (np.array([0.1]), np.array([1.0]), 2e20), (np.array([np.nan]), np.array([1.0]), 1.0)):
+               (np.array([0.1]), np.array([1.0]), 2e20), (np.array([np.nan]), np.array([1.0]), 1.0), (np.array([0.1, 0.1]), np.array([1e100, 1e98]), 1.0)):
     try:
         chain_inventory(*_t_bad)
     except ValueError:

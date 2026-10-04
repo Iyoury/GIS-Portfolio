@@ -14,7 +14,7 @@ def network_inventory(lam, branching, source, n0, t):
                  directed graph with an edge i -> j wherever branching[j, i] > 0 must be acyclic.
       source: 1-D array of n constant production rates (atoms per unit of time), nonnegative.
       n0: 1-D array of n initial numbers of atoms, nonnegative.
-      t: elapsed time, 0 <= t <= 1e20.
+      t: elapsed time, 0 <= t <= 1e20, with sum(n0) + t * sum(source) <= 1e100.
 
     Output:
       x: numpy array of shape (n,), the numbers of atoms at time t. With S = sum(n0) + t * sum(source):
@@ -25,7 +25,8 @@ def network_inventory(lam, branching, source, n0, t):
     Raises:
       ValueError if the arrays do not have these shapes (1 <= n <= 30), if an entry is negative or not
       finite, if a decay constant exceeds 1e10, if a diagonal entry of branching is nonzero or a column
-      sum exceeds 1 + 1e-12, if the network has a cycle, or if t is not finite or outside [0, 1e20].
+      sum exceeds 1 + 1e-12, if the network has a cycle, if t is not finite or outside [0, 1e20], or if
+      sum(n0) + t * sum(source) > 1e100.
     '''
     lam = np.asarray(lam, dtype=float)
     branching = np.asarray(branching, dtype=float)
@@ -45,6 +46,8 @@ def network_inventory(lam, branching, source, n0, t):
     t = float(t)
     if not (np.isfinite(t) and 0.0 <= t <= 1e20):
         raise ValueError("need 0 <= t <= 1e20")
+    if n0.sum() + t * source.sum() > 1e100:
+        raise ValueError("sum(n0) + t * sum(source) must not exceed 1e100")
     # acyclic: repeatedly remove nuclides without incoming edges (Kahn)
     edges = branching > 0.0
     indeg = edges.sum(axis=1)
