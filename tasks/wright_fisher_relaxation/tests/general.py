@@ -170,3 +170,13 @@ for a, b in zip(q, t_q):
     assert _t_rel(a, b) < 1e-8, (a, b)
 times = substitution_times(N, s, 1e-12, v)
 assert _t_rel(rate * times[0], 1.0) < 1e-8, (rate, times)
+
+# --- test case 4: the fastest mode: the smallest eigenvalue of the matrix (about 1.3e-8 here) against
+# mpmath eigenvalues of the matrix in extended precision, and below 1 - gap of step 4 ---
+N, s, u, v = 18, -0.4, 1e-9, 0.08
+lam = smallest_eigenvalue(N, s, u, v)
+with _t_mp.workdps(100):
+    _t_E = _t_mp.eig(_t_P(N, s, u, v), left=False, right=False)
+    _t_lam = float(min(_t_E, key=lambda z: abs(z)).real)
+assert _t_rel(lam, _t_lam) < 1e-8, (lam, _t_lam)
+assert lam < 1.0 - relaxation_rate(N, s, u, v)

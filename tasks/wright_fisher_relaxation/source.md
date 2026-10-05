@@ -101,3 +101,21 @@ the rate and the entries i = 0, 1, 2, 3, 5, 10, 20, 50, 100, 200, 300, 399 to a 
 solution that returns 0 (or any inaccurate value) in the tail fails. An unshifted inverse iteration from
 a uniform start had not converged in the tail after 200 iterations (qsd[0] stuck near 1e-85), which is
 why the shifted form is used for this target.
+
+Version 8 (difficulty increase; v7 rollouts solved 8/8): new step 7, smallest_eigenvalue(N, s, u, v), the
+smallest eigenvalue lambda_min of the transition matrix with two-way mutation, to a relative 1e-8 within
+20 s. It is about 1e-173 to 1e-216 at N = 400, far below what a dense eigensolver resolves next to the
+eigenvalue 1, and entrywise relative errors of P do not determine it (P is totally positive, its small
+eigenvalues are ill-conditioned with respect to its entries). Reference: P = diag(q**N) V diag(C(N, j))
+with V the Vandermonde matrix of the increasing nodes x_i = p_i / q_i; P^-1 has the checkerboard sign
+pattern, so 1 / lambda_min is the Perron root of |P^-1|, whose entries
+e_{N-j}(x without x_a) / (C(N, j) prod_{k != a}|x_a - x_k| q_a**N) are sums and products of positive
+terms; the node differences come without cancellation from p_a - p_k = (1 - u - v)(1 + s)(a - k) /
+(N (1 + s a/N)(1 + s k/N)); everything in logarithms; power method (ratio lambda_min / next eigenvalue,
+about 1/N). Second solution: prefix/suffix convolution for the elementary symmetric functions and a
+dense eigensolver after an Osborne-balancing diagonal similarity. Targets: the neutral closed form
+(1 - u - v)**N N!/N**N (Feller; Cannings), mpmath eig at N <= 30 with selection, and inverse iteration with
+a plain mpmath LU at 400 digits for (400, 0.5, 1e-12, 1e-12) -> 2.76656467220724976e-176 and
+(400, -0.5, 0.1, 1e-12) -> 5.87144975069309366e-197 (reference within 3e-13). A dense eigensolver gives
+1e-17 to 1e-31 for these (wrong by 100 to 190 decades); the mutants dense_eigenvalues and
+numerical_inverse fail. General tests: one step-7 check at N = 18.

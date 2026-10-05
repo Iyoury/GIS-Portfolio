@@ -15,35 +15,30 @@ problem_description_main: |-
   the expected frequency, and the next generation is drawn by binomial sampling. This gives a Markov
   chain on i = 0, ..., N. We build its transition matrix, then compute the fixation and loss of A
   without mutation, the stationary distribution with mutation, the relaxation rate of the chain and
-  the mean waiting times between the two fixed states, and finally the quasi-stationary state and
-  absorption rate when mutation goes one way only. Rare mutation rates (down to 1e-12) and strong
+  the mean waiting times between the two fixed states, the quasi-stationary state and absorption rate
+  when mutation goes one way only, and finally the smallest eigenvalue of the chain, the decay factor
+  of its fastest mode. Rare mutation rates (down to 1e-12) and strong
   selection make the probabilities and rates of interest exponentially small, many orders of magnitude
   below the rounding error of the quantities next to them, yet every result is required with a small
   relative error.
 
 problem_io: |-
-  def quasi_stationary(N, s, v):
-      '''Quasi-stationary distribution and absorption rate with one-way mutation a -> A.
+  def smallest_eigenvalue(N, s, u, v):
+      '''Smallest eigenvalue of the Wright-Fisher transition matrix with mutation in both directions.
 
       Inputs:
         N: int, population size, 1 <= N <= 400.
         s: float, selection coefficient of A, -0.5 <= s <= 0.5.
-        v: float, mutation probability a -> A per generation, 1e-12 <= v <= 0.1 (u = 0: no mutation A -> a).
+        u, v: float, mutation probabilities A -> a and a -> A per generation, 1e-12 <= u, v <= 0.1.
 
       Output:
-        (rate, qsd): rate is a Python float, the probability per generation that a population in the
-          quasi-stationary state fixes A, rate = 1 - rho with rho the largest eigenvalue of the transition
-          matrix restricted to i = 0, ..., N - 1; relative error below 1e-8, however small it is.
-          qsd is a numpy array of shape (N,), the quasi-stationary distribution over i = 0, ..., N - 1
-          (left eigenvector of that restricted matrix for rho, summing to 1); every entry whose exact value
-          is positive and at least 1e-250 has a relative error below 1e-8, every other entry lies within
-          1e-250 of its exact value.
+        lam_min: Python float, the smallest eigenvalue of the transition matrix of step 1
+                 (wf_transition_matrix), with a relative error below 1e-8.
 
       Raises:
-        ValueError if N is not an integer in [1, 400] (bool and float are not accepted), or if s or v is
-        not finite or is outside its range.
+        ValueError if N is not an integer in [1, 400] (bool and float are not accepted), or if s, u or v
+        is not finite or is outside its range.
       '''
-
 general_tests: tests/general.py
 
 second_solution: second_solution.py
@@ -420,3 +415,59 @@ sub_steps:
       - name: absorption_from_mutation
         description: "Takes the absorption rate as the mutation supply N v times the one-generation fixation of a single copy, ignoring the quasi-stationary state."
         file: mutants/step_6_absorption_from_mutation.py
+
+  - step_number: 7
+    scaffold: steps/step_7.py
+    solution: solution/step_7.py
+    tests: tests/step_7.py
+    step_description_prompt: |-
+      All eigenvalues of the transition matrix P of step 1 (wf_transition_matrix) are real, positive and
+      distinct when u, v > 0 (step 4). The largest is 1 and governs equilibrium; the smallest, lambda_min,
+      is the factor by which the fastest-decaying mode of the allele-count distribution shrinks in one
+      generation. Return lambda_min as a Python float with a relative error below 1e-8. It is extremely
+      small: about 1e-173 for N = 400 without selection and with rare mutations, about 2e-211 for
+      N = 400, s = 0, u = v = 0.1, and of similar size with selection, far below the rounding errors of
+      the matrix entries next to it; the stated relative accuracy is required there too. Each call must
+      finish within 20 s on one CPU core.
+      Inputs: N (integer, 1 <= N <= 400), s (-0.5 <= s <= 0.5), u and v (1e-12 <= u, v <= 0.1).
+      Errors: raise ValueError if N is not an integer (bool and float are not accepted) or is outside
+      [1, 400], or if s, u or v is not finite or is outside its range.
+    function_header: |-
+      def smallest_eigenvalue(N, s, u, v):
+          '''Smallest eigenvalue of the Wright-Fisher transition matrix with mutation in both directions.
+
+          Inputs:
+            N: int, population size, 1 <= N <= 400.
+            s: float, selection coefficient of A, -0.5 <= s <= 0.5.
+            u, v: float, mutation probabilities A -> a and a -> A per generation, 1e-12 <= u, v <= 0.1.
+
+          Output:
+            lam_min: Python float, the smallest eigenvalue of the transition matrix of step 1
+                     (wf_transition_matrix), with a relative error below 1e-8.
+
+          Raises:
+            ValueError if N is not an integer in [1, 400] (bool and float are not accepted), or if s, u or v
+            is not finite or is outside its range.
+          '''
+    return_line: return lam_min
+    step_background: |-
+      For neutral drift the eigenvalues of the Wright-Fisher matrix are known in closed form,
+      lambda_k = (1 - u - v)**k N! / (N**k (N - k)!) (Feller 1951; Cannings 1974): the k-th mode is a
+      polynomial of degree k in the allele frequency, damped by drift and mutation. With selection the
+      spectrum has no closed form.
+    n_test_cases: 5
+    contract:
+      quantity: Smallest eigenvalue of the Wright-Fisher transition matrix with two-way mutation.
+      assumptions: Wright-Fisher chain of step 1 with u, v > 0; totally positive binomial kernel, real positive eigenvalues.
+      result_kind: exact
+      valid_input_ranges: 1 <= N <= 400 (integer); -0.5 <= s <= 0.5; 1e-12 <= u, v <= 0.1.
+      units: Per generation (dimensionless factor).
+      output_shape: Python float.
+      step_dependencies: [1]
+    mutants:
+      - name: dense_eigenvalues
+        description: "Takes the smallest eigenvalue from a dense eigensolver applied to the double-precision matrix, which only resolves eigenvalues down to the rounding level of the largest one."
+        file: mutants/step_7_dense_eigenvalues.py
+      - name: numerical_inverse
+        description: "Takes 1 / lambda_min as the Perron root of the absolute value of the numerically inverted double-precision matrix, whose inverse is dominated by rounding errors."
+        file: mutants/step_7_numerical_inverse.py

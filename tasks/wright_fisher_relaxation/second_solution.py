@@ -354,3 +354,83 @@ def quasi_stationary(N, s, v):
     out = _mp_adaptive(compute)
     result = (float(out[0]), np.array(out[1:]))
     return result
+
+
+def smallest_eigenvalue(N, s, u, v):
+    '''Smallest eigenvalue of the Wright-Fisher transition matrix with mutation in both directions.'''
+    # Other methods: the elementary symmetric functions of the nodes without x_a are the convolution of
+    # the coefficients of prod_{k<a} (1 + x_k t) and prod_{k>a} (1 + x_k t) (prefix and suffix products),
+    # and the Perron root of |P^-1| is taken from a dense eigensolver after a diagonal similarity that
+    # balances the rows and columns of the matrix (no power iteration).
+    if isinstance(N, (bool, np.bool_)) or not isinstance(N, (int, np.integer)):
+        raise ValueError("N must be an integer")
+    N = int(N)
+    if not 1 <= N <= 400:
+        raise ValueError("need 1 <= N <= 400")
+    s, u, v = float(s), float(u), float(v)
+    if not (np.isfinite(s) and np.isfinite(u) and np.isfinite(v)):
+        raise ValueError("s, u and v must be finite")
+    if not (-0.5 <= s <= 0.5 and 1e-12 <= u <= 0.1 and 1e-12 <= v <= 0.1):
+        raise ValueError("need -0.5 <= s <= 0.5 and 1e-12 <= u, v <= 0.1")
+    n = N + 1
+    k = np.arange(n)
+    f = k / N
+    w = 1.0 + s * f
+    a_sel = (1.0 + s) * f / w
+    b_sel = (1.0 - f) / w
+    lp = np.log(v * b_sel + (1.0 - u) * a_sel)
+    lq = np.log((1.0 - v) * b_sel + u * a_sel)
+    lx = lp - lq                                     # log of p/q at each state
+    # log |x_a - x_b| from p_a - p_b = (1 - u - v)(1 + s)(a - b) / (N w_a w_b) and x = p / q
+    gap = np.abs(k[:, None] - k[None, :]).astype(float)
+    np.fill_diagonal(gap, 1.0)
+    L = np.log((1.0 - u - v) * (1.0 + s) * gap / N) - np.log(w)[:, None] - np.log(w)[None, :]
+    L = L - lq[:, None] - lq[None, :]
+    np.fill_diagonal(L, 0.0)
+    lden = L.sum(axis=1)
+
+    def lse(t, axis):
+        m = np.max(t, axis=axis, keepdims=True)
+        m = np.where(np.isfinite(m), m, 0.0)
+        return np.squeeze(m, axis=axis) + np.log(np.sum(np.exp(t - m), axis=axis))
+
+    def times_linear(c, lxk):
+        # coefficients of (sum c_m t^m) (1 + x t), in logarithms
+        out = np.full(c.size + 1, -np.inf)
+        out[:-1] = c
+        out[1:] = np.logaddexp(out[1:], c + lxk)
+        return out
+
+    pre = [np.zeros(1)]
+    for a in range(n - 1):
+        pre.append(times_linear(pre[-1], lx[a]))
+    suf = [np.zeros(1)]
+    for a in range(n - 1, 0, -1):
+        suf.append(times_linear(suf[-1], lx[a]))
+    suf = suf[::-1]                                  # suf[a]: nodes a + 1 .. N
+    LE = np.empty((n, n))
+    for a in range(n):
+        A, B = pre[a], suf[a]
+        # anti-diagonal sums of exp(A_i + B_j): shift row i by i and reduce over rows
+        T = np.full((A.size, A.size + B.size - 1), -np.inf)
+        rows = np.arange(A.size)[:, None]
+        T[rows, rows + np.arange(B.size)[None, :]] = A[:, None] + B[None, :]
+        LE[a] = lse(T, 0)
+    lC = gammaln(N + 1) - gammaln(k + 1) - gammaln(N - k + 1)
+    LM = LE[:, ::-1].T - lC[:, None] - (lden + N * lq)[None, :]
+    # diagonal similarity: d_j chosen so that row j and column j have the same log-sum (Osborne sweeps)
+    d = np.zeros(n)
+    for sweep in range(200):
+        T = LM + d[None, :] - d[:, None]
+        rs, cs = lse(T, 1), lse(T, 0)
+        step = 0.5 * (rs - cs)
+        d = d + step
+        if np.max(np.abs(step)) < 1e-3:
+            break
+    T = LM + d[None, :] - d[:, None]
+    shift = T.max()
+    B = np.exp(T - shift)
+    ev = np.linalg.eigvals(B)
+    rho = np.max(ev.real)
+    lam_min = float(np.exp(-(np.log(rho) + shift)))
+    return lam_min
