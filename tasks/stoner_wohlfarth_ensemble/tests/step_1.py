@@ -34,7 +34,7 @@ def _t_budget(fn, seconds, name):
     return wrapped
 
 
-branch_magnetization = _t_budget(branch_magnetization, 10.0, "branch_magnetization")
+branch_magnetization = _t_budget(branch_magnetization, 20.0, "branch_magnetization")
 
 import numpy as np
 

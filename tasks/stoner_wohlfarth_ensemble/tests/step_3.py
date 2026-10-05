@@ -34,7 +34,7 @@ def _t_budget(fn, seconds, name):
     return wrapped
 
 
-survival_probability = _t_budget(survival_probability, 10.0, "survival_probability")
+survival_probability = _t_budget(survival_probability, 20.0, "survival_probability")
 
 import numpy as np
 

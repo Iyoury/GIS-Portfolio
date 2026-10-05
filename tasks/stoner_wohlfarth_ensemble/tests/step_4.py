@@ -34,7 +34,7 @@ def _t_budget(fn, seconds, name):
     return wrapped
 
 
-switching_field_statistics = _t_budget(switching_field_statistics, 30.0, "switching_field_statistics")
+switching_field_statistics = _t_budget(switching_field_statistics, 60.0, "switching_field_statistics")
 
 import numpy as np
 

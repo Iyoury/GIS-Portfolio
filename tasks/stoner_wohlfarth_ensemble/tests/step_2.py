@@ -34,7 +34,7 @@ def _t_budget(fn, seconds, name):
     return wrapped
 
 
-escape_barriers = _t_budget(escape_barriers, 10.0, "escape_barriers")
+escape_barriers = _t_budget(escape_barriers, 20.0, "escape_barriers")
 
 import numpy as np
 

@@ -137,3 +137,14 @@ steps 4-6: 30 s; the reference needs at most 0.1 s, 3 s, 6 s and 1.4 s) and the 
 once it exceeds its budget (SIGALRM, one second of grace; measured only where no alarm is available), so
 a too-slow solution fails the check promptly. A solution made to sleep 60 s per call now fails step 5
 after 32 s. No other change.
+
+## Version 12
+
+v11 went 0/8 (best 5/6 steps, mean 0.75): slightly too hard. Small easing, no change to the science or the
+test cases:
+- per-call time budgets doubled (steps 1-3: 10 s -> 20 s, steps 4-6: 30 s -> 60 s), in prompts and tests;
+- step 6 prompt now gives the two exact forms the reference relies on: the self-adjoint Sturm-Liouville
+  form d/dz[(1 - z^2) w g'] = -2 lam w g for lam1, and Garanin's quadrature for tau_int
+  (2 int Q^2 / ((1 - z^2) w) dz / int (z - <z>)^2 w dz, Q = int_{-1}^{z} (z' - <z>) w dz');
+- step 6 relative accuracy relaxed from 1e-6 to 1e-5 (2.1e-5 for the h -> -h comparison of two outputs).
+All mutants still fail by orders of magnitude more than the new bounds.

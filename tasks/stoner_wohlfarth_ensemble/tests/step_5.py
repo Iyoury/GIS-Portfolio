@@ -34,7 +34,7 @@ def _t_budget(fn, seconds, name):
     return wrapped
 
 
-ensemble_switching = _t_budget(ensemble_switching, 30.0, "ensemble_switching")
+ensemble_switching = _t_budget(ensemble_switching, 60.0, "ensemble_switching")
 
 import numpy as np
 
