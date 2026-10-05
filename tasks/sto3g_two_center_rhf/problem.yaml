@@ -7,6 +7,7 @@ required_dependencies: |-
   from scipy.special import erf
   from scipy.optimize import minimize_scalar
   from scipy.integrate import quad
+  from scipy.integrate import solve_ivp
 
 problem_description_main: |-
   Compute the electronic ground state of a diatomic molecule with two electrons, such as

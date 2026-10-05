@@ -2,6 +2,7 @@ import numpy as np
 from scipy.special import erf
 from scipy.optimize import minimize_scalar
 from scipy.integrate import quad
+from scipy.integrate import solve_ivp
 
 
 def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):

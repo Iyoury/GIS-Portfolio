@@ -2,6 +2,7 @@ import numpy as np
 from scipy.special import erf
 from scipy.optimize import minimize_scalar
 from scipy.integrate import quad
+from scipy.integrate import solve_ivp
 
 
 def _s5_atom(Z, zeta):
@@ -69,8 +70,6 @@ def _s5_outer_nodes(u, up, E, mu, a, Vext, Rb):
     # zeros beyond a of the solution continued outward from (u(a), u'(a)) in the analytic potential; beyond
     # the last classical turning point Rb the integration goes on until int sqrt(2 mu (V - E)) dR = 35,
     # after which the growing solution dominates and no further zero can occur
-    from scipy.integrate import solve_ivp
-
     def f(R, y):
         q = 2.0 * mu * (Vext(R) - E)
         return [y[1], q * y[0], np.sqrt(max(q, 0.0)) * y[3], 0.0]
