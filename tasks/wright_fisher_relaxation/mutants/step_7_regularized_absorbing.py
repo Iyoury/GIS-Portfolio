@@ -36,6 +36,8 @@ def fastest_mode(N, s, u, v):
         raise ValueError("need -0.5 <= s <= 0.5 and 0 <= u, v <= 0.1")
     if N == 1 and u == 0.0 and v == 0.0:
         raise ValueError("with N = 1 and u = v = 0 both states are absorbing")
+    # absorbing states avoided by replacing a zero mutation rate with a negligible one
+    u, v = max(u, 1e-300), max(v, 1e-300)
     i = np.arange(N + 1)
     p = i / N
     den = 1.0 + s * p

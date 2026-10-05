@@ -136,3 +136,18 @@ entry changed by less than 1e-60 relative, run once) for (400, -0.5, 1e-9), (400
 reference agrees to 4e-13 (rates) and 2e-12 (entries). The identity checks are gated on the target entries
 (>= 1e-240), not on the submitted ones; a solution that zeroes tail entries now fails. Step 1 transcription
 advisory: no change (the binomial kernel is the definition of the model).
+
+Version 11 (difficulty increase; v10 rollouts solved 7/8): step 7 becomes fastest_mode(N, s, u, v), which returns
+the smallest eigenvalue together with its right eigenvector (scaled to max |entry| = 1, first nonzero entry
+positive), every entry with a relative error below 1e-8; at N = 400 the entries span up to 176 decades. The
+domain now includes u = 0 and/or v = 0 (absorbing end states, eigenvalue 1 repeated, the mode exactly zero on
+absorbing states; ValueError for N = 1 with u = v = 0). The hint "the binomial kernel with increasing p_mut is
+totally positive" was removed from step 4 and from the step 7 contract. Reference: Perron pair of |P_II^-1| on
+the transient block, P_II = diag(q^N x^i0) V(x_I) diag(C), entries from elementary symmetric functions and
+cancellation-free node differences, power method in logarithms (about 0.6 s at N = 400). Second solution:
+prefix/suffix convolutions, Osborne balancing, dense eigensolver, then log-space polishing of the vector;
+the two agree to 2e-13 at N = 400. Targets: mpmath eig plus shifted inverse iteration with plain LU
+(80-150 digits) for N <= 30, and inverse iteration with plain LU at 400 digits (run once, about 3 min each)
+for (400, 0.5, 1e-12, 1e-12), (400, -0.5, 0.1, 1e-12), (400, 0.3, 0, 0) and (400, -0.4, 0, 0.05); the
+reference agrees to 3e-13 (eigenvalues) and 8e-13 (entries). New mutants: regularized absorbing states
+(u, v -> 1e-300) and sign fixed by the largest entry.

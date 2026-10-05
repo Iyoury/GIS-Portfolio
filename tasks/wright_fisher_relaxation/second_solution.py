@@ -356,12 +356,12 @@ def quasi_stationary(N, s, v):
     return result
 
 
-def smallest_eigenvalue(N, s, u, v):
-    '''Smallest eigenvalue of the Wright-Fisher transition matrix with mutation in both directions.'''
+def fastest_mode(N, s, u, v):
+    '''Smallest eigenvalue of the Wright-Fisher transition matrix and its right eigenvector.'''
     # Other methods: the elementary symmetric functions of the nodes without x_a are the convolution of
-    # the coefficients of prod_{k<a} (1 + x_k t) and prod_{k>a} (1 + x_k t) (prefix and suffix products),
-    # and the Perron root of |P^-1| is taken from a dense eigensolver after a diagonal similarity that
-    # balances the rows and columns of the matrix (no power iteration).
+    # the coefficients of prod_{k<a} (1 + x_k t) and prod_{k>a} (1 + x_k t) (prefix and suffix products);
+    # the Perron pair of |P_II^-1| comes from a dense eigensolver after a diagonal similarity that balances
+    # its rows and columns, and the eigenvector is then polished by fixed-point sweeps in logarithms.
     if isinstance(N, (bool, np.bool_)) or not isinstance(N, (int, np.integer)):
         raise ValueError("N must be an integer")
     N = int(N)
@@ -370,18 +370,21 @@ def smallest_eigenvalue(N, s, u, v):
     s, u, v = float(s), float(u), float(v)
     if not (np.isfinite(s) and np.isfinite(u) and np.isfinite(v)):
         raise ValueError("s, u and v must be finite")
-    if not (-0.5 <= s <= 0.5 and 1e-12 <= u <= 0.1 and 1e-12 <= v <= 0.1):
-        raise ValueError("need -0.5 <= s <= 0.5 and 1e-12 <= u, v <= 0.1")
-    n = N + 1
-    k = np.arange(n)
+    if not (-0.5 <= s <= 0.5 and 0.0 <= u <= 0.1 and 0.0 <= v <= 0.1):
+        raise ValueError("need -0.5 <= s <= 0.5 and 0 <= u, v <= 0.1")
+    if N == 1 and u == 0.0 and v == 0.0:
+        raise ValueError("N = 1 without mutation: no transient state")
+    lo = 0 if v > 0.0 else 1                         # state 0 absorbs when v = 0
+    hi = N if u > 0.0 else N - 1                     # state N absorbs when u = 0
+    k = np.arange(lo, hi + 1)
+    n = k.size
     f = k / N
     w = 1.0 + s * f
     a_sel = (1.0 + s) * f / w
     b_sel = (1.0 - f) / w
     lp = np.log(v * b_sel + (1.0 - u) * a_sel)
     lq = np.log((1.0 - v) * b_sel + u * a_sel)
-    lx = lp - lq                                     # log of p/q at each state
-    # log |x_a - x_b| from p_a - p_b = (1 - u - v)(1 + s)(a - b) / (N w_a w_b) and x = p / q
+    lx = lp - lq
     gap = np.abs(k[:, None] - k[None, :]).astype(float)
     np.fill_diagonal(gap, 1.0)
     L = np.log((1.0 - u - v) * (1.0 + s) * gap / N) - np.log(w)[:, None] - np.log(w)[None, :]
@@ -395,7 +398,6 @@ def smallest_eigenvalue(N, s, u, v):
         return np.squeeze(m, axis=axis) + np.log(np.sum(np.exp(t - m), axis=axis))
 
     def times_linear(c, lxk):
-        # coefficients of (sum c_m t^m) (1 + x t), in logarithms
         out = np.full(c.size + 1, -np.inf)
         out[:-1] = c
         out[1:] = np.logaddexp(out[1:], c + lxk)
@@ -407,18 +409,17 @@ def smallest_eigenvalue(N, s, u, v):
     suf = [np.zeros(1)]
     for a in range(n - 1, 0, -1):
         suf.append(times_linear(suf[-1], lx[a]))
-    suf = suf[::-1]                                  # suf[a]: nodes a + 1 .. N
+    suf = suf[::-1]
     LE = np.empty((n, n))
     for a in range(n):
         A, B = pre[a], suf[a]
-        # anti-diagonal sums of exp(A_i + B_j): shift row i by i and reduce over rows
         T = np.full((A.size, A.size + B.size - 1), -np.inf)
         rows = np.arange(A.size)[:, None]
         T[rows, rows + np.arange(B.size)[None, :]] = A[:, None] + B[None, :]
         LE[a] = lse(T, 0)
     lC = gammaln(N + 1) - gammaln(k + 1) - gammaln(N - k + 1)
-    LM = LE[:, ::-1].T - lC[:, None] - (lden + N * lq)[None, :]
-    # diagonal similarity: d_j chosen so that row j and column j have the same log-sum (Osborne sweeps)
+    # P_II = diag(q^N x^lo) V(x) diag(C): log |P_II^-1|
+    LM = LE[:, ::-1].T - lC[:, None] - (lden + N * lq + lo * lx)[None, :]
     d = np.zeros(n)
     for sweep in range(200):
         T = LM + d[None, :] - d[:, None]
@@ -429,8 +430,25 @@ def smallest_eigenvalue(N, s, u, v):
             break
     T = LM + d[None, :] - d[:, None]
     shift = T.max()
-    B = np.exp(T - shift)
-    ev = np.linalg.eigvals(B)
-    rho = np.max(ev.real)
-    lam_min = float(np.exp(-(np.log(rho) + shift)))
-    return lam_min
+    ev, W = np.linalg.eig(np.exp(T - shift))
+    j = int(np.argmax(ev.real))
+    lrho = np.log(ev[j].real) + shift
+    wv = np.abs(W[:, j].real)
+    y = np.log(np.maximum(wv, 1e-300)) + d          # B = D^-1 M D: Perron vector of M is D w
+    # polish: y <- log(M e^y) - log rho, which contracts like (rho_2 / rho)
+    for sweep in range(5000):
+        z = lse(LM + y[None, :], 1)
+        lrho = np.max(z - y)
+        ynew = z - z.max()
+        dy = np.max(np.abs(ynew - (y - y.max())))
+        y = ynew
+        if dy < 1e-12:
+            break
+    z = lse(LM + y[None, :], 1)
+    lrho = float(np.log(np.sum(np.exp(z - z.max()))) + z.max() - np.log(np.sum(np.exp(y - y.max()))) - y.max())
+    lam_min = float(np.exp(-lrho))
+    mode = np.zeros(N + 1)
+    mode[k] = np.where((k - lo) % 2 == 0, 1.0, -1.0) * np.exp(y - y.max())
+    if mode[lo] < 0:
+        mode = -mode
+    return lam_min, mode

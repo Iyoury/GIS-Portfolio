@@ -172,11 +172,15 @@ times = substitution_times(N, s, 1e-12, v)
 assert _t_rel(rate * times[0], 1.0) < 2.5e-8, (rate, times)   # two outputs (1e-8 each) and the 1e-10 link
 
 # --- test case 4: the fastest mode: the smallest eigenvalue of the matrix (about 1.3e-8 here) against
-# mpmath eigenvalues of the matrix in extended precision, and below 1 - gap of step 4 ---
+# mpmath eigenvalues of the matrix in extended precision and below 1 - gap of step 4; the mode is a right
+# eigenvector of the matrix of step 1 (residual small next to |P| |mode|) ---
 N, s, u, v = 18, -0.4, 1e-9, 0.08
-lam = smallest_eigenvalue(N, s, u, v)
+lam, mode = fastest_mode(N, s, u, v)
 with _t_mp.workdps(100):
     _t_E = _t_mp.eig(_t_P(N, s, u, v), left=False, right=False)
     _t_lam = float(min(_t_E, key=lambda z: abs(z)).real)
 assert _t_rel(lam, _t_lam) < 1e-8, (lam, _t_lam)
 assert lam < 1.0 - relaxation_rate(N, s, u, v)
+_t_Pd = wf_transition_matrix(N, s, u, v)
+assert np.max(np.abs(_t_Pd @ mode - lam * mode)) <= 1e-12 * np.max(np.abs(_t_Pd) @ np.abs(mode)), "residual"
+assert abs(np.max(np.abs(mode)) - 1.0) < 1e-12 and mode[0] > 0, mode

@@ -17,27 +17,31 @@ problem_description_main: |-
   without mutation, the stationary distribution with mutation, the relaxation rate of the chain and
   the mean waiting times between the two fixed states, the quasi-stationary state and absorption rate
   when mutation goes one way only, and finally the smallest eigenvalue of the chain, the decay factor
-  of its fastest mode. Rare mutation rates (down to 1e-12) and strong
+  of its fastest mode, together with that mode. Rare mutation rates (down to 1e-12) and strong
   selection make the probabilities and rates of interest exponentially small, many orders of magnitude
   below the rounding error of the quantities next to them, yet every result is required with a small
   relative error.
 
 problem_io: |-
-  def smallest_eigenvalue(N, s, u, v):
-      '''Smallest eigenvalue of the Wright-Fisher transition matrix with mutation in both directions.
+  def fastest_mode(N, s, u, v):
+      '''Smallest eigenvalue of the Wright-Fisher transition matrix and its right eigenvector.
 
       Inputs:
         N: int, population size, 1 <= N <= 400.
         s: float, selection coefficient of A, -0.5 <= s <= 0.5.
-        u, v: float, mutation probabilities A -> a and a -> A per generation, 1e-12 <= u, v <= 0.1.
+        u, v: float, mutation probabilities A -> a and a -> A per generation, 0 <= u, v <= 0.1
+              (v = 0 makes i = 0 absorbing, u = 0 makes i = N absorbing).
 
       Output:
-        lam_min: Python float, the smallest eigenvalue of the transition matrix of step 1
+        lam_min: Python float, the smallest eigenvalue of the transition matrix P of step 1
                  (wf_transition_matrix), with a relative error below 1e-8.
+        mode: numpy float array of shape (N + 1,), the right eigenvector (P mode = lam_min mode), scaled so
+              that max_i |mode[i]| = 1 and its first nonzero entry is positive; every entry with an error
+              below 1e-8 times its absolute value (entries that are exactly zero returned as 0.0).
 
       Raises:
-        ValueError if N is not an integer in [1, 400] (bool and float are not accepted), or if s, u or v
-        is not finite or is outside its range.
+        ValueError if N is not an integer in [1, 400] (bool and float are not accepted), if s, u or v
+        is not finite or is outside its range, or if N = 1 and u = v = 0.
       '''
 general_tests: tests/general.py
 
@@ -238,7 +242,7 @@ sub_steps:
     tests: tests/step_4.py
     step_description_prompt: |-
       All eigenvalues of the transition matrix of step 1 (wf_transition_matrix) are real, positive and
-      distinct when u, v > 0 (the binomial kernel with increasing p_mut is totally positive); the largest
+      distinct when u, v > 0; the largest
       is 1 with left eigenvector the stationary distribution (step 3, stationary_distribution). The
       distance to equilibrium of a generic initial distribution (one with a nonzero component along
       the second eigenvector) eventually decays like lambda_2**t, where lambda_2 is the second largest
@@ -423,51 +427,71 @@ sub_steps:
     step_description_prompt: |-
       All eigenvalues of the transition matrix P of step 1 (wf_transition_matrix) are real, positive and
       distinct when u, v > 0 (step 4). The largest is 1 and governs equilibrium; the smallest, lambda_min,
-      is the factor by which the fastest-decaying mode of the allele-count distribution shrinks in one
-      generation. Return lambda_min as a Python float with a relative error below 1e-8. It is extremely
-      small: about 1e-173 for N = 400 without selection and with rare mutations, about 2e-211 for
-      N = 400, s = 0, u = v = 0.1, and of similar size with selection, far below the rounding errors of
-      the matrix entries next to it; the stated relative accuracy is required there too. Each call must
-      finish within 20 s on one CPU core.
-      Inputs: N (integer, 1 <= N <= 400), s (-0.5 <= s <= 0.5), u and v (1e-12 <= u, v <= 0.1).
+      is the factor by which the fastest-decaying mode of the chain shrinks in one generation. Return
+      lambda_min and that mode, the right eigenvector x of P with P x = lambda_min x (entry i for the
+      allele count i = 0, ..., N).
+      Here mutation may also be switched off in one or both directions, 0 <= u, v <= 0.1: with v = 0 the
+      state i = 0 is absorbing, with u = 0 the state i = N is absorbing. P then has the eigenvalue 1 once
+      for each absorbing state, its other eigenvalues are real, positive, distinct and below 1, and
+      lambda_min is still the smallest eigenvalue of P.
+      Scale the mode so that max_i |x_i| = 1 and its first nonzero entry is positive.
+      Accuracy: lambda_min with a relative error below 1e-8, and every entry of the mode with an error
+      below 1e-8 times its absolute value; entries of the mode that are exactly zero must be returned as
+      0.0. lambda_min is extremely small: about 1e-173 for N = 400 without selection and with rare or no
+      mutation, about 2e-211 for N = 400, s = 0, u = v = 0.1, and of similar size with selection, far below
+      the rounding errors of the matrix entries next to it. The entries of the mode at N = 400 span up to
+      about 180 decades. The stated accuracy is required there too. Each call must finish within 20 s on
+      one CPU core.
+      Inputs: N (integer, 1 <= N <= 400), s (-0.5 <= s <= 0.5), u and v (0 <= u, v <= 0.1).
       Errors: raise ValueError if N is not an integer (bool and float are not accepted) or is outside
-      [1, 400], or if s, u or v is not finite or is outside its range.
+      [1, 400], if s, u or v is not finite or is outside its range, or if N = 1 and u = v = 0 (both states
+      absorbing, P is the identity).
     function_header: |-
-      def smallest_eigenvalue(N, s, u, v):
-          '''Smallest eigenvalue of the Wright-Fisher transition matrix with mutation in both directions.
+      def fastest_mode(N, s, u, v):
+          '''Smallest eigenvalue of the Wright-Fisher transition matrix and its right eigenvector.
 
           Inputs:
             N: int, population size, 1 <= N <= 400.
             s: float, selection coefficient of A, -0.5 <= s <= 0.5.
-            u, v: float, mutation probabilities A -> a and a -> A per generation, 1e-12 <= u, v <= 0.1.
+            u, v: float, mutation probabilities A -> a and a -> A per generation, 0 <= u, v <= 0.1
+                  (v = 0 makes i = 0 absorbing, u = 0 makes i = N absorbing).
 
           Output:
-            lam_min: Python float, the smallest eigenvalue of the transition matrix of step 1
+            lam_min: Python float, the smallest eigenvalue of the transition matrix P of step 1
                      (wf_transition_matrix), with a relative error below 1e-8.
+            mode: numpy float array of shape (N + 1,), the right eigenvector (P mode = lam_min mode), scaled so
+                  that max_i |mode[i]| = 1 and its first nonzero entry is positive; every entry with an error
+                  below 1e-8 times its absolute value (entries that are exactly zero returned as 0.0).
 
           Raises:
-            ValueError if N is not an integer in [1, 400] (bool and float are not accepted), or if s, u or v
-            is not finite or is outside its range.
+            ValueError if N is not an integer in [1, 400] (bool and float are not accepted), if s, u or v
+            is not finite or is outside its range, or if N = 1 and u = v = 0.
           '''
-    return_line: return lam_min
+    return_line: return lam_min, mode
     step_background: |-
       For neutral drift the eigenvalues of the Wright-Fisher matrix are known in closed form,
       lambda_k = (1 - u - v)**k N! / (N**k (N - k)!) (Feller 1951; Cannings 1974): the k-th mode is a
       polynomial of degree k in the allele frequency, damped by drift and mutation. With selection the
       spectrum has no closed form.
-    n_test_cases: 5
+    n_test_cases: 6
     contract:
-      quantity: Smallest eigenvalue of the Wright-Fisher transition matrix with two-way mutation.
-      assumptions: Wright-Fisher chain of step 1 with u, v > 0; totally positive binomial kernel, real positive eigenvalues.
+      quantity: Smallest eigenvalue of the Wright-Fisher transition matrix and its right eigenvector.
+      assumptions: Wright-Fisher chain of step 1 with 0 <= u, v <= 0.1; absorbing states when u = 0 or v = 0; real positive eigenvalues.
       result_kind: exact
-      valid_input_ranges: 1 <= N <= 400 (integer); -0.5 <= s <= 0.5; 1e-12 <= u, v <= 0.1.
-      units: Per generation (dimensionless factor).
-      output_shape: Python float.
+      valid_input_ranges: 1 <= N <= 400 (integer); -0.5 <= s <= 0.5; 0 <= u, v <= 0.1; not N = 1 with u = v = 0.
+      units: Per generation (dimensionless factor); mode dimensionless.
+      output_shape: Tuple (Python float, numpy float array of shape (N + 1,)).
       step_dependencies: [1]
     mutants:
       - name: dense_eigenvalues
-        description: "Takes the smallest eigenvalue from a dense eigensolver applied to the double-precision matrix, which only resolves eigenvalues down to the rounding level of the largest one."
+        description: "Takes the smallest eigenvalue and its eigenvector from a dense eigensolver applied to the double-precision matrix, which only resolves them down to the rounding level of the largest eigenvalue."
         file: mutants/step_7_dense_eigenvalues.py
       - name: numerical_inverse
-        description: "Takes 1 / lambda_min as the Perron root of the absolute value of the numerically inverted double-precision matrix, whose inverse is dominated by rounding errors."
+        description: "Takes 1 / lambda_min and the mode from the Perron pair of the absolute value of the numerically inverted double-precision matrix, whose inverse is dominated by rounding errors."
         file: mutants/step_7_numerical_inverse.py
+      - name: regularized_absorbing
+        description: "Replaces a zero mutation rate by 1e-300 instead of treating the absorbing states, so the mode is not exactly zero on them."
+        file: mutants/step_7_regularized_absorbing.py
+      - name: largest_entry_positive
+        description: "Fixes the sign of the mode by making its largest entry positive instead of its first nonzero entry."
+        file: mutants/step_7_largest_entry_positive.py

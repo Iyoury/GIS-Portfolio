@@ -100,6 +100,6 @@ def fastest_mode(N, s, u, v):
     mode = np.zeros(N + 1)
     sign = np.where(np.arange(m) % 2 == 0, 1.0, -1.0)
     mode[I] = sign * np.exp(y - y.max())
-    first = mode[np.nonzero(mode)[0][0]]
-    mode = mode / np.sign(first)
+    big = mode[np.argmax(np.abs(mode))]
+    mode = mode / np.sign(big)
     return lam_min, mode
