@@ -104,11 +104,13 @@ for N, s, v, dps in ((20, -0.5, 1e-12, 200), (25, 0.3, 1e-3, 120), (16, 0.5, 0.1
 for N, s, v in ((400, -0.5, 1e-9), (400, 0.5, 0.1), (300, -0.2, 1e-12)):
     rate, q = _t_call(N, s, v)
     P = _t_matrix(N, s, v)
-    assert _t_rel(rate, q @ P[:N, N]) < 1e-8, (N, s, v, rate, q @ P[:N, N])
+    # identities between two outputs, each within 1e-8, with the double-precision matrix: margins 2.5e-8
+    # and 3e-8 (the second also carries the error of 1 - rate)
+    assert _t_rel(rate, q @ P[:N, N]) < 2.5e-8, (N, s, v, rate, q @ P[:N, N])
     lhs = q @ P[:N, :N]
     for j in range(N):
         if q[j] >= 1e-240:
-            assert _t_rel(lhs[j], (1.0 - rate) * q[j]) < 1e-8, (N, s, v, j)
+            assert _t_rel(lhs[j], (1.0 - rate) * q[j]) < 3e-8, (N, s, v, j)
     if s < 0:
         assert rate < 1e-60, rate
 

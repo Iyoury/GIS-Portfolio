@@ -51,9 +51,9 @@ def _t_gap(N, s, u, v, dps):
         return float(1 / size)
 
 
-def _t_check(g, target):
+def _t_check(g, target, tol=1e-8):
     assert isinstance(g, float), type(g)
-    assert _t_rel(g, target) < 1e-8, (g, target)
+    assert _t_rel(g, target) < tol, (g, target)
 
 
 import time as _t_time
@@ -86,7 +86,7 @@ for N, s, u, v in ((20, 0.3, 1e-9, 1e-6), (20, -0.5, 1e-12, 1e-12), (16, 0.5, 1e
 for N, s, s2, u, v, top in ((400, 0.5, -1.0 / 3.0, 1e-12, 3e-12, 1e-8), (300, 0.25, -0.2, 1e-9, 1e-5, 1.0)):
     a, b = relaxation_rate(N, s, u, v), relaxation_rate(N, s2, v, u)
     assert a < top, a
-    _t_check(a, b)
+    _t_check(a, b, tol=2.1e-8)            # two computed outputs, each within 1e-8: 2.1e-8
 
 # --- test case 4: N not an integer in [1, 400], or s, u, v not finite or out of range (u, v >= 1e-12) ---
 for _t_bad in ((0, 0.1, 0.01, 0.01), (500, 0.1, 0.01, 0.01), (8.0, 0.1, 0.01, 0.01), (False, 0.1, 0.01, 0.01), (10, 0.6, 0.01, 0.01), (10, 0.1, 0.0, 0.01), (10, 0.1, 0.01, 0.11), (10, float("nan"), 0.01, 0.01)):

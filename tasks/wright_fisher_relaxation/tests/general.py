@@ -169,7 +169,7 @@ assert _t_rel(rate, t_rate) < 1e-8, (rate, t_rate)
 for a, b in zip(q, t_q):
     assert _t_rel(a, b) < 1e-8, (a, b)
 times = substitution_times(N, s, 1e-12, v)
-assert _t_rel(rate * times[0], 1.0) < 1e-8, (rate, times)
+assert _t_rel(rate * times[0], 1.0) < 2.5e-8, (rate, times)   # two outputs (1e-8 each) and the 1e-10 link
 
 # --- test case 4: the fastest mode: the smallest eigenvalue of the matrix (about 1.3e-8 here) against
 # mpmath eigenvalues of the matrix in extended precision, and below 1 - gap of step 4 ---

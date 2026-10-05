@@ -67,7 +67,7 @@ for (N, s, u, v), t in (((400, 0.5, 1e-12, 1e-12), "2.76656467220724976158637404
     assert _t_rel(got, float(t)) < 1e-8, (N, s, u, v, got, t)
 a = _t_call(400, 0.3, 1e-6, 0.05)
 b = _t_call(400, -0.3 / 1.3, 0.05, 1e-6)
-assert _t_rel(a, b) < 1e-8, (a, b)
+assert _t_rel(a, b) < 2.1e-8, (a, b)          # two computed outputs, each within 1e-8: 2.1e-8
 assert 1e-200 < a < 1e-160, a
 
 # --- test case 4: N not an integer in [1, 400], or s, u, v not finite or out of range (u, v >= 1e-12) ---

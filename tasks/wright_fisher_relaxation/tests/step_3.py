@@ -36,14 +36,15 @@ def _t_stationary(N, s, u, v, dps):
         return [float(x) for x in _t_mp.lu_solve(M, rhs)]
 
 
-def _t_check(pi, target):
+def _t_check(pi, target, tol=1e-8):
     pi = np.asarray(pi)
     assert pi.shape == (len(target),), pi.shape
     for a, b in zip(pi, target):
         if b >= 1e-250:
-            assert _t_rel(a, b) < 1e-8, (a, b)
+            assert _t_rel(a, b) < tol, (a, b)
         else:
-            assert abs(a - b) <= 1e-250, (a, b)
+            # 1e-250 against an exact target, 2e-250 between two computed outputs
+            assert abs(a - b) <= (2e-250 if tol > 1e-8 else 1e-250), (a, b)
 
 
 import time as _t_time
@@ -86,13 +87,20 @@ for N, s, s2, u, v in ((400, 0.5, -1.0 / 3.0, 1e-12, 1e-12), (300, 0.25, -0.2, 1
     a = stationary_distribution(N, s, u, v)
     b = stationary_distribution(N, s2, v, u)[::-1]
     assert a.min() < 1e-60, a.min()
-    _t_check(a, b)
+    _t_check(a, b, tol=2.1e-8)            # two computed outputs, each within 1e-8: 2.1e-8
 
 # selected entries of the N = 400, s = 0.5, u = v = 1e-12 distribution, from the largest to about 6e-150,
 # against independent targets: plain Gaussian elimination with partial pivoting in mpmath at 400 digits, run once (the normalized system pi (I - P) = 0)
 _T_PI400 = {0: 4.94116127507236145905204620329e-141, 1: 6.36089756835676078305578893786e-150, 2: 6.95238834484355169992953876913e-150, 5: 3.92169133044440556851206613453e-149, 20: 4.67437739851039383742400642633e-144, 50: 3.21915037362450569537510917039e-133, 100: 4.06794059951012930020318771023e-115, 150: 3.02751884997609130817033404023e-97, 200: 1.25749031680770628987807725071e-79, 250: 3.07910294494558639844691955626e-62, 300: 4.90732674695967331243089316249e-45, 350: 6.31249880988631372426442824871e-28, 380: 1.53470434599298048276897709076e-17, 395: 5.68910886367584408915605652943e-12, 398: 1.27405798115104130323093073556e-10, 399: 7.00640566036223133820257310194e-10, 400: 0.999999999102745405225542146036}
 pi = stationary_distribution(400, 0.5, 1e-12, 1e-12)
 for _t_i, _t_v in _T_PI400.items():
+    assert _t_rel(pi[_t_i], float(_t_v)) < 1e-8, (_t_i, pi[_t_i], _t_v)
+
+# N = 400, s = -0.5, u = v = 1e-12 (A deleterious): entries from the largest down to about 1.3e-248, many of
+# them between 1e-160 and 1e-250, against independent targets (same method, run once)
+_T_PI400B = {0: 0.999999999302861192899082297338, 1: 6.160479874109954259093598051e-10, 10: 6.25249254735737461421144225314e-16, 100: 7.49376642376130645326028972991e-67, 200: 1.05943343187438244029411313061e-124, 250: 1.2539533917607727124297648688e-154, 261: 2.52977809035656817356344627748e-161, 270: 7.80509627467630295345328177044e-167, 300: 1.97242508617735664803857894273e-185, 330: 2.06109467248043194007825125277e-204, 360: 8.36989714563045932632084386903e-224, 390: 1.98578943480245519905452196041e-243, 398: 3.05195164582500612801241466235e-248, 399: 1.3171353389076868535938508154e-248, 400: 7.16957094624388165837027559461e-240}
+pi = stationary_distribution(400, -0.5, 1e-12, 1e-12)
+for _t_i, _t_v in _T_PI400B.items():
     assert _t_rel(pi[_t_i], float(_t_v)) < 1e-8, (_t_i, pi[_t_i], _t_v)
 
 # --- test case 4: N not an integer in [1, 400], or s, u, v not finite or out of range (u, v >= 1e-12) ---

@@ -119,3 +119,12 @@ a plain mpmath LU at 400 digits for (400, 0.5, 1e-12, 1e-12) -> 2.76656467220724
 (400, -0.5, 0.1, 1e-12) -> 5.87144975069309366e-197 (reference within 3e-13). A dense eigensolver gives
 1e-17 to 1e-31 for these (wrong by 100 to 190 decades); the mutants dense_eigenvalues and
 numerical_inverse fail. General tests: one step-7 check at N = 18.
+
+Version 9 (content-check fixes on v8): independent 400-digit targets (plain mpmath LU, run once) added for
+fixation_statistics(400, -0.5, 1) (p_fix = 5.71042258020734e-240, all four values), for the stationary
+distribution at N = 400, s = -0.5, u = v = 1e-12 (entries down to 1.3e-248, many between 1e-160 and 1e-250)
+and for substitution_times(400, -0.5, 1e-12, 1e-12) (t_up = 4.37795967826815e248); the reference agrees to
+about 1e-13. Comparisons between two computed outputs (the relabeling checks of steps 2, 3, 4, 5 and 7, the
+origin-fixation link of step 5) use 2.1e-8, the identities of step 6 between rate and qsd 2.5e-8 and 3e-8,
+the general rate * t_up link 2.5e-8; comparisons with independent targets stay at 1e-8. Step 1 transcription
+advisory: no change (the binomial kernel is the definition of the model).

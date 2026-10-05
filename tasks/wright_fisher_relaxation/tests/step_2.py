@@ -81,8 +81,9 @@ for N, s, s2 in ((400, 0.5, -1.0 / 3.0), (400, 0.25, -0.2), (250, -0.1, 1.0 / 9.
     for i0 in (1, N // 3, N - 1):
         a = fixation_statistics(N, s, i0)
         b = fixation_statistics(N, s2, N - i0)
-        assert _t_rel(a[0], b[1]) < 1e-8 and _t_rel(a[1], b[0]) < 1e-8, (N, s, i0, a, b)
-        assert _t_rel(a[2], b[3]) < 1e-8 and _t_rel(a[3], b[2]) < 1e-8, (N, s, i0, a, b)
+        # two computed outputs, each within 1e-8 of the exact value: they agree to 2.1e-8
+        assert _t_rel(a[0], b[1]) < 2.1e-8 and _t_rel(a[1], b[0]) < 2.1e-8, (N, s, i0, a, b)
+        assert _t_rel(a[2], b[3]) < 2.1e-8 and _t_rel(a[3], b[2]) < 2.1e-8, (N, s, i0, a, b)
 a = fixation_statistics(400, -1.0 / 3.0, 1)
 assert 0.0 < a[0] < 1e-100 and _t_rel(a[0] + a[1], 1.0) < 1e-8, a
 # independent targets: plain Gaussian elimination with partial pivoting in mpmath at 400 digits, run once
@@ -91,6 +92,9 @@ _T_FIX_DELETERIOUS = (2.87852227828767689465326565713e-141, 1.0, 29.451455127683
 _T_FIX_BENEFICIAL = (1.0, 2.87852227828761356463703277399e-141, 2.24313648794346015228827662588, 29.4514551276837942099904412489)        # N = 400, s = 0.5, i0 = 399
 _t_check(fixation_statistics(400, -1.0 / 3.0, 1), [float(x) for x in _T_FIX_DELETERIOUS])
 _t_check(fixation_statistics(400, 0.5, 399), [float(x) for x in _T_FIX_BENEFICIAL])
+# the lower end of the selection range, s = -0.5, i0 = 1: p_fix about 5.7e-240 (same method, run once)
+_T_FIX_STRONGEST = (5.71042258020733655842240186369e-240, 1.0, 18.192116467196947744171843041, 1.74284701835980197143864271246)       # N = 400, s = -0.5, i0 = 1
+_t_check(fixation_statistics(400, -0.5, 1), [float(x) for x in _T_FIX_STRONGEST])
 
 # --- test case 3: N not an integer in [2, 400], i0 outside [1, N - 1], or s not finite or out of range ---
 for _t_bad in ((1, 0.1, 1), (401, 0.1, 1), (10.0, 0.1, 1), (10, 0.1, True), (10, 0.1, 2.0), (10, 0.1, 0), (10, 0.1, 10), (10, 0.7, 3), (10, float("inf"), 3)):

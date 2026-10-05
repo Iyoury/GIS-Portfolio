@@ -39,9 +39,9 @@ def _t_times(N, s, u, v, dps):
         return tuple(out)
 
 
-def _t_check(out, target):
+def _t_check(out, target, tol=1e-8):
     assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(x, float) for x in out), out
-    assert _t_rel(out[0], target[0]) < 1e-8 and _t_rel(out[1], target[1]) < 1e-8, (out, target)
+    assert _t_rel(out[0], target[0]) < tol and _t_rel(out[1], target[1]) < tol, (out, target)
 
 
 import time as _t_time
@@ -70,10 +70,12 @@ for N, s, u, v in ((20, -0.5, 1e-12, 1e-12), (30, 0.3, 1e-3, 1e-10), (25, 0.0, 1
 for N, s, s2, u, v in ((400, 0.5, -1.0 / 3.0, 1e-12, 1e-12), (250, 0.25, -0.2, 1e-7, 1e-11)):
     a = substitution_times(N, s, u, v)
     b = substitution_times(N, s2, v, u)
-    _t_check(a, (b[1], b[0]))
+    _t_check(a, (b[1], b[0]), tol=2.1e-8)    # two computed outputs, each within 1e-8: 2.1e-8
 assert substitution_times(400, 0.5, 1e-12, 1e-12)[1] > 1e100
 # N = 400, s = 0.5, u = v = 1e-12: both times against independent targets: plain Gaussian elimination with partial pivoting in mpmath at 400 digits, run once
 _t_check(substitution_times(400, 0.5, 1e-12, 1e-12), (float("4291404419.48431774984735370533"), float("8.68501178089203024655547514684e+149")))
+# N = 400, s = -0.5, u = v = 1e-12: t_up is about 4.4e248 generations (same method, run once)
+_t_check(substitution_times(400, -0.5, 1e-12, 1e-12), (float("4.37795967826815097712471068418e+248"), float("3138809269.90745487051403101222")))
 
 # --- test case 3: rare mutations: the population waits about 1 / (N v p_fix(1 copy)) generations in
 # i = 0; for N = 20, s = 0.3, u = v = 1e-12 the hitting time differs from that only through the short
@@ -88,7 +90,8 @@ with _t_mp.workdps(60):
             M[a - 1, b - 1] = (1 if a == b else 0) - P[a, b]
     p1 = float(_t_mp.lu_solve(M, rhs)[0])
 out = substitution_times(20, 0.3, 1e-12, 1e-12)
-assert _t_rel(out[0], 1.0 / (20 * 1e-12 * p1)) < 1e-8, (out, 1.0 / (20 * 1e-12 * p1))
+# (1e-8 allowed for t_up plus the 2e-10 by which the origin-fixation form differs: 2.1e-8)
+assert _t_rel(out[0], 1.0 / (20 * 1e-12 * p1)) < 2.1e-8, (out, 1.0 / (20 * 1e-12 * p1))
 
 # --- test case 4: N not an integer in [1, 400], or s, u, v not finite or out of range (u, v >= 1e-12) ---
 for _t_bad in ((0, 0.1, 0.01, 0.01), (401, 0.1, 0.01, 0.01), (True, 0.1, 0.01, 0.01), (10, 0.1, 0.01, 0.0), (10, 0.1, 0.01, 0.15), (6.0, 0.1, 0.01, 0.01), (10, -0.51, 0.01, 0.01), (10, 0.1, float("inf"), 0.01)):
