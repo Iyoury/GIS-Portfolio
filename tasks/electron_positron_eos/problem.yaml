@@ -1,0 +1,335 @@
+domain: physics
+
+required_dependencies: |-
+  import numpy as np
+  import math
+
+problem_description_main: |-
+  In the hot, dense interiors of stars, white dwarfs and supernova cores the electrons form an ideal
+  Fermi gas that can be anywhere between classical and completely degenerate, and between
+  non-relativistic and ultra-relativistic; above about 10^9 K, electron-positron pairs appear and at
+  low density they outnumber the electrons left over from the ions by many decades. We compute the
+  equation of state of this gas from first principles: the number densities of electrons and
+  positrons, the pressure, the internal energy and the entropy for a given temperature and chemical
+  potential, the chemical potential that reproduces a given electron density, the specific heat at
+  constant density, and finally the complete equation of state for a given mass density, temperature
+  and electron fraction. The quantities wanted are often tiny differences of large ones (the net
+  electron density in a pair plasma, the entropy and the specific heat of a degenerate gas), and each
+  must be delivered with a small relative error.
+
+  Conventions used in every step. The particles have spin 1/2 (two states per momentum). Momenta p are
+  in units of m_e c, energies in units of m_e c^2: the total energy of a particle is eps = sqrt(1 + p^2)
+  and its kinetic energy is eps - 1. theta = k T / (m_e c^2). The state of the gas is given by T and
+  psi = (mu + m_e c^2) / (k T), where mu is the electron chemical potential without the rest mass; the
+  occupation numbers are f_-(p) = 1 / (exp(eps / theta - psi) + 1) for electrons and
+  f_+(p) = 1 / (exp(eps / theta + psi) + 1) for positrons (pairs are in equilibrium with radiation, so
+  the positron chemical potential is minus that of the electrons). psi > 0 means more electrons than
+  positrons. Number densities are n = (1 / (pi^2 lambda^3)) int_0^inf p^2 f(p) dp with
+  lambda = hbar / (m_e c). Constants (CGS, exact as given): m_e c^2 = 8.1871057769e-7 erg,
+  k = 1.380649e-16 erg/K, lambda = 3.8615926796e-11 cm, Avogadro's number N_A = 6.02214076e23 per mol.
+
+problem_io: |-
+  def electron_positron_eos(rho, T, Ye):
+      '''Equation of state of the electron-positron gas for a mass density, temperature and electron fraction.
+
+      Inputs:
+        rho: float, mass density in g cm^-3.
+        T: float, temperature in K, 1e7 <= T <= 1e11.
+        Ye: float, electrons per baryon, 0 < Ye <= 1; 1e-10 <= rho Ye <= 1e13.
+
+      Output:
+        dict with the Python floats "psi", "n_minus", "n_plus", "P", "u", "s", "cv" (units and accuracy
+          as in steps 1-4). Each call within 30 s.
+
+      Raises:
+        ValueError if rho, T or Ye is not finite, if Ye is not in (0, 1], or if T or rho Ye is outside
+        its range.
+      '''
+
+general_tests: tests/general.py
+
+second_solution: second_solution.py
+
+mutants:
+  - name: whole_task_classical_occupation
+    description: "Uses Boltzmann occupation numbers e^{-x} instead of the Fermi-Dirac ones, wrong for degenerate gases."
+    file: mutants/whole_task_classical_occupation.py
+
+sub_steps:
+
+  - step_number: 1
+    scaffold: steps/step_1.py
+    solution: solution/step_1.py
+    tests: tests/step_1.py
+    step_description_prompt: |-
+      Number densities of the electron-positron gas. For given T (K) and psi (see the conventions), return
+      the electron number density n_minus, the positron number density n_plus and the net electron density
+      n_net = n_minus - n_plus, all in cm^-3:
+        n_minus = (1 / (pi^2 lambda^3)) int_0^inf p^2 / (exp(eps / theta - psi) + 1) dp,
+        n_plus  = (1 / (pi^2 lambda^3)) int_0^inf p^2 / (exp(eps / theta + psi) + 1) dp,
+      with eps = sqrt(1 + p^2) and theta = k T / (m_e c^2).
+
+      Accuracy: n_minus and n_net with a relative error below 1e-10; n_plus with a relative error below
+      1e-10 whenever its exact value is at least 1e-250 cm^-3, and otherwise within 1e-250 cm^-3 of it.
+      This holds over the whole domain: a strongly degenerate gas (psi up to 1e6, where the electrons fill
+      all states up to a sharp Fermi edge many hundreds of k T wide), a classical one, and a pair plasma in
+      which positrons and electrons outnumber their difference by more than 20 decades (n_net / n_minus is
+      about 4e-21 at T = 1e11 K, psi = 2.2e-21); n_net must have the stated relative accuracy there too.
+      Each call must finish within 10 s on one CPU core.
+      Inputs: T (float, 1e7 <= T <= 1e11) and psi (float, 0 < psi <= 1e6).
+      Errors: raise ValueError if T or psi is not finite, if T is outside [1e7, 1e11] or if psi is not in
+      (0, 1e6].
+    function_header: |-
+      def pair_densities(T, psi):
+          '''Number densities of electrons and positrons in an ideal Fermi gas with pairs.
+
+          Inputs:
+            T: float, temperature in K, 1e7 <= T <= 1e11.
+            psi: float, (mu + m_e c^2) / (k T) with mu the electron chemical potential without the rest
+                 mass, 0 < psi <= 1e6; electrons occupy 1 / (exp(eps/theta - psi) + 1), positrons
+                 1 / (exp(eps/theta + psi) + 1), eps = sqrt(1 + p^2), theta = k T / (m_e c^2).
+
+          Output:
+            (n_minus, n_plus, n_net): Python floats in cm^-3, n = (1 / (pi^2 lambda^3)) int p^2 f dp with
+              lambda = hbar / (m_e c); n_net = n_minus - n_plus. n_minus and n_net with a relative error
+              below 1e-10; n_plus with a relative error below 1e-10 when at least 1e-250 cm^-3, otherwise
+              within 1e-250 cm^-3. Each call within 10 s.
+
+          Raises:
+            ValueError if T or psi is not finite, if T is outside [1e7, 1e11] or psi is not in (0, 1e6].
+          '''
+    return_line: return result
+    step_background: |-
+      The ideal Fermi gas of electrons and positrons is the standard model of stellar plasma at high density
+      and temperature (Chandrasekhar 1939; Cox and Giuli 1968). Pairs are in equilibrium with the photons
+      (e- + e+ <-> 2 gamma), so the positron chemical potential is minus the electron one, both including
+      the rest energy. Above about 1e9 K, at low density, the pairs vastly outnumber the electrons supplied
+      by the ions; the net electron density is then a tiny difference of two large numbers.
+    n_test_cases: 4
+    contract:
+      quantity: "Number densities of electrons and positrons and their difference in an ideal relativistic Fermi gas with pairs."
+      assumptions: "Ideal gas, spin 1/2, pairs in equilibrium with radiation (positron chemical potential minus the electron one, rest energy included)."
+      result_kind: exact
+      valid_input_ranges: "1e7 <= T <= 1e11 K; 0 < psi <= 1e6."
+      units: "cm^-3."
+      output_shape: "Tuple of three Python floats."
+      step_dependencies: []
+    mutants:
+      - name: net_by_subtraction
+        description: "Takes the net electron density as n_minus - n_plus, which has no relative accuracy when pairs dominate."
+        file: mutants/step_1_net_by_subtraction.py
+
+  - step_number: 2
+    scaffold: steps/step_2.py
+    solution: solution/step_2.py
+    tests: tests/step_2.py
+    step_description_prompt: |-
+      Pressure, internal energy and entropy of the electron-positron gas at given T (K) and psi (see the
+      conventions; occupation numbers f_- of electrons and f_+ of positrons as in pair_densities, step 1).
+      Return the tuple (P, u, s):
+        P = (m_e c^2 / (3 pi^2 lambda^3)) int_0^inf (p^4 / eps) (f_- + f_+) dp          (erg cm^-3),
+        u = (m_e c^2 / (pi^2 lambda^3)) int_0^inf p^2 [(eps - 1) f_- + (eps + 1) f_+] dp (erg cm^-3),
+            the kinetic energy of the electrons plus the kinetic energy and the rest energy 2 m_e c^2 of
+            each positron (the energy of the pairs),
+        s = -(k / (pi^2 lambda^3)) int_0^inf p^2 [f_- ln f_- + (1 - f_-) ln(1 - f_-)
+                                                 + f_+ ln f_+ + (1 - f_+) ln(1 - f_+)] dp  (erg K^-1 cm^-3).
+      Each with a relative error below 1e-10 over the whole domain, including the strongly degenerate gas,
+      whose entropy is a tiny fraction of (u + P) / T (about 6e-10 of it for psi near 1.3e5 at T = 1e7 K), the
+      classical gas and the pair plasma. Each call must finish within 10 s on one CPU core.
+      Inputs: T (float, 1e7 <= T <= 1e11) and psi (float, 0 < psi <= 1e6).
+      Errors: raise ValueError if T or psi is not finite, if T is outside [1e7, 1e11] or if psi is not in
+      (0, 1e6].
+    function_header: |-
+      def pair_thermodynamics(T, psi):
+          '''Pressure, internal energy and entropy of an ideal electron-positron gas.
+
+          Inputs:
+            T: float, temperature in K, 1e7 <= T <= 1e11.
+            psi: float, (mu + m_e c^2) / (k T), 0 < psi <= 1e6 (as in pair_densities).
+
+          Output:
+            (P, u, s): Python floats. P the pressure (erg cm^-3); u the energy density (erg cm^-3): kinetic
+              energy of the electrons plus kinetic energy and 2 m_e c^2 per positron; s the entropy density
+              (erg K^-1 cm^-3). Each with a relative error below 1e-10. Each call within 10 s.
+
+          Raises:
+            ValueError if T or psi is not finite, if T is outside [1e7, 1e11] or psi is not in (0, 1e6].
+          '''
+    return_line: return result
+    step_background: |-
+      Pressure, energy and entropy follow from the occupation numbers; the entropy density of an ideal Fermi
+      gas is -k sum over states [f ln f + (1 - f) ln(1 - f)]. In a degenerate gas the entropy is of order
+      k T / E_F times the particle number and is a minute fraction of the energy and pressure terms of the
+      Euler relation u_tot + P - T s = mu n (Landau and Lifshitz, Statistical Physics, sec. 56-61).
+    n_test_cases: 3
+    contract:
+      quantity: "Pressure, energy density and entropy density of the ideal electron-positron gas."
+      assumptions: "As in step 1; energy density counts the kinetic energy of the electrons and kinetic plus rest energy of the pairs."
+      result_kind: exact
+      valid_input_ranges: "1e7 <= T <= 1e11 K; 0 < psi <= 1e6."
+      units: "erg cm^-3, erg cm^-3, erg K^-1 cm^-3."
+      output_shape: "Tuple of three Python floats."
+      step_dependencies: [1]
+    mutants:
+      - name: entropy_from_euler
+        description: "Takes the entropy from the Euler relation (u_tot + P - mu n) / T, which cancels in a degenerate gas."
+        file: mutants/step_2_entropy_from_euler.py
+
+  - step_number: 3
+    scaffold: steps/step_3.py
+    solution: solution/step_3.py
+    tests: tests/step_3.py
+    step_description_prompt: |-
+      Chemical potential of the electron-positron gas from its electron density. In matter, the net number
+      of electrons per volume is fixed by the ions: n_net = rho Y_e N_A, with rho the mass density (g cm^-3)
+      and Y_e the number of electrons per baryon, so rho_Ye = rho Y_e is given in g cm^-3. For given rho_Ye
+      and T (K), return the psi > 0 at which the net electron density n_net of pair_densities (step 1)
+      equals rho_Ye N_A. n_net increases strictly with psi, so this psi is unique.
+      Return psi as a Python float with a relative error below 1e-10. The domain reaches from strongly
+      degenerate gases (psi above 1e5 at rho_Ye = 1e13, T = 1e7 K) to pair plasmas in which psi is
+      extremely small (about 2e-21 at rho_Ye = 1e-10, T = 1e11 K); the relative accuracy is required
+      there too. Each call must finish within 10 s on one CPU core.
+      Inputs: rho_Ye (float, 1e-10 <= rho_Ye <= 1e13) and T (float, 1e7 <= T <= 1e11).
+      Errors: raise ValueError if rho_Ye or T is not finite or is outside its range.
+    function_header: |-
+      def degeneracy_parameter(rho_Ye, T):
+          '''psi = (mu + m_e c^2) / (k T) at which the net electron density equals rho_Ye N_A.
+
+          Inputs:
+            rho_Ye: float, rho Y_e in g cm^-3, 1e-10 <= rho_Ye <= 1e13.
+            T: float, temperature in K, 1e7 <= T <= 1e11.
+
+          Output:
+            psi: Python float, psi > 0 with n_net(T, psi) = rho_Ye N_A (n_net of pair_densities), with a
+              relative error below 1e-10. Each call within 10 s.
+
+          Raises:
+            ValueError if rho_Ye or T is not finite or is outside its range.
+          '''
+    return_line: return psi
+    step_background: |-
+      Stellar evolution codes tabulate the electron equation of state in density and temperature (Timmes
+      and Arnett 1999; Timmes and Swesty 2000, the Helmholtz EOS); for every (rho, T) the chemical potential
+      must first be found from the net electron density rho Y_e N_A. psi = (mu + m_e c^2) / (k T) covers both
+      the degenerate limit (psi large) and the pair-dominated limit (psi tiny) with full relative precision.
+    n_test_cases: 3
+    contract:
+      quantity: "Degeneracy parameter psi = (mu + m_e c^2)/(k T) from the net electron density rho Y_e N_A."
+      assumptions: "As in step 1; n_net strictly increasing in psi."
+      result_kind: exact
+      valid_input_ranges: "1e-10 <= rho_Ye <= 1e13 g cm^-3; 1e7 <= T <= 1e11 K."
+      units: "Dimensionless."
+      output_shape: "Python float."
+      step_dependencies: [1]
+    mutants:
+      - name: positrons_ignored
+        description: "Solves n_minus = rho_Ye N_A, ignoring the positrons (wrong in pair plasmas)."
+        file: mutants/step_3_positrons_ignored.py
+
+  - step_number: 4
+    scaffold: steps/step_4.py
+    solution: solution/step_4.py
+    tests: tests/step_4.py
+    step_description_prompt: |-
+      Specific heat at constant density of the electron-positron gas. With the net electron density held at
+      n_net = rho_Ye N_A (the psi of degeneracy_parameter, step 3), return
+        c_V = (d u_tot / d T) at constant n_net      (erg K^-1 cm^-3),
+      where u_tot = u + n_net m_e c^2 is the total energy density including all rest energies (u as in
+      pair_thermodynamics, step 2; at constant n_net, c_V is also d u / d T). Pairs are created as T rises,
+      and the positron number is not held fixed: only n_net is.
+      Return c_V as a Python float with a relative error below 1e-8 over the whole domain. In a strongly
+      degenerate gas c_V is smaller than u / T by about (k T / E_F)^2 (E_F the Fermi energy), about 8e-10
+      at rho_Ye = 1e13 g cm^-3, T = 1e7 K; the stated relative accuracy is required there too.
+      Each call must finish within 10 s on one CPU core.
+      Inputs: rho_Ye (float, 1e-10 <= rho_Ye <= 1e13) and T (float, 1e7 <= T <= 1e11).
+      Errors: raise ValueError if rho_Ye or T is not finite or is outside its range.
+    function_header: |-
+      def specific_heat(rho_Ye, T):
+          '''Specific heat per volume at constant net electron density of the electron-positron gas.
+
+          Inputs:
+            rho_Ye: float, rho Y_e in g cm^-3, 1e-10 <= rho_Ye <= 1e13 (n_net = rho_Ye N_A).
+            T: float, temperature in K, 1e7 <= T <= 1e11.
+
+          Output:
+            cv: Python float, (d u_tot / d T) at constant n_net in erg K^-1 cm^-3, u_tot the total energy
+              density including the rest energies; relative error below 1e-8. Each call within 10 s.
+
+          Raises:
+            ValueError if rho_Ye or T is not finite or is outside its range.
+          '''
+    return_line: return cv
+    step_background: |-
+      The specific heat at constant density controls the thermal evolution of white dwarfs and of the
+      cores of massive stars. For a degenerate gas it is smaller than the classical 3/2 n k by about
+      pi^2 k T / E_F (the Sommerfeld expansion); pair creation adds to it at high temperature. In the grand
+      canonical ensemble, c_V = (<dE^2> - <dE dN>^2 / <dN^2>) / (k T^2), with the fluctuations of energy and of
+      the net particle number.
+    n_test_cases: 2
+    contract:
+      quantity: "Specific heat per volume at constant net electron density."
+      assumptions: "As in step 1; pairs created freely, only n_net held fixed."
+      result_kind: exact
+      valid_input_ranges: "1e-10 <= rho_Ye <= 1e13 g cm^-3; 1e7 <= T <= 1e11 K."
+      units: "erg K^-1 cm^-3."
+      output_shape: "Python float."
+      step_dependencies: [1, 2, 3]
+    mutants:
+      - name: schur_complement
+        description: "Forms <dE^2><dN^2> - <dE dN>^2 directly, which cancels to (k T / E_F)^2 in a degenerate gas."
+        file: mutants/step_4_schur_complement.py
+      - name: positron_fluctuations_ignored
+        description: "Keeps only the electron fluctuations, missing the heat taken up by pair creation."
+        file: mutants/step_4_positron_fluctuations_ignored.py
+
+  - step_number: 5
+    scaffold: steps/step_5.py
+    solution: solution/step_5.py
+    tests: tests/step_5.py
+    step_description_prompt: |-
+      Complete equation of state of the electron-positron gas for a mass density rho (g cm^-3), a
+      temperature T (K) and an electron fraction Ye (electrons per baryon). With rho_Ye = rho Ye, find psi
+      with degeneracy_parameter (step 3), then the densities with pair_densities (step 1), P, u and s with
+      pair_thermodynamics (step 2) and c_V with specific_heat (step 4).
+      Return a dict with the keys "psi", "n_minus", "n_plus", "P", "u", "s", "cv" (Python floats, units as
+      in the earlier steps), each with the accuracy stated in its step (psi, n_minus, P, u, s relative
+      1e-10; n_plus relative 1e-10 when at least 1e-250 cm^-3, otherwise within 1e-250 cm^-3; cv relative
+      1e-8). Each call must finish within 30 s on one CPU core.
+      Inputs: rho (float), T (float, 1e7 <= T <= 1e11) and Ye (float, 0 < Ye <= 1), with
+      1e-10 <= rho Ye <= 1e13.
+      Errors: raise ValueError if rho, T or Ye is not finite, if Ye is not in (0, 1], or if T or rho Ye is
+      outside its range.
+    function_header: |-
+      def electron_positron_eos(rho, T, Ye):
+          '''Equation of state of the electron-positron gas for a mass density, temperature and electron fraction.
+
+          Inputs:
+            rho: float, mass density in g cm^-3.
+            T: float, temperature in K, 1e7 <= T <= 1e11.
+            Ye: float, electrons per baryon, 0 < Ye <= 1; 1e-10 <= rho Ye <= 1e13.
+
+          Output:
+            dict with the Python floats "psi", "n_minus", "n_plus", "P", "u", "s", "cv" (units and accuracy
+              as in steps 1-4). Each call within 30 s.
+
+          Raises:
+            ValueError if rho, T or Ye is not finite, if Ye is not in (0, 1], or if T or rho Ye is outside
+            its range.
+          '''
+    return_line: return result
+    step_background: |-
+      A complete equation of state gives every thermodynamic quantity of the electron-positron component
+      for (rho, T, Y_e); ions and radiation are added separately in a stellar model.
+    n_test_cases: 2
+    contract:
+      quantity: "Equation of state of the electron-positron gas for (rho, T, Y_e)."
+      assumptions: "As in steps 1-4."
+      result_kind: exact
+      valid_input_ranges: "1e7 <= T <= 1e11 K; 0 < Ye <= 1; 1e-10 <= rho Ye <= 1e13 g cm^-3."
+      units: "As in steps 1-4."
+      output_shape: "Dict of seven Python floats."
+      step_dependencies: [1, 2, 3, 4]
+    mutants:
+      - name: cv_at_fixed_psi
+        description: "Differentiates the energy at constant psi instead of constant net electron density."
+        file: mutants/step_5_cv_at_fixed_psi.py
