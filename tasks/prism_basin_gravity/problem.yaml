@@ -1,0 +1,290 @@
+domain: earth
+
+required_dependencies: |-
+  import numpy as np
+  import math
+
+problem_description_main: |-
+  Gravity surveys map the density of the subsurface. The building block of most forward models is the
+  right rectangular prism of uniform density, whose potential, attraction and gravity gradients have
+  closed forms (Nagy, Papp and Benedek 2000), and sedimentary basins are commonly modelled as columns
+  whose density contrast with the basement decays with depth as the sediments compact. We compute the
+  potential and attraction of a prism at any point, its gravity-gradient tensor, the attraction of a
+  column with an exponentially decaying density contrast, and finally the depths of a basin from its
+  gravity anomaly.
+
+  Conventions used in every step. Coordinates x, y (horizontal) and z (positive downward, depth) in
+  metres; G = 6.6743e-11 m^3 kg^-1 s^-2. A density rho (kg m^-3) in a volume V produces the potential
+  U(P) = G int_V rho / |Q - P| dV(Q) (m^2 s^-2) and the attraction g = grad U at P (m s^-2), which points
+  toward the mass for rho > 0; its z component is positive downward. The gravity-gradient tensor is
+  T_ij = d g_i / d x_j at P (s^-2).
+
+problem_io: |-
+  def invert_basin_depths(x_edges, y_edges, gz_obs, drho0, lam):
+      """Depths of a basin of columns (density contrast drho0 exp(-lam z)) from its gravity anomaly.
+
+      Inputs:
+        x_edges, y_edges: 1-D float arrays (nx + 1 and ny + 1 entries), strictly increasing, nx ny <= 100.
+        gz_obs: float array (nx, ny), the vertical attraction (m s^-2) of all columns at the cell centres on
+          the surface z = 0; it is that of a basin with every depth in (0, 5e4] m.
+        drho0: float, nonzero density contrast at the surface (kg m^-3).
+        lam: float, 0 <= lam <= 1e-2 (per m).
+
+      Output:
+        depths: numpy array (nx, ny) in m, each with a relative error below 1e-8. Each call within 30 s.
+
+      Raises:
+        ValueError for invalid edges, nx ny > 100, gz_obs of the wrong shape or non-finite, drho0 zero or
+        non-finite, lam outside [0, 1e-2], an observation without the sign of drho0, or (lam > 0) an
+        observation of at least 2 pi G |drho0| / lam.
+      """
+
+general_tests: tests/general.py
+
+second_solution: second_solution.py
+
+mutants:
+  - name: whole_task_upward_z
+    description: "Takes the z axis upward for the attraction, so every vertical component has the wrong sign."
+    file: mutants/whole_task_upward_z.py
+
+sub_steps:
+
+  - step_number: 1
+    scaffold: steps/step_1.py
+    solution: solution/step_1.py
+    tests: tests/step_1.py
+    step_description_prompt: |-
+      Potential and attraction of a right rectangular prism x1 <= x <= x2, y1 <= y <= y2, z1 <= z <= z2 of
+      uniform density rho at observation points P (see the conventions). bounds = (x1, x2, y1, y2, z1, z2).
+      Return (U, g): U = G rho int 1/|Q - P| dV and g = grad U at P.
+
+      Accuracy: U with a relative error below 1e-10; every component of g within 1e-10 |g| + 1e-14 G |rho| L
+      of its exact value, where |g| is the Euclidean norm of the exact attraction and L the longest edge of
+      the prism. This holds at every point: outside the prism at any distance (up to a million times the
+      size of the prism, where |g| falls below 1e-12 G |rho| L), on its faces, edges and corners, and
+      inside it. Each call must finish within 10 s on one CPU core for up to 1000 points.
+      Inputs: points, a float array of shape (3,) or (n, 3); bounds; rho (float).
+      Output: for points of shape (3,), a Python float U and a numpy array g of shape (3,); for shape (n, 3),
+      numpy arrays U of shape (n,) and g of shape (n, 3).
+      Errors: raise ValueError if bounds are not six finite numbers with x1 < x2, y1 < y2, z1 < z2, if rho is
+      not finite, or if points do not have shape (3,) or (n, 3) with n >= 1 or contain a non-finite value.
+    function_header: |-
+      def prism_gravity(points, bounds, rho):
+          """Potential and attraction of a right rectangular prism of uniform density.
+
+          Inputs:
+            points: float array of shape (3,) or (n, 3), observation points (x, y, z) in m, z positive down.
+            bounds: (x1, x2, y1, y2, z1, z2), the prism x1 <= x <= x2, y1 <= y <= y2, z1 <= z <= z2 (m).
+            rho: float, density (kg m^-3).
+
+          Output:
+            (U, g): U = G rho int dV / |Q - P| (m^2 s^-2) and g = grad U (m s^-2, toward the mass for rho > 0,
+              z component positive down). Python float and array (3,) for one point, arrays (n,) and (n, 3)
+              otherwise. U with a relative error below 1e-10; each component of g within
+              1e-10 |g| + 1e-14 G |rho| L (L the longest edge), at every point, inside, on the surface or
+              outside at any distance. Each call within 10 s for up to 1000 points.
+
+          Raises:
+            ValueError for invalid bounds (not six finite numbers with x1 < x2, y1 < y2, z1 < z2), a
+            non-finite rho, or points of the wrong shape or with a non-finite value.
+          """
+    return_line: return result
+    step_background: |-
+      Nagy (1966) and Nagy, Papp and Benedek (2000) gave the potential and attraction of a right rectangular prism as
+      sums over its eight corners of terms such as x y ln(z + r) and z^2 atan(x y / (z r)). These sums are exact,
+      but their terms grow like the square of the distance while the potential falls like 1/distance and the
+      attraction like 1/distance^2, so far from the prism they are small differences of large numbers. At the
+      faces, edges and corners some terms take limiting values (0 ln 0, atan of 0/0).
+    n_test_cases: 4
+    contract:
+      quantity: "Potential and attraction of a uniform right rectangular prism."
+      assumptions: "Newtonian gravity, uniform density, z positive downward, G = 6.6743e-11."
+      result_kind: exact
+      valid_input_ranges: "Any finite point; finite rho; x1 < x2, y1 < y2, z1 < z2."
+      units: "m^2 s^-2 and m s^-2."
+      output_shape: "(float, array (3,)) or (array (n,), array (n, 3))."
+      step_dependencies: []
+    mutants:
+      - name: closed_form_everywhere
+        description: "Uses the corner sums at every distance; far from the prism they cancel and lose all accuracy."
+        file: mutants/step_1_closed_form_everywhere.py
+      - name: direct_log
+        description: "Evaluates ln(x + r) directly also for x < 0, where it cancels."
+        file: mutants/step_1_direct_log.py
+
+  - step_number: 2
+    scaffold: steps/step_2.py
+    solution: solution/step_2.py
+    tests: tests/step_2.py
+    step_description_prompt: |-
+      Gravity-gradient tensor of the right rectangular prism of prism_gravity (step 1): T_ij = d g_i / d x_j
+      at P (s^-2), a symmetric 3 x 3 matrix. Inside the prism it satisfies Poisson's equation
+      T_xx + T_yy + T_zz = -4 pi G rho; outside, Laplace's equation. It is discontinuous across the faces and
+      singular on the edges, so it is not defined on the surface of the prism.
+
+      Accuracy: every component within 1e-9 ||T|| of its exact value, ||T|| the Frobenius norm of the exact
+      tensor, at every point that is not on the surface of the prism: outside at any distance
+      (up to a million times the size of the prism), including points in the planes of the faces, and inside.
+      Each call must finish within 10 s on one CPU core for up to 1000 points.
+      Inputs: points, a float array of shape (3,) or (n, 3); bounds = (x1, x2, y1, y2, z1, z2); rho (float).
+      Output: a numpy array of shape (3, 3) for points of shape (3,), of shape (n, 3, 3) for shape (n, 3).
+      Errors: raise ValueError as in prism_gravity, and if a point lies on the surface of the prism (on a
+      face, edge or corner).
+    function_header: |-
+      def prism_gradients(points, bounds, rho):
+          """Gravity-gradient tensor T_ij = d g_i / d x_j of a right rectangular prism of uniform density.
+
+          Inputs:
+            points: float array of shape (3,) or (n, 3), observation points (m), not on the prism surface.
+            bounds: (x1, x2, y1, y2, z1, z2) (m).
+            rho: float, density (kg m^-3).
+
+          Output:
+            T: numpy array of shape (3, 3) (one point) or (n, 3, 3), in s^-2; each component within
+              1e-9 ||T|| (Frobenius norm of the exact tensor), inside or outside at any distance. Each call within
+              10 s for up to 1000 points.
+
+          Raises:
+            ValueError as in prism_gravity, and for a point on the surface of the prism.
+          """
+    return_line: return T
+    step_background: |-
+      Gravity gradiometry (airborne and satellite, GOCE) measures the tensor T_ij = d^2 U / dx_i dx_j. For the prism
+      its components are corner sums of atan(y z / (x r)) and ln(x + r) terms (Nagy et al. 2000). The diagonal
+      components jump by 4 pi G rho across the faces, and the off-diagonal ones diverge logarithmically along the
+      edges.
+    n_test_cases: 4
+    contract:
+      quantity: "Gravity-gradient tensor of a uniform right rectangular prism."
+      assumptions: "As in step 1."
+      result_kind: exact
+      valid_input_ranges: "Any finite point not on the surface of the prism."
+      units: "s^-2."
+      output_shape: "Array (3, 3) or (n, 3, 3)."
+      step_dependencies: [1]
+    mutants:
+      - name: closed_form_everywhere
+        description: "Uses the corner sums of the gradients at every distance."
+        file: mutants/step_2_closed_form_everywhere.py
+
+  - step_number: 3
+    scaffold: steps/step_3.py
+    solution: solution/step_3.py
+    tests: tests/step_3.py
+    step_description_prompt: |-
+      Vertical attraction of a sedimentary column whose density contrast with the basement decreases with
+      depth as the sediments compact. The column occupies x1 <= x <= x2, y1 <= y <= y2, 0 <= z <= depth (the
+      top at the surface z = 0) and has the density contrast drho0 exp(-lam z) (kg m^-3). Return the z
+      component of its attraction (m s^-2, positive downward for drho0 > 0; see the conventions) at stations
+      at or above the surface (z <= 0).
+
+      Accuracy: a relative error below 1e-10 at every station: above the column or beside it, near or far,
+      on the surface directly above an edge or a corner of the column, and at any horizontal distance from
+      its edges, however small (a station on the surface 1e-6 m from an edge included). Each call must finish
+      within 10 s on one CPU core for up to 1000 stations.
+      Inputs: stations, a float array of shape (3,) or (n, 3) with z <= 0; x1 < x2, y1 < y2 (floats);
+      depth (float, 0 < depth <= 5e4); drho0 (float); lam (float, 0 <= lam <= 1e-2 per m).
+      Output: a Python float for stations of shape (3,), a numpy array of shape (n,) for shape (n, 3).
+      Errors: raise ValueError if stations do not have shape (3,) or (n, 3) or contain a non-finite value or
+      a z > 0, if any parameter is not finite, if x1 >= x2 or y1 >= y2, if depth is not in (0, 5e4] or if
+      lam is not in [0, 1e-2].
+    function_header: |-
+      def column_gz(stations, x1, x2, y1, y2, depth, drho0, lam):
+          """Vertical attraction of a column with density contrast drho0 exp(-lam z), 0 <= z <= depth.
+
+          Inputs:
+            stations: float array of shape (3,) or (n, 3), stations (x, y, z) in m with z <= 0.
+            x1, x2, y1, y2: floats, the column x1 <= x <= x2, y1 <= y <= y2 (m), x1 < x2, y1 < y2.
+            depth: float, 0 < depth <= 5e4 (m).
+            drho0: float, density contrast at the surface (kg m^-3).
+            lam: float, 0 <= lam <= 1e-2 (per m).
+
+          Output:
+            gz: z component of the attraction (m s^-2, positive down for drho0 > 0); a Python float for one
+              station, a numpy array (n,) otherwise; relative error below 1e-10 at every station. Each call
+              within 10 s for up to 1000 stations.
+
+          Raises:
+            ValueError for stations of the wrong shape, non-finite or with z > 0, a non-finite parameter,
+            x1 >= x2 or y1 >= y2, depth outside (0, 5e4] or lam outside [0, 1e-2].
+          """
+    return_line: return gz
+    step_background: |-
+      Sediments compact with burial, so their density contrast with the basement decreases with depth; an
+      exponential law drho0 exp(-lam z) (Cordell 1973; Chakravarthi and Sundararajan 2007) is the classical
+      model. A column of such sediment has no closed-form attraction; the attraction of a horizontal lamina of the
+      column is the sum of atan(x y / (z r)) over its corners.
+    n_test_cases: 4
+    contract:
+      quantity: "Vertical attraction of a column with density contrast decaying exponentially with depth."
+      assumptions: "As in step 1; column from z = 0 to depth, density contrast drho0 exp(-lam z)."
+      result_kind: exact
+      valid_input_ranges: "Stations with z <= 0; 0 < depth <= 5e4 m; 0 <= lam <= 1e-2 per m."
+      units: "m s^-2."
+      output_shape: "Float or array (n,)."
+      step_dependencies: [1]
+    mutants:
+      - name: uniform_gauss_legendre
+        description: "Integrates over depth with one 64-point Gauss-Legendre rule, which misses the sharp variation of the lamina term near the top for stations close to an edge."
+        file: mutants/step_3_uniform_gauss_legendre.py
+      - name: uniform_density
+        description: "Ignores the decay of the density contrast with depth."
+        file: mutants/step_3_uniform_density.py
+
+  - step_number: 4
+    scaffold: steps/step_4.py
+    solution: solution/step_4.py
+    tests: tests/step_4.py
+    step_description_prompt: |-
+      Depths of a sedimentary basin from its gravity anomaly. The basin is a grid of nx x ny columns: column
+      (i, j) occupies x_edges[i] <= x <= x_edges[i + 1], y_edges[j] <= y <= y_edges[j + 1] and
+      0 <= z <= depth[i, j], all with the density contrast drho0 exp(-lam z) of column_gz (step 3). The
+      anomaly gz_obs[i, j] is the total vertical attraction of all columns at the station at the centre of
+      cell (i, j) on the surface, ((x_edges[i] + x_edges[i + 1]) / 2, (y_edges[j] + y_edges[j + 1]) / 2, 0).
+      The anomaly is that of such a basin with every depth in (0, 5e4]. Find the depths (m) that
+      reproduce it; return them as a numpy array of shape
+      (nx, ny) with a relative error below 1e-8 each. Each call must finish within 30 s on one CPU core.
+      Inputs: x_edges (nx + 1 floats) and y_edges (ny + 1 floats), strictly increasing, nx ny <= 100;
+      gz_obs, a float array of shape (nx, ny) (m s^-2); drho0 (float, nonzero); lam (float, 0 <= lam <= 1e-2).
+      Errors: raise ValueError if an edge array is not 1-D with at least two entries, finite and strictly
+      increasing, if nx ny > 100, if gz_obs does not have shape (nx, ny) or contains a non-finite value, if
+      drho0 is zero or not finite, if lam is not in [0, 1e-2], if an observation does not have the sign of
+      drho0 or (for lam > 0) is at least the attraction of an infinite slab, 2 pi G |drho0| / lam.
+    function_header: |-
+      def invert_basin_depths(x_edges, y_edges, gz_obs, drho0, lam):
+          """Depths of a basin of columns (density contrast drho0 exp(-lam z)) from its gravity anomaly.
+
+          Inputs:
+            x_edges, y_edges: 1-D float arrays (nx + 1 and ny + 1 entries), strictly increasing, nx ny <= 100.
+            gz_obs: float array (nx, ny), the vertical attraction (m s^-2) of all columns at the cell centres on
+              the surface z = 0; it is that of a basin with every depth in (0, 5e4] m.
+            drho0: float, nonzero density contrast at the surface (kg m^-3).
+            lam: float, 0 <= lam <= 1e-2 (per m).
+
+          Output:
+            depths: numpy array (nx, ny) in m, each with a relative error below 1e-8. Each call within 30 s.
+
+          Raises:
+            ValueError for invalid edges, nx ny > 100, gz_obs of the wrong shape or non-finite, drho0 zero or
+            non-finite, lam outside [0, 1e-2], an observation without the sign of drho0, or (lam > 0) an
+            observation of at least 2 pi G |drho0| / lam.
+          """
+    return_line: return depths
+    step_background: |-
+      Basin depth from gravity (Bott 1960; Cordell and Henderson 1968; Chakravarthi and Sundararajan 2007): with
+      one station above each column the anomaly determines the depths; each station is mostly sensitive to the
+      column below it, so the system is well conditioned and can be solved to high accuracy from exact data.
+    n_test_cases: 2
+    contract:
+      quantity: "Depths of a basin of exponential-density columns from its gravity anomaly at the cell centres."
+      assumptions: "As in step 3; one station at the centre of each cell on the surface."
+      result_kind: exact
+      valid_input_ranges: "At most 100 cells; depths in (0, 5e4] m; 0 <= lam <= 1e-2 per m."
+      units: "m."
+      output_shape: "Array (nx, ny)."
+      step_dependencies: [3]
+    mutants:
+      - name: slab_thickness
+        description: "Returns the infinite-slab (Bouguer) thickness under each station."
+        file: mutants/step_4_slab_thickness.py
