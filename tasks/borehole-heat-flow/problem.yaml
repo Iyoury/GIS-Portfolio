@@ -1,0 +1,1905 @@
+problem_name: Paleoclimate-corrected surface heat flow from an inclined exploration borehole in the Canadian Shield
+problem_id: borehole-heat-flow
+domain: earth
+edit_label: difficulty_increase
+problem_description_main: |
+  An exploration diamond-drill hole in the Canadian Shield has been logged for temperature after thermal re-equilibration. Using the deviation survey, the lithology-based conductivity column, the known radiogenic heat production and a prescribed shape of the last-glacial surface-temperature history, estimate the steady-state surface heat flow q0, the reference surface temperature T0 and the amplitude g of the glacial history, with 1-sigma uncertainties.
+
+  Workflow: (1) convert the MD of every log reading and every layer top to TVD (step 1); (2) drop readings with TVD < z_min; (3) evaluate R and S at the remaining depths (step 2); (4) evaluate the unit-amplitude paleoclimate perturbation P (step 3); (5) estimate T0, q0 and g jointly (step 4). Step 5 (surface_heat_flow) chains steps 1-4 into this full workflow, the top-level function of the task. Step 6 (layered_paleoclimate_perturbation) goes beyond the half-space of step 3: the paleoclimate perturbation in the layered conductivity column itself, where the glacial signal is refracted at every conductivity contrast.
+problem_background_main: |
+  # Scientific background: heat flow from an inclined Shield borehole
+
+  ## Why this workflow exists
+
+  Surface heat flow constrains crustal radiogenic heat production, lithospheric
+  thickness and geothermal potential. On the Canadian Shield, most heat-flow
+  determinations come from **mineral-exploration diamond-drill holes** that have
+  been left to re-equilibrate after drilling. Examples are the Abitibi,
+  Sudbury, Thompson and Flin Flon compilations (Jessop et al. 1984; Mareschal &
+  Jaupart 2004).
+
+  These holes are drilled at an angle to cut steeply dipping ore bodies. A
+  collar dip of 45–60° is typical, and the path keeps bending as it deepens.
+  Conductivity is measured on core from each rock unit. Shallow temperatures
+  still carry the signature of the last glaciation, which ended only about
+  10 ka ago.
+
+  Producing a heat-flow value therefore takes three corrections: convert depth
+  along the hole to vertical depth, integrate thermal resistance through the
+  layered column, and remove the paleoclimatic transient.
+
+  ## 1. Borehole trajectory: minimum curvature
+
+  A deviation survey gives, at measured depths (MD) along the hole, the
+  inclination I from vertical (0° = straight down) and the azimuth A (clockwise
+  from north). The unit tangent in (north, east, down) coordinates is
+
+      t(I, A) = (sin I cos A, sin I sin A, cos I)
+
+  The **minimum-curvature** method is the industry standard. It assumes that
+  between two stations the hole follows the circular arc along which the tangent
+  turns at a constant rate on the great circle from t1 to t2. The total turning
+  angle between the two stations is the **dogleg** β, with cos β = t1 · t2.
+
+  The vertical depth of any point follows by integrating the down component of
+  the tangent along this arc. The closed form contains the "ratio factor" of
+  the method (Sawaryn & Thorogood 2005); a point inside a segment is handled
+  with the partial arc that ends at that point.
+
+  Interpolating TVD, or the angles, linearly between stations is not the
+  minimum-curvature path. Neither is ignoring the ratio factor (the
+  "balanced tangential" method). Treating MD as depth is a gross error in
+  inclined holes: T(z) stretched along the hole lowers the apparent gradient by
+  cos I, typically 15–30 %.
+
+  Layer contacts are logged in MD along the core. In this task they are
+  horizontal, so their depth is the TVD of the contact.
+
+  ## 2. Steady conduction in a layered column (Bullard method)
+
+  In one dimension, with conductivity k(z) and uniform radiogenic heat
+  production A (W m^-3), the heat flow decreases with depth as q(z) = q0 − A z,
+  and Fourier's law gives dT/dz = q(z)/k(z). Integrating from the surface:
+
+      T_ss(z) = T0 + q0 R(z) − A S(z)
+
+  where R(z) is the thermal resistance between the surface and depth z
+  (m^2 K W^-1) and S(z) (m^3 K W^-1) is the second depth function that comes
+  from the heat-production term; both are zero at the surface.
+
+  Resistances add in series, so the effective conductivity of a stack is the
+  thickness-weighted **harmonic** mean. An arithmetic mean, or a single average
+  k, biases both q0 and the curvature of the profile. The "Bullard plot" of T
+  against R is a straight line when there is no heat production and no
+  transient.
+
+  ## 3. Paleoclimate perturbation
+
+  Suppose the ground surface of a homogeneous half-space (diffusivity κ, in
+  m^2 s^-1) undergoes a step change ΔT that starts a time t before present and
+  persists until now. The present-day perturbation at depth z is
+
+      ΔT(z) = ΔT · erfc( z / (2 √(κ t)) )
+
+  A step that began at t_old and ended at t_new (both before present, with
+  t_new < t_old) is the difference of two such responses. A piecewise-constant
+  surface history is the sum of these terms by superposition (Birch 1948;
+  Beck 1977).
+
+  Some practical points:
+
+  - Times must be in seconds. This task uses a Julian year of 365.25 days.
+  - The erfc argument contains the factor 2. Dropping it is a common error.
+  - For the interval that ends at the present (t_new = 0), erfc(z/0) → 0 for
+    z > 0.
+
+  On the Shield, the last glaciation left temperatures in the upper 1–2 km
+  several kelvin warmer than a steady profile would predict. If the correction
+  is ignored, heat flow from holes shallower than about 1 km is underestimated
+  by several mW m^-2.
+
+  The *shape* of the history comes from paleoclimate proxies: Holocene,
+  glacial, and the Eemian interglacial. Its *amplitude* is poorly known,
+  because the ground-surface temperature under an ice sheet is set by the
+  basal thermal regime. The amplitude is therefore estimated from the borehole
+  itself.
+
+  ## 4. Joint estimate
+
+  With R, S and the unit-amplitude perturbation P(z) evaluated at every
+  reading, the observation model is linear in the unknowns T0, q0 and g:
+
+      T_obs(z) = T0 + q0 R(z) − A S(z) + g P(z) + ε
+
+  A is known from geochemistry on core, so the term A·S is moved to the left
+  side. The three parameters follow from ordinary least squares on the design
+  matrix [1, R, P], with the usual least-squares parameter covariance and the
+  unbiased residual variance RSS/(n − 3).
+
+  Readings shallower than a cut-off depth are excluded. They are disturbed by
+  recent (post-Little-Ice-Age) warming and by ground-water circulation in
+  fractured near-surface rock.
+
+  ## References
+
+  - Beck, A.E. (1977) Climatically perturbed temperature gradients and their effect on regional and continental heat-flow means. Tectonophysics 41, 17–39.
+  - Birch, F. (1948) The effects of Pleistocene climatic variations upon geothermal gradients. American Journal of Science 246, 729–760.
+  - Bullard, E.C. (1939) Heat flow in South Africa. Proceedings of the Royal Society A 173, 474–502.
+  - Jessop, A.M., Lewis, T.J., Judge, A.S., Taylor, A.E., Drury, M.J. (1984) Terrestrial heat flow in Canada. Tectonophysics 103, 239–261.
+  - Mareschal, J.-C., Jaupart, C. (2004) Variations of surface heat flow and lithospheric thermal structure beneath the North American craton. Earth and Planetary Science Letters 223, 65–77.
+  - Sawaryn, S.J., Thorogood, J.L. (2005) A compendium of directional calculations based on the minimum curvature method. SPE Drilling & Completion 20, 24–36.
+  - Carslaw, H.S., Jaeger, J.C. (1959) Conduction of Heat in Solids, 2nd ed. Oxford.
+problem_io: |
+  function: surface_heat_flow
+
+  signature: def surface_heat_flow(survey_md, survey_inc, survey_azi, log_md, log_temp, layer_top_md, layer_k, heat_production, kappa, hist_t_years, hist_dT_shape, z_min) -> dict
+
+  inputs:
+  survey_md: measured depth of deviation-survey stations, m, 1-D, starts at 0 (collar), strictly increasing
+  survey_inc: inclination from vertical at each station, degrees (0 = straight down)
+  survey_azi: azimuth at each station, degrees clockwise from north
+  log_md: measured depth of each temperature reading, m, 1-D (n,), within the survey
+  log_temp: equilibrium temperature at each reading, deg C, (n,)
+  layer_top_md: measured depth of the top of each lithological layer, m, first = 0, strictly increasing; the last layer extends below the hole
+  layer_k: thermal conductivity of each layer, W m^-1 K^-1, > 0
+  heat_production: uniform radiogenic heat production A, W m^-3, >= 0 (known)
+  kappa: thermal diffusivity of the ground, m^2 s^-1 (homogeneous)
+  hist_t_years: ends of the surface-history intervals, years before present, positive, strictly increasing
+  hist_dT_shape: shape of the surface-temperature departure during each interval, K per unit amplitude
+  z_min: readings with true vertical depth shallower than z_min (m) are excluded from the fit
+
+  outputs (dict):
+  T0: reference (long-term) ground-surface temperature, deg C
+  q0: steady-state surface heat flow, W m^-2
+  amplitude: multiplier g of hist_dT_shape (K), e.g. g = 6.5 means a glacial departure of -6.5 K for shape -1
+  sigma_T0: 1-sigma of T0
+  sigma_q0: 1-sigma of q0
+  sigma_amplitude: 1-sigma of amplitude
+  rms_residual: sqrt(RSS/n_used) of the fit, K
+  n_used: number of readings used (int)
+required_dependencies: |
+  import numpy as np
+  import math
+general_solution: solution.py
+general_tests: tests/general.py
+id: borehole-heat-flow
+task_id: borehole-heat-flow
+title: Paleoclimate-corrected surface heat flow from an inclined exploration borehole in the Canadian Shield
+subfield: geothermics
+subdomain: geothermics / borehole geophysics
+keywords:
+- heat flow
+- borehole temperature
+- paleoclimate correction
+- minimum curvature
+- thermal conductivity
+- Canadian Shield
+author: Ayoub Bousfiha
+language: python
+python_version: '3.11'
+dependencies:
+- numpy==2.1.3
+- scipy==1.14.1
+test_dependencies:
+- numpy==2.1.3
+result_type: exact
+expert_time_estimate_hours: 4
+main_problem:
+  objective: An exploration diamond-drill hole in the Canadian Shield has been logged for temperature after thermal
+    re-equilibration. Using the deviation survey, the lithology-based conductivity column, the known radiogenic
+    heat production and a prescribed shape of the last-glacial surface-temperature history, estimate the steady-state
+    surface heat flow q0, the reference surface temperature T0 and the amplitude g of the glacial history, with
+    1-sigma uncertainties.
+  function: surface_heat_flow(survey_md, survey_inc, survey_azi, log_md, log_temp, layer_top_md, layer_k, heat_production,
+    kappa, hist_t_years, hist_dT_shape, z_min) -> dict
+  inputs: &id001
+    survey_md: measured depth of deviation-survey stations, m, 1-D, starts at 0 (collar), strictly increasing
+    survey_inc: inclination from vertical at each station, degrees (0 = straight down)
+    survey_azi: azimuth at each station, degrees clockwise from north
+    log_md: measured depth of each temperature reading, m, 1-D (n,), within the survey
+    log_temp: equilibrium temperature at each reading, deg C, (n,)
+    layer_top_md: measured depth of the top of each lithological layer, m, first = 0, strictly increasing; the last
+      layer extends below the hole
+    layer_k: thermal conductivity of each layer, W m^-1 K^-1, > 0
+    heat_production: uniform radiogenic heat production A, W m^-3, >= 0 (known)
+    kappa: thermal diffusivity of the ground, m^2 s^-1 (homogeneous)
+    hist_t_years: ends of the surface-history intervals, years before present, positive, strictly increasing
+    hist_dT_shape: shape of the surface-temperature departure during each interval, K per unit amplitude
+    z_min: readings with true vertical depth shallower than z_min (m) are excluded from the fit
+  outputs:
+    type: dict
+    keys:
+      T0: reference (long-term) ground-surface temperature, deg C
+      q0: steady-state surface heat flow, W m^-2
+      amplitude: multiplier g of hist_dT_shape (K), e.g. g = 6.5 means a glacial departure of -6.5 K for shape -1
+      sigma_T0: 1-sigma of T0
+      sigma_q0: 1-sigma of q0
+      sigma_amplitude: 1-sigma of amplitude
+      rms_residual: sqrt(RSS/n_used) of the fit, K
+      n_used: number of readings used (int)
+  conventions:
+  - Depth z is true vertical depth (TVD, m, positive down) below the collar; collar elevation is the datum. The
+    borehole path between survey stations is the minimum-curvature arc (constant-rate rotation of the unit tangent
+    on the great circle joining the station directions); TVD at any measured depth, including between stations,
+    is taken on that arc.
+  - Layer boundaries are given in measured depth along the hole and are horizontal; convert them to TVD with the
+    same trajectory.
+  - 'Steady conduction with uniform heat production A in the layered column: the heat flow is q(z) = q0 - A z and
+    dT/dz = q/k, so T_ss(z) = T0 + q0 R(z) - A S(z) with R(0) = S(0) = 0.'
+  - 'Transient paleoclimate signal: the surface temperature departed from T0 by g * hist_dT_shape[i] during interval
+    i (interval 0 is [0, hist_t_years[0]] years before present, interval i is [hist_t_years[i-1], hist_t_years[i]]),
+    and was at T0 before hist_t_years[-1] long enough for steady state. The present-day perturbation is computed
+    for a homogeneous half-space with diffusivity kappa. One year = 365.25 days.'
+  - 'Observation model: T_obs(z) = T0 + q0 R(z) - A S(z) + g P(z) + noise, where P is the perturbation of the unit-amplitude
+    history. T0, q0 and g are estimated jointly by ordinary (unweighted) least squares; their 1-sigma standard errors
+    use the noise variance RSS/(n_used - 3).'
+  - Only readings with TVD >= z_min are used (the shallow part of logs is affected by recent climate and ground-water
+    flow).
+  assumptions_and_ranges:
+  - Conduction only, horizontal layering, 1-D heat flow; the ground is laterally homogeneous.
+  - Holes up to a few km, inclinations below 90 degrees, temperatures 0-80 deg C.
+  errors:
+  - Raise ValueError if log_md and log_temp are not 1-D arrays of equal length; if any survey, layer or history
+    input violates the ranges of steps 1-3 (including layer tops or log depths beyond the last survey station);
+    if heat_production is negative or non-finite; if fewer than 4 readings remain after the z_min cut; or if T0,
+    q0 and the amplitude are not separately resolvable (for example an all-zero hist_dT_shape).
+  accuracy_and_tolerances:
+  - The estimator is deterministic; the result is exact up to numerical precision.
+  - For a noise-free synthetic hole q0 must be reproduced within 1e-8 W m^-2, T0 within 1e-5 K and g within 1e-4
+    K.
+  - For noisy holes q0 must agree with the exact least-squares solution within 2e-6 W m^-2, T0 within 5e-4 K, g
+    within 2e-3 K; the three sigmas within 2 % and rms_residual within 1 %; n_used exactly.
+  exactness: exact (deterministic least squares on closed-form model terms)
+  signature: def surface_heat_flow(survey_md, survey_inc, survey_azi, log_md, log_temp, layer_top_md, layer_k, heat_production,
+    kappa, hist_t_years, hist_dT_shape, z_min) -> dict
+  description: |
+    An exploration diamond-drill hole in the Canadian Shield has been logged for temperature after thermal re-equilibration. Using the deviation survey, the lithology-based conductivity column, the known radiogenic heat production and a prescribed shape of the last-glacial surface-temperature history, estimate the steady-state surface heat flow q0, the reference surface temperature T0 and the amplitude g of the glacial history, with 1-sigma uncertainties.
+
+    Workflow: (1) convert the MD of every log reading and every layer top to TVD (step 1); (2) drop readings with TVD < z_min; (3) evaluate R and S at the remaining depths (step 2); (4) evaluate the unit-amplitude paleoclimate perturbation P (step 3); (5) estimate T0, q0 and g jointly (step 4). Step 5 (surface_heat_flow) chains steps 1-4 into this full workflow, the top-level function of the task. Step 6 (layered_paleoclimate_perturbation) goes beyond the half-space of step 3: the paleoclimate perturbation in the layered conductivity column itself, where the glacial signal is refracted at every conductivity contrast.
+  accuracy_requirements: |
+    - The estimator is deterministic; the result is exact up to numerical precision.
+    - For a noise-free synthetic hole q0 must be reproduced within 1e-8 W m^-2, T0 within 1e-5 K and g within 1e-4 K.
+    - For noisy holes q0 must agree with the exact least-squares solution within 2e-6 W m^-2, T0 within 5e-4 K, g within 2e-3 K; the three sigmas within 2 % and rms_residual within 1 %; n_used exactly.
+  mutants: &id002
+  - name: measured_depth_as_depth
+    description: Measured depth along the inclined hole used as depth (no trajectory correction).
+    code: |
+      """Reference solution: paleoclimate-corrected surface heat flow from an
+      inclined exploration borehole.
+
+      Pipeline
+          deviation survey -> true vertical depth (minimum curvature, exact arc
+          interpolation) -> Bullard thermal-resistance integrals over a layered
+          conductivity column -> present-day perturbation of a piecewise-constant
+          surface-temperature history -> joint linear least-squares estimate of
+          surface temperature, surface heat flow and glacial amplitude.
+      """
+      import numpy as np
+      import math
+
+      def erfc(x):
+          """Element-wise complementary error function (numpy + math only)."""
+          import math  # local import: harness may strip top-level imports
+          f = np.frompyfunc(math.erfc, 1, 1)
+          return np.asarray(f(np.asarray(x, float)), dtype=float)
+
+      SECONDS_PER_YEAR = 365.25 * 86400.0
+
+
+      # ---------------------------------------------------------------- step 1
+      def _unit(inc, azi):
+          return np.array([np.sin(inc) * np.cos(azi), np.sin(inc) * np.sin(azi), np.cos(inc)])
+
+
+      def _sinc(x):
+          return np.sinc(x / np.pi)          # sin(x) / x, exact at x = 0
+
+
+      def _ratio_factor(beta):
+          h = 0.5 * beta                     # tan(h) / h, no straight-line shortcut
+          if h < 1e-4:
+              return 1.0 + h * h / 3.0 + 2.0 * h ** 4 / 15.0   # series, truncation < 1e-24
+          return np.tan(h) / h
+
+
+      def true_vertical_depth(survey_md, inc_deg, azi_deg, md_query):
+          """TVD (m) at md_query by the minimum-curvature method."""
+          md = np.asarray(survey_md, float)
+          inc = np.radians(np.asarray(inc_deg, float))
+          azi = np.radians(np.asarray(azi_deg, float))
+          q_in = np.asarray(md_query, float)
+          q = np.atleast_1d(q_in).ravel()
+          if not (md.shape == inc.shape == azi.shape) or md.ndim != 1 or md.size < 2:
+              raise ValueError("survey arrays must be 1-D, equal length, >= 2 stations")
+          if md[0] != 0.0 or np.any(np.diff(md) <= 0):
+              raise ValueError("survey must start at MD 0 and increase strictly")
+          if np.any(inc < 0) or np.any(inc >= np.pi):
+              raise ValueError("inclination must be in [0, 180) degrees")
+          if np.any(~np.isfinite(q)) or np.any(q < 0) or np.any(q > md[-1]):
+              raise ValueError("query depths must lie within the survey")
+          # cumulative TVD at stations
+          tvd_st = np.zeros(md.size)
+          units = [_unit(inc[i], azi[i]) for i in range(md.size)]
+          betas = np.zeros(md.size - 1)
+          for i in range(md.size - 1):
+              # atan2 keeps full precision for tiny doglegs (arccos of a dot product does not)
+              betas[i] = np.arctan2(np.linalg.norm(np.cross(units[i], units[i + 1])), units[i] @ units[i + 1])
+              if betas[i] >= np.pi - 1e-6:
+                  raise ValueError("dogleg of 180 degrees between stations: path undefined")
+              dmd = md[i + 1] - md[i]
+              tvd_st[i + 1] = tvd_st[i] + 0.5 * dmd * (units[i][2] + units[i + 1][2]) * _ratio_factor(betas[i])
+          out = np.empty(q.size)
+          for j, m in enumerate(q):
+              i = min(np.searchsorted(md, m, side="right") - 1, md.size - 2)
+              dmd_seg = md[i + 1] - md[i]
+              f = (m - md[i]) / dmd_seg
+              b = betas[i]
+              t1, t2 = units[i], units[i + 1]
+              # tangent on the arc; the sinc form is exact for every dogleg, including 0
+              tq = ((1 - f) * _sinc((1 - f) * b) * t1 + f * _sinc(f * b) * t2) / _sinc(b)
+              dm = m - md[i]
+              out[j] = tvd_st[i] + 0.5 * dm * (t1[2] + tq[2]) * _ratio_factor(f * b)
+          return float(out[0]) if q_in.ndim == 0 else out.reshape(q_in.shape)
+
+
+      # ---------------------------------------------------------------- step 2
+      def layer_integrals(layer_top_tvd, layer_k, z):
+          """Thermal resistance R(z) = int_0^z dz'/k and S(z) = int_0^z z'/k dz'."""
+          tops = np.asarray(layer_top_tvd, float)
+          k = np.asarray(layer_k, float)
+          z_in = np.asarray(z, float)
+          zz = np.atleast_1d(z_in).ravel()
+          if tops.ndim != 1 or tops.shape != k.shape or tops.size < 1:
+              raise ValueError("layer arrays must be 1-D with equal length")
+          if tops[0] != 0.0 or np.any(np.diff(tops) <= 0):
+              raise ValueError("layer tops must start at 0 and increase strictly")
+          if np.any(~np.isfinite(k)) or np.any(k <= 0):
+              raise ValueError("conductivities must be positive")
+          if np.any(~np.isfinite(zz)) or np.any(zz < 0):
+              raise ValueError("depths must be >= 0")
+          bottoms = np.append(tops[1:], np.inf)
+          R = np.zeros(zz.size)
+          S = np.zeros(zz.size)
+          for top, bot, kk in zip(tops, bottoms, k):
+              lo = np.clip(zz, top, bot) - top
+              a = top
+              b = top + lo
+              R += (b - a) / kk
+              S += (b**2 - a**2) / (2 * kk)
+          if z_in.ndim == 0:
+              return float(R[0]), float(S[0])
+          return R.reshape(z_in.shape), S.reshape(z_in.shape)
+
+
+      # ---------------------------------------------------------------- step 3
+      def paleoclimate_perturbation(z, t_years, dT, kappa):
+          """Present-day temperature perturbation (K) at depth z (m) from a
+          piecewise-constant surface-temperature history."""
+          z_in = np.asarray(z, float)
+          zz = np.atleast_1d(z_in).ravel()
+          t = np.asarray(t_years, float)
+          d = np.asarray(dT, float)
+          if t.ndim != 1 or t.shape != d.shape or t.size < 1:
+              raise ValueError("history arrays must be 1-D with equal length")
+          if t[0] <= 0 or np.any(np.diff(t) <= 0):
+              raise ValueError("history times must be positive and increasing")
+          if not np.isfinite(kappa) or kappa <= 0:
+              raise ValueError("diffusivity must be positive")
+          if np.any(~np.isfinite(zz)) or np.any(zz < 0):
+              raise ValueError("depths must be >= 0")
+          ts = t * SECONDS_PER_YEAR
+          edges = np.concatenate(([0.0], ts))
+          out = np.zeros(zz.size)
+          for i in range(t.size):
+              t_new, t_old = edges[i], edges[i + 1]
+              e_old = erfc(zz / (2 * np.sqrt(kappa * t_old)))
+              if t_new == 0.0:
+                  e_new = np.zeros_like(zz)       # limit z / sqrt(kappa * 0) -> inf
+              else:
+                  e_new = erfc(zz / (2 * np.sqrt(kappa * t_new)))
+              out += d[i] * (e_old - e_new)
+          return float(out[0]) if z_in.ndim == 0 else out.reshape(z_in.shape)
+
+
+      # ---------------------------------------------------------------- step 4
+      def fit_heat_flow(T, R, S, P, A):
+          """Least-squares T = T0 + q0 R - A S + g P  ->  (T0, q0, g) + errors."""
+          T, R, S, P = (np.asarray(v, float).ravel() for v in (T, R, S, P))
+          n = T.size
+          if not (R.size == S.size == P.size == n):
+              raise ValueError("arrays must have equal length")
+          if n < 4:
+              raise ValueError("need at least 4 temperatures")
+          if not np.all(np.isfinite(np.concatenate([T, R, S, P]))) or not np.isfinite(A) or A < 0:
+              raise ValueError("invalid input")
+          y = T + A * S
+          G = np.column_stack([np.ones(n), R, P])
+          # stated criterion: a zero column, or smallest singular value < 1e-8 after
+          # scaling each column to unit Euclidean length
+          norms = np.linalg.norm(G, axis=0)
+          if np.any(norms == 0.0) or np.linalg.svd(G / norms, compute_uv=False)[-1] < 1e-8:
+              raise ValueError("T0, q0 and amplitude are not separately resolvable (rank-deficient design)")
+          GtG = G.T @ G
+          m = np.linalg.solve(GtG, G.T @ y)
+          res = y - G @ m
+          s2 = float(res @ res) / (n - 3)
+          C = s2 * np.linalg.inv(GtG)
+          return {"T0": float(m[0]), "q0": float(m[1]), "amplitude": float(m[2]),
+                  "sigma_T0": float(np.sqrt(C[0, 0])), "sigma_q0": float(np.sqrt(C[1, 1])),
+                  "sigma_amplitude": float(np.sqrt(C[2, 2])),
+                  "rms_residual": float(np.sqrt(np.mean(res**2)))}
+
+
+      # ---------------------------------------------------------------- main
+      def surface_heat_flow(survey_md, survey_inc, survey_azi, log_md, log_temp,
+                            layer_top_md, layer_k, heat_production, kappa,
+                            hist_t_years, hist_dT_shape, z_min):
+          """Paleoclimate-corrected surface heat flow from an inclined borehole."""
+          log_md = np.asarray(log_md, float)
+          log_temp = np.asarray(log_temp, float)
+          if log_md.shape != log_temp.shape or log_md.ndim != 1:
+              raise ValueError("log arrays must be 1-D with equal length")
+          z = log_md.copy()
+          tops = np.asarray(layer_top_md, float)
+          keep = z >= z_min
+          z, T = z[keep], log_temp[keep]
+          R, S = layer_integrals(tops, layer_k, z)
+          P = paleoclimate_perturbation(z, hist_t_years, hist_dT_shape, kappa)
+          fit = fit_heat_flow(T, R, S, P, heat_production)
+          fit["n_used"] = int(z.size)
+          return fit
+  - name: no_paleoclimate_correction
+    description: 'Paleoclimate term omitted: T0 and q0 fitted to a steady geotherm only (amplitude reported as 0).'
+    code: |
+      """Reference solution: paleoclimate-corrected surface heat flow from an
+      inclined exploration borehole.
+
+      Pipeline
+          deviation survey -> true vertical depth (minimum curvature, exact arc
+          interpolation) -> Bullard thermal-resistance integrals over a layered
+          conductivity column -> present-day perturbation of a piecewise-constant
+          surface-temperature history -> joint linear least-squares estimate of
+          surface temperature, surface heat flow and glacial amplitude.
+      """
+      import numpy as np
+      import math
+
+      def erfc(x):
+          """Element-wise complementary error function (numpy + math only)."""
+          import math  # local import: harness may strip top-level imports
+          f = np.frompyfunc(math.erfc, 1, 1)
+          return np.asarray(f(np.asarray(x, float)), dtype=float)
+
+      SECONDS_PER_YEAR = 365.25 * 86400.0
+
+
+      # ---------------------------------------------------------------- step 1
+      def _unit(inc, azi):
+          return np.array([np.sin(inc) * np.cos(azi), np.sin(inc) * np.sin(azi), np.cos(inc)])
+
+
+      def _sinc(x):
+          return np.sinc(x / np.pi)          # sin(x) / x, exact at x = 0
+
+
+      def _ratio_factor(beta):
+          h = 0.5 * beta                     # tan(h) / h, no straight-line shortcut
+          if h < 1e-4:
+              return 1.0 + h * h / 3.0 + 2.0 * h ** 4 / 15.0   # series, truncation < 1e-24
+          return np.tan(h) / h
+
+
+      def true_vertical_depth(survey_md, inc_deg, azi_deg, md_query):
+          """TVD (m) at md_query by the minimum-curvature method."""
+          md = np.asarray(survey_md, float)
+          inc = np.radians(np.asarray(inc_deg, float))
+          azi = np.radians(np.asarray(azi_deg, float))
+          q_in = np.asarray(md_query, float)
+          q = np.atleast_1d(q_in).ravel()
+          if not (md.shape == inc.shape == azi.shape) or md.ndim != 1 or md.size < 2:
+              raise ValueError("survey arrays must be 1-D, equal length, >= 2 stations")
+          if md[0] != 0.0 or np.any(np.diff(md) <= 0):
+              raise ValueError("survey must start at MD 0 and increase strictly")
+          if np.any(inc < 0) or np.any(inc >= np.pi):
+              raise ValueError("inclination must be in [0, 180) degrees")
+          if np.any(~np.isfinite(q)) or np.any(q < 0) or np.any(q > md[-1]):
+              raise ValueError("query depths must lie within the survey")
+          # cumulative TVD at stations
+          tvd_st = np.zeros(md.size)
+          units = [_unit(inc[i], azi[i]) for i in range(md.size)]
+          betas = np.zeros(md.size - 1)
+          for i in range(md.size - 1):
+              # atan2 keeps full precision for tiny doglegs (arccos of a dot product does not)
+              betas[i] = np.arctan2(np.linalg.norm(np.cross(units[i], units[i + 1])), units[i] @ units[i + 1])
+              if betas[i] >= np.pi - 1e-6:
+                  raise ValueError("dogleg of 180 degrees between stations: path undefined")
+              dmd = md[i + 1] - md[i]
+              tvd_st[i + 1] = tvd_st[i] + 0.5 * dmd * (units[i][2] + units[i + 1][2]) * _ratio_factor(betas[i])
+          out = np.empty(q.size)
+          for j, m in enumerate(q):
+              i = min(np.searchsorted(md, m, side="right") - 1, md.size - 2)
+              dmd_seg = md[i + 1] - md[i]
+              f = (m - md[i]) / dmd_seg
+              b = betas[i]
+              t1, t2 = units[i], units[i + 1]
+              # tangent on the arc; the sinc form is exact for every dogleg, including 0
+              tq = ((1 - f) * _sinc((1 - f) * b) * t1 + f * _sinc(f * b) * t2) / _sinc(b)
+              dm = m - md[i]
+              out[j] = tvd_st[i] + 0.5 * dm * (t1[2] + tq[2]) * _ratio_factor(f * b)
+          return float(out[0]) if q_in.ndim == 0 else out.reshape(q_in.shape)
+
+
+      # ---------------------------------------------------------------- step 2
+      def layer_integrals(layer_top_tvd, layer_k, z):
+          """Thermal resistance R(z) = int_0^z dz'/k and S(z) = int_0^z z'/k dz'."""
+          tops = np.asarray(layer_top_tvd, float)
+          k = np.asarray(layer_k, float)
+          z_in = np.asarray(z, float)
+          zz = np.atleast_1d(z_in).ravel()
+          if tops.ndim != 1 or tops.shape != k.shape or tops.size < 1:
+              raise ValueError("layer arrays must be 1-D with equal length")
+          if tops[0] != 0.0 or np.any(np.diff(tops) <= 0):
+              raise ValueError("layer tops must start at 0 and increase strictly")
+          if np.any(~np.isfinite(k)) or np.any(k <= 0):
+              raise ValueError("conductivities must be positive")
+          if np.any(~np.isfinite(zz)) or np.any(zz < 0):
+              raise ValueError("depths must be >= 0")
+          bottoms = np.append(tops[1:], np.inf)
+          R = np.zeros(zz.size)
+          S = np.zeros(zz.size)
+          for top, bot, kk in zip(tops, bottoms, k):
+              lo = np.clip(zz, top, bot) - top
+              a = top
+              b = top + lo
+              R += (b - a) / kk
+              S += (b**2 - a**2) / (2 * kk)
+          if z_in.ndim == 0:
+              return float(R[0]), float(S[0])
+          return R.reshape(z_in.shape), S.reshape(z_in.shape)
+
+
+      # ---------------------------------------------------------------- step 3
+      def paleoclimate_perturbation(z, t_years, dT, kappa):
+          """Present-day temperature perturbation (K) at depth z (m) from a
+          piecewise-constant surface-temperature history."""
+          z_in = np.asarray(z, float)
+          zz = np.atleast_1d(z_in).ravel()
+          t = np.asarray(t_years, float)
+          d = np.asarray(dT, float)
+          if t.ndim != 1 or t.shape != d.shape or t.size < 1:
+              raise ValueError("history arrays must be 1-D with equal length")
+          if t[0] <= 0 or np.any(np.diff(t) <= 0):
+              raise ValueError("history times must be positive and increasing")
+          if not np.isfinite(kappa) or kappa <= 0:
+              raise ValueError("diffusivity must be positive")
+          if np.any(~np.isfinite(zz)) or np.any(zz < 0):
+              raise ValueError("depths must be >= 0")
+          ts = t * SECONDS_PER_YEAR
+          edges = np.concatenate(([0.0], ts))
+          out = np.zeros(zz.size)
+          for i in range(t.size):
+              t_new, t_old = edges[i], edges[i + 1]
+              e_old = erfc(zz / (2 * np.sqrt(kappa * t_old)))
+              if t_new == 0.0:
+                  e_new = np.zeros_like(zz)       # limit z / sqrt(kappa * 0) -> inf
+              else:
+                  e_new = erfc(zz / (2 * np.sqrt(kappa * t_new)))
+              out += d[i] * (e_old - e_new)
+          return float(out[0]) if z_in.ndim == 0 else out.reshape(z_in.shape)
+
+
+      # ---------------------------------------------------------------- step 4
+      def fit_heat_flow(T, R, S, P, A):
+          """Least-squares T = T0 + q0 R - A S + g P  ->  (T0, q0, g) + errors."""
+          T, R, S, P = (np.asarray(v, float).ravel() for v in (T, R, S, P))
+          n = T.size
+          if not (R.size == S.size == P.size == n):
+              raise ValueError("arrays must have equal length")
+          if n < 4:
+              raise ValueError("need at least 4 temperatures")
+          if not np.all(np.isfinite(np.concatenate([T, R, S, P]))) or not np.isfinite(A) or A < 0:
+              raise ValueError("invalid input")
+          y = T + A * S
+          G = np.column_stack([np.ones(n), R, P])
+          # stated criterion: a zero column, or smallest singular value < 1e-8 after
+          # scaling each column to unit Euclidean length
+          norms = np.linalg.norm(G, axis=0)
+          if np.any(norms == 0.0) or np.linalg.svd(G / norms, compute_uv=False)[-1] < 1e-8:
+              raise ValueError("T0, q0 and amplitude are not separately resolvable (rank-deficient design)")
+          GtG = G.T @ G
+          m = np.linalg.solve(GtG, G.T @ y)
+          res = y - G @ m
+          s2 = float(res @ res) / (n - 3)
+          C = s2 * np.linalg.inv(GtG)
+          return {"T0": float(m[0]), "q0": float(m[1]), "amplitude": float(m[2]),
+                  "sigma_T0": float(np.sqrt(C[0, 0])), "sigma_q0": float(np.sqrt(C[1, 1])),
+                  "sigma_amplitude": float(np.sqrt(C[2, 2])),
+                  "rms_residual": float(np.sqrt(np.mean(res**2)))}
+
+
+      # ---------------------------------------------------------------- main
+      def surface_heat_flow(survey_md, survey_inc, survey_azi, log_md, log_temp,
+                            layer_top_md, layer_k, heat_production, kappa,
+                            hist_t_years, hist_dT_shape, z_min):
+          """Paleoclimate-corrected surface heat flow from an inclined borehole."""
+          log_md = np.asarray(log_md, float)
+          log_temp = np.asarray(log_temp, float)
+          if log_md.shape != log_temp.shape or log_md.ndim != 1:
+              raise ValueError("log arrays must be 1-D with equal length")
+          z = true_vertical_depth(survey_md, survey_inc, survey_azi, log_md)
+          tops = true_vertical_depth(survey_md, survey_inc, survey_azi, np.asarray(layer_top_md, float))
+          keep = z >= z_min
+          z, T = z[keep], log_temp[keep]
+          R, S = layer_integrals(tops, layer_k, z)
+          P = paleoclimate_perturbation(z, hist_t_years, hist_dT_shape, kappa)
+          fit = fit_heat_flow(T, R, S, P, heat_production)
+          G = np.column_stack([np.ones_like(R), R])
+          m, *_ = np.linalg.lstsq(G, T + heat_production * S, rcond=None)
+          fit.update(T0=float(m[0]), q0=float(m[1]), amplitude=0.0)
+          fit["n_used"] = int(z.size)
+          return fit
+  - name: single_mean_conductivity
+    description: Layered column replaced by one layer with the arithmetic mean conductivity.
+    code: |
+      """Reference solution: paleoclimate-corrected surface heat flow from an
+      inclined exploration borehole.
+
+      Pipeline
+          deviation survey -> true vertical depth (minimum curvature, exact arc
+          interpolation) -> Bullard thermal-resistance integrals over a layered
+          conductivity column -> present-day perturbation of a piecewise-constant
+          surface-temperature history -> joint linear least-squares estimate of
+          surface temperature, surface heat flow and glacial amplitude.
+      """
+      import numpy as np
+      import math
+
+      def erfc(x):
+          """Element-wise complementary error function (numpy + math only)."""
+          import math  # local import: harness may strip top-level imports
+          f = np.frompyfunc(math.erfc, 1, 1)
+          return np.asarray(f(np.asarray(x, float)), dtype=float)
+
+      SECONDS_PER_YEAR = 365.25 * 86400.0
+
+
+      # ---------------------------------------------------------------- step 1
+      def _unit(inc, azi):
+          return np.array([np.sin(inc) * np.cos(azi), np.sin(inc) * np.sin(azi), np.cos(inc)])
+
+
+      def _sinc(x):
+          return np.sinc(x / np.pi)          # sin(x) / x, exact at x = 0
+
+
+      def _ratio_factor(beta):
+          h = 0.5 * beta                     # tan(h) / h, no straight-line shortcut
+          if h < 1e-4:
+              return 1.0 + h * h / 3.0 + 2.0 * h ** 4 / 15.0   # series, truncation < 1e-24
+          return np.tan(h) / h
+
+
+      def true_vertical_depth(survey_md, inc_deg, azi_deg, md_query):
+          """TVD (m) at md_query by the minimum-curvature method."""
+          md = np.asarray(survey_md, float)
+          inc = np.radians(np.asarray(inc_deg, float))
+          azi = np.radians(np.asarray(azi_deg, float))
+          q_in = np.asarray(md_query, float)
+          q = np.atleast_1d(q_in).ravel()
+          if not (md.shape == inc.shape == azi.shape) or md.ndim != 1 or md.size < 2:
+              raise ValueError("survey arrays must be 1-D, equal length, >= 2 stations")
+          if md[0] != 0.0 or np.any(np.diff(md) <= 0):
+              raise ValueError("survey must start at MD 0 and increase strictly")
+          if np.any(inc < 0) or np.any(inc >= np.pi):
+              raise ValueError("inclination must be in [0, 180) degrees")
+          if np.any(~np.isfinite(q)) or np.any(q < 0) or np.any(q > md[-1]):
+              raise ValueError("query depths must lie within the survey")
+          # cumulative TVD at stations
+          tvd_st = np.zeros(md.size)
+          units = [_unit(inc[i], azi[i]) for i in range(md.size)]
+          betas = np.zeros(md.size - 1)
+          for i in range(md.size - 1):
+              # atan2 keeps full precision for tiny doglegs (arccos of a dot product does not)
+              betas[i] = np.arctan2(np.linalg.norm(np.cross(units[i], units[i + 1])), units[i] @ units[i + 1])
+              if betas[i] >= np.pi - 1e-6:
+                  raise ValueError("dogleg of 180 degrees between stations: path undefined")
+              dmd = md[i + 1] - md[i]
+              tvd_st[i + 1] = tvd_st[i] + 0.5 * dmd * (units[i][2] + units[i + 1][2]) * _ratio_factor(betas[i])
+          out = np.empty(q.size)
+          for j, m in enumerate(q):
+              i = min(np.searchsorted(md, m, side="right") - 1, md.size - 2)
+              dmd_seg = md[i + 1] - md[i]
+              f = (m - md[i]) / dmd_seg
+              b = betas[i]
+              t1, t2 = units[i], units[i + 1]
+              # tangent on the arc; the sinc form is exact for every dogleg, including 0
+              tq = ((1 - f) * _sinc((1 - f) * b) * t1 + f * _sinc(f * b) * t2) / _sinc(b)
+              dm = m - md[i]
+              out[j] = tvd_st[i] + 0.5 * dm * (t1[2] + tq[2]) * _ratio_factor(f * b)
+          return float(out[0]) if q_in.ndim == 0 else out.reshape(q_in.shape)
+
+
+      # ---------------------------------------------------------------- step 2
+      def layer_integrals(layer_top_tvd, layer_k, z):
+          """Thermal resistance R(z) = int_0^z dz'/k and S(z) = int_0^z z'/k dz'."""
+          tops = np.asarray(layer_top_tvd, float)
+          k = np.asarray(layer_k, float)
+          z_in = np.asarray(z, float)
+          zz = np.atleast_1d(z_in).ravel()
+          if tops.ndim != 1 or tops.shape != k.shape or tops.size < 1:
+              raise ValueError("layer arrays must be 1-D with equal length")
+          if tops[0] != 0.0 or np.any(np.diff(tops) <= 0):
+              raise ValueError("layer tops must start at 0 and increase strictly")
+          if np.any(~np.isfinite(k)) or np.any(k <= 0):
+              raise ValueError("conductivities must be positive")
+          if np.any(~np.isfinite(zz)) or np.any(zz < 0):
+              raise ValueError("depths must be >= 0")
+          bottoms = np.append(tops[1:], np.inf)
+          R = np.zeros(zz.size)
+          S = np.zeros(zz.size)
+          for top, bot, kk in zip(tops, bottoms, k):
+              lo = np.clip(zz, top, bot) - top
+              a = top
+              b = top + lo
+              R += (b - a) / kk
+              S += (b**2 - a**2) / (2 * kk)
+          if z_in.ndim == 0:
+              return float(R[0]), float(S[0])
+          return R.reshape(z_in.shape), S.reshape(z_in.shape)
+
+
+      # ---------------------------------------------------------------- step 3
+      def paleoclimate_perturbation(z, t_years, dT, kappa):
+          """Present-day temperature perturbation (K) at depth z (m) from a
+          piecewise-constant surface-temperature history."""
+          z_in = np.asarray(z, float)
+          zz = np.atleast_1d(z_in).ravel()
+          t = np.asarray(t_years, float)
+          d = np.asarray(dT, float)
+          if t.ndim != 1 or t.shape != d.shape or t.size < 1:
+              raise ValueError("history arrays must be 1-D with equal length")
+          if t[0] <= 0 or np.any(np.diff(t) <= 0):
+              raise ValueError("history times must be positive and increasing")
+          if not np.isfinite(kappa) or kappa <= 0:
+              raise ValueError("diffusivity must be positive")
+          if np.any(~np.isfinite(zz)) or np.any(zz < 0):
+              raise ValueError("depths must be >= 0")
+          ts = t * SECONDS_PER_YEAR
+          edges = np.concatenate(([0.0], ts))
+          out = np.zeros(zz.size)
+          for i in range(t.size):
+              t_new, t_old = edges[i], edges[i + 1]
+              e_old = erfc(zz / (2 * np.sqrt(kappa * t_old)))
+              if t_new == 0.0:
+                  e_new = np.zeros_like(zz)       # limit z / sqrt(kappa * 0) -> inf
+              else:
+                  e_new = erfc(zz / (2 * np.sqrt(kappa * t_new)))
+              out += d[i] * (e_old - e_new)
+          return float(out[0]) if z_in.ndim == 0 else out.reshape(z_in.shape)
+
+
+      # ---------------------------------------------------------------- step 4
+      def fit_heat_flow(T, R, S, P, A):
+          """Least-squares T = T0 + q0 R - A S + g P  ->  (T0, q0, g) + errors."""
+          T, R, S, P = (np.asarray(v, float).ravel() for v in (T, R, S, P))
+          n = T.size
+          if not (R.size == S.size == P.size == n):
+              raise ValueError("arrays must have equal length")
+          if n < 4:
+              raise ValueError("need at least 4 temperatures")
+          if not np.all(np.isfinite(np.concatenate([T, R, S, P]))) or not np.isfinite(A) or A < 0:
+              raise ValueError("invalid input")
+          y = T + A * S
+          G = np.column_stack([np.ones(n), R, P])
+          # stated criterion: a zero column, or smallest singular value < 1e-8 after
+          # scaling each column to unit Euclidean length
+          norms = np.linalg.norm(G, axis=0)
+          if np.any(norms == 0.0) or np.linalg.svd(G / norms, compute_uv=False)[-1] < 1e-8:
+              raise ValueError("T0, q0 and amplitude are not separately resolvable (rank-deficient design)")
+          GtG = G.T @ G
+          m = np.linalg.solve(GtG, G.T @ y)
+          res = y - G @ m
+          s2 = float(res @ res) / (n - 3)
+          C = s2 * np.linalg.inv(GtG)
+          return {"T0": float(m[0]), "q0": float(m[1]), "amplitude": float(m[2]),
+                  "sigma_T0": float(np.sqrt(C[0, 0])), "sigma_q0": float(np.sqrt(C[1, 1])),
+                  "sigma_amplitude": float(np.sqrt(C[2, 2])),
+                  "rms_residual": float(np.sqrt(np.mean(res**2)))}
+
+
+      # ---------------------------------------------------------------- main
+      def surface_heat_flow(survey_md, survey_inc, survey_azi, log_md, log_temp,
+                            layer_top_md, layer_k, heat_production, kappa,
+                            hist_t_years, hist_dT_shape, z_min):
+          """Paleoclimate-corrected surface heat flow from an inclined borehole."""
+          log_md = np.asarray(log_md, float)
+          log_temp = np.asarray(log_temp, float)
+          if log_md.shape != log_temp.shape or log_md.ndim != 1:
+              raise ValueError("log arrays must be 1-D with equal length")
+          z = true_vertical_depth(survey_md, survey_inc, survey_azi, log_md)
+          tops = true_vertical_depth(survey_md, survey_inc, survey_azi, np.asarray(layer_top_md, float))
+          keep = z >= z_min
+          z, T = z[keep], log_temp[keep]
+          R, S = layer_integrals([0.0], [float(np.mean(layer_k))], z)
+          P = paleoclimate_perturbation(z, hist_t_years, hist_dT_shape, kappa)
+          fit = fit_heat_flow(T, R, S, P, heat_production)
+          fit["n_used"] = int(z.size)
+          return fit
+  - name: z_min_on_measured_depth
+    description: Shallow-reading cut applied to measured depth instead of true vertical depth.
+    code: |
+      """Reference solution: paleoclimate-corrected surface heat flow from an
+      inclined exploration borehole.
+
+      Pipeline
+          deviation survey -> true vertical depth (minimum curvature, exact arc
+          interpolation) -> Bullard thermal-resistance integrals over a layered
+          conductivity column -> present-day perturbation of a piecewise-constant
+          surface-temperature history -> joint linear least-squares estimate of
+          surface temperature, surface heat flow and glacial amplitude.
+      """
+      import numpy as np
+      import math
+
+      def erfc(x):
+          """Element-wise complementary error function (numpy + math only)."""
+          import math  # local import: harness may strip top-level imports
+          f = np.frompyfunc(math.erfc, 1, 1)
+          return np.asarray(f(np.asarray(x, float)), dtype=float)
+
+      SECONDS_PER_YEAR = 365.25 * 86400.0
+
+
+      # ---------------------------------------------------------------- step 1
+      def _unit(inc, azi):
+          return np.array([np.sin(inc) * np.cos(azi), np.sin(inc) * np.sin(azi), np.cos(inc)])
+
+
+      def _sinc(x):
+          return np.sinc(x / np.pi)          # sin(x) / x, exact at x = 0
+
+
+      def _ratio_factor(beta):
+          h = 0.5 * beta                     # tan(h) / h, no straight-line shortcut
+          if h < 1e-4:
+              return 1.0 + h * h / 3.0 + 2.0 * h ** 4 / 15.0   # series, truncation < 1e-24
+          return np.tan(h) / h
+
+
+      def true_vertical_depth(survey_md, inc_deg, azi_deg, md_query):
+          """TVD (m) at md_query by the minimum-curvature method."""
+          md = np.asarray(survey_md, float)
+          inc = np.radians(np.asarray(inc_deg, float))
+          azi = np.radians(np.asarray(azi_deg, float))
+          q_in = np.asarray(md_query, float)
+          q = np.atleast_1d(q_in).ravel()
+          if not (md.shape == inc.shape == azi.shape) or md.ndim != 1 or md.size < 2:
+              raise ValueError("survey arrays must be 1-D, equal length, >= 2 stations")
+          if md[0] != 0.0 or np.any(np.diff(md) <= 0):
+              raise ValueError("survey must start at MD 0 and increase strictly")
+          if np.any(inc < 0) or np.any(inc >= np.pi):
+              raise ValueError("inclination must be in [0, 180) degrees")
+          if np.any(~np.isfinite(q)) or np.any(q < 0) or np.any(q > md[-1]):
+              raise ValueError("query depths must lie within the survey")
+          # cumulative TVD at stations
+          tvd_st = np.zeros(md.size)
+          units = [_unit(inc[i], azi[i]) for i in range(md.size)]
+          betas = np.zeros(md.size - 1)
+          for i in range(md.size - 1):
+              # atan2 keeps full precision for tiny doglegs (arccos of a dot product does not)
+              betas[i] = np.arctan2(np.linalg.norm(np.cross(units[i], units[i + 1])), units[i] @ units[i + 1])
+              if betas[i] >= np.pi - 1e-6:
+                  raise ValueError("dogleg of 180 degrees between stations: path undefined")
+              dmd = md[i + 1] - md[i]
+              tvd_st[i + 1] = tvd_st[i] + 0.5 * dmd * (units[i][2] + units[i + 1][2]) * _ratio_factor(betas[i])
+          out = np.empty(q.size)
+          for j, m in enumerate(q):
+              i = min(np.searchsorted(md, m, side="right") - 1, md.size - 2)
+              dmd_seg = md[i + 1] - md[i]
+              f = (m - md[i]) / dmd_seg
+              b = betas[i]
+              t1, t2 = units[i], units[i + 1]
+              # tangent on the arc; the sinc form is exact for every dogleg, including 0
+              tq = ((1 - f) * _sinc((1 - f) * b) * t1 + f * _sinc(f * b) * t2) / _sinc(b)
+              dm = m - md[i]
+              out[j] = tvd_st[i] + 0.5 * dm * (t1[2] + tq[2]) * _ratio_factor(f * b)
+          return float(out[0]) if q_in.ndim == 0 else out.reshape(q_in.shape)
+
+
+      # ---------------------------------------------------------------- step 2
+      def layer_integrals(layer_top_tvd, layer_k, z):
+          """Thermal resistance R(z) = int_0^z dz'/k and S(z) = int_0^z z'/k dz'."""
+          tops = np.asarray(layer_top_tvd, float)
+          k = np.asarray(layer_k, float)
+          z_in = np.asarray(z, float)
+          zz = np.atleast_1d(z_in).ravel()
+          if tops.ndim != 1 or tops.shape != k.shape or tops.size < 1:
+              raise ValueError("layer arrays must be 1-D with equal length")
+          if tops[0] != 0.0 or np.any(np.diff(tops) <= 0):
+              raise ValueError("layer tops must start at 0 and increase strictly")
+          if np.any(~np.isfinite(k)) or np.any(k <= 0):
+              raise ValueError("conductivities must be positive")
+          if np.any(~np.isfinite(zz)) or np.any(zz < 0):
+              raise ValueError("depths must be >= 0")
+          bottoms = np.append(tops[1:], np.inf)
+          R = np.zeros(zz.size)
+          S = np.zeros(zz.size)
+          for top, bot, kk in zip(tops, bottoms, k):
+              lo = np.clip(zz, top, bot) - top
+              a = top
+              b = top + lo
+              R += (b - a) / kk
+              S += (b**2 - a**2) / (2 * kk)
+          if z_in.ndim == 0:
+              return float(R[0]), float(S[0])
+          return R.reshape(z_in.shape), S.reshape(z_in.shape)
+
+
+      # ---------------------------------------------------------------- step 3
+      def paleoclimate_perturbation(z, t_years, dT, kappa):
+          """Present-day temperature perturbation (K) at depth z (m) from a
+          piecewise-constant surface-temperature history."""
+          z_in = np.asarray(z, float)
+          zz = np.atleast_1d(z_in).ravel()
+          t = np.asarray(t_years, float)
+          d = np.asarray(dT, float)
+          if t.ndim != 1 or t.shape != d.shape or t.size < 1:
+              raise ValueError("history arrays must be 1-D with equal length")
+          if t[0] <= 0 or np.any(np.diff(t) <= 0):
+              raise ValueError("history times must be positive and increasing")
+          if not np.isfinite(kappa) or kappa <= 0:
+              raise ValueError("diffusivity must be positive")
+          if np.any(~np.isfinite(zz)) or np.any(zz < 0):
+              raise ValueError("depths must be >= 0")
+          ts = t * SECONDS_PER_YEAR
+          edges = np.concatenate(([0.0], ts))
+          out = np.zeros(zz.size)
+          for i in range(t.size):
+              t_new, t_old = edges[i], edges[i + 1]
+              e_old = erfc(zz / (2 * np.sqrt(kappa * t_old)))
+              if t_new == 0.0:
+                  e_new = np.zeros_like(zz)       # limit z / sqrt(kappa * 0) -> inf
+              else:
+                  e_new = erfc(zz / (2 * np.sqrt(kappa * t_new)))
+              out += d[i] * (e_old - e_new)
+          return float(out[0]) if z_in.ndim == 0 else out.reshape(z_in.shape)
+
+
+      # ---------------------------------------------------------------- step 4
+      def fit_heat_flow(T, R, S, P, A):
+          """Least-squares T = T0 + q0 R - A S + g P  ->  (T0, q0, g) + errors."""
+          T, R, S, P = (np.asarray(v, float).ravel() for v in (T, R, S, P))
+          n = T.size
+          if not (R.size == S.size == P.size == n):
+              raise ValueError("arrays must have equal length")
+          if n < 4:
+              raise ValueError("need at least 4 temperatures")
+          if not np.all(np.isfinite(np.concatenate([T, R, S, P]))) or not np.isfinite(A) or A < 0:
+              raise ValueError("invalid input")
+          y = T + A * S
+          G = np.column_stack([np.ones(n), R, P])
+          # stated criterion: a zero column, or smallest singular value < 1e-8 after
+          # scaling each column to unit Euclidean length
+          norms = np.linalg.norm(G, axis=0)
+          if np.any(norms == 0.0) or np.linalg.svd(G / norms, compute_uv=False)[-1] < 1e-8:
+              raise ValueError("T0, q0 and amplitude are not separately resolvable (rank-deficient design)")
+          GtG = G.T @ G
+          m = np.linalg.solve(GtG, G.T @ y)
+          res = y - G @ m
+          s2 = float(res @ res) / (n - 3)
+          C = s2 * np.linalg.inv(GtG)
+          return {"T0": float(m[0]), "q0": float(m[1]), "amplitude": float(m[2]),
+                  "sigma_T0": float(np.sqrt(C[0, 0])), "sigma_q0": float(np.sqrt(C[1, 1])),
+                  "sigma_amplitude": float(np.sqrt(C[2, 2])),
+                  "rms_residual": float(np.sqrt(np.mean(res**2)))}
+
+
+      # ---------------------------------------------------------------- main
+      def surface_heat_flow(survey_md, survey_inc, survey_azi, log_md, log_temp,
+                            layer_top_md, layer_k, heat_production, kappa,
+                            hist_t_years, hist_dT_shape, z_min):
+          """Paleoclimate-corrected surface heat flow from an inclined borehole."""
+          log_md = np.asarray(log_md, float)
+          log_temp = np.asarray(log_temp, float)
+          if log_md.shape != log_temp.shape or log_md.ndim != 1:
+              raise ValueError("log arrays must be 1-D with equal length")
+          z = true_vertical_depth(survey_md, survey_inc, survey_azi, log_md)
+          tops = true_vertical_depth(survey_md, survey_inc, survey_azi, np.asarray(layer_top_md, float))
+          keep = log_md >= z_min
+          z, T = z[keep], log_temp[keep]
+          R, S = layer_integrals(tops, layer_k, z)
+          P = paleoclimate_perturbation(z, hist_t_years, hist_dT_shape, kappa)
+          fit = fit_heat_flow(T, R, S, P, heat_production)
+          fit["n_used"] = int(z.size)
+          return fit
+  target_provenance: &id003
+  - target: q0, T0, amplitude (noiseless hole)
+    test: test_noiseless_hole_returns_generator_parameters (tests/general.py and tests/step_5.py)
+    method: generator inputs (q0 = 0.041 W m^-2, T0 = 5.2 C, g = 6.5 K)
+    note: analytic truth; tolerances 1e-8 W m^-2, 1e-5 K, 1e-4 K cover round-off only
+    valid: noise-free data following the stated 1-D model
+  - target: q0, T0, amplitude, sigmas, rms_residual (noisy and deep holes)
+    test: test_noisy_holes_match_least_squares_solution (tests/general.py and tests/step_5.py)
+    method: recomputed in tests/general.py by numpy.linalg.lstsq and pinv on the generator-side model terms (Gauss-Legendre
+      TVD, exact layer sums, math.erfc)
+    note: agrees with the reference to 1e-10 W m^-2 and 1e-7 K
+    valid: 1-D conduction, horizontal layers, uniform kappa; OLS covariance with n - 3 degrees of freedom
+  - target: n_used
+    test: test_output_contract, test_noisy_holes_match_least_squares_solution (tests/general.py and tests/step_5.py)
+    method: count of readings whose generator TVD >= z_min
+    note: definition
+    valid: always
+  - target: 46 readings removed
+    test: test_z_min_is_applied_in_vertical_depth (tests/general.py and tests/step_5.py)
+    method: count of generator TVD values in [150, 350) m for the noisy hole
+    note: an MD-based cut would remove 40
+    valid: this hole geometry
+sub_steps:
+- step_number: '1'
+  scaffold: steps/step_1.py
+  solution: solution/step_1.py
+  tests: tests/step_1.py
+  name: True vertical depth by minimum curvature
+  function: true_vertical_depth(survey_md, inc_deg, azi_deg, md_query)
+  description: |
+    Compute the true vertical depth (TVD, m, positive down) at arbitrary measured depths (MD) along a borehole from its deviation survey, using the minimum-curvature model of the well path.
+    At each survey station the inclination I is given in degrees from vertical (0 = straight down) and the azimuth A in degrees clockwise from north. The unit tangent of the path at a station is t = (sin I cos A, sin I sin A, cos I) in (north, east, down) coordinates.
+    Minimum-curvature model: between two consecutive stations the path is the circular arc on which the unit tangent turns at a constant rate (per metre of MD) along the great circle from t1 to t2. The total turning angle over the segment is the dogleg beta, with cos beta = t1 . t2; only for beta exactly 0 is the segment straight. The accuracy below must hold for every dogleg, including very small non-zero doglegs on long segments. A query point inside a segment lies on that same arc, at the distance (MD - MD1) along it from the first station.
+    The TVD of any point is the integral, along the path from the collar (MD = 0, TVD = 0), of the down component of the unit tangent. Derive the TVD of the stations and of points inside a segment from this model; linear interpolation of TVD, of the angles or of the tangent between stations is not allowed.
+    Returns: float for a scalar md_query, otherwise a numpy array with the shape of md_query. Accuracy: 1e-6 m.
+    Errors: ValueError if the survey arrays are not 1-D of equal length with >= 2 stations, contain a non-finite value, do not start at MD 0 or increase strictly, if any inclination is outside [0, 180), if the dogleg between two consecutive stations is within 1e-6 rad of 180 degrees (opposite directions: the arc is not defined), or if a query depth is non-finite or outside [0, survey_md[-1]].
+  depends_on: []
+  function_header: |
+    def true_vertical_depth(survey_md, inc_deg, azi_deg, md_query):
+        """True vertical depth (m, positive down) at measured depths md_query.
+
+        Parameters
+        ----------
+        survey_md : 1-D array_like, measured depth of survey stations (m); first
+            station at 0 (collar), strictly increasing, at least 2 stations.
+        inc_deg : 1-D array_like, inclination from vertical at each station
+            (degrees, 0 = straight down), 0 <= inc < 180.
+        azi_deg : 1-D array_like, azimuth at each station (degrees clockwise from
+            north).
+        md_query : float or array_like, measured depths (m) with
+            0 <= md_query <= survey_md[-1].
+
+        Returns
+        -------
+        float for scalar md_query, otherwise ndarray with the shape of md_query.
+        Accuracy: 1e-6 m (the minimum-curvature path is exact; no approximation
+        between stations is permitted).
+
+        Raises
+        ------
+        ValueError if the survey arrays are not 1-D of equal length, have fewer
+        than 2 stations, do not start at MD 0 or do not increase strictly, if any
+        inclination is outside [0, 180), if the dogleg between two consecutive
+        stations is within 1e-6 rad of 180 degrees (opposite directions: the arc
+        is undefined), or if any query depth is non-finite or outside
+        [0, survey_md[-1]].
+        """
+  return_line: '    return tvd'
+  step_description_prompt: |
+    Compute the true vertical depth (TVD, m, positive down) at arbitrary measured depths (MD) along a borehole from its deviation survey, using the minimum-curvature model of the well path.
+    At each survey station the inclination I is given in degrees from vertical (0 = straight down) and the azimuth A in degrees clockwise from north. The unit tangent of the path at a station is t = (sin I cos A, sin I sin A, cos I) in (north, east, down) coordinates.
+    Minimum-curvature model: between two consecutive stations the path is the circular arc on which the unit tangent turns at a constant rate (per metre of MD) along the great circle from t1 to t2. The total turning angle over the segment is the dogleg beta, with cos beta = t1 . t2; only for beta exactly 0 is the segment straight. The accuracy below must hold for every dogleg, including very small non-zero doglegs on long segments. A query point inside a segment lies on that same arc, at the distance (MD - MD1) along it from the first station.
+    The TVD of any point is the integral, along the path from the collar (MD = 0, TVD = 0), of the down component of the unit tangent. Derive the TVD of the stations and of points inside a segment from this model; linear interpolation of TVD, of the angles or of the tangent between stations is not allowed.
+    Returns: float for a scalar md_query, otherwise a numpy array with the shape of md_query. Accuracy: 1e-6 m.
+    Errors: ValueError if the survey arrays are not 1-D of equal length with >= 2 stations, contain a non-finite value, do not start at MD 0 or increase strictly, if any inclination is outside [0, 180), if the dogleg between two consecutive stations is within 1e-6 rad of 180 degrees (opposite directions: the arc is not defined), or if a query depth is non-finite or outside [0, survey_md[-1]].
+  step_background: |
+    Compute the true vertical depth (TVD, m, positive down) at arbitrary measured depths (MD) along a borehole from its deviation survey, using the minimum-curvature model of the well path.
+    At each survey station the inclination I is given in degrees from vertical (0 = straight down) and the azimuth A in degrees clockwise from north. The unit tangent of the path at a station is t = (sin I cos A, sin I sin A, cos I) in (north, east, down) coordinates.
+    Minimum-curvature model: between two consecutive stations the path is the circular arc on which the unit tangent turns at a constant rate (per metre of MD) along the great circle from t1 to t2. The total turning angle over the segment is the dogleg beta, with cos beta = t1 . t2; only for beta exactly 0 is the segment straight. The accuracy below must hold for every dogleg, including very small non-zero doglegs on long segments. A query point inside a segment lies on that same arc, at the distance (MD - MD1) along it from the first station.
+    The TVD of any point is the integral, along the path from the collar (MD = 0, TVD = 0), of the down component of the unit tangent. Derive the TVD of the stations and of points inside a segment from this model; linear interpolation of TVD, of the angles or of the tangent between stations is not allowed.
+    Returns: float for a scalar md_query, otherwise a numpy array with the shape of md_query. Accuracy: 1e-6 m.
+    Errors: ValueError if the survey arrays are not 1-D of equal length with >= 2 stations, contain a non-finite value, do not start at MD 0 or increase strictly, if any inclination is outside [0, 180), if the dogleg between two consecutive stations is within 1e-6 rad of 180 degrees (opposite directions: the arc is not defined), or if a query depth is non-finite or outside [0, survey_md[-1]].
+  inputs:
+    survey_md: station MD (m), first 0, strictly increasing, >= 2 stations
+    inc_deg: inclination (deg from vertical), 0 <= inc < 180
+    azi_deg: azimuth (deg from north)
+    md_query: float or array of MD (m) within [0, survey_md[-1]]
+  outputs: TVD (m); float for scalar input, ndarray of the input shape otherwise
+  valid_range: 0 <= md_query <= last station MD
+  accuracy: 1e-6 m
+  errors: ValueError if the survey arrays are not 1-D of equal length with >= 2 stations, do not start at MD 0 or
+    increase strictly, if any inclination is outside [0, 180), if the dogleg between two consecutive stations is
+    within 1e-6 rad of 180 degrees, or if a query depth is non-finite or outside [0, survey_md[-1]]
+  step_name: True vertical depth by minimum curvature
+  function_name: true_vertical_depth
+  mutants:
+  - name: linear_tvd_between_stations
+    description: TVD between survey stations interpolated linearly in measured depth instead of on the minimum-curvature
+      arc.
+    code: |
+      """Reference for step 1."""
+      import numpy as np
+      import math
+
+      _erfc = np.frompyfunc(math.erfc, 1, 1)
+
+
+      def erfc(x):
+          """Element-wise complementary error function (numpy + math only)."""
+          return np.asarray(_erfc(np.asarray(x, float)), dtype=float)
+
+      SECONDS_PER_YEAR = 365.25 * 86400.0
+
+
+      def _unit(inc, azi):
+          return np.array([np.sin(inc) * np.cos(azi), np.sin(inc) * np.sin(azi), np.cos(inc)])
+
+
+      def _sinc(x):
+          return np.sinc(x / np.pi)          # sin(x) / x, exact at x = 0
+
+
+      def _ratio_factor(beta):
+          h = 0.5 * beta                     # tan(h) / h, no straight-line shortcut
+          if h < 1e-4:
+              return 1.0 + h * h / 3.0 + 2.0 * h ** 4 / 15.0   # series, truncation < 1e-24
+          return np.tan(h) / h
+
+
+      def true_vertical_depth(survey_md, inc_deg, azi_deg, md_query):
+          """TVD (m) at md_query by the minimum-curvature method."""
+          md = np.asarray(survey_md, float)
+          inc = np.radians(np.asarray(inc_deg, float))
+          azi = np.radians(np.asarray(azi_deg, float))
+          q_in = np.asarray(md_query, float)
+          q = np.atleast_1d(q_in).ravel()
+          if not (md.shape == inc.shape == azi.shape) or md.ndim != 1 or md.size < 2:
+              raise ValueError("survey arrays must be 1-D, equal length, >= 2 stations")
+          if md[0] != 0.0 or np.any(np.diff(md) <= 0):
+              raise ValueError("survey must start at MD 0 and increase strictly")
+          if np.any(inc < 0) or np.any(inc >= np.pi):
+              raise ValueError("inclination must be in [0, 180) degrees")
+          if np.any(~np.isfinite(q)) or np.any(q < 0) or np.any(q > md[-1]):
+              raise ValueError("query depths must lie within the survey")
+          # cumulative TVD at stations
+          tvd_st = np.zeros(md.size)
+          units = [_unit(inc[i], azi[i]) for i in range(md.size)]
+          betas = np.zeros(md.size - 1)
+          for i in range(md.size - 1):
+              # atan2 keeps full precision for tiny doglegs (arccos of a dot product does not)
+              betas[i] = np.arctan2(np.linalg.norm(np.cross(units[i], units[i + 1])), units[i] @ units[i + 1])
+              if betas[i] >= np.pi - 1e-6:
+                  raise ValueError("dogleg of 180 degrees between stations: path undefined")
+              dmd = md[i + 1] - md[i]
+              tvd_st[i + 1] = tvd_st[i] + 0.5 * dmd * (units[i][2] + units[i + 1][2]) * _ratio_factor(betas[i])
+          out = np.empty(q.size)
+          for j, m in enumerate(q):
+              i = min(np.searchsorted(md, m, side="right") - 1, md.size - 2)
+              dmd_seg = md[i + 1] - md[i]
+              f = (m - md[i]) / dmd_seg
+              b = betas[i]
+              t1, t2 = units[i], units[i + 1]
+              # tangent on the arc; the sinc form is exact for every dogleg, including 0
+              tq = ((1 - f) * _sinc((1 - f) * b) * t1 + f * _sinc(f * b) * t2) / _sinc(b)
+              out[j] = tvd_st[i] + f * (tvd_st[i + 1] - tvd_st[i])
+          return float(out[0]) if q_in.ndim == 0 else out.reshape(q_in.shape)
+  - name: balanced_tangential
+    description: 'Ratio factor omitted (balanced-tangential method): the arc is replaced by two straight half-segments.'
+    code: |
+      """Reference for step 1."""
+      import numpy as np
+      import math
+
+      _erfc = np.frompyfunc(math.erfc, 1, 1)
+
+
+      def erfc(x):
+          """Element-wise complementary error function (numpy + math only)."""
+          return np.asarray(_erfc(np.asarray(x, float)), dtype=float)
+
+      SECONDS_PER_YEAR = 365.25 * 86400.0
+
+
+      def _unit(inc, azi):
+          return np.array([np.sin(inc) * np.cos(azi), np.sin(inc) * np.sin(azi), np.cos(inc)])
+
+
+      def _sinc(x):
+          return np.sinc(x / np.pi)
+
+
+      def _ratio_factor(beta):
+          return 1.0
+
+
+      def true_vertical_depth(survey_md, inc_deg, azi_deg, md_query):
+          """TVD (m) at md_query by the minimum-curvature method."""
+          md = np.asarray(survey_md, float)
+          inc = np.radians(np.asarray(inc_deg, float))
+          azi = np.radians(np.asarray(azi_deg, float))
+          q_in = np.asarray(md_query, float)
+          q = np.atleast_1d(q_in).ravel()
+          if not (md.shape == inc.shape == azi.shape) or md.ndim != 1 or md.size < 2:
+              raise ValueError("survey arrays must be 1-D, equal length, >= 2 stations")
+          if md[0] != 0.0 or np.any(np.diff(md) <= 0):
+              raise ValueError("survey must start at MD 0 and increase strictly")
+          if np.any(inc < 0) or np.any(inc >= np.pi):
+              raise ValueError("inclination must be in [0, 180) degrees")
+          if np.any(~np.isfinite(q)) or np.any(q < 0) or np.any(q > md[-1]):
+              raise ValueError("query depths must lie within the survey")
+          # cumulative TVD at stations
+          tvd_st = np.zeros(md.size)
+          units = [_unit(inc[i], azi[i]) for i in range(md.size)]
+          betas = np.zeros(md.size - 1)
+          for i in range(md.size - 1):
+              # atan2 keeps full precision for tiny doglegs (arccos of a dot product does not)
+              betas[i] = np.arctan2(np.linalg.norm(np.cross(units[i], units[i + 1])), units[i] @ units[i + 1])
+              if betas[i] >= np.pi - 1e-6:
+                  raise ValueError("dogleg of 180 degrees between stations: path undefined")
+              dmd = md[i + 1] - md[i]
+              tvd_st[i + 1] = tvd_st[i] + 0.5 * dmd * (units[i][2] + units[i + 1][2]) * _ratio_factor(betas[i])
+          out = np.empty(q.size)
+          for j, m in enumerate(q):
+              i = min(np.searchsorted(md, m, side="right") - 1, md.size - 2)
+              dmd_seg = md[i + 1] - md[i]
+              f = (m - md[i]) / dmd_seg
+              b = betas[i]
+              t1, t2 = units[i], units[i + 1]
+              # tangent on the arc; the sinc form is exact for every dogleg, including 0
+              tq = ((1 - f) * _sinc((1 - f) * b) * t1 + f * _sinc(f * b) * t2) / _sinc(b)
+              dm = m - md[i]
+              out[j] = tvd_st[i] + 0.5 * dm * (t1[2] + tq[2]) * _ratio_factor(f * b)
+          return float(out[0]) if q_in.ndim == 0 else out.reshape(q_in.shape)
+- step_number: '2'
+  scaffold: steps/step_2.py
+  solution: solution/step_2.py
+  tests: tests/step_2.py
+  name: Bullard thermal resistance and heat-production integral
+  function: layer_integrals(layer_top_tvd, layer_k, z)
+  description: |
+    A column of horizontal layers has a constant thermal conductivity k_i (W m^-1 K^-1) inside each layer. The top of layer i is at depth z_i (m): the first top is 0, the tops increase strictly, and the last layer extends to infinite depth.
+    In steady one-dimensional conduction with a uniform radiogenic heat production A (W m^-3), the upward heat flow decreases with depth as q(z) = q0 - A z, where q0 is the surface heat flow, and Fourier's law gives dT/dz = q(z) / k(z), with T(0) = T0. The steady temperature can therefore be written as T(z) = T0 + q0 R(z) - A S(z), where R(z) (thermal resistance, m^2 K W^-1) and S(z) (m^3 K W^-1) depend only on the conductivity column and are zero at z = 0. Return R(z) and S(z) at each requested depth z (m) for the given layers.
+    Returns: tuple (R, S); floats for a scalar z, otherwise numpy arrays with the shape of z. Relative accuracy: 1e-9.
+    Errors: ValueError if the layer arrays are not 1-D of equal length, any top is non-finite, the first top is not 0 or tops do not increase strictly, any conductivity is non-finite or <= 0, or any depth is non-finite or negative.
+  depends_on: []
+  function_header: |
+    def layer_integrals(layer_top_tvd, layer_k, z):
+        """Depth functions R(z), S(z) of the steady layered geotherm T = T0 + q0 R - A S.
+
+        Parameters
+        ----------
+        layer_top_tvd : 1-D array_like, depth (m) of the top of each layer; the
+            first is 0, strictly increasing. The last layer extends to infinity.
+        layer_k : 1-D array_like, thermal conductivity of each layer (W m^-1 K^-1), > 0.
+        z : float or array_like, depths (m) >= 0.
+
+        Returns
+        -------
+        (R, S) : R in m^2 K W^-1, S in m^3 K W^-1; floats for scalar z, otherwise
+        arrays with the shape of z. Relative accuracy 1e-9.
+
+        Raises
+        ------
+        ValueError if the layer arrays are not 1-D of equal length, if the first
+        top is not 0 or tops do not increase strictly, if any conductivity is
+        non-finite or <= 0, or if any depth is non-finite or negative.
+        """
+  return_line: '    return (R, S)'
+  step_description_prompt: |
+    A column of horizontal layers has a constant thermal conductivity k_i (W m^-1 K^-1) inside each layer. The top of layer i is at depth z_i (m): the first top is 0, the tops increase strictly, and the last layer extends to infinite depth.
+    In steady one-dimensional conduction with a uniform radiogenic heat production A (W m^-3), the upward heat flow decreases with depth as q(z) = q0 - A z, where q0 is the surface heat flow, and Fourier's law gives dT/dz = q(z) / k(z), with T(0) = T0. The steady temperature can therefore be written as T(z) = T0 + q0 R(z) - A S(z), where R(z) (thermal resistance, m^2 K W^-1) and S(z) (m^3 K W^-1) depend only on the conductivity column and are zero at z = 0. Return R(z) and S(z) at each requested depth z (m) for the given layers.
+    Returns: tuple (R, S); floats for a scalar z, otherwise numpy arrays with the shape of z. Relative accuracy: 1e-9.
+    Errors: ValueError if the layer arrays are not 1-D of equal length, any top is non-finite, the first top is not 0 or tops do not increase strictly, any conductivity is non-finite or <= 0, or any depth is non-finite or negative.
+  step_background: |
+    A column of horizontal layers has a constant thermal conductivity k_i (W m^-1 K^-1) inside each layer. The top of layer i is at depth z_i (m): the first top is 0, the tops increase strictly, and the last layer extends to infinite depth.
+    In steady one-dimensional conduction with a uniform radiogenic heat production A (W m^-3), the upward heat flow decreases with depth as q(z) = q0 - A z, where q0 is the surface heat flow, and Fourier's law gives dT/dz = q(z) / k(z), with T(0) = T0. The steady temperature can therefore be written as T(z) = T0 + q0 R(z) - A S(z), where R(z) (thermal resistance, m^2 K W^-1) and S(z) (m^3 K W^-1) depend only on the conductivity column and are zero at z = 0. Return R(z) and S(z) at each requested depth z (m) for the given layers.
+    Returns: tuple (R, S); floats for a scalar z, otherwise numpy arrays with the shape of z. Relative accuracy: 1e-9.
+    Errors: ValueError if the layer arrays are not 1-D of equal length, any top is non-finite, the first top is not 0 or tops do not increase strictly, any conductivity is non-finite or <= 0, or any depth is non-finite or negative.
+  inputs:
+    layer_top_tvd: layer tops (m), first 0, strictly increasing
+    layer_k: conductivity (W m^-1 K^-1) > 0
+    z: float or array of depths (m) >= 0
+  outputs: 'tuple (R, S): R in m^2 K W^-1, S in m^3 K W^-1; floats or arrays of the input shape'
+  valid_range: z >= 0
+  accuracy: relative 1e-9
+  errors: ValueError if the layer arrays are not 1-D of equal length, the first top is not 0 or tops do not increase
+    strictly, any conductivity is non-finite or <= 0, or any depth is non-finite or negative
+  step_name: Bullard thermal resistance and heat-production integral
+  function_name: layer_integrals
+  mutants:
+  - name: arithmetic_conductivity
+    description: Thermal resistance computed with the arithmetic mean conductivity of all layers instead of summing
+      the layer resistances in series.
+    code: |
+      """Reference for step 2."""
+      import numpy as np
+      import math
+
+      _erfc = np.frompyfunc(math.erfc, 1, 1)
+
+
+      def erfc(x):
+          """Element-wise complementary error function (numpy + math only)."""
+          return np.asarray(_erfc(np.asarray(x, float)), dtype=float)
+
+      SECONDS_PER_YEAR = 365.25 * 86400.0
+
+
+      def layer_integrals(layer_top_tvd, layer_k, z):
+          """Thermal resistance R(z) = int_0^z dz'/k and S(z) = int_0^z z'/k dz'."""
+          tops = np.asarray(layer_top_tvd, float)
+          k = np.asarray(layer_k, float)
+          z_in = np.asarray(z, float)
+          zz = np.atleast_1d(z_in).ravel()
+          if tops.ndim != 1 or tops.shape != k.shape or tops.size < 1:
+              raise ValueError("layer arrays must be 1-D with equal length")
+          if tops[0] != 0.0 or np.any(np.diff(tops) <= 0):
+              raise ValueError("layer tops must start at 0 and increase strictly")
+          if np.any(~np.isfinite(k)) or np.any(k <= 0):
+              raise ValueError("conductivities must be positive")
+          if np.any(~np.isfinite(zz)) or np.any(zz < 0):
+              raise ValueError("depths must be >= 0")
+          bottoms = np.append(tops[1:], np.inf)
+          R = np.zeros(zz.size)
+          S = np.zeros(zz.size)
+          for top, bot, kk in zip(tops, bottoms, k):
+              lo = np.clip(zz, top, bot) - top
+              a = top
+              b = top + lo
+              R += (b - a) / np.mean(k)
+              S += (b**2 - a**2) / (2 * kk)
+          if z_in.ndim == 0:
+              return float(R[0]), float(S[0])
+          return R.reshape(z_in.shape), S.reshape(z_in.shape)
+  - name: heat_production_integral_missing_half
+    description: S(z) integrated as (b^2 - a^2)/k instead of (b^2 - a^2)/(2k).
+    code: |
+      """Reference for step 2."""
+      import numpy as np
+      import math
+
+      _erfc = np.frompyfunc(math.erfc, 1, 1)
+
+
+      def erfc(x):
+          """Element-wise complementary error function (numpy + math only)."""
+          return np.asarray(_erfc(np.asarray(x, float)), dtype=float)
+
+      SECONDS_PER_YEAR = 365.25 * 86400.0
+
+
+      def layer_integrals(layer_top_tvd, layer_k, z):
+          """Thermal resistance R(z) = int_0^z dz'/k and S(z) = int_0^z z'/k dz'."""
+          tops = np.asarray(layer_top_tvd, float)
+          k = np.asarray(layer_k, float)
+          z_in = np.asarray(z, float)
+          zz = np.atleast_1d(z_in).ravel()
+          if tops.ndim != 1 or tops.shape != k.shape or tops.size < 1:
+              raise ValueError("layer arrays must be 1-D with equal length")
+          if tops[0] != 0.0 or np.any(np.diff(tops) <= 0):
+              raise ValueError("layer tops must start at 0 and increase strictly")
+          if np.any(~np.isfinite(k)) or np.any(k <= 0):
+              raise ValueError("conductivities must be positive")
+          if np.any(~np.isfinite(zz)) or np.any(zz < 0):
+              raise ValueError("depths must be >= 0")
+          bottoms = np.append(tops[1:], np.inf)
+          R = np.zeros(zz.size)
+          S = np.zeros(zz.size)
+          for top, bot, kk in zip(tops, bottoms, k):
+              lo = np.clip(zz, top, bot) - top
+              a = top
+              b = top + lo
+              R += (b - a) / kk
+              S += (b**2 - a**2) / kk
+          if z_in.ndim == 0:
+              return float(R[0]), float(S[0])
+          return R.reshape(z_in.shape), S.reshape(z_in.shape)
+- step_number: '3'
+  scaffold: steps/step_3.py
+  solution: solution/step_3.py
+  tests: tests/step_3.py
+  name: Paleoclimate perturbation of a piecewise-constant surface history
+  function: paleoclimate_perturbation(z, t_years, dT, kappa)
+  description: |
+    Return the present-day departure (K) of subsurface temperature from the steady state caused by a past ground-surface temperature history. The ground is a homogeneous conducting half-space z >= 0 (z = depth, m) with thermal diffusivity kappa (m^2 s^-1) and no internal heat sources: the departure obeys the one-dimensional heat equation, and at the surface it equals the surface-temperature departure.
+    History: interval 0 runs from the present back to t_years[0], interval i from t_years[i-1] back to t_years[i] (years before present). During interval i the ground-surface temperature differed from the long-term reference by dT[i] (K). Before t_years[-1] the surface stayed at the reference long enough for the departure to be zero at all depths. Convert years to seconds with 1 year = 365.25 x 86400 s. At z = 0 the result is the present surface departure dT[0].
+    Returns: float for a scalar z, otherwise a numpy array with the shape of z (any number of dimensions). Absolute accuracy: 1e-6 K per kelvin of the largest |dT[i]|.
+    Errors: ValueError if t_years and dT are not 1-D of equal length, contain a non-finite value, t_years[0] <= 0 or t_years does not increase strictly, kappa is non-finite or <= 0, or any depth is non-finite or negative.
+  depends_on: []
+  function_header: |
+    def paleoclimate_perturbation(z, t_years, dT, kappa):
+        """Present-day temperature perturbation (K) at depth z.
+
+        History convention: interval 0 runs from the present back to t_years[0],
+        interval i runs from t_years[i-1] back to t_years[i]. During interval i
+        the ground-surface temperature differed from the long-term reference
+        surface temperature by dT[i] (K). Before t_years[-1] the surface stayed at
+        the reference temperature long enough for the ground to be in steady state. The subsurface is a homogeneous
+        conductive half-space with thermal diffusivity kappa. Times in years are
+        converted with SECONDS_PER_YEAR.
+
+        Parameters
+        ----------
+        z : float or array_like, depth (m) >= 0.
+        t_years : 1-D array_like, positive, strictly increasing ends of the
+            history intervals (years before present).
+        dT : 1-D array_like, same length, departure during each interval (K).
+        kappa : float, thermal diffusivity (m^2 s^-1), > 0.
+
+        Returns
+        -------
+        float for scalar z, else ndarray with the shape of z. Absolute accuracy
+        1e-6 K per kelvin of the largest |dT|.
+
+        Raises
+        ------
+        ValueError if t_years and dT are not 1-D of equal length, if t_years[0]
+        <= 0 or t_years does not increase strictly, if kappa is non-finite or
+        <= 0, or if any depth is non-finite or negative.
+        """
+  return_line: '    return dT_z'
+  step_description_prompt: |
+    Return the present-day departure (K) of subsurface temperature from the steady state caused by a past ground-surface temperature history. The ground is a homogeneous conducting half-space z >= 0 (z = depth, m) with thermal diffusivity kappa (m^2 s^-1) and no internal heat sources: the departure obeys the one-dimensional heat equation, and at the surface it equals the surface-temperature departure.
+    History: interval 0 runs from the present back to t_years[0], interval i from t_years[i-1] back to t_years[i] (years before present). During interval i the ground-surface temperature differed from the long-term reference by dT[i] (K). Before t_years[-1] the surface stayed at the reference long enough for the departure to be zero at all depths. Convert years to seconds with 1 year = 365.25 x 86400 s. At z = 0 the result is the present surface departure dT[0].
+    Returns: float for a scalar z, otherwise a numpy array with the shape of z (any number of dimensions). Absolute accuracy: 1e-6 K per kelvin of the largest |dT[i]|.
+    Errors: ValueError if t_years and dT are not 1-D of equal length, contain a non-finite value, t_years[0] <= 0 or t_years does not increase strictly, kappa is non-finite or <= 0, or any depth is non-finite or negative.
+  step_background: |
+    Return the present-day departure (K) of subsurface temperature from the steady state caused by a past ground-surface temperature history. The ground is a homogeneous conducting half-space z >= 0 (z = depth, m) with thermal diffusivity kappa (m^2 s^-1) and no internal heat sources: the departure obeys the one-dimensional heat equation, and at the surface it equals the surface-temperature departure.
+    History: interval 0 runs from the present back to t_years[0], interval i from t_years[i-1] back to t_years[i] (years before present). During interval i the ground-surface temperature differed from the long-term reference by dT[i] (K). Before t_years[-1] the surface stayed at the reference long enough for the departure to be zero at all depths. Convert years to seconds with 1 year = 365.25 x 86400 s. At z = 0 the result is the present surface departure dT[0].
+    Returns: float for a scalar z, otherwise a numpy array with the shape of z (any number of dimensions). Absolute accuracy: 1e-6 K per kelvin of the largest |dT[i]|.
+    Errors: ValueError if t_years and dT are not 1-D of equal length, contain a non-finite value, t_years[0] <= 0 or t_years does not increase strictly, kappa is non-finite or <= 0, or any depth is non-finite or negative.
+  inputs:
+    z: float or array of depths (m) >= 0
+    t_years: interval ends (years before present), positive, strictly increasing
+    dT: departure during each interval (K)
+    kappa: thermal diffusivity (m^2 s^-1) > 0
+  outputs: temperature perturbation (K); float, or array with the full shape of z
+  valid_range: z >= 0
+  accuracy: 1e-6 K per kelvin of the largest |dT|
+  errors: ValueError if t_years and dT are not 1-D of equal length, t_years[0] <= 0 or t_years does not increase
+    strictly, kappa is non-finite or <= 0, or any depth is non-finite or negative
+  step_name: Paleoclimate perturbation of a piecewise-constant surface history
+  function_name: paleoclimate_perturbation
+  mutants:
+  - name: years_not_converted
+    description: History times used in years instead of seconds in the diffusion length sqrt(kappa t).
+    code: |
+      """Reference for step 3."""
+      import numpy as np
+      import math
+
+      def erfc(x):
+          """Element-wise complementary error function (numpy + math only)."""
+          import math  # local import: harness may strip top-level imports
+          f = np.frompyfunc(math.erfc, 1, 1)
+          return np.asarray(f(np.asarray(x, float)), dtype=float)
+
+      SECONDS_PER_YEAR = 365.25 * 86400.0
+
+
+      def paleoclimate_perturbation(z, t_years, dT, kappa):
+          """Present-day temperature perturbation (K) at depth z (m) from a
+          piecewise-constant surface-temperature history."""
+          z_in = np.asarray(z, float)
+          zz = np.atleast_1d(z_in).ravel()
+          t = np.asarray(t_years, float)
+          d = np.asarray(dT, float)
+          if t.ndim != 1 or t.shape != d.shape or t.size < 1:
+              raise ValueError("history arrays must be 1-D with equal length")
+          if t[0] <= 0 or np.any(np.diff(t) <= 0):
+              raise ValueError("history times must be positive and increasing")
+          if not np.isfinite(kappa) or kappa <= 0:
+              raise ValueError("diffusivity must be positive")
+          if np.any(~np.isfinite(zz)) or np.any(zz < 0):
+              raise ValueError("depths must be >= 0")
+          ts = t
+          edges = np.concatenate(([0.0], ts))
+          out = np.zeros(zz.size)
+          for i in range(t.size):
+              t_new, t_old = edges[i], edges[i + 1]
+              e_old = erfc(zz / (2 * np.sqrt(kappa * t_old)))
+              if t_new == 0.0:
+                  e_new = np.zeros_like(zz)       # limit z / sqrt(kappa * 0) -> inf
+              else:
+                  e_new = erfc(zz / (2 * np.sqrt(kappa * t_new)))
+              out += d[i] * (e_old - e_new)
+          return float(out[0]) if z_in.ndim == 0 else out.reshape(z_in.shape)
+  - name: erfc_missing_factor_2
+    description: Diffusion argument written z/sqrt(kappa t) instead of z/(2 sqrt(kappa t)).
+    code: |
+      """Reference for step 3."""
+      import numpy as np
+      import math
+
+      def erfc(x):
+          """Element-wise complementary error function (numpy + math only)."""
+          import math  # local import: harness may strip top-level imports
+          f = np.frompyfunc(math.erfc, 1, 1)
+          return np.asarray(f(np.asarray(x, float)), dtype=float)
+
+      SECONDS_PER_YEAR = 365.25 * 86400.0
+
+
+      def paleoclimate_perturbation(z, t_years, dT, kappa):
+          """Present-day temperature perturbation (K) at depth z (m) from a
+          piecewise-constant surface-temperature history."""
+          z_in = np.asarray(z, float)
+          zz = np.atleast_1d(z_in).ravel()
+          t = np.asarray(t_years, float)
+          d = np.asarray(dT, float)
+          if t.ndim != 1 or t.shape != d.shape or t.size < 1:
+              raise ValueError("history arrays must be 1-D with equal length")
+          if t[0] <= 0 or np.any(np.diff(t) <= 0):
+              raise ValueError("history times must be positive and increasing")
+          if not np.isfinite(kappa) or kappa <= 0:
+              raise ValueError("diffusivity must be positive")
+          if np.any(~np.isfinite(zz)) or np.any(zz < 0):
+              raise ValueError("depths must be >= 0")
+          ts = t * SECONDS_PER_YEAR
+          edges = np.concatenate(([0.0], ts))
+          out = np.zeros(zz.size)
+          for i in range(t.size):
+              t_new, t_old = edges[i], edges[i + 1]
+              e_old = erfc(zz / np.sqrt(kappa * t_old))
+              if t_new == 0.0:
+                  e_new = np.zeros_like(zz)       # limit z / sqrt(kappa * 0) -> inf
+              else:
+                  e_new = erfc(zz / np.sqrt(kappa * t_new))
+              out += d[i] * (e_old - e_new)
+          return float(out[0]) if z_in.ndim == 0 else out.reshape(z_in.shape)
+  - name: interval_sign_reversed
+    description: Each interval contributes erfc(new) - erfc(old) instead of erfc(old) - erfc(new) (warming read
+      as cooling).
+    code: |
+      """Reference for step 3."""
+      import numpy as np
+      import math
+
+      def erfc(x):
+          """Element-wise complementary error function (numpy + math only)."""
+          import math  # local import: harness may strip top-level imports
+          f = np.frompyfunc(math.erfc, 1, 1)
+          return np.asarray(f(np.asarray(x, float)), dtype=float)
+
+      SECONDS_PER_YEAR = 365.25 * 86400.0
+
+
+      def paleoclimate_perturbation(z, t_years, dT, kappa):
+          """Present-day temperature perturbation (K) at depth z (m) from a
+          piecewise-constant surface-temperature history."""
+          z_in = np.asarray(z, float)
+          zz = np.atleast_1d(z_in).ravel()
+          t = np.asarray(t_years, float)
+          d = np.asarray(dT, float)
+          if t.ndim != 1 or t.shape != d.shape or t.size < 1:
+              raise ValueError("history arrays must be 1-D with equal length")
+          if t[0] <= 0 or np.any(np.diff(t) <= 0):
+              raise ValueError("history times must be positive and increasing")
+          if not np.isfinite(kappa) or kappa <= 0:
+              raise ValueError("diffusivity must be positive")
+          if np.any(~np.isfinite(zz)) or np.any(zz < 0):
+              raise ValueError("depths must be >= 0")
+          ts = t * SECONDS_PER_YEAR
+          edges = np.concatenate(([0.0], ts))
+          out = np.zeros(zz.size)
+          for i in range(t.size):
+              t_new, t_old = edges[i], edges[i + 1]
+              e_old = erfc(zz / (2 * np.sqrt(kappa * t_old)))
+              if t_new == 0.0:
+                  e_new = np.zeros_like(zz)       # limit z / sqrt(kappa * 0) -> inf
+              else:
+                  e_new = erfc(zz / (2 * np.sqrt(kappa * t_new)))
+              out += d[i] * (e_new - e_old)
+          return float(out[0]) if z_in.ndim == 0 else out.reshape(z_in.shape)
+- step_number: '4'
+  scaffold: steps/step_4.py
+  solution: solution/step_4.py
+  tests: tests/step_4.py
+  name: Joint least-squares estimate of T0, q0 and glacial amplitude
+  function: fit_heat_flow(T, R, S, P, A)
+  description: |
+    The equilibrium temperatures follow the observation model T = T0 + q0 R - A S + g P + noise. At each reading, R and S come from layer_integrals (step 2) and P is the perturbation of the unit-amplitude paleoclimate history from paleoclimate_perturbation (step 3); true_vertical_depth (step 1) gives the depths at which they are evaluated. The heat production A (W m^-3) is known. The unknowns are the surface temperature T0 (deg C), the surface heat flow q0 (W m^-2) and the amplitude g (K) of the history.
+    Estimate T0, q0 and g by ordinary (unweighted) least squares. Report their 1-sigma standard errors from the least-squares parameter covariance, with the noise variance estimated without bias from the residuals (residual sum of squares RSS divided by n - 3), and the root-mean-square residual sqrt(RSS / n).
+    The three unknowns are separately determined only if the data resolve the constant, R and P: scale each of the three columns 1, R and P to unit Euclidean length; if one of them is all zero (for example P identically zero) or the smallest singular value of the scaled n x 3 matrix is below 1e-8 (for example P proportional to R), raise ValueError.
+    Returns: dict with float keys T0, q0, amplitude, sigma_T0, sigma_q0, sigma_amplitude, rms_residual.
+    Errors: ValueError for unequal lengths, n < 4, non-finite values, A < 0 or non-finite, or an unresolvable design as defined above.
+  depends_on:
+  - 1
+  - 2
+  - 3
+  function_header: |
+    def fit_heat_flow(T, R, S, P, A):
+        """Least-squares fit of  T = T0 + q0 R - A S + g P.
+
+        Parameters
+        ----------
+        T : (n,) observed temperatures (deg C), n >= 4
+        R : (n,) thermal resistance at the observation depths (m^2 K W^-1)
+        S : (n,) heat-production integral at the observation depths (m^3 K W^-1)
+        P : (n,) paleoclimate perturbation for a unit-amplitude history (K per K)
+        A : float, uniform radiogenic heat production (W m^-3), >= 0 (known)
+
+        Returns
+        -------
+        dict of floats: T0 (deg C), q0 (W m^-2), amplitude (g, K),
+        sigma_T0, sigma_q0, sigma_amplitude (1-sigma standard errors of ordinary
+        least squares, noise variance estimated as RSS/(n-3)),
+        rms_residual (K, sqrt(RSS/n)).
+
+        Raises
+        ------
+        ValueError for unequal lengths, n < 4, non-finite values, A < 0 or
+        non-finite, or an unresolvable design: one of the columns 1, R, P is all
+        zero, or the smallest singular value of the n x 3 matrix [1, R, P] with
+        each column scaled to unit length is below 1e-8 (e.g. P proportional to R).
+        """
+  return_line: '    return result'
+  step_description_prompt: |
+    The equilibrium temperatures follow the observation model T = T0 + q0 R - A S + g P + noise. At each reading, R and S come from layer_integrals (step 2) and P is the perturbation of the unit-amplitude paleoclimate history from paleoclimate_perturbation (step 3); true_vertical_depth (step 1) gives the depths at which they are evaluated. The heat production A (W m^-3) is known. The unknowns are the surface temperature T0 (deg C), the surface heat flow q0 (W m^-2) and the amplitude g (K) of the history.
+    Estimate T0, q0 and g by ordinary (unweighted) least squares. Report their 1-sigma standard errors from the least-squares parameter covariance, with the noise variance estimated without bias from the residuals (residual sum of squares RSS divided by n - 3), and the root-mean-square residual sqrt(RSS / n).
+    The three unknowns are separately determined only if the data resolve the constant, R and P: scale each of the three columns 1, R and P to unit Euclidean length; if one of them is all zero (for example P identically zero) or the smallest singular value of the scaled n x 3 matrix is below 1e-8 (for example P proportional to R), raise ValueError.
+    Returns: dict with float keys T0, q0, amplitude, sigma_T0, sigma_q0, sigma_amplitude, rms_residual.
+    Errors: ValueError for unequal lengths, n < 4, non-finite values, A < 0 or non-finite, or an unresolvable design as defined above.
+  step_background: |
+    The equilibrium temperatures follow the observation model T = T0 + q0 R - A S + g P + noise. At each reading, R and S come from layer_integrals (step 2) and P is the perturbation of the unit-amplitude paleoclimate history from paleoclimate_perturbation (step 3); true_vertical_depth (step 1) gives the depths at which they are evaluated. The heat production A (W m^-3) is known. The unknowns are the surface temperature T0 (deg C), the surface heat flow q0 (W m^-2) and the amplitude g (K) of the history.
+    Estimate T0, q0 and g by ordinary (unweighted) least squares. Report their 1-sigma standard errors from the least-squares parameter covariance, with the noise variance estimated without bias from the residuals (residual sum of squares RSS divided by n - 3), and the root-mean-square residual sqrt(RSS / n).
+    The three unknowns are separately determined only if the data resolve the constant, R and P: scale each of the three columns 1, R and P to unit Euclidean length; if one of them is all zero (for example P identically zero) or the smallest singular value of the scaled n x 3 matrix is below 1e-8 (for example P proportional to R), raise ValueError.
+    Returns: dict with float keys T0, q0, amplitude, sigma_T0, sigma_q0, sigma_amplitude, rms_residual.
+    Errors: ValueError for unequal lengths, n < 4, non-finite values, A < 0 or non-finite, or an unresolvable design as defined above.
+  inputs:
+    T: (n,) temperatures (deg C), n >= 4
+    R: (n,) thermal resistance
+    S: (n,) heat-production integral
+    P: (n,) unit-amplitude paleoclimate perturbation
+    A: heat production (W m^-3) >= 0
+  outputs: dict with float keys T0, q0, amplitude, sigma_T0, sigma_q0, sigma_amplitude, rms_residual
+  valid_range: n >= 4, design [1, R, P] resolvable (see errors)
+  accuracy: estimates to numerical precision of the least-squares solution; sigmas 1e-6 relative
+  errors: ValueError for unequal lengths, n < 4, non-finite values, A < 0 or non-finite, or an unresolvable design
+    (a zero column among 1, R, P, or smallest singular value below 1e-8 after scaling each column to unit length)
+  step_name: Joint least-squares estimate of T0, q0 and glacial amplitude
+  function_name: fit_heat_flow
+  mutants:
+  - name: heat_production_sign
+    description: Heat-production term added with the wrong sign (T = T0 + q0 R + A S + g P).
+    code: |
+      """Reference for step 4."""
+      import numpy as np
+      import math
+
+      _erfc = np.frompyfunc(math.erfc, 1, 1)
+
+
+      def erfc(x):
+          """Element-wise complementary error function (numpy + math only)."""
+          return np.asarray(_erfc(np.asarray(x, float)), dtype=float)
+
+      SECONDS_PER_YEAR = 365.25 * 86400.0
+
+
+      def fit_heat_flow(T, R, S, P, A):
+          """Least-squares T = T0 + q0 R - A S + g P  ->  (T0, q0, g) + errors."""
+          T, R, S, P = (np.asarray(v, float).ravel() for v in (T, R, S, P))
+          n = T.size
+          if not (R.size == S.size == P.size == n):
+              raise ValueError("arrays must have equal length")
+          if n < 4:
+              raise ValueError("need at least 4 temperatures")
+          if not np.all(np.isfinite(np.concatenate([T, R, S, P]))) or not np.isfinite(A) or A < 0:
+              raise ValueError("invalid input")
+          y = T - A * S
+          G = np.column_stack([np.ones(n), R, P])
+          # stated criterion: a zero column, or smallest singular value < 1e-8 after
+          # scaling each column to unit Euclidean length
+          norms = np.linalg.norm(G, axis=0)
+          if np.any(norms == 0.0) or np.linalg.svd(G / norms, compute_uv=False)[-1] < 1e-8:
+              raise ValueError("T0, q0 and amplitude are not separately resolvable (rank-deficient design)")
+          GtG = G.T @ G
+          m = np.linalg.solve(GtG, G.T @ y)
+          res = y - G @ m
+          s2 = float(res @ res) / (n - 3)
+          C = s2 * np.linalg.inv(GtG)
+          return {"T0": float(m[0]), "q0": float(m[1]), "amplitude": float(m[2]),
+                  "sigma_T0": float(np.sqrt(C[0, 0])), "sigma_q0": float(np.sqrt(C[1, 1])),
+                  "sigma_amplitude": float(np.sqrt(C[2, 2])),
+                  "rms_residual": float(np.sqrt(np.mean(res**2)))}
+  - name: dof_n
+    description: Residual variance divided by n instead of n - 3 degrees of freedom.
+    code: |
+      """Reference for step 4."""
+      import numpy as np
+      import math
+
+      _erfc = np.frompyfunc(math.erfc, 1, 1)
+
+
+      def erfc(x):
+          """Element-wise complementary error function (numpy + math only)."""
+          return np.asarray(_erfc(np.asarray(x, float)), dtype=float)
+
+      SECONDS_PER_YEAR = 365.25 * 86400.0
+
+
+      def fit_heat_flow(T, R, S, P, A):
+          """Least-squares T = T0 + q0 R - A S + g P  ->  (T0, q0, g) + errors."""
+          T, R, S, P = (np.asarray(v, float).ravel() for v in (T, R, S, P))
+          n = T.size
+          if not (R.size == S.size == P.size == n):
+              raise ValueError("arrays must have equal length")
+          if n < 4:
+              raise ValueError("need at least 4 temperatures")
+          if not np.all(np.isfinite(np.concatenate([T, R, S, P]))) or not np.isfinite(A) or A < 0:
+              raise ValueError("invalid input")
+          y = T + A * S
+          G = np.column_stack([np.ones(n), R, P])
+          # stated criterion: a zero column, or smallest singular value < 1e-8 after
+          # scaling each column to unit Euclidean length
+          norms = np.linalg.norm(G, axis=0)
+          if np.any(norms == 0.0) or np.linalg.svd(G / norms, compute_uv=False)[-1] < 1e-8:
+              raise ValueError("T0, q0 and amplitude are not separately resolvable (rank-deficient design)")
+          GtG = G.T @ G
+          m = np.linalg.solve(GtG, G.T @ y)
+          res = y - G @ m
+          s2 = float(res @ res) / n
+          C = s2 * np.linalg.inv(GtG)
+          return {"T0": float(m[0]), "q0": float(m[1]), "amplitude": float(m[2]),
+                  "sigma_T0": float(np.sqrt(C[0, 0])), "sigma_q0": float(np.sqrt(C[1, 1])),
+                  "sigma_amplitude": float(np.sqrt(C[2, 2])),
+                  "rms_residual": float(np.sqrt(np.mean(res**2)))}
+- step_number: '5'
+  step_name: 'Full workflow: surface heat flow'
+  function_name: surface_heat_flow
+  function_header: |
+    def surface_heat_flow(survey_md, survey_inc, survey_azi, log_md, log_temp,
+                          layer_top_md, layer_k, heat_production, kappa,
+                          hist_t_years, hist_dT_shape, z_min):
+        """Paleoclimate-corrected surface heat flow from an inclined borehole.
+
+        Parameters
+        ----------
+        survey_md, survey_inc, survey_azi : deviation survey (m, degrees, degrees)
+        log_md, log_temp : 1-D arrays of equal length, reading MD (m) and temperature (deg C)
+        layer_top_md, layer_k : layer tops along the hole (m, first 0) and conductivities (W/m/K)
+        heat_production : uniform A (W m^-3), >= 0
+        kappa : thermal diffusivity (m^2 s^-1)
+        hist_t_years, hist_dT_shape : unit-amplitude surface-temperature history
+        z_min : readings with TVD < z_min (m) are excluded
+
+        Workflow
+        --------
+        1. TVD of every reading and every layer top (step 1).
+        2. Keep readings with TVD >= z_min.
+        3. R and S at the kept depths (step 2); P of the unit-amplitude history (step 3).
+        4. Joint least-squares estimate of T0, q0 and g (step 4).
+
+        Returns
+        -------
+        dict: "T0", "q0", "amplitude", "sigma_T0", "sigma_q0", "sigma_amplitude",
+        "rms_residual" (Python floats) and "n_used" (int).
+
+        Raises
+        ------
+        ValueError if log_md and log_temp are not 1-D of equal length, if any
+        earlier step raises (invalid survey, layers, history, heat production),
+        or if fewer than 4 readings remain after the z_min cut.
+        """
+  scaffold: steps/step_5.py
+  solution: solution/step_5.py
+  tests: tests/step_5.py
+  description: |
+    Run the complete workflow on one borehole (this step is the integration wrapper of steps 1-4).
+    (1) Convert the MD of every log reading and every layer top to TVD with true_vertical_depth (step 1).
+    (2) Keep only readings with TVD >= z_min (the cut is applied to vertical depth, not MD).
+    (3) Evaluate R(z) and S(z) with layer_integrals (step 2) using the layer tops in TVD, and P(z) = paleoclimate_perturbation(z, hist_t_years, hist_dT_shape, kappa) (step 3) for the unit-amplitude history.
+    (4) Estimate T0, q0 and g in T = T0 + q0 R - A S + g P with fit_heat_flow (step 4).
+    Builds on: true_vertical_depth (step 1), layer_integrals (step 2), paleoclimate_perturbation (step 3), fit_heat_flow (step 4).
+    Returns: dict with keys "T0", "q0", "amplitude", "sigma_T0", "sigma_q0", "sigma_amplitude", "rms_residual" (Python floats) and "n_used" (int, readings used).
+    Errors: ValueError if log_md and log_temp are not 1-D of equal length, if any earlier step raises (invalid survey, layer tops or log depths beyond the survey, invalid history or kappa, heat_production < 0), if fewer than 4 readings remain after the cut, or if T0, q0 and g are not separately resolvable.
+  step_description_prompt: |
+    Run the complete workflow on one borehole (this step is the integration wrapper of steps 1-4).
+    (1) Convert the MD of every log reading and every layer top to TVD with true_vertical_depth (step 1).
+    (2) Keep only readings with TVD >= z_min (the cut is applied to vertical depth, not MD).
+    (3) Evaluate R(z) and S(z) with layer_integrals (step 2) using the layer tops in TVD, and P(z) = paleoclimate_perturbation(z, hist_t_years, hist_dT_shape, kappa) (step 3) for the unit-amplitude history.
+    (4) Estimate T0, q0 and g in T = T0 + q0 R - A S + g P with fit_heat_flow (step 4).
+    Builds on: true_vertical_depth (step 1), layer_integrals (step 2), paleoclimate_perturbation (step 3), fit_heat_flow (step 4).
+    Returns: dict with keys "T0", "q0", "amplitude", "sigma_T0", "sigma_q0", "sigma_amplitude", "rms_residual" (Python floats) and "n_used" (int, readings used).
+    Errors: ValueError if log_md and log_temp are not 1-D of equal length, if any earlier step raises (invalid survey, layer tops or log depths beyond the survey, invalid history or kappa, heat_production < 0), if fewer than 4 readings remain after the cut, or if T0, q0 and g are not separately resolvable.
+  step_background: |
+    Run the complete workflow on one borehole (this step is the integration wrapper of steps 1-4).
+    (1) Convert the MD of every log reading and every layer top to TVD with true_vertical_depth (step 1).
+    (2) Keep only readings with TVD >= z_min (the cut is applied to vertical depth, not MD).
+    (3) Evaluate R(z) and S(z) with layer_integrals (step 2) using the layer tops in TVD, and P(z) = paleoclimate_perturbation(z, hist_t_years, hist_dT_shape, kappa) (step 3) for the unit-amplitude history.
+    (4) Estimate T0, q0 and g in T = T0 + q0 R - A S + g P with fit_heat_flow (step 4).
+    Builds on: true_vertical_depth (step 1), layer_integrals (step 2), paleoclimate_perturbation (step 3), fit_heat_flow (step 4).
+    Returns: dict with keys "T0", "q0", "amplitude", "sigma_T0", "sigma_q0", "sigma_amplitude", "rms_residual" (Python floats) and "n_used" (int, readings used).
+    Errors: ValueError if log_md and log_temp are not 1-D of equal length, if any earlier step raises (invalid survey, layer tops or log depths beyond the survey, invalid history or kappa, heat_production < 0), if fewer than 4 readings remain after the cut, or if T0, q0 and g are not separately resolvable.
+  depends_on:
+  - 1
+  - 2
+  - 3
+  - 4
+  inputs: *id001
+  outputs: 'dict: T0, q0, amplitude, sigma_T0, sigma_q0, sigma_amplitude, rms_residual (floats), n_used (int)'
+  accuracy: 'noise-free: q0 1e-8 W m^-2, T0 1e-5 K, g 1e-4 K; noisy: q0 2e-6 W m^-2, T0 5e-4 K, g 2e-3 K, sigmas
+    2 %'
+  errors: ValueError as listed in the description
+  mutants: *id002
+  return_line: '    return result'
+- step_number: '6'
+  scaffold: steps/step_6.py
+  solution: solution/step_6.py
+  tests: tests/step_6.py
+  name: Paleoclimate perturbation in a layered conductivity column
+  function: layered_paleoclimate_perturbation(z, layer_tops, layer_k, rho_c, t_years, dT)
+  description: 'The half-space formula of step 3 gives the whole ground one diffusivity. In the borehole the conductivity changes from layer to layer (the column of layer_integrals, step 2: tops in m, the first at 0, the last layer extending to infinite depth), and with a uniform volumetric heat capacity rho_c (J m^-3 K^-1) layer i has the diffusivity kappa_i = k_i / rho_c. Return the present-day departure (K) of the temperature from the steady state at depths z (m) in this layered ground for a piecewise-constant surface history with the convention of step 3: interval 0 runs from the present back to t_years[0], interval i from t_years[i-1] back to t_years[i] (years before present, 1 year = 365.25 x 86400 s); dT[i] is the surface departure during interval i, and before t_years[-1] the departure was zero at all depths.
+
+    In every layer the departure theta obeys rho_c d(theta)/dt = d/dz (k d(theta)/dz); theta and the heat flux k d(theta)/dz are continuous at every layer top, theta at z = 0 equals the surface departure, and theta vanishes at infinite depth. At z = 0 the result is dT[0].
+
+    Returns: float for a scalar z, otherwise a numpy array with the shape of z. Absolute accuracy: 1e-8 K per kelvin of the largest |dT[i]|, at every depth and for every history, layering and conductivity contrast. Each call must finish within 10 s on one CPU core for up to 1000 depths, 50 layers and 20 history intervals.
+
+    Errors: ValueError if the layer arrays are not 1-D of equal length with at least one layer, any top is non-finite, the first top is not 0 or the tops do not increase strictly, any conductivity is non-finite or <= 0, rho_c is non-finite or <= 0, t_years and dT are not 1-D of equal length, contain a non-finite value, t_years[0] <= 0 or t_years does not increase strictly, or any depth is non-finite or negative.
+
+    '
+  depends_on: []
+  function_header: "def layered_paleoclimate_perturbation(z, layer_tops, layer_k, rho_c, t_years, dT):\n    \"\"\"Present-day temperature perturbation (K) at depth z in a layered column.\n\n    History convention as in paleoclimate_perturbation (step 3). The ground\n    is a column of horizontal layers (tops layer_tops, the first at 0, the\n    last layer extending to infinite depth) with conductivities layer_k and a\n    uniform volumetric heat capacity rho_c; temperature and heat flux are\n    continuous at the layer tops.\n\n    Parameters\n    ----------\n    z : float or array_like, depth (m) >= 0.\n    layer_tops : 1-D array_like, layer tops (m), first 0, strictly increasing.\n    layer_k : 1-D array_like, same length, conductivities (W m^-1 K^-1) > 0.\n    rho_c : float, volumetric heat capacity (J m^-3 K^-1) > 0.\n    t_years : 1-D array_like, positive, strictly increasing ends of the\n        history intervals (years before present).\n    dT : 1-D array_like, same length, departure during each interval (K).\n\n    Returns\n    -------\n    float for scalar z, else ndarray with the shape of z. Absolute accuracy\n    1e-8 K per kelvin of the largest |dT|; within 10 s for up to 1000 depths,\n    50 layers and 20 history intervals.\n\n    Raises\n    ------\n    ValueError for invalid layers (not 1-D of equal length, first top not 0,\n    tops not strictly increasing, non-finite or non-positive conductivity),\n    rho_c non-finite or <= 0, an invalid history (as in step 3), or a depth\n    that is non-finite or negative.\n    \"\"\"\n"
+  return_line: '    return dT_z'
+  step_description_prompt: 'The half-space formula of step 3 gives the whole ground one diffusivity. In the borehole the conductivity changes from layer to layer (the column of layer_integrals, step 2: tops in m, the first at 0, the last layer extending to infinite depth), and with a uniform volumetric heat capacity rho_c (J m^-3 K^-1) layer i has the diffusivity kappa_i = k_i / rho_c. Return the present-day departure (K) of the temperature from the steady state at depths z (m) in this layered ground for a piecewise-constant surface history with the convention of step 3: interval 0 runs from the present back to t_years[0], interval i from t_years[i-1] back to t_years[i] (years before present, 1 year = 365.25 x 86400 s); dT[i] is the surface departure during interval i, and before t_years[-1] the departure was zero at all depths.
+
+    In every layer the departure theta obeys rho_c d(theta)/dt = d/dz (k d(theta)/dz); theta and the heat flux k d(theta)/dz are continuous at every layer top, theta at z = 0 equals the surface departure, and theta vanishes at infinite depth. At z = 0 the result is dT[0].
+
+    Returns: float for a scalar z, otherwise a numpy array with the shape of z. Absolute accuracy: 1e-8 K per kelvin of the largest |dT[i]|, at every depth and for every history, layering and conductivity contrast. Each call must finish within 10 s on one CPU core for up to 1000 depths, 50 layers and 20 history intervals.
+
+    Errors: ValueError if the layer arrays are not 1-D of equal length with at least one layer, any top is non-finite, the first top is not 0 or the tops do not increase strictly, any conductivity is non-finite or <= 0, rho_c is non-finite or <= 0, t_years and dT are not 1-D of equal length, contain a non-finite value, t_years[0] <= 0 or t_years does not increase strictly, or any depth is non-finite or negative.
+
+    '
+  step_background: 'For a single homogeneous half-space the response to a step change of the surface temperature is the error function complement (Birch 1948). Real Shield columns alternate volcanics, intrusions and metasediments with conductivities from about 2 to 5 W m^-1 K^-1, and the glacial signal is refracted at each contrast: the diffusion is faster in conductive layers, and the heat flux, not the temperature gradient, is continuous across an interface (Carslaw and Jaeger 1959, ch. 12, give the image series for a layer over a half-space). Paleoclimate corrections in layered ground therefore differ from the half-space formula by up to tens of percent near strong contrasts (Beck 1977; Clauser 1984).
+
+    '
+  inputs:
+    z: float or array of depths (m) >= 0
+    layer_tops: layer tops (m), first 0, strictly increasing
+    layer_k: conductivities (W m^-1 K^-1) > 0
+    rho_c: volumetric heat capacity (J m^-3 K^-1) > 0
+    t_years: interval ends (years before present), positive, strictly increasing
+    dT: departure during each interval (K)
+  outputs: temperature perturbation (K); float, or array with the full shape of z
+  valid_range: z >= 0
+  accuracy: 1e-8 K per kelvin of the largest |dT|
+  errors: ValueError for invalid layers, rho_c non-finite or <= 0, an invalid history, or a depth that is non-finite or negative
+  step_name: Paleoclimate perturbation in a layered conductivity column
+  function_name: layered_paleoclimate_perturbation
+  mutants:
+  - name: mean_diffusivity_halfspace
+    description: Uses the erfc half-space response with the mean diffusivity of the layers, ignoring the refraction of the signal at the interfaces.
+    code: "\"\"\"Mutant for step 6.\"\"\"\nimport numpy as np\nimport math\n\nSECONDS_PER_YEAR = 365.25 * 86400.0\n\ndef layered_paleoclimate_perturbation(z, layer_tops, layer_k, rho_c, t_years, dT):\n    \"\"\"Present-day departure (K) from the steady state at depth z in a layered column, for a\n    piecewise-constant surface-temperature history.\"\"\"\n    z_in = np.asarray(z, float)\n    zz = np.atleast_1d(z_in).ravel()\n    tops = np.asarray(layer_tops, float)\n    k = np.asarray(layer_k, float)\n    t = np.asarray(t_years, float)\n    d = np.asarray(dT, float)\n    if tops.ndim != 1 or k.ndim != 1 or tops.shape != k.shape or tops.size < 1:\n        raise ValueError(\"layer arrays must be 1-D with equal length\")\n    if not np.all(np.isfinite(tops)) or tops[0] != 0.0 or np.any(np.diff(tops) <= 0):\n        raise ValueError(\"layer tops must start at 0 and increase strictly\")\n    if not np.all(np.isfinite(k)) or np.any(k <= 0):\n        raise ValueError(\"conductivities must be finite and positive\")\n    if not (np.isfinite(rho_c) and rho_c > 0):\n        raise ValueError(\"volumetric heat capacity must be finite and positive\")\n    if t.ndim != 1 or t.shape != d.shape or t.size < 1:\n        raise ValueError(\"history arrays must be 1-D with equal length\")\n    if not (np.all(np.isfinite(t)) and np.all(np.isfinite(d))):\n        raise ValueError(\"history values must be finite\")\n    if t[0] <= 0 or np.any(np.diff(t) <= 0):\n        raise ValueError(\"history times must be positive and increasing\")\n    if np.any(~np.isfinite(zz)) or np.any(zz < 0):\n        raise ValueError(\"depths must be >= 0\")\n    # one half-space with the mean diffusivity of the layers (the erfc formula of step 3)\n    kap_z = np.full(zz.size, np.mean(k) / rho_c)\n\n    ef = np.frompyfunc(math.erfc, 1, 1)\n    erfc = lambda x: np.asarray(ef(np.asarray(x, float)), dtype=float)\n    ts = t * SECONDS_PER_YEAR\n    edges = np.concatenate(([0.0], ts))\n    out = np.zeros(zz.size)\n    for i in range(t.size):\n        e_old = erfc(zz / (2 * np.sqrt(kap_z * edges[i + 1])))\n        e_new = np.zeros_like(zz) if edges[i] == 0.0 else erfc(zz / (2 * np.sqrt(kap_z * edges[i])))\n        out += d[i] * (e_old - e_new)\n    dT_z = float(out[0]) if z_in.ndim == 0 else out.reshape(z_in.shape)\n    return dT_z\n"
+  - name: local_diffusivity_halfspace
+    description: Uses the erfc half-space response with the diffusivity of the layer that contains each depth.
+    code: "\"\"\"Mutant for step 6.\"\"\"\nimport numpy as np\nimport math\n\nSECONDS_PER_YEAR = 365.25 * 86400.0\n\ndef layered_paleoclimate_perturbation(z, layer_tops, layer_k, rho_c, t_years, dT):\n    \"\"\"Present-day departure (K) from the steady state at depth z in a layered column, for a\n    piecewise-constant surface-temperature history.\"\"\"\n    z_in = np.asarray(z, float)\n    zz = np.atleast_1d(z_in).ravel()\n    tops = np.asarray(layer_tops, float)\n    k = np.asarray(layer_k, float)\n    t = np.asarray(t_years, float)\n    d = np.asarray(dT, float)\n    if tops.ndim != 1 or k.ndim != 1 or tops.shape != k.shape or tops.size < 1:\n        raise ValueError(\"layer arrays must be 1-D with equal length\")\n    if not np.all(np.isfinite(tops)) or tops[0] != 0.0 or np.any(np.diff(tops) <= 0):\n        raise ValueError(\"layer tops must start at 0 and increase strictly\")\n    if not np.all(np.isfinite(k)) or np.any(k <= 0):\n        raise ValueError(\"conductivities must be finite and positive\")\n    if not (np.isfinite(rho_c) and rho_c > 0):\n        raise ValueError(\"volumetric heat capacity must be finite and positive\")\n    if t.ndim != 1 or t.shape != d.shape or t.size < 1:\n        raise ValueError(\"history arrays must be 1-D with equal length\")\n    if not (np.all(np.isfinite(t)) and np.all(np.isfinite(d))):\n        raise ValueError(\"history values must be finite\")\n    if t[0] <= 0 or np.any(np.diff(t) <= 0):\n        raise ValueError(\"history times must be positive and increasing\")\n    if np.any(~np.isfinite(zz)) or np.any(zz < 0):\n        raise ValueError(\"depths must be >= 0\")\n    # erfc with the diffusivity of the layer that contains each depth\n    lay = np.searchsorted(tops, zz, side=\"right\") - 1\n    kap_z = k[lay] / rho_c\n\n    ef = np.frompyfunc(math.erfc, 1, 1)\n    erfc = lambda x: np.asarray(ef(np.asarray(x, float)), dtype=float)\n    ts = t * SECONDS_PER_YEAR\n    edges = np.concatenate(([0.0], ts))\n    out = np.zeros(zz.size)\n    for i in range(t.size):\n        e_old = erfc(zz / (2 * np.sqrt(kap_z * edges[i + 1])))\n        e_new = np.zeros_like(zz) if edges[i] == 0.0 else erfc(zz / (2 * np.sqrt(kap_z * edges[i])))\n        out += d[i] * (e_old - e_new)\n    dT_z = float(out[0]) if z_in.ndim == 0 else out.reshape(z_in.shape)\n    return dT_z\n"
+  - name: stehfest_double_precision
+    description: Inverts the exact Laplace-domain solution with the Gaver-Stehfest formula in double precision, whose cancellation limits the accuracy to far above 1e-8 K.
+    code: "\"\"\"Reference for step 6.\"\"\"\nimport numpy as np\nimport math\n\nSECONDS_PER_YEAR = 365.25 * 86400.0\n\n\ndef _log_surface_response(z, lay, s, tops, k, rho_c):\n    \"\"\"log F(z, s): Laplace transform (in time) of the departure at depth z for a unit departure applied\n    at the surface, F(0, s) = 1, in the layered column (z: depths, lay: their layer indices, s: complex).\"\"\"\n    nl = tops.size\n    kap = k / rho_c\n    q = np.sqrt(s[None, :] / kap[:, None])                  # (layers, nodes), Re q > 0\n    kq = k[:, None] * q\n    h = np.diff(tops)\n    # admittance Y = k F' / F at the top of each layer, from the bottom up (continuity of F and k F'):\n    # the bottom half-space keeps only the decaying solution, Y = -k q\n    Y = np.empty((nl, s.size), complex)\n    Y[-1] = -kq[-1]\n    for i in range(nl - 2, -1, -1):\n        th = np.tanh(q[i] * h[i])\n        Y[i] = (Y[i + 1] - kq[i] * th) / (1.0 - Y[i + 1] * th / kq[i])\n    # F at the layer tops: F_{i+1} / F_i = 1 / (cosh(q h) - r sinh(q h)) with r = Y_{i+1} / (k_i q_i),\n    # written as 2 e^{-q h} / ((1 + e^{-2qh}) - r (1 - e^{-2qh})): no cancellation, no overflow\n    lFtop = np.zeros((nl, s.size), complex)\n    for i in range(nl - 1):\n        e2 = np.exp(-2.0 * q[i] * h[i])\n        r = Y[i + 1] / kq[i]\n        lFtop[i + 1] = lFtop[i] - q[i] * h[i] + np.log(2.0 / ((1.0 + e2) - r * (1.0 - e2)))\n    out = np.empty((z.size, s.size), complex)\n    for i in np.unique(lay):\n        sel = np.where(lay == i)[0]\n        d = (z[sel] - tops[i])[:, None]\n        if i == nl - 1:\n            out[sel] = lFtop[i][None, :] - q[i][None, :] * d\n        else:\n            # inside the layer: F(d) / F_top = (cosh(q(h-d)) - r sinh(q(h-d))) / (cosh(qh) - r sinh(qh))\n            r = (Y[i + 1] / kq[i])[None, :]\n            e2a = np.exp(-2.0 * q[i][None, :] * (h[i] - d))\n            e2b = np.exp(-2.0 * q[i] * h[i])[None, :]\n            num = (1.0 + e2a) - r * (1.0 - e2a)\n            den = (1.0 + e2b) - r * (1.0 - e2b)\n            out[sel] = lFtop[i][None, :] - q[i][None, :] * d + np.log(num / den)\n    return out\n\n\ndef _step_response_talbot(z, lay, tau, tops, k, rho_c, M=32):\n    \"\"\"Departure now at depth z after the surface was raised by 1 K a time tau (s) ago: inverse Laplace\n    transform of F / s at tau on the fixed Talbot contour (Abate and Valko 2004).\"\"\"\n    r = 2.0 * M / (5.0 * tau)\n    th = np.arange(1, M) * np.pi / M\n    cot = np.cos(th) / np.sin(th)\n    sig = r * th * (cot + 1j)\n    beta = th + (th * cot - 1.0) * cot\n    s = np.concatenate(([r + 0j], sig))\n    terms = np.exp(_log_surface_response(z, lay, s, tops, k, rho_c) - np.log(s)[None, :] + s[None, :] * tau)\n    val = 0.5 * terms[:, 0].real + np.sum((terms[:, 1:] * (1.0 + 1j * beta)[None, :]).real, axis=1)\n    return r / M * val\n\n\ndef _step_response(z, lay, tau, tops, k, rho_c, N=16):\n    \"\"\"Gaver-Stehfest inversion in double precision (real Laplace variable).\"\"\"\n    V = np.zeros(N)\n    for i in range(1, N + 1):\n        acc = 0.0\n        for kk in range((i + 1) // 2, min(i, N // 2) + 1):\n            acc += kk ** (N // 2) * math.factorial(2 * kk) / (math.factorial(N // 2 - kk) * math.factorial(kk)\n                   * math.factorial(kk - 1) * math.factorial(i - kk) * math.factorial(2 * kk - i))\n        V[i - 1] = (-1) ** (i + N // 2) * acc\n    s = np.arange(1, N + 1) * math.log(2.0) / tau + 0j\n    F = np.exp(_log_surface_response(z, lay, s, tops, k, rho_c)).real / s.real[None, :]\n    return math.log(2.0) / tau * (F @ V)\n\n\ndef layered_paleoclimate_perturbation(z, layer_tops, layer_k, rho_c, t_years, dT):\n    \"\"\"Present-day departure (K) from the steady state at depth z in a layered column, for a\n    piecewise-constant surface-temperature history.\"\"\"\n    z_in = np.asarray(z, float)\n    zz = np.atleast_1d(z_in).ravel()\n    tops = np.asarray(layer_tops, float)\n    k = np.asarray(layer_k, float)\n    t = np.asarray(t_years, float)\n    d = np.asarray(dT, float)\n    if tops.ndim != 1 or k.ndim != 1 or tops.shape != k.shape or tops.size < 1:\n        raise ValueError(\"layer arrays must be 1-D with equal length\")\n    if not np.all(np.isfinite(tops)) or tops[0] != 0.0 or np.any(np.diff(tops) <= 0):\n        raise ValueError(\"layer tops must start at 0 and increase strictly\")\n    if not np.all(np.isfinite(k)) or np.any(k <= 0):\n        raise ValueError(\"conductivities must be finite and positive\")\n    if not (np.isfinite(rho_c) and rho_c > 0):\n        raise ValueError(\"volumetric heat capacity must be finite and positive\")\n    if t.ndim != 1 or t.shape != d.shape or t.size < 1:\n        raise ValueError(\"history arrays must be 1-D with equal length\")\n    if not (np.all(np.isfinite(t)) and np.all(np.isfinite(d))):\n        raise ValueError(\"history values must be finite\")\n    if t[0] <= 0 or np.any(np.diff(t) <= 0):\n        raise ValueError(\"history times must be positive and increasing\")\n    if np.any(~np.isfinite(zz)) or np.any(zz < 0):\n        raise ValueError(\"depths must be >= 0\")\n    # The departure obeys rho_c dT/dt = d/dz (k dT/dz) with T and k dT/dz continuous at the interfaces\n    # and the surface history as boundary value; the erfc half-space formula holds only for a uniform\n    # column. By superposition it is a sum of step responses U(z, tau) (surface raised by 1 K a time tau\n    # ago), each obtained from its Laplace transform F(z, s) / s, which the layers give in closed form.\n    lay = np.searchsorted(tops, zz, side=\"right\") - 1\n    ts = t * SECONDS_PER_YEAR\n    edges = np.concatenate(([0.0], ts))\n    inside = zz > 0\n    out = np.zeros(zz.size)\n    if np.any(inside):\n        zi, li = zz[inside], lay[inside]\n        U = {}\n        for tau in edges[1:]:\n            U[tau] = _step_response(zi, li, tau, tops, k, float(rho_c))\n        acc = np.zeros(zi.size)\n        for i in range(t.size):\n            u_old = U[edges[i + 1]]\n            u_new = U[edges[i]] if edges[i] > 0 else 0.0     # U(z > 0, 0) = 0\n            acc += d[i] * (u_old - u_new)\n        out[inside] = acc\n    out[~inside] = d[0]                                       # at the surface: the present departure\n    dT_z = float(out[0]) if z_in.ndim == 0 else out.reshape(z_in.shape)\n    return dT_z\n"
+integration:
+  function: surface_heat_flow
+  solution: solution.py
+  second_solution: second_solution.py
+  tests: tests/general.py
+  uses_steps:
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  flow: true_vertical_depth (log and layer tops) -> z_min cut -> layer_integrals -> paleoclimate_perturbation (unit
+    amplitude) -> fit_heat_flow
+  mutants: *id002
+function_header: |
+  def surface_heat_flow(survey_md, survey_inc, survey_azi, log_md, log_temp,
+                        layer_top_md, layer_k, heat_production, kappa,
+                        hist_t_years, hist_dT_shape, z_min):
+      """Paleoclimate-corrected surface heat flow from an inclined borehole.
+
+      See the problem statement for input definitions and units.
+      Returns dict with keys T0 (deg C), q0 (W m^-2), amplitude (K), sigma_T0,
+      sigma_q0, sigma_amplitude (1-sigma), rms_residual (K), n_used (int).
+      """
+return_line: '    return result'
+general_mutants: *id002
+whole_task_mutants: *id002
+target_provenance: *id003
+mutants: *id002
+main_mutants: *id002
