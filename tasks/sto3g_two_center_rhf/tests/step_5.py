@@ -123,14 +123,30 @@ def _t_limit_raw(ZA, ZB, za, zb):
     return min(opts)
 
 
-def _t_numerov_levels(ZA, ZB, za, zb, mA, mB, nlev=5, h=0.004, r0=0.25, r1=22.0):
+def _t_arrangements(ZA, ZB, za, zb):
+    # energies E_j and fragment-charge products c_j of the three separated arrangements
+    sA, hA, jA = _t_atom(ZA, za)
+    sB, hB, jB = _t_atom(ZB, zb)
+    return [((2 * hA * sA + jA) / sA ** 2, (ZA - 2) * ZB), ((2 * hB * sB + jB) / sB ** 2, (ZB - 2) * ZA),
+            (hA / sA + hB / sB, (ZA - 1) * (ZB - 1))]
+
+
+def _t_numerov_levels(ZA, ZB, za, zb, mA, mB, nlev=5, h=0.004, r0=0.25, r1=22.0, rc=None):
     # second-order finite differences of the radial equation on steps h, h/2 and h/4
-    # (tridiagonal eigenproblems, Dirichlet walls), extrapolated twice by Richardson (error O(h**6))
+    # (tridiagonal eigenproblems, Dirichlet walls), extrapolated twice by Richardson (error O(h**6));
+    # beyond rc (where all cross integrals have vanished) the curve is the exact separated-fragment
+    # form min_j (E_j - E_inf + c_j / R), so the outer wall r1 can be put far out
     from scipy.linalg import eigh_tridiagonal as _t_eigt
     mu = mA * mB / (mA + mB) * _T_ME
     e_inf = _t_limit(ZA, ZB, za, zb)[0]
     R = np.arange(r0, r1 + 0.125 * h, 0.25 * h)
-    V = _t_curve(ZA, ZB, za, zb, R) - e_inf
+    if rc is None:
+        V = _t_curve(ZA, ZB, za, zb, R) - e_inf
+    else:
+        far = R > rc
+        V = np.empty_like(R)
+        V[~far] = _t_curve(ZA, ZB, za, zb, R[~far]) - e_inf
+        V[far] = np.min([e - e_inf + c / R[far] for e, c in _t_arrangements(ZA, ZB, za, zb)], axis=0)
     out = []
     for k in (4, 2, 1):
         step = 0.25 * h * k
@@ -177,7 +193,23 @@ assert lev_d[0] < lev[0] and lev_d[1] - lev_d[0] < lev[1] - lev[0]
 assert _t_check_levels((1.0, 1.0, 0.8, 0.8, 10.0, 10.0)) is not None
 assert _t_check_levels((1.0, 1.0, 3.0, 3.0, 10.0, 10.0)) is not None
 assert _t_check_levels((1.0, 1.0, 1.24, 1.24, 1.0, 1.0)) is not None
-# --- test case 6: no five bound levels (He2 2+ only has a metastable well above He+ + He+),
+# --- test case 6: a fifth level just below the dissociation limit (H + a two-electron atom on B with
+# zetaB = 1.592, neutral fragments, nuclei of 1 u): exactly five levels, the fifth about 0.27 cm^-1 below
+# the limit, whose state reaches out to about 100 bohr. The target is converged in the outer wall:
+# the curve equals its separated-fragment form beyond 30 bohr, and walls at 150 and 250 bohr agree ---
+_t_args = (1.0, 2.0, 1.24, 1.592, 1.0, 1.0)
+_t_e = _t_limit(*_t_args[:4])[0]
+_t_tail30 = min(e - _t_e + c / 30.0 for e, c in _t_arrangements(*_t_args[:4]))
+assert abs(_t_curve(*_t_args[:4], np.array([30.0]))[0] - _t_e - _t_tail30) < 1e-12
+_t_far = _t_numerov_levels(*_t_args, nlev=6, r1=150.0, rc=30.0)
+_t_farther = _t_numerov_levels(*_t_args, nlev=6, r1=250.0, rc=30.0)
+assert np.max(np.abs(_t_far[:5] - _t_farther[:5])) < 1e-3, (_t_far, _t_farther)
+assert -1.0 < _t_farther[4] < 0.0 < _t_farther[5], _t_farther
+lev = vibrational_levels(*_t_args)
+assert isinstance(lev, np.ndarray) and lev.shape == (5,), lev
+assert np.all(np.abs(lev - _t_farther[:5]) < 0.01), (lev, _t_farther)
+
+# --- test case 7: no five bound levels (He2 2+ only has a metastable well above He+ + He+),
 # a charge that is not finite or outside [1, 2], or a mass that is not finite or outside [1, 10] u,
 # raise ValueError ---
 for _t_bad in ((2.0, 2.0, 2.0925, 2.0925, _T_MHE, _T_MHE), (1.0, 1.0, 1.24, 1.24, np.nan, _T_MH),

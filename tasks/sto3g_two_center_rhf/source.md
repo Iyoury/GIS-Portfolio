@@ -147,3 +147,26 @@ Version 11 (content-check fixes):
   not exist. The upper endpoint Z = 2 is exercised on both centres (HeH+ and its swap). Charges
   outside [1, 2] or not finite now raise ValueError, stated and tested.
 - Step 1 rejects an array with one bad element (NaN, negative or above 1e6).
+
+## Version 12
+
+- Step 5 reference rewritten so that no outer wall limits the states. Once the cross integrals have
+  died out (Gaussian decay; checked to 1e-12 hartree over 2 bohr) the full-CI curve is exactly
+  min_j (E_j - E_inf + c_j / R) over the three separated arrangements. The radial equation is solved
+  with the computed curve on [r0, a] by a Lagrange-Legendre mesh with a free end at a (R-matrix
+  u(a)/u'(a) = (1/2mu) sum_n u_n(a)^2/(E_n - E)) and with the analytic tail on [a, infinity) by outward
+  integration; levels are located by Sturm counting (zeros of the solution regular at r0) and
+  bisection to 1e-11 hartree. No R range is fixed in advance: the outer region extends as far as each
+  energy requires, and the inner wall, tail start and mesh are refined until the five levels change by
+  less than 1e-4 cm^-1. With an attractive tail (infinitely many levels) a level above -1e-12 hartree is
+  returned as -0.5e-12 hartree. Checked on hydrogen (-1/r, exact levels to 1e-12 with a = 15 bohr while
+  the 5th state reaches 50 bohr).
+- New test case 6: (ZA, ZB, zetaA, zetaB) = (1, 2, 1.24, 1.592), masses 1 u, neutral fragments: exactly
+  five levels, the fifth at -0.2689 cm^-1, reaching out to about 100 bohr. Target: the independent
+  finite-difference/Richardson solver of the tests with the exact separated-fragment tail beyond 30 bohr
+  (asserted equal to the curve there to 1e-12 hartree) and outer walls at 150 and 250 bohr, which agree
+  to 1e-3 cm^-1. The v11 reference (walls up to 36 bohr) gives -0.1988 cm^-1 and fails.
+- Second solution step 5: sinc DVR with the exact tail beyond the same kind of matching point, the grid
+  length doubled and the step refined until converged (no fixed wall); it agrees with the reference to
+  about 1e-6 cm^-1.
+- Prompt: the far reach of near-threshold levels is stated.

@@ -229,8 +229,10 @@ def fci_energy(ZA, ZB, zetaA, zetaB, R):
 def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
     '''Lowest five vibrational levels (J = 0) on the full-CI potential curve, from the dissociation limit.'''
     # Other methods: the dissociation limit from one-centre integrals evaluated primitive pair
-    # by primitive pair, V(R) sampled on Chebyshev nodes in ln R and interpolated, and the
-    # radial equation solved by Chebyshev spectral collocation (no DVR, no shooting).
+    # by primitive pair, V(R) sampled on Chebyshev nodes in ln R and interpolated up to the distance
+    # where the cross integrals have died out, the exact Coulomb tail of the separated fragments
+    # beyond it, and the radial equation by the sinc DVR on uniform grids whose length is doubled and
+    # whose step is refined until the five levels stop changing (no shooting, no fixed outer wall).
     for z in (ZA, ZB):
         if not (np.isfinite(z) and 1.0 <= z <= 2.0):
             raise ValueError("nuclear charges must be finite and between 1 and 2")
@@ -258,37 +260,67 @@ def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
 
     sA, hA, jA = atom(ZA, zetaA)
     sB, hB, jB = atom(ZB, zetaB)
-    # both electrons on A, both on B, or one on each: the lowest is the R -> infinity limit
-    e_inf = min((2.0 * hA * sA + jA) / sA ** 2, (2.0 * hB * sB + jB) / sB ** 2, hA / sA + hB / sB)
-    r_lo, r_hi = 0.35, 16.0
-    # Chebyshev interpolant of V in x = ln R
-    n_int = 110
+    # both electrons on A, both on B, or one on each: energies E_j + c_j / R at large R
+    arr = [((2.0 * hA * sA + jA) / sA ** 2, (ZA - 2.0) * ZB), ((2.0 * hB * sB + jB) / sB ** 2, (ZB - 2.0) * ZA),
+           (hA / sA + hB / sB, (ZA - 1.0) * (ZB - 1.0))]
+    e_inf = min(e for e, c in arr)
+
+    def tail(r):
+        return np.min([e - e_inf + c / r for e, c in arr], axis=0)
+
+    # where the computed curve has become the tail (to 1e-12 hartree over 2 bohr)
+    r_c = 6.0
+    while max(abs(fci_energy(ZA, ZB, zetaA, zetaB, r_c + d)[0] - e_inf - tail(r_c + d)) for d in (0.0, 1.0, 2.0)) > 1e-12:
+        r_c += 2.0
+    r_lo = 0.3
+    # Chebyshev interpolant of V in x = ln R on [r_lo, r_c]
+    n_int = 200
     t = np.cos(np.pi * (np.arange(n_int) + 0.5) / n_int)
-    x_lo, x_hi = np.log(r_lo), np.log(r_hi)
+    x_lo, x_hi = np.log(r_lo), np.log(r_c)
     xs = 0.5 * (x_hi + x_lo) + 0.5 * (x_hi - x_lo) * t
     Vs = np.array([fci_energy(ZA, ZB, zetaA, zetaB, np.exp(x))[0] for x in xs]) - e_inf
     cheb = np.polynomial.chebyshev.Chebyshev.fit(t, Vs, n_int - 1)
 
     def V(r):
-        return cheb((2.0 * np.log(r) - x_hi - x_lo) / (x_hi - x_lo))
+        r = np.asarray(r, float)
+        inside = r <= r_c
+        out = np.empty_like(r)
+        out[inside] = cheb((2.0 * np.log(r[inside]) - x_hi - x_lo) / (x_hi - x_lo))
+        out[~inside] = tail(r[~inside])
+        return out
 
-    # Chebyshev collocation on [r_lo, r_hi] with chi = 0 at both ends
-    N = 420
-    k = np.arange(N + 1)
-    y = np.cos(np.pi * k / N)
-    c = np.ones(N + 1)
-    c[0] = c[-1] = 2.0
-    c = c * (-1.0) ** k
-    dy = y[:, None] - y[None, :]
-    D = np.outer(c, 1.0 / c) / (dy + np.eye(N + 1))
-    D -= np.diag(D.sum(axis=1))
-    L = 0.5 * (r_hi - r_lo)
-    D2 = (D @ D)[1:-1, 1:-1] / L ** 2
-    r = 0.5 * (r_hi + r_lo) + L * y[1:-1]
     mu = massA * massB / (massA + massB) * 1822.888486209
-    A = -D2 / (2.0 * mu) + np.diag(V(r))
-    E = np.sort(np.linalg.eigvals(A).real)
-    bound = E[E < 0.0]
+    v_min = float(np.min(V(np.linspace(r_lo, r_c, 4000))))
+    kmax = np.sqrt(2.0 * mu * max(-v_min, 1e-4))
+
+    def dvr(h, length):
+        # Colbert-Miller sinc DVR on R = r_lo + k h, k = 1 .. n (chi = 0 at r_lo and at r_lo + (n + 1) h)
+        n = int(length / h)
+        k = np.arange(1, n + 1)
+        d = k[:, None] - k[None, :]
+        T = np.where(d == 0, np.pi ** 2 / 3.0, 2.0 * (-1.0) ** d / np.where(d == 0, 1, d) ** 2) / (2.0 * mu * h * h)
+        E = np.linalg.eigvalsh(T + np.diag(V(r_lo + k * h)))
+        return E[:5]
+
+    def converged_in_length(h):
+        length = r_c - r_lo
+        cur = dvr(h, length)
+        while True:
+            length *= 2.0
+            nxt = dvr(h, length)
+            if np.max(np.abs(nxt - cur)) * 219474.6313632 < 1e-4:
+                return nxt, length
+            cur = nxt
+
+    h = 0.6 * np.pi / kmax
+    cur, length = converged_in_length(h)
+    while True:
+        h *= 0.8
+        nxt, length = converged_in_length(h)
+        if np.max(np.abs(nxt - cur)) * 219474.6313632 < 1e-4:
+            break
+        cur = nxt
+    bound = nxt[nxt < 0.0]
     if bound.size < 5:
         raise ValueError("fewer than five vibrational levels lie below the dissociation limit")
     levels = bound[:5] * 219474.6313632

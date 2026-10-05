@@ -310,7 +310,8 @@ sub_steps:
       representation of the radial equation (grid step and the extent of the R range) is
       converged for these five states for every allowed input; with heavy nuclei and tight
       exponents the well sits at small R, with light nuclei and weak binding the states
-      reach far out.
+      reach far out (a level a fraction of a cm^-1 below the limit extends to about a hundred
+      bohr, and further the closer it lies to the limit).
       Errors: raise ValueError if a charge is not finite or not in [1, 2], if a mass is not
       finite or not in [1, 10] u, or if fewer than five vibrational levels lie below E_inf
       (for example when the only well lies above the dissociation limit). (With a charge
