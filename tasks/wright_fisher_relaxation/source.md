@@ -128,3 +128,11 @@ about 1e-13. Comparisons between two computed outputs (the relabeling checks of 
 origin-fixation link of step 5) use 2.1e-8, the identities of step 6 between rate and qsd 2.5e-8 and 3e-8,
 the general rate * t_up link 2.5e-8; comparisons with independent targets stay at 1e-8. Step 1 transcription
 advisory: no change (the binomial kernel is the definition of the model).
+
+Version 10 (content-check fixes on v9, step 6): the complete quasi-stationary distribution, every entry, and the
+rate are now compared with independent 400-digit targets (mpmath LU on (I - Q)^T, inverse iteration until every
+entry changed by less than 1e-60 relative, run once) for (400, -0.5, 1e-9), (400, 0.5, 0.1), the lower-end case
+(400, -0.5, 1e-12) (rate 2.28416905628920e-249) and (300, -0.2, 1e-12) (rate 1.32212623303458e-68); the
+reference agrees to 4e-13 (rates) and 2e-12 (entries). The identity checks are gated on the target entries
+(>= 1e-240), not on the submitted ones; a solution that zeroes tail entries now fails. Step 1 transcription
+advisory: no change (the binomial kernel is the definition of the model).
