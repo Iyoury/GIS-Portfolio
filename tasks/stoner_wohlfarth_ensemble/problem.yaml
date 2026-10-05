@@ -84,6 +84,7 @@ sub_steps:
       Inputs: h (float) and psi (float, radians, 0 <= psi <= pi/2). Return m as a Python
       float with an absolute error below 1e-8 for every h with |h + h_sw(psi)| >= 1e-3;
       closer to the jump no accuracy is required.
+      Each call must finish within 10 s on one CPU core.
       Errors: raise ValueError if psi is outside [0, pi/2] or h is not finite.
     function_header: |-
       def branch_magnetization(h, psi):
@@ -144,6 +145,7 @@ sub_steps:
       h may be a float or a numpy array of any shape. Return two values with the shape of
       np.asarray(h) (float numpy arrays, or numpy floats for a plain number), each entry
       with an absolute error below 1e-8 whenever h_sw(psi) - |h| >= 1e-3.
+      Each call must finish within 10 s on one CPU core.
       Errors: raise ValueError if psi is outside [0, pi/2], if any h is not finite, or if
       any h has |h| >= h_sw(psi) (only one minimum exists there).
     function_header: |-
@@ -204,6 +206,7 @@ sub_steps:
       field reaches h, as a Python float with an absolute error below 1e-8. The domain is
       40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13 (bounds included); there the particle has
       left with a probability far above 1/2 before its original minimum disappears.
+      Each call must finish within 10 s on one CPU core.
       Errors: raise ValueError if psi is outside [0, pi/2], if h is not finite, if a, f0 or
       rate is not a positive finite number, if a is outside [40, 1000] or if f0 / rate is
       outside [1e5, 1e13].
@@ -264,6 +267,7 @@ sub_steps:
       40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13, for every psi in [0, pi/2] including both
       end points; in it the survival probability falls below 1/2 before -h_sw(psi), so the
       median is a field inside (-h_sw, h_sw).
+      Each call must finish within 30 s on one CPU core.
       Errors: raise ValueError if psi is outside [0, pi/2], if a, f0 or rate is not a
       positive finite number, if a is outside [40, 1000] or if f0 / rate is outside
       [1e5, 1e13].
@@ -326,6 +330,7 @@ sub_steps:
       with an absolute error below 1e-6. Angles may be anywhere in [0, pi/2], end points
       included, and single weights may be zero (such a particle does not count); a, f0 and
       rate have the domain of step 3, 40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13.
+      Each call must finish within 30 s on one CPU core.
       Errors: raise ValueError if psis and weights are not 1-D arrays of the same nonzero
       length, if a psi is outside [0, pi/2], if a weight is negative or not finite, if the
       weights add up to zero, if a, f0 or rate is not a positive finite number, if a is

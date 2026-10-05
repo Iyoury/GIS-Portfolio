@@ -1,3 +1,46 @@
+import signal as _t_signal
+import time as _t_btime
+
+# Time budget of one call, as stated in the prompt: the call is interrupted once it exceeds the budget
+# (by one second), so a solution that is too slow fails this check instead of holding up the tests.
+_t_depth = [0]
+
+
+def _t_budget(fn, seconds, name):
+    def wrapped(*args, **kwargs):
+        if _t_depth[0]:
+            return fn(*args, **kwargs)
+
+        def _alarm(signum, frame):
+            raise TimeoutError("%s did not finish within its budget of %g s per call" % (name, seconds))
+        try:
+            old = _t_signal.signal(_t_signal.SIGALRM, _alarm)
+            _t_signal.setitimer(_t_signal.ITIMER_REAL, seconds + 1.0)
+            armed = True
+        except (ValueError, AttributeError, OSError):      # no SIGALRM here: measure only
+            armed = False
+        _t_depth[0] += 1
+        start = _t_btime.perf_counter()
+        try:
+            out = fn(*args, **kwargs)
+        finally:
+            _t_depth[0] -= 1
+            if armed:
+                _t_signal.setitimer(_t_signal.ITIMER_REAL, 0.0)
+                _t_signal.signal(_t_signal.SIGALRM, old)
+        elapsed = _t_btime.perf_counter() - start
+        assert elapsed <= seconds, ("%s took %.1f s (budget %g s per call)" % (name, elapsed, seconds))
+        return out
+    return wrapped
+
+
+branch_magnetization = _t_budget(branch_magnetization, 10.0, "branch_magnetization")
+escape_barriers = _t_budget(escape_barriers, 10.0, "escape_barriers")
+survival_probability = _t_budget(survival_probability, 10.0, "survival_probability")
+switching_field_statistics = _t_budget(switching_field_statistics, 30.0, "switching_field_statistics")
+ensemble_switching = _t_budget(ensemble_switching, 30.0, "ensemble_switching")
+brown_relaxation = _t_budget(brown_relaxation, 30.0, "brown_relaxation")
+
 import time as _t_time
 import numpy as np
 import mpmath as _t_mp

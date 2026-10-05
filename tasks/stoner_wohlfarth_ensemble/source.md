@@ -127,3 +127,13 @@ Version 10 (content-check fixes):
 - Step 2 rejects negative fields beyond -h_sw (h = -1 at psi = 0, an array with -0.6 at psi = pi/4).
 - Step 1: the near-jump checks use |h + h_sw| = 1.1e-3, safely inside the accurate range, instead
   of the boundary value 1e-3.
+
+## Version 11
+
+v10 was in band (1/8) but held for an admin: 2 of 8 attempts were flagged "possibly timed out". Only step 6
+had a time budget, checked after the call returned, so a very slow solution could hold up the grader
+until its global time-out instead of failing. Now every step states a budget per call (steps 1-3: 10 s,
+steps 4-6: 30 s; the reference needs at most 0.1 s, 3 s, 6 s and 1.4 s) and the tests interrupt a call
+once it exceeds its budget (SIGALRM, one second of grace; measured only where no alarm is available), so
+a too-slow solution fails the check promptly. A solution made to sleep 60 s per call now fails step 5
+after 32 s. No other change.
