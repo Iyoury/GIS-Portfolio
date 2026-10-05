@@ -154,3 +154,18 @@ Version 10 (content-check fixes):
   prompt states that the rule holds in that case; a new test with lam[k] = 1e-75 and a two-capture
   product holding 5e-267 of the atoms at flux_lo raises ValueError (the v10 reference returned flux_hi).
   ln A is formed as ln lam[k] + ln x[k] so that lam[k] * x[k] cannot underflow.
+
+## Version 12
+
+- Step 4 end rule: the tolerance 1e-9 is stated to hold up to the rounding of the end values, 1e-12 in
+  ln (for 1e-9 - 1e-12 < |ln| <= 1e-9 + 1e-12 the end, the root and, outside the interval, ValueError
+  are all correct), a normative rule since A(end) itself carries rounding errors of order 1e-15 in any
+  implementation. Tests, at both ends and on both sides: the representable activity adjacent to
+  |ln| = 1e-9 - 1e-12 from inside (exact logarithms in mpmath against the extended-precision A(end)) gives
+  the end; the representable activity adjacent to |ln| = 1e-9 + 1e-12 from beyond raises ValueError
+  outside the interval and gives a flux within 1e-8 of the end inside it. Cutoffs at 0.998e-9 and
+  1.002e-9 fail.
+- Step 4 accuracy edge: a round trip at 1.645e14 on the gold monitor, where d ln A / d ln flux is just
+  above 0.5 (asserted in the test; 0.5 is reached at about 1.6454e14).
+- Steps 1-3: one-nuclide cases at exp(-575.636) = 1.01e-250 S, just above the threshold of the relative
+  rule (pure decay, decay without source, burnup).

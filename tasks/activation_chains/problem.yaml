@@ -51,7 +51,8 @@ problem_io: |-
         of the initial atoms at flux_lo), or if activity lies outside [A(flux_lo), A(flux_hi)] by more
         than a relative 1e-9.
         An activity with |ln(activity / A(end))| <= 1e-9 for an end of the interval, on either side of
-        it, gives that end.
+        it, gives that end. The end values carry rounding errors, so the tolerance holds up to 1e-12 in ln:
+        for 1e-9 - 1e-12 < |ln| <= 1e-9 + 1e-12 the end, the root and (outside the interval) ValueError are all correct.
       '''
 
 general_tests: tests/general.py
@@ -299,7 +300,9 @@ sub_steps:
       The result must have a relative error below 1e-8 wherever d ln A / d ln phi >= 0.5 at the solution.
       This includes activities as small as 1e-11 Bq. The interval is closed, with a two-sided tolerance
       at its ends: if |ln(activity / A(flux_lo))| <= 1e-9 return flux_lo, else if
-      |ln(activity / A(flux_hi))| <= 1e-9 return flux_hi (on either side of the end value). Positive cross sections
+      |ln(activity / A(flux_hi))| <= 1e-9 return flux_hi (on either side of the end value). The end
+      values carry rounding errors, so this tolerance holds up to 1e-12 in ln: for
+      1e-9 - 1e-12 < |ln| <= 1e-9 + 1e-12 the end, the root and (outside the interval) ValueError are all correct. Positive cross sections
       are at least 1e-6 b. Domain: at flux_lo the measured nuclide must hold at least 1e-250 of the
       initial atoms, A(flux_lo) >= 1e-250 * lam[k] * sum(n0) (the range in which step 3 is accurate);
       otherwise raise ValueError. This holds as well when lam[k] is so small that 1e-250 * lam[k] *
@@ -353,7 +356,8 @@ sub_steps:
             of the initial atoms at flux_lo), or if activity lies outside [A(flux_lo), A(flux_hi)] by more
             than a relative 1e-9.
             An activity with |ln(activity / A(end))| <= 1e-9 for an end of the interval, on either side of
-            it, gives that end.
+            it, gives that end. The end values carry rounding errors, so the tolerance holds up to 1e-12 in ln:
+            for 1e-9 - 1e-12 < |ln| <= 1e-9 + 1e-12 the end, the root and (outside the interval) ValueError are all correct.
           '''
     return_line: return flux
     step_background: |-

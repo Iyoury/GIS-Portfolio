@@ -61,8 +61,8 @@ def _t_network(lam, branching, source, n0, t):
 
 # --- test case 0: one nuclide with constant production: n0 exp(-lam t) + q (1 - exp(-lam t)) / lam,
 # also when lam t is far below rounding (then about n0 + q t), when production dominates, and pure decay
-# down to exp(-550), about 1e-239, exp(-575), about 8e-250 (relative rule), and exp(-600), about 3e-261 (below 1e-250 S: absolute rule) ---
-for _t_lam, _t_q, _t_n0, _t_t in ((0.5, 3.0, 1.0, 2.0), (1e-10, 7.0, 0.0, 1e-5), (2.0, 1e6, 1e-3, 1e3), (0.0, 2.0, 1.0, 10.0), (1.0, 0.0, 1.0, 550.0), (1.0, 0.0, 1.0, 575.0), (1.0, 0.0, 1.0, 600.0)):
+# down to exp(-550), about 1e-239, exp(-575), about 8e-250, exp(-575.64), 1.01e-250 just above 1e-250 S (relative rule), and exp(-600), about 3e-261 (below 1e-250 S: absolute rule) ---
+for _t_lam, _t_q, _t_n0, _t_t in ((0.5, 3.0, 1.0, 2.0), (1e-10, 7.0, 0.0, 1e-5), (2.0, 1e6, 1e-3, 1e3), (0.0, 2.0, 1.0, 10.0), (1.0, 0.0, 1.0, 550.0), (1.0, 0.0, 1.0, 575.0), (1.0, 0.0, 1.0, 575.6363229176583), (1.0, 0.0, 1.0, 600.0)):
     x = network_inventory(np.array([_t_lam]), np.zeros((1, 1)), np.array([_t_q]), np.array([_t_n0]), _t_t)
     with _t_mp.workdps(50):
         L = _t_mp.mpf(_t_lam)

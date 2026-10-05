@@ -110,6 +110,12 @@ for _t_flux in (1e4, 7.7e9):
 _t_roundtrip(1, 1e14, 5 * _T_DAY, _T_DAY, 1e13, 1.5e15, _T_DATA)
 # near the edge of the accuracy statement: at 1.547e14 the slope d ln A / d ln flux is about 0.52
 _t_roundtrip(1, 1.547e14, 5 * _T_DAY, _T_DAY, 1e13, 1.5e15, _T_DATA)
+# at the edge itself: at 1.645e14 the slope is just above 0.5 (0.5 is reached at about 1.6454e14)
+_t_h = 1e-5
+_t_slope = (np.log(_t_activity(1, 1.645e14 * np.exp(_t_h), 5 * _T_DAY, _T_DAY, *_T_DATA))
+            - np.log(_t_activity(1, 1.645e14 * np.exp(-_t_h), 5 * _T_DAY, _T_DAY, *_T_DATA))) / (2 * _t_h)
+assert 0.5 < _t_slope < 0.5005, _t_slope
+_t_roundtrip(1, 1.645e14, 5 * _T_DAY, _T_DAY, 1e13, 1.5e15, _T_DATA)
 
 # --- test case 3: the ends of the domain: no cooling (t_cool = 0); t_irr = 1e9 s and t_cool = 1e9 s on
 # a cobalt monitor (60Co, 5.27 y); flux_hi = 1e18 on a monitor whose product (1e-3 per s, no capture)
@@ -132,29 +138,45 @@ for _t_end, _t_in in ((1e8, 1.0 + 5e-10), (1e13, 1.0 - 5e-10)):
         act = _t_f * _t_activity(1, _t_end, 5 * _T_DAY, _T_DAY, *_T_DATA)
         got = monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, act, 1e8, 1e13)
         assert _t_rel(got, _t_end) < 1e-11, (got, _t_end, _t_f)
-    # at the bound on both sides: the activities closest to |ln(activity / A(end))| = 1e-9 from inside
-    # (|ln| = 1e-9 - 1e-14, a few rounding units of the logarithms) give the end
+    # the tolerance 1e-9 holds up to the rounding of the end values (1e-12 in ln): at both ends and on both
+    # sides, the representable activity closest to |ln(activity / A(end))| = 1e-9 - 1e-12 from inside gives
+    # the end; outside the interval the representable activity closest to |ln| = 1e-9 + 1e-12 from beyond
+    # raises ValueError, and inside the interval it gives a flux within 1e-8 of the end (the exact root is
+    # about 2e-9 away). A(end) is the extended-precision target; the logarithms are taken in mpmath.
     _t_a = _t_activity(1, _t_end, 5 * _T_DAY, _T_DAY, *_T_DATA)
     for _t_sgn in (1, -1):
-        with _t_mp.workdps(50):
-            _t_x = float(_t_mp.mpf(_t_a) * _t_mp.exp(_t_sgn * (_t_mp.mpf("1e-9") - _t_mp.mpf("1e-14"))))
-            while abs(_t_mp.log(_t_mp.mpf(_t_x) / _t_mp.mpf(_t_a))) > _t_mp.mpf("1e-9") - _t_mp.mpf("1e-14"):
-                _t_x = float(np.nextafter(_t_x, _t_a))
-            assert abs(_t_mp.log(_t_mp.mpf(_t_x) / _t_mp.mpf(_t_a))) > _t_mp.mpf("1e-9") - _t_mp.mpf("2e-14")
-        got = monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, _t_x, 1e8, 1e13)
+        _t_outside = (_t_sgn < 0) == (_t_end == 1e8)
+        with _t_mp.workdps(60):
+            _t_A = _t_mp.mpf(_t_a)
+            _t_lr = lambda x: abs(_t_mp.log(_t_mp.mpf(x) / _t_A))
+            _t_lo_b, _t_hi_b = _t_mp.mpf("1e-9") - _t_mp.mpf("1e-12"), _t_mp.mpf("1e-9") + _t_mp.mpf("1e-12")
+            _t_in = float(_t_A * _t_mp.exp(_t_sgn * _t_lo_b))
+            while _t_lr(_t_in) > _t_lo_b:
+                _t_in = float(np.nextafter(_t_in, _t_a))
+            while _t_lr(np.nextafter(_t_in, _t_sgn * np.inf)) <= _t_lo_b:
+                _t_in = float(np.nextafter(_t_in, _t_sgn * np.inf))
+            _t_beyond = float(_t_A * _t_mp.exp(_t_sgn * _t_hi_b))
+            while _t_lr(_t_beyond) <= _t_hi_b:
+                _t_beyond = float(np.nextafter(_t_beyond, _t_sgn * np.inf))
+            while _t_lr(np.nextafter(_t_beyond, _t_a)) > _t_hi_b:
+                _t_beyond = float(np.nextafter(_t_beyond, _t_a))
+        got = monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, _t_in, 1e8, 1e13)
         assert _t_rel(got, _t_end) < 1e-11, (got, _t_end, _t_sgn)
-    # just beyond the tolerance, outside the interval (|ln| = 1.01e-9 > 1e-9): no flux in the interval
-    _t_raised = False
-    try:
-        monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, (np.exp(-1.01e-9) if _t_end == 1e8 else np.exp(1.01e-9)) * _t_a, 1e8, 1e13)
-    except ValueError:
-        _t_raised = True
-    assert _t_raised, ("activity 1.01e-9 outside the end at %g must raise ValueError" % _t_end)
+        if _t_outside:
+            _t_raised = False
+            try:
+                monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, _t_beyond, 1e8, 1e13)
+            except ValueError:
+                _t_raised = True
+            assert _t_raised, ("activity just beyond 1e-9 + 1e-12 outside the end at %g must raise ValueError" % _t_end)
+        else:
+            got = monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, _t_beyond, 1e8, 1e13)
+            assert _t_rel(got, _t_end) < 1e-8, (got, _t_end, _t_sgn)
     # and 2e-9 outside
     _t_out = np.exp(-2e-9) if _t_end == 1e8 else np.exp(2e-9)
     _t_raised = False
     try:
-        monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, _t_out * _t_activity(1, _t_end, 5 * _T_DAY, _T_DAY, *_T_DATA), 1e8, 1e13)
+        monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, _t_out * _t_a, 1e8, 1e13)
     except ValueError:
         _t_raised = True
     assert _t_raised, ("activity 2e-9 outside the end at %g must raise ValueError" % _t_end)

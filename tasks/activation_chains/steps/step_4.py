@@ -33,6 +33,7 @@ def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activi
       of the initial atoms at flux_lo), or if activity lies outside [A(flux_lo), A(flux_hi)] by more
       than a relative 1e-9.
       An activity with |ln(activity / A(end))| <= 1e-9 for an end of the interval, on either side of
-      it, gives that end.
+      it, gives that end. The end values carry rounding errors, so the tolerance holds up to 1e-12 in ln:
+      for 1e-9 - 1e-12 < |ln| <= 1e-9 + 1e-12 the end, the root and (outside the interval) ValueError are all correct.
     '''
     raise NotImplementedError

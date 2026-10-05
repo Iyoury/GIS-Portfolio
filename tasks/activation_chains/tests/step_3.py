@@ -77,8 +77,8 @@ _T_B = np.zeros((3, 3))
 _T_N0 = np.array([1e18, 0.0, 0.0])
 
 # --- test case 0: burnup of a stable target: n0 exp(-sigma phi t), down to exp(-550), about 1e-239, exp(-575),
-# about 8e-250 (relative rule), and exp(-600), about 3e-261 (below 1e-250 S: absolute rule) ---
-for _t_flux, _t_t in ((1e13, 1e5), (1e17, 2e7), (2e17, 1e10), (1e18, 5.5e6), (1e18, 5.75e6), (1e18, 6e6)):
+# about 8e-250, exp(-575.64), 1.01e-250 just above 1e-250 S (relative rule), and exp(-600), about 3e-261 (below 1e-250 S: absolute rule) ---
+for _t_flux, _t_t in ((1e13, 1e5), (1e17, 2e7), (2e17, 1e10), (1e18, 5.5e6), (1e18, 5.75e6), (1e18, 5756363.229176583), (1e18, 6e6)):
     x = activation_inventory(np.array([0.0]), np.zeros((1, 1)), np.array([100.0]), np.array([-1]), np.array([3.0]),
                              [(_t_t, _t_flux)])
     with _t_mp.workdps(40):
