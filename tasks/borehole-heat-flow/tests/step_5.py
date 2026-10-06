@@ -304,6 +304,24 @@ def test_z_min_is_applied_in_vertical_depth():
     assert abs(r2["q0"] - a["true_q0"]) < 4 * r2["sigma_q0"]
 
 
+def test_reading_exactly_at_z_min_is_kept():
+    # vertical hole: TVD = MD exactly, so the reading at MD 200 m sits exactly at z_min = 200 m and is kept
+    md = np.array([0.0, 500.0, 1000.0, 1500.0])
+    inc = np.zeros(4)
+    azi = np.zeros(4)
+    log_md = np.arange(10.0, 1500.0 + 1e-9, 10.0)
+    tops_md, k = np.array([0.0, 300.0, 800.0]), np.array([2.8, 3.6, 3.1])
+    A, kappa = 0.8e-6, 1.2e-6
+    T = np.empty(log_md.size)
+    for j, z in enumerate(log_md):
+        R, S = _g_RS(z, list(tops_md), list(k))
+        T[j] = 6.0 + 0.045 * R - A * S + 5.5 * _g_P(z, _HIST_SHAPE, kappa)
+    args = [md, inc, azi, log_md, T, tops_md, k, A, kappa, np.array(_HIST_T), np.array(_HIST_SHAPE), 200.0]
+    r = _f()(*args)
+    assert int(round(float(r["n_used"]))) == int(np.sum(log_md >= 200.0)) == 131
+    assert abs(r["q0"] - 0.045) < 1e-8
+
+
 def _crown_run_all():
     failures = []
     for _name, _fn in list(globals().items()):

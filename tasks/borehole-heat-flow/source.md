@@ -377,3 +377,10 @@ applies. Steps 1-5 and the workflow are unchanged.
 - Mutants: erfc with the mean diffusivity, erfc with the local diffusivity, and Gaver-Stehfest inversion
   of the exact transform in double precision (fails the 1e-8 K requirement); all fail.
 - Comparisons between two computed outputs use twice the per-output tolerance.
+
+Version 9 (content-check fixes on v8): step 6 no longer reads the clock; the prompt states the size it must
+handle (1000 depths, 50 layers, 20 intervals in one call) and that case is now checked on values (50 equal
+conductivities against the erfc half-space, varying conductivities against single-depth calls). Step 6 also
+rejects two-dimensional and empty layer arrays in the tests. Step 4 fits a resolvable four-reading design
+(smallest valid n). Step 5 has a vertical hole (TVD = MD exactly) with a reading exactly at z_min, which must
+be kept (n_used = 131).

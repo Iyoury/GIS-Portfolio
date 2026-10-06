@@ -26,8 +26,8 @@ def layered_paleoclimate_perturbation(z, layer_tops, layer_k, rho_c, t_years, dT
     Returns
     -------
     float for scalar z, else ndarray with the shape of z. Absolute accuracy
-    1e-8 K per kelvin of the largest |dT|; within 10 s for up to 1000 depths,
-    50 layers and 20 history intervals.
+    1e-8 K per kelvin of the largest |dT|; up to 1000 depths, 50 layers
+    and 20 history intervals per call.
 
     Raises
     ------

@@ -72,6 +72,20 @@ def test_exact_recovery():
     assert r["rms_residual"] < 1e-9
 
 
+def test_four_observations_are_enough():
+    # n = 4 is the smallest valid sample: a resolvable four-reading design is fitted exactly
+    z = np.array([200.0, 500.0, 900.0, 1400.0])
+    R = z / 3.1 + 0.00002 * z**1.5
+    S = z**2 / (2 * 3.1)
+    P = -(np.exp(-z / 900.0) - np.exp(-z / 250.0)) - 0.3 * np.exp(-z / 2000.0)
+    T = 4.7 + 0.044 * R - 1.1e-6 * S + 7.0 * P
+    r = _f()(T, R, S, P, 1.1e-6)
+    assert abs(r["T0"] - 4.7) < 1e-8
+    assert abs(r["q0"] - 0.044) < 1e-11
+    assert abs(r["amplitude"] - 7.0) < 1e-8
+    assert r["rms_residual"] < 1e-9
+
+
 def test_noisy_estimates_and_covariance():
     T, R, S, P = _synthetic(0.01)
     r = _f()(T, R, S, P, 1.1e-6)
