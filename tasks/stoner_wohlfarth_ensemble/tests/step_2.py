@@ -145,6 +145,8 @@ for _t_p in (0.0, 0.4, np.pi / 4, 1.3, np.pi / 2):
 h = np.array([-0.9, -0.5, -0.1, 0.2, 0.7, 0.95])
 low, high = escape_barriers(h, 0.0)
 assert isinstance(low, np.ndarray) and low.shape == h.shape and high.shape == h.shape
+assert isinstance(high, np.ndarray), type(high)
+assert np.issubdtype(low.dtype, np.floating) and np.issubdtype(high.dtype, np.floating), (low.dtype, high.dtype)
 assert np.allclose(low, 0.5 * (1.0 + h) ** 2, rtol=0.0, atol=1e-8)
 assert np.allclose(high, 0.5 * (1.0 + h) ** 2, rtol=0.0, atol=1e-8)
 low, high = escape_barriers(h, np.pi / 2)
@@ -157,6 +159,7 @@ for _t_p in (0.2, np.pi / 6, np.pi / 4, 1.0, 1.4):
     h = np.array([[-0.9, -0.4, 0.0], [0.3, 0.7, 0.95]]) * _t_hs
     low, high = escape_barriers(h, _t_p)
     assert low.shape == (2, 3) and high.shape == (2, 3)
+    assert np.issubdtype(np.asarray(low).dtype, np.floating) and np.issubdtype(np.asarray(high).dtype, np.floating)
     for idx in np.ndindex(h.shape):
         t_lo, t_hi = _t_barriers(h[idx], _t_p)
         assert abs(low[idx] - t_lo) < 1e-8 and abs(high[idx] - t_hi) < 1e-8, (_t_p, h[idx])

@@ -148,3 +148,6 @@ test cases:
   (2 int Q^2 / ((1 - z^2) w) dz / int (z - <z>)^2 w dz, Q = int_{-1}^{z} (z' - <z>) w dz');
 - step 6 relative accuracy relaxed from 1e-6 to 1e-5 (2.1e-5 for the h -> -h comparison of two outputs).
 All mutants still fail by orders of magnitude more than the new bounds.
+
+Version 12 content-check fixes: the step 6 prompt now states the 60 s budget used by the tests (one line had
+kept 30 s); the step 2 array tests also check that both outputs are ndarrays with a floating dtype.
