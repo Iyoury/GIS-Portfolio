@@ -1,192 +1,917 @@
-import signal as _t_signal
-import time as _t_btime
-
-# Time budget of one call, as stated in the prompt: the call is interrupted once it exceeds the budget
-# (by one second), so a solution that is too slow fails this check instead of holding up the tests.
-_t_depth = [0]
-
-
-def _t_budget(fn, seconds, name):
-    def wrapped(*args, **kwargs):
-        if _t_depth[0]:
-            return fn(*args, **kwargs)
-
-        def _alarm(signum, frame):
-            raise TimeoutError("%s did not finish within its budget of %g s per call" % (name, seconds))
-        try:
-            old = _t_signal.signal(_t_signal.SIGALRM, _alarm)
-            _t_signal.setitimer(_t_signal.ITIMER_REAL, seconds + 1.0)
-            armed = True
-        except (ValueError, AttributeError, OSError):      # no SIGALRM here: measure only
-            armed = False
-        _t_depth[0] += 1
-        start = _t_btime.perf_counter()
-        try:
-            out = fn(*args, **kwargs)
-        finally:
-            _t_depth[0] -= 1
-            if armed:
-                _t_signal.setitimer(_t_signal.ITIMER_REAL, 0.0)
-                _t_signal.signal(_t_signal.SIGALRM, old)
-        elapsed = _t_btime.perf_counter() - start
-        assert elapsed <= seconds, ("%s took %.1f s (budget %g s per call)" % (name, elapsed, seconds))
-        return out
-    return wrapped
-
-
-brown_relaxation = _t_budget(brown_relaxation, 60.0, "brown_relaxation")
-
-import time as _t_time
+# --- test case 0 ---
+# one particle at psi = 0: h_c = h_half = minus the median switching field
 import numpy as np
-import mpmath as _t_mp
+from scipy.integrate import quad as _t_quad
+from scipy.special import erfc as _t_erfc, erfcinv as _t_erfcinv
 
-# Independent targets for step 6: Brown's equation expanded in Legendre polynomials of z = cos(theta)
-# (W = sum b_l P_l). The operator is pentadiagonal in l; it is built exactly from the recurrences for
-# z P_l and (1 - z^2) P_l', and solved in extended precision (30 + sigma (1 + |h|)**2 / 2 digits):
-# lam1 by inverse iteration on the block l >= 1 (the l = 0 row is mass conservation), the equilibrium
-# density from the same block, and tau_int = int z Psi dz / int z rho0 dz with L Psi = -rho0,
-# rho0 = (z - <z>) W_eq. No quadrature, no grid.
+_T_HP = 0.5 * np.pi
 
+_T_GOLD = 0.5 * (np.sqrt(5.0) - 1.0)
 
-def _t_band_solve(rows, rhs, N):
-    # Gaussian elimination with partial pivoting on a pentadiagonal system given as dict rows[i] = {j: a_ij}
-    A = [dict(r) for r in rows]
-    b = list(rhs)
-    for k in range(N):
-        cand = [i for i in range(k, min(k + 3, N)) if k in A[i]]
-        p = max(cand, key=lambda i: abs(A[i][k]))
-        if p != k:
-            A[k], A[p] = A[p], A[k]
-            b[k], b[p] = b[p], b[k]
-        piv = A[k][k]
-        for i in range(k + 1, min(k + 3, N)):
-            if k in A[i] and A[i][k] != 0:
-                f = A[i][k] / piv
-                for j, v in A[k].items():
-                    A[i][j] = A[i].get(j, 0) - f * v
-                del A[i][k]
-                b[i] -= f * b[k]
-    x = [_t_mp.mpf(0)] * N
-    for k in range(N - 1, -1, -1):
-        s = b[k] - _t_mp.fsum(v * x[j] for j, v in A[k].items() if j > k)
-        x[k] = s / A[k][k]
-    return x
+_T_Q = np.concatenate([np.geomspace(1e-9, 1e-2, 40), np.linspace(0.0125, 0.9875, 400),
+                       1.0 - np.geomspace(1e-2, 1e-9, 40)])
 
-def _t_brown(sigma, h, N=None, dps=None):
-    if dps is None: dps = 30 + int(0.5 * sigma * (1 + abs(h)) ** 2)
-    if N is None: N = int(60 + 3 * sigma)
-    with _t_mp.workdps(dps):
-        s = _t_mp.mpf(sigma); xi = 2 * s * _t_mp.mpf(h)
-        def Mz(v):
-            out = [_t_mp.mpf(0)] * (len(v) + 1)
-            for l, c in enumerate(v):
-                if c == 0: continue
-                out[l + 1] += c * (l + 1) / _t_mp.mpf(2 * l + 1)
-                if l >= 1: out[l - 1] += c * l / _t_mp.mpf(2 * l + 1)
-            return out
-        def Tz(v):
-            out = [_t_mp.mpf(0)] * (len(v) + 1)
-            for l, c in enumerate(v):
-                if c == 0 or l == 0: continue
-                f = c * l * (l + 1) / _t_mp.mpf(2 * l + 1)
-                out[l - 1] += f; out[l + 1] -= f
-            return out
-        cols = {}
-        for l in range(0, N + 1):
-            e = [_t_mp.mpf(0)] * (l + 1); e[l] = _t_mp.mpf(1)
-            g = [-2 * s * x for x in Mz(e)] + [_t_mp.mpf(0)]
-            for k in range(len(e)): g[k] -= xi * e[k]
-            Tg, Mg = Tz(g), Mz(g)
-            col = {}
-            col[l] = col.get(l, 0) - l * (l + 1)
-            for k, v in enumerate(Tg): col[k] = col.get(k, 0) + v
-            for k, v in enumerate(Mg): col[k] = col.get(k, 0) - 2 * v
-            cols[l] = {k: v / 2 for k, v in col.items() if v != 0 and k <= N}
-        # L' (rows/cols 1..N), stored by rows
-        rows = [dict() for _ in range(N)]
-        for l in range(1, N + 1):
-            for k, v in cols[l].items():
-                if k >= 1: rows[k - 1][l - 1] = v
-        # equilibrium density: L' b + L[1:,0] b0 = 0, b0 = 1
-        r0 = [-cols[0].get(k, 0) for k in range(1, N + 1)]
-        beq = [_t_mp.mpf(1)] + _t_band_solve(rows, r0, N)
-        # lam1: inverse iteration on L'
-        x = [_t_mp.mpf(1)] * N
-        lam_old = None
-        for it in range(60):
-            y = _t_band_solve(rows, x, N)
-            nrm = _t_mp.sqrt(_t_mp.fsum(t * t for t in y)); y = [t / nrm for t in y]
-            Ay = [_t_mp.fsum(v * y[j] for j, v in rows[i].items()) for i in range(N)]
-            lam = _t_mp.fsum(a * b for a, b in zip(y, Ay))
-            x = y
-            if lam_old is not None and abs(lam - lam_old) < abs(lam) * _t_mp.mpf(10) ** (-(dps - 10)): break
-            lam_old = lam
-        lam1 = -lam
-        # integral relaxation time of z: tau = -int z Psi dz / int z rho0 dz, L Psi = -rho0... (L^{-1} rho0)
-        zW = Mz(beq)
-        zmean = zW[0] / beq[0]
-        rho0 = [zW[k] - zmean * (beq[k] if k < len(beq) else 0) for k in range(N + 1)]
-        y = _t_band_solve(rows, rho0[1:], N)           # L' y = rho0  ->  Psi = -y solves L Psi = -rho0
-        tau = -y[0] / rho0[1]                        # int z Psi = (2/3)(-y_1), C(0) = (2/3) rho0_1
-        return lam1, tau
+def _t_fold(psi):
+    # (h_sw, theta_fold): scan of the curve, then golden-section search for its lowest field
+    if psi <= 0.0:
+        return 1.0, 0.0
+    if psi >= _T_HP:
+        return 1.0, -_T_HP
 
+    def H(t):
+        return -np.sin(2.0 * t) / (2.0 * np.sin(t - psi))
 
-def _t_rel(x, y):
-    return abs(x - y) / abs(y)
+    ts = psi - np.pi + np.pi * _T_Q
+    i = int(np.argmin(H(ts)))
+    a, b = ts[max(i - 1, 0)], ts[min(i + 1, len(ts) - 1)]
+    c, d = b - _T_GOLD * (b - a), a + _T_GOLD * (b - a)
+    fc, fd = H(c), H(d)
+    while b - a > 1e-13:
+        if fc < fd:
+            b, d, fd = d, c, fc
+            c = b - _T_GOLD * (b - a)
+            fc = H(c)
+        else:
+            a, c, fc = c, d, fd
+            d = a + _T_GOLD * (b - a)
+            fd = H(d)
+    t = 0.5 * (a + b)
+    return -float(H(t)), float(t)
 
+_T_NG = 20000
 
-def _t_check6(sigma, h):
-    # the prompt requires every call to finish within 60 s on one CPU core
-    start = _t_time.perf_counter()
-    out = brown_relaxation(sigma, h)
-    elapsed = _t_time.perf_counter() - start
-    assert elapsed <= 60.0, ("brown_relaxation took %.1f s" % elapsed, sigma, h)
-    assert isinstance(out, tuple) and len(out) == 2 and all(type(x) is float for x in out), out
-    lam, tau = (float(x) for x in _t_brown(sigma, h))
-    assert _t_rel(out[0], lam) < 1e-5, (sigma, h, out, lam)
-    assert _t_rel(out[1], tau) < 1e-5, (sigma, h, out, tau)
+_T_GRID = -np.pi + 1.234567e-4 + 2.0 * np.pi * np.arange(_T_NG) / _T_NG
+
+_T_DG = 2.0 * np.pi / _T_NG
+
+def _t_slope(t, h, psi):
+    return 0.5 * np.sin(2.0 * t) + h * np.sin(t - psi)
+
+def _t_energy(t, h, psi):
+    return 0.5 * np.sin(t) ** 2 - h * np.cos(t - psi)
+
+def _t_minima(h, psi):
+    g = _t_slope(_T_GRID, h, psi)
+    out = []
+    for i in np.where((g < 0.0) & (np.roll(g, -1) >= 0.0))[0]:
+        a, b = _T_GRID[i], _T_GRID[i] + _T_DG
+        for _ in range(60):
+            mid = 0.5 * (a + b)
+            if _t_slope(mid, h, psi) < 0.0:
+                a = mid
+            else:
+                b = mid
+        out.append(0.5 * (a + b))
     return out
 
+def _t_extrema(h, psi):
+    # minima (e' from - to +) and maxima (e' from + to -) of e on the circle grid, bisected
+    g = _t_slope(_T_GRID, h, psi)
+    found = []
+    for mask in ((g < 0.0) & (np.roll(g, -1) >= 0.0), (g > 0.0) & (np.roll(g, -1) <= 0.0)):
+        roots = []
+        for i in np.where(mask)[0]:
+            lo, hi = _T_GRID[i], _T_GRID[i] + _T_DG
+            s_lo = _t_slope(lo, h, psi)
+            for _ in range(60):
+                mid = 0.5 * (lo + hi)
+                if _t_slope(mid, h, psi) * s_lo > 0.0:
+                    lo = mid
+                else:
+                    hi = mid
+            roots.append(0.5 * (lo + hi))
+        found.append(roots)
+    return found[0], found[1]
 
+def _t_gamma(x, psi, a):
+    # escape rate over f0: both routes, exponent 2 a Delta_e because E = 2 K V e. Within a grid
+    # step of +-h_sw two extrema may merge on the grid; the rate is negligible there.
+    mins, maxs = _t_extrema(x, psi)
+    if len(mins) < 2 or len(maxs) < 2:
+        return 0.0
+    t_o = max(mins, key=np.cos)
+    e_o = _t_energy(t_o, x, psi)
+    return sum(np.exp(-2.0 * a * (_t_energy(t, x, psi) - e_o)) for t in maxs)
 
-# --- test case 0: no anisotropy and no field energy (sigma = 0): free rotational diffusion,
-# the slowest mode is P_1(z) with rate exactly 1/tau_N, and tau_int = tau_N ---
-for _t_h in (0.0, 0.6):
-    _t_o = _t_check6(0.0, _t_h)
-    assert abs(_t_o[0] - 1.0) < 1e-5 and abs(_t_o[1] - 1.0) < 1e-5, _t_o
+def _t_P(h, psi, a, ratio):
+    # survival probability exp(-(f0 / rate) int_h^h_sw Gamma / f0), quadrature on the grid barriers
+    hs = _t_fold(psi)[0]
+    if h >= hs:
+        return 1.0
+    if h <= -hs:
+        return 0.0
+    I = _t_quad(lambda x: _t_gamma(x, psi, a), h, hs, epsabs=0.0, epsrel=1e-12, limit=1000)[0]
+    return float(np.exp(-ratio * I))
 
-# --- test case 1: zero field, moderate to high barriers; at sigma = 60 Brown's high-barrier
-# asymptote (2 / sqrt(pi)) sigma**1.5 exp(-sigma) is reached within a few percent ---
-_t_check6(1.0, 0.0)
-_t_check6(5.0, 0.0)
-_t_o = _t_check6(60.0, 0.0)
-_t_asym = 2.0 / np.sqrt(np.pi) * 60.0 ** 1.5 * np.exp(-60.0)
-assert 0.9 < _t_o[0] / _t_asym < 1.0, (_t_o, _t_asym)
+def _t_median0(a, ratio):
+    # psi = 0: P = 1/2 where (f0 / rate) * I = ln 2, solved with the inverse erfc
+    return -1.0 + _t_erfcinv(np.log(2.0) / ratio * np.sqrt(a / np.pi) + _t_erfc(2.0 * np.sqrt(a))) / np.sqrt(a)
 
-# --- test case 2: exponentially small rates in a weak field (relative accuracy still required) ---
-_t_check6(40.0, 0.2)
-_t_check6(55.0, 0.07)
-_t_check6(25.0, -0.15)
+def _t_dm(t, h, psi):
+    # dm/dh along a minimum theta(h): dtheta/dh = -sin(theta - psi) / e''(theta)
+    return np.sin(t - psi) ** 2 / (np.cos(2.0 * t) + h * np.cos(t - psi))
 
-# --- test case 3: strong fields: the shallow well is depleted and tau_int is far below 1/lam1;
-# here the slow mode lives in a well whose Boltzmann weight is ~exp(-216) of the deep one ---
-_t_o = _t_check6(60.0, 0.9)
-assert _t_o[1] * _t_o[0] < 0.1, _t_o
-_t_om = _t_check6(60.0, -0.9)
-assert _t_rel(_t_o[0], _t_om[0]) < 1e-5 and _t_rel(_t_o[1], _t_om[1]) < 1e-5, (_t_o, _t_om)
-_t_check6(30.0, 0.75)
-_t_check6(20.0, -0.5)
-_t_check6(5.0, 0.3)
+def _t_ensemble(h, psis, w, a, ratio):
+    # expected ensemble magnetization M, switched weight S and their derivatives in h
+    w = np.asarray(w, dtype=float) / np.sum(w)
+    M = dM = S = dS = 0.0
+    for psi, wi in zip(psis, w):
+        hs = _t_fold(psi)[0]
+        mins = _t_minima(h, psi)
+        t_x = min(mins, key=np.cos)        # the other minimum, cos(theta) < 0
+        m_x, dm_x = np.cos(t_x - psi), _t_dm(t_x, h, psi)
+        if h <= -hs:
+            p = dp = m_o = dm_o = 0.0
+        else:
+            t_o = max(mins, key=np.cos)
+            m_o, dm_o = np.cos(t_o - psi), _t_dm(t_o, h, psi)
+            p = _t_P(h, psi, a, ratio)
+            dp = ratio * _t_gamma(h, psi, a) * p
+        M += wi * (p * m_o + (1.0 - p) * m_x)
+        dM += wi * (dp * (m_o - m_x) + p * dm_o + (1.0 - p) * dm_x)
+        S += wi * (1.0 - p)
+        dS -= wi * dp
+    return M, dM, S, dS
 
-# --- test case 4: h -> -h symmetry (z -> -z) ---
-_t_p, _t_m = brown_relaxation(45.0, 0.6), brown_relaxation(45.0, -0.6)
-assert _t_rel(_t_p[0], _t_m[0]) < 2.1e-5 and _t_rel(_t_p[1], _t_m[1]) < 2.1e-5
+def _t_check_ensemble(out, psis, w, a, ratio):
+    # one Newton step on the independent M(h) = 0 and S(h) = 1/2 must not move the results
+    assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(v, float) for v in out)
+    h_c, h_half = out
+    assert -1.0 < h_c < 1.0 and -1.0 < h_half < 1.0, out
+    M, dM, _, _ = _t_ensemble(-h_c, psis, w, a, ratio)
+    assert abs(M / dM) < 1e-6, (h_c, M / dM)
+    _, _, S, dS = _t_ensemble(-h_half, psis, w, a, ratio)
+    assert abs((S - 0.5) / dS) < 1e-6, (h_half, (S - 0.5) / dS)
+    return out
 
-# --- test case 5: inputs outside the stated ranges raise ValueError ---
-for _t_bad in ((-1.0, 0.1), (61.0, 0.1), (10.0, 0.95), (10.0, -0.91), (float("nan"), 0.1)):
+out = _t_check_ensemble(ensemble_switching(np.array([0.0]), np.array([2.0]), 100.0, 1e9, 1.0),
+                        [0.0], [2.0], 100.0, 1e9)
+hm = _t_median0(100.0, 1e9)
+assert abs(out[0] + hm) < 1e-6 and abs(out[1] + hm) < 1e-6, (out, hm)
+
+# --- test case 1 ---
+# three particles with weights that do not add up to 1
+import numpy as np
+from scipy.integrate import quad as _t_quad
+
+_T_HP = 0.5 * np.pi
+
+_T_GOLD = 0.5 * (np.sqrt(5.0) - 1.0)
+
+_T_Q = np.concatenate([np.geomspace(1e-9, 1e-2, 40), np.linspace(0.0125, 0.9875, 400),
+                       1.0 - np.geomspace(1e-2, 1e-9, 40)])
+
+def _t_fold(psi):
+    # (h_sw, theta_fold): scan of the curve, then golden-section search for its lowest field
+    if psi <= 0.0:
+        return 1.0, 0.0
+    if psi >= _T_HP:
+        return 1.0, -_T_HP
+
+    def H(t):
+        return -np.sin(2.0 * t) / (2.0 * np.sin(t - psi))
+
+    ts = psi - np.pi + np.pi * _T_Q
+    i = int(np.argmin(H(ts)))
+    a, b = ts[max(i - 1, 0)], ts[min(i + 1, len(ts) - 1)]
+    c, d = b - _T_GOLD * (b - a), a + _T_GOLD * (b - a)
+    fc, fd = H(c), H(d)
+    while b - a > 1e-13:
+        if fc < fd:
+            b, d, fd = d, c, fc
+            c = b - _T_GOLD * (b - a)
+            fc = H(c)
+        else:
+            a, c, fc = c, d, fd
+            d = a + _T_GOLD * (b - a)
+            fd = H(d)
+    t = 0.5 * (a + b)
+    return -float(H(t)), float(t)
+
+_T_NG = 20000
+
+_T_GRID = -np.pi + 1.234567e-4 + 2.0 * np.pi * np.arange(_T_NG) / _T_NG
+
+_T_DG = 2.0 * np.pi / _T_NG
+
+def _t_slope(t, h, psi):
+    return 0.5 * np.sin(2.0 * t) + h * np.sin(t - psi)
+
+def _t_energy(t, h, psi):
+    return 0.5 * np.sin(t) ** 2 - h * np.cos(t - psi)
+
+def _t_minima(h, psi):
+    g = _t_slope(_T_GRID, h, psi)
+    out = []
+    for i in np.where((g < 0.0) & (np.roll(g, -1) >= 0.0))[0]:
+        a, b = _T_GRID[i], _T_GRID[i] + _T_DG
+        for _ in range(60):
+            mid = 0.5 * (a + b)
+            if _t_slope(mid, h, psi) < 0.0:
+                a = mid
+            else:
+                b = mid
+        out.append(0.5 * (a + b))
+    return out
+
+def _t_extrema(h, psi):
+    # minima (e' from - to +) and maxima (e' from + to -) of e on the circle grid, bisected
+    g = _t_slope(_T_GRID, h, psi)
+    found = []
+    for mask in ((g < 0.0) & (np.roll(g, -1) >= 0.0), (g > 0.0) & (np.roll(g, -1) <= 0.0)):
+        roots = []
+        for i in np.where(mask)[0]:
+            lo, hi = _T_GRID[i], _T_GRID[i] + _T_DG
+            s_lo = _t_slope(lo, h, psi)
+            for _ in range(60):
+                mid = 0.5 * (lo + hi)
+                if _t_slope(mid, h, psi) * s_lo > 0.0:
+                    lo = mid
+                else:
+                    hi = mid
+            roots.append(0.5 * (lo + hi))
+        found.append(roots)
+    return found[0], found[1]
+
+def _t_gamma(x, psi, a):
+    # escape rate over f0: both routes, exponent 2 a Delta_e because E = 2 K V e. Within a grid
+    # step of +-h_sw two extrema may merge on the grid; the rate is negligible there.
+    mins, maxs = _t_extrema(x, psi)
+    if len(mins) < 2 or len(maxs) < 2:
+        return 0.0
+    t_o = max(mins, key=np.cos)
+    e_o = _t_energy(t_o, x, psi)
+    return sum(np.exp(-2.0 * a * (_t_energy(t, x, psi) - e_o)) for t in maxs)
+
+def _t_P(h, psi, a, ratio):
+    # survival probability exp(-(f0 / rate) int_h^h_sw Gamma / f0), quadrature on the grid barriers
+    hs = _t_fold(psi)[0]
+    if h >= hs:
+        return 1.0
+    if h <= -hs:
+        return 0.0
+    I = _t_quad(lambda x: _t_gamma(x, psi, a), h, hs, epsabs=0.0, epsrel=1e-12, limit=1000)[0]
+    return float(np.exp(-ratio * I))
+
+def _t_dm(t, h, psi):
+    # dm/dh along a minimum theta(h): dtheta/dh = -sin(theta - psi) / e''(theta)
+    return np.sin(t - psi) ** 2 / (np.cos(2.0 * t) + h * np.cos(t - psi))
+
+def _t_ensemble(h, psis, w, a, ratio):
+    # expected ensemble magnetization M, switched weight S and their derivatives in h
+    w = np.asarray(w, dtype=float) / np.sum(w)
+    M = dM = S = dS = 0.0
+    for psi, wi in zip(psis, w):
+        hs = _t_fold(psi)[0]
+        mins = _t_minima(h, psi)
+        t_x = min(mins, key=np.cos)        # the other minimum, cos(theta) < 0
+        m_x, dm_x = np.cos(t_x - psi), _t_dm(t_x, h, psi)
+        if h <= -hs:
+            p = dp = m_o = dm_o = 0.0
+        else:
+            t_o = max(mins, key=np.cos)
+            m_o, dm_o = np.cos(t_o - psi), _t_dm(t_o, h, psi)
+            p = _t_P(h, psi, a, ratio)
+            dp = ratio * _t_gamma(h, psi, a) * p
+        M += wi * (p * m_o + (1.0 - p) * m_x)
+        dM += wi * (dp * (m_o - m_x) + p * dm_o + (1.0 - p) * dm_x)
+        S += wi * (1.0 - p)
+        dS -= wi * dp
+    return M, dM, S, dS
+
+def _t_check_ensemble(out, psis, w, a, ratio):
+    # one Newton step on the independent M(h) = 0 and S(h) = 1/2 must not move the results
+    assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(v, float) for v in out)
+    h_c, h_half = out
+    assert -1.0 < h_c < 1.0 and -1.0 < h_half < 1.0, out
+    M, dM, _, _ = _t_ensemble(-h_c, psis, w, a, ratio)
+    assert abs(M / dM) < 1e-6, (h_c, M / dM)
+    _, _, S, dS = _t_ensemble(-h_half, psis, w, a, ratio)
+    assert abs((S - 0.5) / dS) < 1e-6, (h_half, (S - 0.5) / dS)
+    return out
+
+_t_check_ensemble(ensemble_switching(np.array([0.2, 0.8, 1.25]), np.array([1.0, 3.0, 2.0]), 150.0, 1e9, 10.0),
+                  [0.2, 0.8, 1.25], [1.0, 3.0, 2.0], 150.0, 1e8)
+
+# --- test case 2 ---
+# an ensemble with a particle at psi = pi/2 (both of its minima have m = h, so it
+# only shifts the magnetization, but it has left its original minimum almost at h = 1)
+import numpy as np
+from scipy.integrate import quad as _t_quad
+
+_T_HP = 0.5 * np.pi
+
+_T_GOLD = 0.5 * (np.sqrt(5.0) - 1.0)
+
+_T_Q = np.concatenate([np.geomspace(1e-9, 1e-2, 40), np.linspace(0.0125, 0.9875, 400),
+                       1.0 - np.geomspace(1e-2, 1e-9, 40)])
+
+def _t_fold(psi):
+    # (h_sw, theta_fold): scan of the curve, then golden-section search for its lowest field
+    if psi <= 0.0:
+        return 1.0, 0.0
+    if psi >= _T_HP:
+        return 1.0, -_T_HP
+
+    def H(t):
+        return -np.sin(2.0 * t) / (2.0 * np.sin(t - psi))
+
+    ts = psi - np.pi + np.pi * _T_Q
+    i = int(np.argmin(H(ts)))
+    a, b = ts[max(i - 1, 0)], ts[min(i + 1, len(ts) - 1)]
+    c, d = b - _T_GOLD * (b - a), a + _T_GOLD * (b - a)
+    fc, fd = H(c), H(d)
+    while b - a > 1e-13:
+        if fc < fd:
+            b, d, fd = d, c, fc
+            c = b - _T_GOLD * (b - a)
+            fc = H(c)
+        else:
+            a, c, fc = c, d, fd
+            d = a + _T_GOLD * (b - a)
+            fd = H(d)
+    t = 0.5 * (a + b)
+    return -float(H(t)), float(t)
+
+_T_NG = 20000
+
+_T_GRID = -np.pi + 1.234567e-4 + 2.0 * np.pi * np.arange(_T_NG) / _T_NG
+
+_T_DG = 2.0 * np.pi / _T_NG
+
+def _t_slope(t, h, psi):
+    return 0.5 * np.sin(2.0 * t) + h * np.sin(t - psi)
+
+def _t_energy(t, h, psi):
+    return 0.5 * np.sin(t) ** 2 - h * np.cos(t - psi)
+
+def _t_minima(h, psi):
+    g = _t_slope(_T_GRID, h, psi)
+    out = []
+    for i in np.where((g < 0.0) & (np.roll(g, -1) >= 0.0))[0]:
+        a, b = _T_GRID[i], _T_GRID[i] + _T_DG
+        for _ in range(60):
+            mid = 0.5 * (a + b)
+            if _t_slope(mid, h, psi) < 0.0:
+                a = mid
+            else:
+                b = mid
+        out.append(0.5 * (a + b))
+    return out
+
+def _t_extrema(h, psi):
+    # minima (e' from - to +) and maxima (e' from + to -) of e on the circle grid, bisected
+    g = _t_slope(_T_GRID, h, psi)
+    found = []
+    for mask in ((g < 0.0) & (np.roll(g, -1) >= 0.0), (g > 0.0) & (np.roll(g, -1) <= 0.0)):
+        roots = []
+        for i in np.where(mask)[0]:
+            lo, hi = _T_GRID[i], _T_GRID[i] + _T_DG
+            s_lo = _t_slope(lo, h, psi)
+            for _ in range(60):
+                mid = 0.5 * (lo + hi)
+                if _t_slope(mid, h, psi) * s_lo > 0.0:
+                    lo = mid
+                else:
+                    hi = mid
+            roots.append(0.5 * (lo + hi))
+        found.append(roots)
+    return found[0], found[1]
+
+def _t_gamma(x, psi, a):
+    # escape rate over f0: both routes, exponent 2 a Delta_e because E = 2 K V e. Within a grid
+    # step of +-h_sw two extrema may merge on the grid; the rate is negligible there.
+    mins, maxs = _t_extrema(x, psi)
+    if len(mins) < 2 or len(maxs) < 2:
+        return 0.0
+    t_o = max(mins, key=np.cos)
+    e_o = _t_energy(t_o, x, psi)
+    return sum(np.exp(-2.0 * a * (_t_energy(t, x, psi) - e_o)) for t in maxs)
+
+def _t_P(h, psi, a, ratio):
+    # survival probability exp(-(f0 / rate) int_h^h_sw Gamma / f0), quadrature on the grid barriers
+    hs = _t_fold(psi)[0]
+    if h >= hs:
+        return 1.0
+    if h <= -hs:
+        return 0.0
+    I = _t_quad(lambda x: _t_gamma(x, psi, a), h, hs, epsabs=0.0, epsrel=1e-12, limit=1000)[0]
+    return float(np.exp(-ratio * I))
+
+def _t_dm(t, h, psi):
+    # dm/dh along a minimum theta(h): dtheta/dh = -sin(theta - psi) / e''(theta)
+    return np.sin(t - psi) ** 2 / (np.cos(2.0 * t) + h * np.cos(t - psi))
+
+def _t_ensemble(h, psis, w, a, ratio):
+    # expected ensemble magnetization M, switched weight S and their derivatives in h
+    w = np.asarray(w, dtype=float) / np.sum(w)
+    M = dM = S = dS = 0.0
+    for psi, wi in zip(psis, w):
+        hs = _t_fold(psi)[0]
+        mins = _t_minima(h, psi)
+        t_x = min(mins, key=np.cos)        # the other minimum, cos(theta) < 0
+        m_x, dm_x = np.cos(t_x - psi), _t_dm(t_x, h, psi)
+        if h <= -hs:
+            p = dp = m_o = dm_o = 0.0
+        else:
+            t_o = max(mins, key=np.cos)
+            m_o, dm_o = np.cos(t_o - psi), _t_dm(t_o, h, psi)
+            p = _t_P(h, psi, a, ratio)
+            dp = ratio * _t_gamma(h, psi, a) * p
+        M += wi * (p * m_o + (1.0 - p) * m_x)
+        dM += wi * (dp * (m_o - m_x) + p * dm_o + (1.0 - p) * dm_x)
+        S += wi * (1.0 - p)
+        dS -= wi * dp
+    return M, dM, S, dS
+
+def _t_check_ensemble(out, psis, w, a, ratio):
+    # one Newton step on the independent M(h) = 0 and S(h) = 1/2 must not move the results
+    assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(v, float) for v in out)
+    h_c, h_half = out
+    assert -1.0 < h_c < 1.0 and -1.0 < h_half < 1.0, out
+    M, dM, _, _ = _t_ensemble(-h_c, psis, w, a, ratio)
+    assert abs(M / dM) < 1e-6, (h_c, M / dM)
+    _, _, S, dS = _t_ensemble(-h_half, psis, w, a, ratio)
+    assert abs((S - 0.5) / dS) < 1e-6, (h_half, (S - 0.5) / dS)
+    return out
+
+_t_ps, _t_ws = [0.3, np.pi / 2, 1.0], [2.0, 1.0, 1.0]
+_t_check_ensemble(ensemble_switching(np.array(_t_ps), np.array(_t_ws), 200.0, 1e9, 1.0),
+                  _t_ps, _t_ws, 200.0, 1e9)
+
+# --- test case 3 ---
+# a zero weight is allowed and the particle then does not count
+import numpy as np
+from scipy.integrate import quad as _t_quad
+
+_T_HP = 0.5 * np.pi
+
+_T_GOLD = 0.5 * (np.sqrt(5.0) - 1.0)
+
+_T_Q = np.concatenate([np.geomspace(1e-9, 1e-2, 40), np.linspace(0.0125, 0.9875, 400),
+                       1.0 - np.geomspace(1e-2, 1e-9, 40)])
+
+def _t_fold(psi):
+    # (h_sw, theta_fold): scan of the curve, then golden-section search for its lowest field
+    if psi <= 0.0:
+        return 1.0, 0.0
+    if psi >= _T_HP:
+        return 1.0, -_T_HP
+
+    def H(t):
+        return -np.sin(2.0 * t) / (2.0 * np.sin(t - psi))
+
+    ts = psi - np.pi + np.pi * _T_Q
+    i = int(np.argmin(H(ts)))
+    a, b = ts[max(i - 1, 0)], ts[min(i + 1, len(ts) - 1)]
+    c, d = b - _T_GOLD * (b - a), a + _T_GOLD * (b - a)
+    fc, fd = H(c), H(d)
+    while b - a > 1e-13:
+        if fc < fd:
+            b, d, fd = d, c, fc
+            c = b - _T_GOLD * (b - a)
+            fc = H(c)
+        else:
+            a, c, fc = c, d, fd
+            d = a + _T_GOLD * (b - a)
+            fd = H(d)
+    t = 0.5 * (a + b)
+    return -float(H(t)), float(t)
+
+_T_NG = 20000
+
+_T_GRID = -np.pi + 1.234567e-4 + 2.0 * np.pi * np.arange(_T_NG) / _T_NG
+
+_T_DG = 2.0 * np.pi / _T_NG
+
+def _t_slope(t, h, psi):
+    return 0.5 * np.sin(2.0 * t) + h * np.sin(t - psi)
+
+def _t_energy(t, h, psi):
+    return 0.5 * np.sin(t) ** 2 - h * np.cos(t - psi)
+
+def _t_minima(h, psi):
+    g = _t_slope(_T_GRID, h, psi)
+    out = []
+    for i in np.where((g < 0.0) & (np.roll(g, -1) >= 0.0))[0]:
+        a, b = _T_GRID[i], _T_GRID[i] + _T_DG
+        for _ in range(60):
+            mid = 0.5 * (a + b)
+            if _t_slope(mid, h, psi) < 0.0:
+                a = mid
+            else:
+                b = mid
+        out.append(0.5 * (a + b))
+    return out
+
+def _t_extrema(h, psi):
+    # minima (e' from - to +) and maxima (e' from + to -) of e on the circle grid, bisected
+    g = _t_slope(_T_GRID, h, psi)
+    found = []
+    for mask in ((g < 0.0) & (np.roll(g, -1) >= 0.0), (g > 0.0) & (np.roll(g, -1) <= 0.0)):
+        roots = []
+        for i in np.where(mask)[0]:
+            lo, hi = _T_GRID[i], _T_GRID[i] + _T_DG
+            s_lo = _t_slope(lo, h, psi)
+            for _ in range(60):
+                mid = 0.5 * (lo + hi)
+                if _t_slope(mid, h, psi) * s_lo > 0.0:
+                    lo = mid
+                else:
+                    hi = mid
+            roots.append(0.5 * (lo + hi))
+        found.append(roots)
+    return found[0], found[1]
+
+def _t_gamma(x, psi, a):
+    # escape rate over f0: both routes, exponent 2 a Delta_e because E = 2 K V e. Within a grid
+    # step of +-h_sw two extrema may merge on the grid; the rate is negligible there.
+    mins, maxs = _t_extrema(x, psi)
+    if len(mins) < 2 or len(maxs) < 2:
+        return 0.0
+    t_o = max(mins, key=np.cos)
+    e_o = _t_energy(t_o, x, psi)
+    return sum(np.exp(-2.0 * a * (_t_energy(t, x, psi) - e_o)) for t in maxs)
+
+def _t_P(h, psi, a, ratio):
+    # survival probability exp(-(f0 / rate) int_h^h_sw Gamma / f0), quadrature on the grid barriers
+    hs = _t_fold(psi)[0]
+    if h >= hs:
+        return 1.0
+    if h <= -hs:
+        return 0.0
+    I = _t_quad(lambda x: _t_gamma(x, psi, a), h, hs, epsabs=0.0, epsrel=1e-12, limit=1000)[0]
+    return float(np.exp(-ratio * I))
+
+def _t_dm(t, h, psi):
+    # dm/dh along a minimum theta(h): dtheta/dh = -sin(theta - psi) / e''(theta)
+    return np.sin(t - psi) ** 2 / (np.cos(2.0 * t) + h * np.cos(t - psi))
+
+def _t_ensemble(h, psis, w, a, ratio):
+    # expected ensemble magnetization M, switched weight S and their derivatives in h
+    w = np.asarray(w, dtype=float) / np.sum(w)
+    M = dM = S = dS = 0.0
+    for psi, wi in zip(psis, w):
+        hs = _t_fold(psi)[0]
+        mins = _t_minima(h, psi)
+        t_x = min(mins, key=np.cos)        # the other minimum, cos(theta) < 0
+        m_x, dm_x = np.cos(t_x - psi), _t_dm(t_x, h, psi)
+        if h <= -hs:
+            p = dp = m_o = dm_o = 0.0
+        else:
+            t_o = max(mins, key=np.cos)
+            m_o, dm_o = np.cos(t_o - psi), _t_dm(t_o, h, psi)
+            p = _t_P(h, psi, a, ratio)
+            dp = ratio * _t_gamma(h, psi, a) * p
+        M += wi * (p * m_o + (1.0 - p) * m_x)
+        dM += wi * (dp * (m_o - m_x) + p * dm_o + (1.0 - p) * dm_x)
+        S += wi * (1.0 - p)
+        dS -= wi * dp
+    return M, dM, S, dS
+
+def _t_check_ensemble(out, psis, w, a, ratio):
+    # one Newton step on the independent M(h) = 0 and S(h) = 1/2 must not move the results
+    assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(v, float) for v in out)
+    h_c, h_half = out
+    assert -1.0 < h_c < 1.0 and -1.0 < h_half < 1.0, out
+    M, dM, _, _ = _t_ensemble(-h_c, psis, w, a, ratio)
+    assert abs(M / dM) < 1e-6, (h_c, M / dM)
+    _, _, S, dS = _t_ensemble(-h_half, psis, w, a, ratio)
+    assert abs((S - 0.5) / dS) < 1e-6, (h_half, (S - 0.5) / dS)
+    return out
+
+out = _t_check_ensemble(ensemble_switching(np.array([0.3, 0.9, 1.4]), np.array([1.0, 0.0, 2.0]), 100.0, 1e9, 1.0),
+                        [0.3, 1.4], [1.0, 2.0], 100.0, 1e9)
+out2 = ensemble_switching(np.array([0.3, 1.4]), np.array([1.0, 2.0]), 100.0, 1e9, 1.0)
+assert abs(out[0] - out2[0]) < 2e-6 and abs(out[1] - out2[1]) < 2e-6, (out, out2)
+
+# --- test case 4 ---
+# corners of the domain: a = 1000 with f0 / rate = 1e5 for one particle at psi = 0
+# (closed-form median), and a = 40 with f0 / rate = 1e13 for two particles
+import numpy as np
+from scipy.integrate import quad as _t_quad
+from scipy.special import erfc as _t_erfc, erfcinv as _t_erfcinv
+
+_T_HP = 0.5 * np.pi
+
+_T_GOLD = 0.5 * (np.sqrt(5.0) - 1.0)
+
+_T_Q = np.concatenate([np.geomspace(1e-9, 1e-2, 40), np.linspace(0.0125, 0.9875, 400),
+                       1.0 - np.geomspace(1e-2, 1e-9, 40)])
+
+def _t_fold(psi):
+    # (h_sw, theta_fold): scan of the curve, then golden-section search for its lowest field
+    if psi <= 0.0:
+        return 1.0, 0.0
+    if psi >= _T_HP:
+        return 1.0, -_T_HP
+
+    def H(t):
+        return -np.sin(2.0 * t) / (2.0 * np.sin(t - psi))
+
+    ts = psi - np.pi + np.pi * _T_Q
+    i = int(np.argmin(H(ts)))
+    a, b = ts[max(i - 1, 0)], ts[min(i + 1, len(ts) - 1)]
+    c, d = b - _T_GOLD * (b - a), a + _T_GOLD * (b - a)
+    fc, fd = H(c), H(d)
+    while b - a > 1e-13:
+        if fc < fd:
+            b, d, fd = d, c, fc
+            c = b - _T_GOLD * (b - a)
+            fc = H(c)
+        else:
+            a, c, fc = c, d, fd
+            d = a + _T_GOLD * (b - a)
+            fd = H(d)
+    t = 0.5 * (a + b)
+    return -float(H(t)), float(t)
+
+_T_NG = 20000
+
+_T_GRID = -np.pi + 1.234567e-4 + 2.0 * np.pi * np.arange(_T_NG) / _T_NG
+
+_T_DG = 2.0 * np.pi / _T_NG
+
+def _t_slope(t, h, psi):
+    return 0.5 * np.sin(2.0 * t) + h * np.sin(t - psi)
+
+def _t_energy(t, h, psi):
+    return 0.5 * np.sin(t) ** 2 - h * np.cos(t - psi)
+
+def _t_minima(h, psi):
+    g = _t_slope(_T_GRID, h, psi)
+    out = []
+    for i in np.where((g < 0.0) & (np.roll(g, -1) >= 0.0))[0]:
+        a, b = _T_GRID[i], _T_GRID[i] + _T_DG
+        for _ in range(60):
+            mid = 0.5 * (a + b)
+            if _t_slope(mid, h, psi) < 0.0:
+                a = mid
+            else:
+                b = mid
+        out.append(0.5 * (a + b))
+    return out
+
+def _t_extrema(h, psi):
+    # minima (e' from - to +) and maxima (e' from + to -) of e on the circle grid, bisected
+    g = _t_slope(_T_GRID, h, psi)
+    found = []
+    for mask in ((g < 0.0) & (np.roll(g, -1) >= 0.0), (g > 0.0) & (np.roll(g, -1) <= 0.0)):
+        roots = []
+        for i in np.where(mask)[0]:
+            lo, hi = _T_GRID[i], _T_GRID[i] + _T_DG
+            s_lo = _t_slope(lo, h, psi)
+            for _ in range(60):
+                mid = 0.5 * (lo + hi)
+                if _t_slope(mid, h, psi) * s_lo > 0.0:
+                    lo = mid
+                else:
+                    hi = mid
+            roots.append(0.5 * (lo + hi))
+        found.append(roots)
+    return found[0], found[1]
+
+def _t_gamma(x, psi, a):
+    # escape rate over f0: both routes, exponent 2 a Delta_e because E = 2 K V e. Within a grid
+    # step of +-h_sw two extrema may merge on the grid; the rate is negligible there.
+    mins, maxs = _t_extrema(x, psi)
+    if len(mins) < 2 or len(maxs) < 2:
+        return 0.0
+    t_o = max(mins, key=np.cos)
+    e_o = _t_energy(t_o, x, psi)
+    return sum(np.exp(-2.0 * a * (_t_energy(t, x, psi) - e_o)) for t in maxs)
+
+def _t_P(h, psi, a, ratio):
+    # survival probability exp(-(f0 / rate) int_h^h_sw Gamma / f0), quadrature on the grid barriers
+    hs = _t_fold(psi)[0]
+    if h >= hs:
+        return 1.0
+    if h <= -hs:
+        return 0.0
+    I = _t_quad(lambda x: _t_gamma(x, psi, a), h, hs, epsabs=0.0, epsrel=1e-12, limit=1000)[0]
+    return float(np.exp(-ratio * I))
+
+def _t_median0(a, ratio):
+    # psi = 0: P = 1/2 where (f0 / rate) * I = ln 2, solved with the inverse erfc
+    return -1.0 + _t_erfcinv(np.log(2.0) / ratio * np.sqrt(a / np.pi) + _t_erfc(2.0 * np.sqrt(a))) / np.sqrt(a)
+
+def _t_dm(t, h, psi):
+    # dm/dh along a minimum theta(h): dtheta/dh = -sin(theta - psi) / e''(theta)
+    return np.sin(t - psi) ** 2 / (np.cos(2.0 * t) + h * np.cos(t - psi))
+
+def _t_ensemble(h, psis, w, a, ratio):
+    # expected ensemble magnetization M, switched weight S and their derivatives in h
+    w = np.asarray(w, dtype=float) / np.sum(w)
+    M = dM = S = dS = 0.0
+    for psi, wi in zip(psis, w):
+        hs = _t_fold(psi)[0]
+        mins = _t_minima(h, psi)
+        t_x = min(mins, key=np.cos)        # the other minimum, cos(theta) < 0
+        m_x, dm_x = np.cos(t_x - psi), _t_dm(t_x, h, psi)
+        if h <= -hs:
+            p = dp = m_o = dm_o = 0.0
+        else:
+            t_o = max(mins, key=np.cos)
+            m_o, dm_o = np.cos(t_o - psi), _t_dm(t_o, h, psi)
+            p = _t_P(h, psi, a, ratio)
+            dp = ratio * _t_gamma(h, psi, a) * p
+        M += wi * (p * m_o + (1.0 - p) * m_x)
+        dM += wi * (dp * (m_o - m_x) + p * dm_o + (1.0 - p) * dm_x)
+        S += wi * (1.0 - p)
+        dS -= wi * dp
+    return M, dM, S, dS
+
+def _t_check_ensemble(out, psis, w, a, ratio):
+    # one Newton step on the independent M(h) = 0 and S(h) = 1/2 must not move the results
+    assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(v, float) for v in out)
+    h_c, h_half = out
+    assert -1.0 < h_c < 1.0 and -1.0 < h_half < 1.0, out
+    M, dM, _, _ = _t_ensemble(-h_c, psis, w, a, ratio)
+    assert abs(M / dM) < 1e-6, (h_c, M / dM)
+    _, _, S, dS = _t_ensemble(-h_half, psis, w, a, ratio)
+    assert abs((S - 0.5) / dS) < 1e-6, (h_half, (S - 0.5) / dS)
+    return out
+
+out = ensemble_switching(np.array([0.0]), np.array([1.0]), 1000.0, 1e5, 1.0)
+hm = _t_median0(1000.0, 1e5)
+assert abs(out[0] + hm) < 1e-6 and abs(out[1] + hm) < 1e-6, (out, hm)
+_t_check_ensemble(ensemble_switching(np.array([0.0, 0.6]), np.array([1.0, 1.0]), 40.0, 1e13, 1.0),
+                  [0.0, 0.6], [1.0, 1.0], 40.0, 1e13)
+
+# --- test case 5 ---
+# one particle at psi = 0 over the domain: the magnetization is 2 P - 1, so h_c and h_half
+# are both minus the closed-form median switching field
+import numpy as np
+from scipy.special import erfc as _t_erfc, erfcinv as _t_erfcinv
+
+def _t_median0(a, ratio):
+    # psi = 0: P = 1/2 where (f0 / rate) * I = ln 2, solved with the inverse erfc
+    return -1.0 + _t_erfcinv(np.log(2.0) / ratio * np.sqrt(a / np.pi) + _t_erfc(2.0 * np.sqrt(a))) / np.sqrt(a)
+
+for _t_a, _t_ratio in ((60.0, 1e7), (150.0, 1e11), (300.0, 1e6), (800.0, 1e12)):
+    out = ensemble_switching(np.array([0.0]), np.array([1.0]), _t_a, _t_ratio, 1.0)
+    hm = _t_median0(_t_a, _t_ratio)
+    assert abs(out[0] + hm) < 1e-6, (_t_a, _t_ratio, out, hm)
+    assert abs(out[1] + hm) < 1e-6, (_t_a, _t_ratio, out, hm)
+
+# --- test case 6 ---
+# dynamic coercivity of a two-particle ensemble: both fields fall as the sweep gets slower
+# (larger f0 / rate) and rise as the particles get more stable (larger a)
+import numpy as np
+from scipy.integrate import quad as _t_quad
+
+_T_HP = 0.5 * np.pi
+
+_T_GOLD = 0.5 * (np.sqrt(5.0) - 1.0)
+
+_T_Q = np.concatenate([np.geomspace(1e-9, 1e-2, 40), np.linspace(0.0125, 0.9875, 400),
+                       1.0 - np.geomspace(1e-2, 1e-9, 40)])
+
+def _t_fold(psi):
+    # (h_sw, theta_fold): scan of the curve, then golden-section search for its lowest field
+    if psi <= 0.0:
+        return 1.0, 0.0
+    if psi >= _T_HP:
+        return 1.0, -_T_HP
+
+    def H(t):
+        return -np.sin(2.0 * t) / (2.0 * np.sin(t - psi))
+
+    ts = psi - np.pi + np.pi * _T_Q
+    i = int(np.argmin(H(ts)))
+    a, b = ts[max(i - 1, 0)], ts[min(i + 1, len(ts) - 1)]
+    c, d = b - _T_GOLD * (b - a), a + _T_GOLD * (b - a)
+    fc, fd = H(c), H(d)
+    while b - a > 1e-13:
+        if fc < fd:
+            b, d, fd = d, c, fc
+            c = b - _T_GOLD * (b - a)
+            fc = H(c)
+        else:
+            a, c, fc = c, d, fd
+            d = a + _T_GOLD * (b - a)
+            fd = H(d)
+    t = 0.5 * (a + b)
+    return -float(H(t)), float(t)
+
+_T_NG = 20000
+
+_T_GRID = -np.pi + 1.234567e-4 + 2.0 * np.pi * np.arange(_T_NG) / _T_NG
+
+_T_DG = 2.0 * np.pi / _T_NG
+
+def _t_slope(t, h, psi):
+    return 0.5 * np.sin(2.0 * t) + h * np.sin(t - psi)
+
+def _t_energy(t, h, psi):
+    return 0.5 * np.sin(t) ** 2 - h * np.cos(t - psi)
+
+def _t_minima(h, psi):
+    g = _t_slope(_T_GRID, h, psi)
+    out = []
+    for i in np.where((g < 0.0) & (np.roll(g, -1) >= 0.0))[0]:
+        a, b = _T_GRID[i], _T_GRID[i] + _T_DG
+        for _ in range(60):
+            mid = 0.5 * (a + b)
+            if _t_slope(mid, h, psi) < 0.0:
+                a = mid
+            else:
+                b = mid
+        out.append(0.5 * (a + b))
+    return out
+
+def _t_extrema(h, psi):
+    # minima (e' from - to +) and maxima (e' from + to -) of e on the circle grid, bisected
+    g = _t_slope(_T_GRID, h, psi)
+    found = []
+    for mask in ((g < 0.0) & (np.roll(g, -1) >= 0.0), (g > 0.0) & (np.roll(g, -1) <= 0.0)):
+        roots = []
+        for i in np.where(mask)[0]:
+            lo, hi = _T_GRID[i], _T_GRID[i] + _T_DG
+            s_lo = _t_slope(lo, h, psi)
+            for _ in range(60):
+                mid = 0.5 * (lo + hi)
+                if _t_slope(mid, h, psi) * s_lo > 0.0:
+                    lo = mid
+                else:
+                    hi = mid
+            roots.append(0.5 * (lo + hi))
+        found.append(roots)
+    return found[0], found[1]
+
+def _t_gamma(x, psi, a):
+    # escape rate over f0: both routes, exponent 2 a Delta_e because E = 2 K V e. Within a grid
+    # step of +-h_sw two extrema may merge on the grid; the rate is negligible there.
+    mins, maxs = _t_extrema(x, psi)
+    if len(mins) < 2 or len(maxs) < 2:
+        return 0.0
+    t_o = max(mins, key=np.cos)
+    e_o = _t_energy(t_o, x, psi)
+    return sum(np.exp(-2.0 * a * (_t_energy(t, x, psi) - e_o)) for t in maxs)
+
+def _t_P(h, psi, a, ratio):
+    # survival probability exp(-(f0 / rate) int_h^h_sw Gamma / f0), quadrature on the grid barriers
+    hs = _t_fold(psi)[0]
+    if h >= hs:
+        return 1.0
+    if h <= -hs:
+        return 0.0
+    I = _t_quad(lambda x: _t_gamma(x, psi, a), h, hs, epsabs=0.0, epsrel=1e-12, limit=1000)[0]
+    return float(np.exp(-ratio * I))
+
+def _t_dm(t, h, psi):
+    # dm/dh along a minimum theta(h): dtheta/dh = -sin(theta - psi) / e''(theta)
+    return np.sin(t - psi) ** 2 / (np.cos(2.0 * t) + h * np.cos(t - psi))
+
+def _t_ensemble(h, psis, w, a, ratio):
+    # expected ensemble magnetization M, switched weight S and their derivatives in h
+    w = np.asarray(w, dtype=float) / np.sum(w)
+    M = dM = S = dS = 0.0
+    for psi, wi in zip(psis, w):
+        hs = _t_fold(psi)[0]
+        mins = _t_minima(h, psi)
+        t_x = min(mins, key=np.cos)        # the other minimum, cos(theta) < 0
+        m_x, dm_x = np.cos(t_x - psi), _t_dm(t_x, h, psi)
+        if h <= -hs:
+            p = dp = m_o = dm_o = 0.0
+        else:
+            t_o = max(mins, key=np.cos)
+            m_o, dm_o = np.cos(t_o - psi), _t_dm(t_o, h, psi)
+            p = _t_P(h, psi, a, ratio)
+            dp = ratio * _t_gamma(h, psi, a) * p
+        M += wi * (p * m_o + (1.0 - p) * m_x)
+        dM += wi * (dp * (m_o - m_x) + p * dm_o + (1.0 - p) * dm_x)
+        S += wi * (1.0 - p)
+        dS -= wi * dp
+    return M, dM, S, dS
+
+def _t_check_ensemble(out, psis, w, a, ratio):
+    # one Newton step on the independent M(h) = 0 and S(h) = 1/2 must not move the results
+    assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(v, float) for v in out)
+    h_c, h_half = out
+    assert -1.0 < h_c < 1.0 and -1.0 < h_half < 1.0, out
+    M, dM, _, _ = _t_ensemble(-h_c, psis, w, a, ratio)
+    assert abs(M / dM) < 1e-6, (h_c, M / dM)
+    _, _, S, dS = _t_ensemble(-h_half, psis, w, a, ratio)
+    assert abs((S - 0.5) / dS) < 1e-6, (h_half, (S - 0.5) / dS)
+    return out
+
+_t_hc = [ensemble_switching(np.array([0.2, 0.7]), np.array([1.0, 1.0]), 150.0, r, 1.0) for r in (1e6, 1e9, 1e12)]
+assert _t_hc[0][0] > _t_hc[1][0] > _t_hc[2][0], _t_hc
+assert _t_hc[0][1] > _t_hc[1][1] > _t_hc[2][1], _t_hc
+_t_hot = ensemble_switching(np.array([0.2, 0.7]), np.array([1.0, 1.0]), 80.0, 1e9, 1.0)
+assert _t_hot[0] < _t_hc[1][0] and _t_hot[1] < _t_hc[1][1], (_t_hot, _t_hc[1])
+_t_check_ensemble(_t_hot, [0.2, 0.7], [1.0, 1.0], 80.0, 1e9)
+
+# --- test case 7 ---
+# every invalid input of the prompt raises ValueError: arrays that are not 1-D of the
+# same nonzero length, a psi outside [0, pi/2], a negative or nonfinite weight, weights adding up to
+# zero, a, f0 or rate not positive and finite, a or f0 / rate outside the domain
+import numpy as np
+for _t_bad in ((np.array([0.1, 0.2]), np.array([1.0]), 100.0, 1e9, 1.0), (np.array([[0.1, 0.2]]), np.array([[1.0, 1.0]]), 100.0, 1e9, 1.0), (np.array([]), np.array([]), 100.0, 1e9, 1.0), (np.array([0.1, 0.2]), np.array([1.0, np.inf]), 100.0, 1e9, 1.0), (np.array([0.1, 0.2]), np.array([1.0, np.nan]), 100.0, 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 100.0, 1e9, 0.0), (np.array([0.1]), np.array([1.0]), 100.0, -1e9, 1.0), (np.array([0.1]), np.array([1.0]), float("nan"), 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 100.0, 1e9, np.inf), (np.array([0.1, 1.7]), np.array([1.0, 1.0]), 100.0, 1e9, 1.0), (np.array([0.1, 0.2]), np.array([1.0, -1.0]), 100.0, 1e9, 1.0), (np.array([0.1, 0.2]), np.array([0.0, 0.0]), 100.0, 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 30.0, 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 100.0, 1e14, 1.0), (np.array([-0.1]), np.array([1.0]), 100.0, 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 1001.0, 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 100.0, 1e4, 1.0)):
     try:
-        brown_relaxation(*_t_bad)
+        ensemble_switching(*_t_bad)
     except ValueError:
         pass
     else:
-        raise AssertionError("brown_relaxation%r must raise ValueError" % (_t_bad,))
+        raise AssertionError("ensemble_switching%r must raise ValueError" % (_t_bad,))

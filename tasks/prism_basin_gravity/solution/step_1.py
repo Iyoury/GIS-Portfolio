@@ -1,5 +1,6 @@
 import numpy as np
 import math
+from scipy.optimize import least_squares
 
 G = 6.6743e-11          # m^3 kg^-1 s^-2 (CODATA 2018)
 
@@ -117,12 +118,146 @@ def _cubature(p, b):
     return out
 
 
+_KSPLIT = 200.0     # largest diag^3 / volume of a prism (or piece) whose corner sums are used directly
+
+
+def _shape_factor(e):
+    # diag^3 / volume of a box with edges e: 5.2 for a cube, about aspect^2 for a rod and 2.8 aspect for a
+    # plate. Within two diagonals the corner sums lose about 1e-16 times this factor (relative to U and g):
+    # 4e-12 for 200, 1e-10 at 1e4 (a 1 x 1 x 100 rod), 1e-8 at 1e6 (a 1 x 1 x 1000 rod)
+    return float(np.sum(e * e)) ** 1.5 / float(np.prod(e))
+
+
+def _split_counts(b):
+    # numbers of equal pieces along x, y, z so that every piece has a shape factor <= _KSPLIT
+    e = np.array([b[1] - b[0], b[3] - b[2], b[5] - b[4]])
+    n = np.ones(3, int)
+    while _shape_factor(e / n) > _KSPLIT:
+        n[int(np.argmax(e / n))] += 1
+    return n
+
+
+def _gl_orders(e, diag, R):
+    # Gauss-Legendre points per axis for a box with edges e and diagonal diag, seen from at least R >= 2 diag
+    # from its centre: along axis k the integrand is analytic inside the Bernstein ellipse of parameter
+    # rho_k >= q + sqrt(q^2 - 1), q = (2 R - diag) / e_k, so n_k points leave an error ~ rho_k^(-2 n_k) <= 1e-24
+    q = (2.0 * R - diag) / e
+    rho = q + np.sqrt(q * q - 1.0)
+    return np.clip(np.ceil(12.0 / np.log10(rho)), 2, 16).astype(int)
+
+
+def _box_cubature(p, lo, hi, n, want_T):
+    # U and g (or T) of a unit-density box lo <= Q <= hi by an n[0] x n[1] x n[2] Gauss-Legendre rule,
+    # vectorised over the points p (m, 3)
+    xs, ws = [], []
+    for k in range(3):
+        t, w = np.polynomial.legendre.leggauss(int(n[k]))
+        xs.append(0.5 * (hi[k] - lo[k]) * t + 0.5 * (hi[k] + lo[k]))
+        ws.append(0.5 * (hi[k] - lo[k]) * w)
+    X, Y, Z = np.meshgrid(xs[0], xs[1], xs[2], indexing="ij")
+    W = (ws[0][:, None, None] * ws[1][None, :, None] * ws[2][None, None, :]).ravel()
+    dx = X.ravel()[None, :] - p[:, 0:1]
+    dy = Y.ravel()[None, :] - p[:, 1:2]
+    dz = Z.ravel()[None, :] - p[:, 2:3]
+    r2 = dx * dx + dy * dy + dz * dz
+    r = np.sqrt(r2)
+    if not want_T:
+        i1 = W / r
+        i3 = i1 / r2
+        return i1.sum(axis=1), np.stack([(i3 * dx).sum(1), (i3 * dy).sum(1), (i3 * dz).sum(1)], axis=1)
+    i5 = W / (r2 * r2 * r)
+    d = (dx, dy, dz)
+    T = np.empty((p.shape[0], 3, 3))
+    for a in range(3):
+        for c in range(a, 3):
+            v = (i5 * (3.0 * d[a] * d[c] - (r2 if a == c else 0.0))).sum(1)
+            T[:, a, c] = v
+            T[:, c, a] = v
+    return T
+
+
+def _split_sums(p, b, want_T):
+    # points within two diagonals of an elongated prism (shape factor > _KSPLIT): the prism is cut into
+    # equal pieces of shape factor <= _KSPLIT (superposition is exact); corner sums for the pieces within two
+    # of their diagonals of a point, Gauss-Legendre for the others (rules chosen per band of distance).
+    # A point closer than a quarter piece to an internal plane of the default cuts uses, on that axis, the
+    # cuts shifted by half a piece, so that no point lies on an internal face, edge or corner (where the
+    # gradients of the pieces jump or diverge although their sum does not).
+    # Returns the unscaled sums (U, g) or T of unit density.
+    n = _split_counts(b)
+    lo = np.array([b[0], b[2], b[4]])
+    hi = np.array([b[1], b[3], b[5]])
+    e = (hi - lo) / n
+    m = p.shape[0]
+    shift = np.zeros((m, 3), bool)
+    for k in range(3):
+        if n[k] > 1:
+            f = (p[:, k] - lo[k]) / e[k]
+            shift[:, k] = np.abs(f - np.clip(np.round(f), 1, n[k] - 1)) < 0.25
+    if want_T:
+        T = np.zeros((m, 3, 3))
+    else:
+        U = np.zeros(m)
+        g = np.zeros((m, 3))
+    codes = shift[:, 0] * 1 + shift[:, 1] * 2 + shift[:, 2] * 4
+    for code in np.unique(codes):
+        sel = np.nonzero(codes == code)[0]
+        ps = p[sel]
+        cuts = []
+        for k in range(3):
+            if n[k] == 1:
+                cuts.append(np.array([lo[k], hi[k]]))
+            elif (code >> k) & 1:
+                cuts.append(np.concatenate([[lo[k]], lo[k] + e[k] * (np.arange(n[k]) + 0.5), [hi[k]]]))
+            else:
+                cuts.append(np.concatenate([[lo[k]], lo[k] + e[k] * np.arange(1, n[k]), [hi[k]]]))
+        for i in range(len(cuts[0]) - 1):
+            for j in range(len(cuts[1]) - 1):
+                for k in range(len(cuts[2]) - 1):
+                    plo = np.array([cuts[0][i], cuts[1][j], cuts[2][k]])
+                    phi = np.array([cuts[0][i + 1], cuts[1][j + 1], cuts[2][k + 1]])
+                    pe = phi - plo
+                    diag = math.sqrt(float(np.sum(pe * pe)))
+                    dist = np.linalg.norm(ps - 0.5 * (plo + phi)[None, :], axis=1)
+                    near = dist < 2.0 * diag
+                    if np.any(near):
+                        bb = np.array([plo[0], phi[0], plo[1], phi[1], plo[2], phi[2]])
+                        idx = sel[near]
+                        if want_T:
+                            xx, yy, zz, xy, xz, yz = _corners(ps[near], bb, _tens)
+                            T[idx] += np.stack([np.stack([xx, xy, xz], 1), np.stack([xy, yy, yz], 1),
+                                                np.stack([xz, yz, zz], 1)], 1)
+                        else:
+                            U_, Fx, Fy, Fz = _corners(ps[near], bb, _uvw)
+                            U[idx] += U_
+                            g[idx] -= np.stack([Fx, Fy, Fz], axis=1)
+                    fidx = np.nonzero(~near)[0]
+                    if fidx.size:
+                        band = np.floor(np.log2(dist[fidx] / diag)).astype(int)    # [2, 4), [4, 8), ... diagonals
+                        for bnd in np.unique(band):
+                            ii = fidx[band == bnd]
+                            nn = _gl_orders(pe, diag, diag * 2.0 ** bnd)
+                            if want_T:
+                                T[sel[ii]] += _box_cubature(ps[ii], plo, phi, nn, True)
+                            else:
+                                u_, g_ = _box_cubature(ps[ii], plo, phi, nn, False)
+                                U[sel[ii]] += u_
+                                g[sel[ii]] += g_
+    return T if want_T else (U, g)
+
+
+def _elongated(b):
+    return _shape_factor(np.array([b[1] - b[0], b[3] - b[2], b[5] - b[4]])) > _KSPLIT
+
+
 def prism_gravity(points, bounds, rho):
     """Potential and attraction of a right rectangular prism of uniform density.
 
     Inputs:
-      points: float array of shape (3,) or (n, 3), observation points (x, y, z) in m, z positive down.
-      bounds: (x1, x2, y1, y2, z1, z2), the prism x1 <= x <= x2, y1 <= y <= y2, z1 <= z <= z2 (m).
+      points: float array of shape (3,) or (n, 3), up to 1000 points, observation points (x, y, z) in m,
+        z positive down.
+      bounds: (x1, x2, y1, y2, z1, z2), the prism x1 <= x <= x2, y1 <= y <= y2, z1 <= z <= z2 (m), its
+        longest edge at most 1000 times its shortest.
       rho: float, density (kg m^-3).
 
     Output:
@@ -130,7 +265,7 @@ def prism_gravity(points, bounds, rho):
         z component positive down). Python float and array (3,) for one point, arrays (n,) and (n, 3)
         otherwise. U with a relative error below 1e-10; each component of g within
         1e-10 |g| + 1e-14 G |rho| L (L the longest edge), at every point, inside, on the surface or
-        outside at any distance. Each call within 10 s for up to 1000 points.
+        outside at any distance up to a million times the diagonal of the prism.
 
     Raises:
       ValueError for invalid bounds (not six finite numbers with x1 < x2, y1 < y2, z1 < z2), a
@@ -142,7 +277,11 @@ def prism_gravity(points, bounds, rho):
     U = np.empty(p.shape[0])
     g = np.empty((p.shape[0], 3))
     near = ~far
-    if np.any(near):
+    if np.any(near) and _elongated(b):
+        U_, g_ = _split_sums(p[near], b, False)
+        U[near] = G * rho * U_
+        g[near] = G * rho * g_
+    elif np.any(near):
         U_, Fx, Fy, Fz = _corners(p[near], b, _uvw)
         U[near] = G * rho * U_
         g[near] = -G * rho * np.stack([Fx, Fy, Fz], axis=1)

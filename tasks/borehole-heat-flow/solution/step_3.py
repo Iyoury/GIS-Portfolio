@@ -1,12 +1,13 @@
-"""Reference for step 3."""
+"""Reference for step 3: present-day half-space perturbation of a piecewise-constant surface history."""
 import numpy as np
 import math
 
-def erfc(x):
+
+def _erfc_array(x):
     """Element-wise complementary error function (numpy + math only)."""
-    import math  # local import: harness may strip top-level imports
     f = np.frompyfunc(math.erfc, 1, 1)
     return np.asarray(f(np.asarray(x, float)), dtype=float)
+
 
 SECONDS_PER_YEAR = 365.25 * 86400.0
 
@@ -33,10 +34,10 @@ def paleoclimate_perturbation(z, t_years, dT, kappa):
     out = np.zeros(zz.size)
     for i in range(t.size):
         t_new, t_old = edges[i], edges[i + 1]
-        e_old = erfc(zz / (2 * np.sqrt(kappa * t_old)))
+        e_old = _erfc_array(zz / (2 * np.sqrt(kappa * t_old)))
         if t_new == 0.0:
             e_new = np.zeros_like(zz)       # limit z / sqrt(kappa * 0) -> inf
         else:
-            e_new = erfc(zz / (2 * np.sqrt(kappa * t_new)))
+            e_new = _erfc_array(zz / (2 * np.sqrt(kappa * t_new)))
         out += d[i] * (e_old - e_new)
     return float(out[0]) if z_in.ndim == 0 else out.reshape(z_in.shape)

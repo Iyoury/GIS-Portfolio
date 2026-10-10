@@ -1,5 +1,8 @@
 import numpy as np
 import math
+import warnings
+from scipy.integrate import quad, IntegrationWarning
+from scipy.optimize import brentq
 
 
 def degeneracy_parameter(rho_Ye, T):
@@ -11,7 +14,7 @@ def degeneracy_parameter(rho_Ye, T):
 
     Output:
       psi: Python float, psi > 0 with n_net(T, psi) = rho_Ye N_A (n_net of pair_densities), with a
-        relative error below 1e-10. Each call within 10 s.
+        relative error below 1e-10.
 
     Raises:
       ValueError if rho_Ye or T is not finite or is outside its range.

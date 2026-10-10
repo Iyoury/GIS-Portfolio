@@ -66,8 +66,8 @@ def escape_barriers(h, psi):
       psi: float, angle in radians between the field axis and the easy axis, 0 <= psi <= pi/2.
 
     Output:
-      (low, high): two values with the shape of np.asarray(h), numpy float scalars for a
-      scalar h. low <= high are
+      (low, high): two values with the shape of np.asarray(h): float numpy arrays, or float
+      scalars (Python float or numpy floating) for a scalar h. low <= high are
       e(theta_max) - e(theta_min) for the two energy maxima, theta_min being the original
       minimum of the descending branch. Absolute error below 1e-8 when
       h_sw(psi) - |h| >= 1e-3.
@@ -115,7 +115,10 @@ def escape_barriers(h, psi):
     minima = np.where(even[:, None], theta[:, 0::2], theta[:, 1::2])
     maxima = np.where(even[:, None], theta[:, 1::2], theta[:, 0::2])
     # the original minimum of the descending branch is the one with cos(theta) > 0
-    first = np.cos(minima[:, 0]) >= np.cos(minima[:, 1])
+    # MUTANT: the barriers are measured from the deeper (global) minimum instead of the original
+    # minimum the particle occupies; survival probability and both ensemble fields inherit the error
+    e_two = 0.5 * np.sin(minima) ** 2 - x[:, None] * np.cos(minima - psi)
+    first = e_two[:, 0] <= e_two[:, 1]
     th_min = np.where(first, minima[:, 0], minima[:, 1])
     e_min = 0.5 * np.sin(th_min) ** 2 - x * np.cos(th_min - psi)
     e_max = 0.5 * np.sin(maxima) ** 2 - x[:, None] * np.cos(maxima - psi)
@@ -248,63 +251,6 @@ def switching_field_statistics(psi, a, f0, rate):
     return result
 
 
-def ensemble_switching(psis, weights, a, f0, rate):
-    '''Dynamic coercive field and half-switching field of an ensemble during the sweep.
-
-    Inputs:
-      psis: 1-D array of easy-axis angles in radians, each in [0, pi/2].
-      weights: 1-D array of the same length, nonnegative, not all zero (normalized by
-               their sum).
-      a: float, thermal stability ratio K V / (k_B T), 40 <= a <= 1000.
-      f0: float, attempt frequency in 1/s, > 0.
-      rate: float, sweep rate |dh/dt| in units of H_K per second, > 0, with
-            1e5 <= f0 / rate <= 1e13.
-
-    Output:
-      (h_c, h_half): tuple of two floats, absolute errors below 1e-6.
-        h_c: the ensemble magnetization is zero at h = -h_c during the sweep.
-        h_half: half of the total weight has left its original minimum at h = -h_half.
-
-    Raises:
-      ValueError if psis and weights are not 1-D arrays of the same nonzero length, if
-      a psi is outside [0, pi/2], if a weight is negative or not finite, if the weights
-      add up to zero, if a, f0 or rate is not a positive finite number, if a is outside
-      [40, 1000] or if f0 / rate is outside [1e5, 1e13].
-    '''
-    psis = np.asarray(psis, dtype=float)
-    weights = np.asarray(weights, dtype=float)
-    if psis.ndim != 1 or weights.shape != psis.shape or psis.size == 0:
-        raise ValueError("psis and weights must be 1-D arrays of the same nonzero length")
-    if not np.all((psis >= 0.0) & (psis <= 0.5 * np.pi)):
-        raise ValueError("every psi must be between 0 and pi/2")
-    if not np.all(np.isfinite(weights)) or np.any(weights < 0.0) or weights.sum() <= 0.0:
-        raise ValueError("weights must be finite, nonnegative and not all zero")
-    for name, value in (("a", a), ("f0", f0), ("rate", rate)):
-        if not (np.isfinite(value) and value > 0.0):
-            raise ValueError("%s must be a positive finite number" % name)
-    if not (40.0 <= a <= 1000.0 and 1e5 <= f0 / rate <= 1e13):
-        raise ValueError("need 40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13")
-    w = weights / weights.sum()
-
-    def ensemble_state(x):
-        # expected ensemble magnetization and weight that has left, at field x
-        magnetization, left = 0.0, 0.0
-        for psi, wi in zip(psis, w):
-            P = survival_probability(x, psi, a, f0, rate)
-            # the other minimum is the original minimum of the field -x turned by pi
-            m_other = -branch_magnetization(-x, psi)
-            m_orig = branch_magnetization(x, psi) if P > 0.0 else m_other
-            magnetization += wi * (P * m_orig + (1.0 - P) * m_other)
-            left += wi * (1.0 - P)
-        return magnetization, left
-
-    # at h = 1 every particle is still in its original minimum (h_sw <= 1), at h = -1 none is
-    h_c = -brentq(lambda x: ensemble_state(x)[0], -1.0, 1.0, xtol=1e-13, rtol=1e-15)
-    h_half = -brentq(lambda x: ensemble_state(x)[1] - 0.5, -1.0, 1.0, xtol=1e-13, rtol=1e-15)
-    result = (float(h_c), float(h_half))
-    return result
-
-
 def brown_relaxation(sigma, h):
     '''Exact thermal relaxation of one particle with its field along the easy axis (Brown's equation).
 
@@ -315,10 +261,10 @@ def brown_relaxation(sigma, h):
     Output:
       (lam1, tau_int): tuple of two Python floats, in units of 1/tau_N and tau_N, respectively.
         lam1: smallest nonzero eigenvalue of the Fokker-Planck operator (relaxation rate times
-              tau_N), relative error below 1e-6.
+              tau_N), relative error below 1e-5.
         tau_int: integral relaxation time of z = cos(theta) divided by tau_N,
                  int_0^inf C(t) dt / C(0) with C(t) = <z(t) z(0)> - <z>**2 in equilibrium,
-                 relative error below 1e-6.
+                 relative error below 1e-5.
 
     Raises:
       ValueError if sigma or h is not finite, if sigma is outside [0, 60] or if |h| > 0.9.
@@ -329,8 +275,6 @@ def brown_relaxation(sigma, h):
         raise ValueError("sigma and h must be finite")
     if not (0.0 <= sigma <= 60.0) or abs(h) > 0.9:
         raise ValueError("need 0 <= sigma <= 60 and |h| <= 0.9")
-    # MUTANT: barrier energy taken as 2 sigma (1 - z^2 - 2 h z) (E = 2 K V e read as K V e times 2)
-    sigma = 2.0 * sigma
     # piecewise Chebyshev representation in theta (z = cos theta); every panel keeps its own
     # relative accuracy, so the exponentially different well weights are resolved
     C = np.polynomial.chebyshev
@@ -415,4 +359,61 @@ def brown_relaxation(sigma, h):
     Q, _ = cum_from_right(W * (Z - zbar) * S)
     tau = 2.0 * total(Q * Q / (S * W)) / total(W * (Z - zbar) ** 2 * S)
     result = (float(lam), float(tau))
+    return result
+
+
+def ensemble_switching(psis, weights, a, f0, rate):
+    '''Dynamic coercive field and half-switching field of an ensemble during the sweep.
+
+    Inputs:
+      psis: 1-D array of easy-axis angles in radians, each in [0, pi/2].
+      weights: 1-D array of the same length, nonnegative, not all zero (normalized by
+               their sum).
+      a: float, thermal stability ratio K V / (k_B T), 40 <= a <= 1000.
+      f0: float, attempt frequency in 1/s, > 0.
+      rate: float, sweep rate |dh/dt| in units of H_K per second, > 0, with
+            1e5 <= f0 / rate <= 1e13.
+
+    Output:
+      (h_c, h_half): tuple of two floats, absolute errors below 1e-6.
+        h_c: the ensemble magnetization is zero at h = -h_c during the sweep.
+        h_half: half of the total weight has left its original minimum at h = -h_half.
+
+    Raises:
+      ValueError if psis and weights are not 1-D arrays of the same nonzero length, if
+      a psi is outside [0, pi/2], if a weight is negative or not finite, if the weights
+      add up to zero, if a, f0 or rate is not a positive finite number, if a is outside
+      [40, 1000] or if f0 / rate is outside [1e5, 1e13].
+    '''
+    psis = np.asarray(psis, dtype=float)
+    weights = np.asarray(weights, dtype=float)
+    if psis.ndim != 1 or weights.shape != psis.shape or psis.size == 0:
+        raise ValueError("psis and weights must be 1-D arrays of the same nonzero length")
+    if not np.all((psis >= 0.0) & (psis <= 0.5 * np.pi)):
+        raise ValueError("every psi must be between 0 and pi/2")
+    if not np.all(np.isfinite(weights)) or np.any(weights < 0.0) or weights.sum() <= 0.0:
+        raise ValueError("weights must be finite, nonnegative and not all zero")
+    for name, value in (("a", a), ("f0", f0), ("rate", rate)):
+        if not (np.isfinite(value) and value > 0.0):
+            raise ValueError("%s must be a positive finite number" % name)
+    if not (40.0 <= a <= 1000.0 and 1e5 <= f0 / rate <= 1e13):
+        raise ValueError("need 40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13")
+    w = weights / weights.sum()
+
+    def ensemble_state(x):
+        # expected ensemble magnetization and weight that has left, at field x
+        magnetization, left = 0.0, 0.0
+        for psi, wi in zip(psis, w):
+            P = survival_probability(x, psi, a, f0, rate)
+            # the other minimum is the original minimum of the field -x turned by pi
+            m_other = -branch_magnetization(-x, psi)
+            m_orig = branch_magnetization(x, psi) if P > 0.0 else m_other
+            magnetization += wi * (P * m_orig + (1.0 - P) * m_other)
+            left += wi * (1.0 - P)
+        return magnetization, left
+
+    # at h = 1 every particle is still in its original minimum (h_sw <= 1), at h = -1 none is
+    h_c = -brentq(lambda x: ensemble_state(x)[0], -1.0, 1.0, xtol=1e-13, rtol=1e-15)
+    h_half = -brentq(lambda x: ensemble_state(x)[1] - 0.5, -1.0, 1.0, xtol=1e-13, rtol=1e-15)
+    result = (float(h_c), float(h_half))
     return result

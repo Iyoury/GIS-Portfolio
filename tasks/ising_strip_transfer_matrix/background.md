@@ -64,7 +64,8 @@ bulk value with a correction of order exp(-L / xi) times a power of L (Luscher-t
 finite-size corrections). Away from the critical region xi is about one lattice spacing
 and modest widths are enough; near Tc in a weak field xi reaches several lattice spacings,
 and the strips that can be diagonalized stay visibly away from the bulk value. The last
-step asks for the bulk magnetization to an accuracy that makes this distinction matter.
+step asks for the bulk free energy, magnetization, susceptibility and specific heat to
+accuracies that make this distinction matter.
 
 ## Thermodynamics of the infinite lattice in a field
 

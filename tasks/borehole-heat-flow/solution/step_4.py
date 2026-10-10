@@ -1,15 +1,5 @@
-"""Reference for step 4."""
+"""Reference for step 4: joint least-squares estimate of T0, q0 and the glacial amplitude."""
 import numpy as np
-import math
-
-_erfc = np.frompyfunc(math.erfc, 1, 1)
-
-
-def erfc(x):
-    """Element-wise complementary error function (numpy + math only)."""
-    return np.asarray(_erfc(np.asarray(x, float)), dtype=float)
-
-SECONDS_PER_YEAR = 365.25 * 86400.0
 
 
 def fit_heat_flow(T, R, S, P, A):

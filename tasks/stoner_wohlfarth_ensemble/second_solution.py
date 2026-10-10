@@ -70,8 +70,8 @@ def escape_barriers(h, psi):
       psi: float, angle in radians between the field axis and the easy axis, 0 <= psi <= pi/2.
 
     Output:
-      (low, high): two values with the shape of np.asarray(h), numpy float scalars for a
-      scalar h. low <= high are
+      (low, high): two values with the shape of np.asarray(h): float numpy arrays, or float
+      scalars (Python float or numpy floating) for a scalar h. low <= high are
       e(theta_max) - e(theta_min) for the two energy maxima, theta_min being the original
       minimum of the descending branch. Absolute error below 1e-8 when
       h_sw(psi) - |h| >= 1e-3.
@@ -281,6 +281,121 @@ def switching_field_statistics(psi, a, f0, rate):
     return result
 
 
+# ---- step 5, second method: Brown's equation in Legendre polynomials, extended precision ----
+def _g5_band_solve(rows, rhs, N):
+    # Gaussian elimination with partial pivoting on a pentadiagonal system given as dict rows[i] = {j: a_ij}
+    A = [dict(r) for r in rows]
+    b = list(rhs)
+    for k in range(N):
+        cand = [i for i in range(k, min(k + 3, N)) if k in A[i]]
+        p = max(cand, key=lambda i: abs(A[i][k]))
+        if p != k:
+            A[k], A[p] = A[p], A[k]
+            b[k], b[p] = b[p], b[k]
+        piv = A[k][k]
+        for i in range(k + 1, min(k + 3, N)):
+            if k in A[i] and A[i][k] != 0:
+                f = A[i][k] / piv
+                for j, v in A[k].items():
+                    A[i][j] = A[i].get(j, 0) - f * v
+                del A[i][k]
+                b[i] -= f * b[k]
+    x = [mp.mpf(0)] * N
+    for k in range(N - 1, -1, -1):
+        s = b[k] - mp.fsum(v * x[j] for j, v in A[k].items() if j > k)
+        x[k] = s / A[k][k]
+    return x
+
+def _g5_legendre(sigma, h, N=None, dps=None):
+    if dps is None: dps = 30 + int(0.5 * sigma * (1 + abs(h)) ** 2)
+    if N is None: N = int(60 + 3 * sigma)
+    with mp.workdps(dps):
+        s = mp.mpf(sigma); xi = 2 * s * mp.mpf(h)
+        def Mz(v):
+            out = [mp.mpf(0)] * (len(v) + 1)
+            for l, c in enumerate(v):
+                if c == 0: continue
+                out[l + 1] += c * (l + 1) / mp.mpf(2 * l + 1)
+                if l >= 1: out[l - 1] += c * l / mp.mpf(2 * l + 1)
+            return out
+        def Tz(v):
+            out = [mp.mpf(0)] * (len(v) + 1)
+            for l, c in enumerate(v):
+                if c == 0 or l == 0: continue
+                f = c * l * (l + 1) / mp.mpf(2 * l + 1)
+                out[l - 1] += f; out[l + 1] -= f
+            return out
+        cols = {}
+        for l in range(0, N + 1):
+            e = [mp.mpf(0)] * (l + 1); e[l] = mp.mpf(1)
+            g = [-2 * s * x for x in Mz(e)] + [mp.mpf(0)]
+            for k in range(len(e)): g[k] -= xi * e[k]
+            Tg, Mg = Tz(g), Mz(g)
+            col = {}
+            col[l] = col.get(l, 0) - l * (l + 1)
+            for k, v in enumerate(Tg): col[k] = col.get(k, 0) + v
+            for k, v in enumerate(Mg): col[k] = col.get(k, 0) - 2 * v
+            cols[l] = {k: v / 2 for k, v in col.items() if v != 0 and k <= N}
+        # L' (rows/cols 1..N), stored by rows
+        rows = [dict() for _ in range(N)]
+        for l in range(1, N + 1):
+            for k, v in cols[l].items():
+                if k >= 1: rows[k - 1][l - 1] = v
+        # equilibrium density: L' b + L[1:,0] b0 = 0, b0 = 1
+        r0 = [-cols[0].get(k, 0) for k in range(1, N + 1)]
+        beq = [mp.mpf(1)] + _g5_band_solve(rows, r0, N)
+        # lam1: inverse iteration on L'
+        x = [mp.mpf(1)] * N
+        lam_old = None
+        for it in range(60):
+            y = _g5_band_solve(rows, x, N)
+            nrm = mp.sqrt(mp.fsum(t * t for t in y)); y = [t / nrm for t in y]
+            Ay = [mp.fsum(v * y[j] for j, v in rows[i].items()) for i in range(N)]
+            lam = mp.fsum(a * b for a, b in zip(y, Ay))
+            x = y
+            if lam_old is not None and abs(lam - lam_old) < abs(lam) * mp.mpf(10) ** (-(dps - 10)): break
+            lam_old = lam
+        lam1 = -lam
+        # integral relaxation time of z: tau = -int z Psi dz / int z rho0 dz, L Psi = -rho0... (L^{-1} rho0)
+        zW = Mz(beq)
+        zmean = zW[0] / beq[0]
+        rho0 = [zW[k] - zmean * (beq[k] if k < len(beq) else 0) for k in range(N + 1)]
+        y = _g5_band_solve(rows, rho0[1:], N)           # L' y = rho0  ->  Psi = -y solves L Psi = -rho0
+        tau = -y[0] / rho0[1]                        # int z Psi = (2/3)(-y_1), C(0) = (2/3) rho0_1
+        return lam1, tau
+
+
+def brown_relaxation(sigma, h):
+    '''Exact thermal relaxation of one particle with its field along the easy axis (Brown's equation).
+
+    Inputs:
+      sigma: float, K V / (k_B T), 0 <= sigma <= 60.
+      h: float, reduced field H / H_K along the easy axis, -0.9 <= h <= 0.9.
+
+    Output:
+      (lam1, tau_int): tuple of two Python floats, in units of 1/tau_N and tau_N, respectively.
+        lam1: smallest nonzero eigenvalue of the Fokker-Planck operator (relaxation rate times
+              tau_N), relative error below 1e-5.
+        tau_int: integral relaxation time of z = cos(theta) divided by tau_N,
+                 int_0^inf C(t) dt / C(0) with C(t) = <z(t) z(0)> - <z>**2 in equilibrium,
+                 relative error below 1e-5.
+
+    Raises:
+      ValueError if sigma or h is not finite, if sigma is outside [0, 60] or if |h| > 0.9.
+    '''
+    # Other method: W = sum b_l P_l(z); the Fokker-Planck operator is pentadiagonal in l and is
+    # solved in extended precision (inverse iteration for lam1, a linear solve for tau_int).
+    sigma = float(sigma)
+    h = float(h)
+    if not (np.isfinite(sigma) and np.isfinite(h)):
+        raise ValueError("sigma and h must be finite")
+    if not (0.0 <= sigma <= 60.0) or abs(h) > 0.9:
+        raise ValueError("need 0 <= sigma <= 60 and |h| <= 0.9")
+    lam1, tau = _g5_legendre(sigma, h)
+    result = (float(lam1), float(tau))
+    return result
+
+
 def ensemble_switching(psis, weights, a, f0, rate):
     '''Dynamic coercive field and half-switching field of an ensemble during the sweep.
 
@@ -393,103 +508,4 @@ def ensemble_switching(psis, weights, a, f0, rate):
             hi = mid
     h_half = -0.5 * (lo + hi)
     result = (float(h_c), float(h_half))
-    return result
-
-
-# ---- step 6, second method: Brown's equation in Legendre polynomials, extended precision ----
-def _g6_band_solve(rows, rhs, N):
-    # Gaussian elimination with partial pivoting on a pentadiagonal system given as dict rows[i] = {j: a_ij}
-    A = [dict(r) for r in rows]
-    b = list(rhs)
-    for k in range(N):
-        cand = [i for i in range(k, min(k + 3, N)) if k in A[i]]
-        p = max(cand, key=lambda i: abs(A[i][k]))
-        if p != k:
-            A[k], A[p] = A[p], A[k]
-            b[k], b[p] = b[p], b[k]
-        piv = A[k][k]
-        for i in range(k + 1, min(k + 3, N)):
-            if k in A[i] and A[i][k] != 0:
-                f = A[i][k] / piv
-                for j, v in A[k].items():
-                    A[i][j] = A[i].get(j, 0) - f * v
-                del A[i][k]
-                b[i] -= f * b[k]
-    x = [mp.mpf(0)] * N
-    for k in range(N - 1, -1, -1):
-        s = b[k] - mp.fsum(v * x[j] for j, v in A[k].items() if j > k)
-        x[k] = s / A[k][k]
-    return x
-
-def _g6_legendre(sigma, h, N=None, dps=None):
-    if dps is None: dps = 30 + int(0.5 * sigma * (1 + abs(h)) ** 2)
-    if N is None: N = int(60 + 3 * sigma)
-    with mp.workdps(dps):
-        s = mp.mpf(sigma); xi = 2 * s * mp.mpf(h)
-        def Mz(v):
-            out = [mp.mpf(0)] * (len(v) + 1)
-            for l, c in enumerate(v):
-                if c == 0: continue
-                out[l + 1] += c * (l + 1) / mp.mpf(2 * l + 1)
-                if l >= 1: out[l - 1] += c * l / mp.mpf(2 * l + 1)
-            return out
-        def Tz(v):
-            out = [mp.mpf(0)] * (len(v) + 1)
-            for l, c in enumerate(v):
-                if c == 0 or l == 0: continue
-                f = c * l * (l + 1) / mp.mpf(2 * l + 1)
-                out[l - 1] += f; out[l + 1] -= f
-            return out
-        cols = {}
-        for l in range(0, N + 1):
-            e = [mp.mpf(0)] * (l + 1); e[l] = mp.mpf(1)
-            g = [-2 * s * x for x in Mz(e)] + [mp.mpf(0)]
-            for k in range(len(e)): g[k] -= xi * e[k]
-            Tg, Mg = Tz(g), Mz(g)
-            col = {}
-            col[l] = col.get(l, 0) - l * (l + 1)
-            for k, v in enumerate(Tg): col[k] = col.get(k, 0) + v
-            for k, v in enumerate(Mg): col[k] = col.get(k, 0) - 2 * v
-            cols[l] = {k: v / 2 for k, v in col.items() if v != 0 and k <= N}
-        # L' (rows/cols 1..N), stored by rows
-        rows = [dict() for _ in range(N)]
-        for l in range(1, N + 1):
-            for k, v in cols[l].items():
-                if k >= 1: rows[k - 1][l - 1] = v
-        # equilibrium density: L' b + L[1:,0] b0 = 0, b0 = 1
-        r0 = [-cols[0].get(k, 0) for k in range(1, N + 1)]
-        beq = [mp.mpf(1)] + _g6_band_solve(rows, r0, N)
-        # lam1: inverse iteration on L'
-        x = [mp.mpf(1)] * N
-        lam_old = None
-        for it in range(60):
-            y = _g6_band_solve(rows, x, N)
-            nrm = mp.sqrt(mp.fsum(t * t for t in y)); y = [t / nrm for t in y]
-            Ay = [mp.fsum(v * y[j] for j, v in rows[i].items()) for i in range(N)]
-            lam = mp.fsum(a * b for a, b in zip(y, Ay))
-            x = y
-            if lam_old is not None and abs(lam - lam_old) < abs(lam) * mp.mpf(10) ** (-(dps - 10)): break
-            lam_old = lam
-        lam1 = -lam
-        # integral relaxation time of z: tau = -int z Psi dz / int z rho0 dz, L Psi = -rho0... (L^{-1} rho0)
-        zW = Mz(beq)
-        zmean = zW[0] / beq[0]
-        rho0 = [zW[k] - zmean * (beq[k] if k < len(beq) else 0) for k in range(N + 1)]
-        y = _g6_band_solve(rows, rho0[1:], N)           # L' y = rho0  ->  Psi = -y solves L Psi = -rho0
-        tau = -y[0] / rho0[1]                        # int z Psi = (2/3)(-y_1), C(0) = (2/3) rho0_1
-        return lam1, tau
-
-
-def brown_relaxation(sigma, h):
-    '''Exact thermal relaxation of one particle with its field along the easy axis (Brown's equation).'''
-    # Other method: W = sum b_l P_l(z); the Fokker-Planck operator is pentadiagonal in l and is
-    # solved in extended precision (inverse iteration for lam1, a linear solve for tau_int).
-    sigma = float(sigma)
-    h = float(h)
-    if not (np.isfinite(sigma) and np.isfinite(h)):
-        raise ValueError("sigma and h must be finite")
-    if not (0.0 <= sigma <= 60.0) or abs(h) > 0.9:
-        raise ValueError("need 0 <= sigma <= 60 and |h| <= 0.9")
-    lam1, tau = _g6_legendre(sigma, h)
-    result = (float(lam1), float(tau))
     return result

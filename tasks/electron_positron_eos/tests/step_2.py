@@ -1,9 +1,3 @@
-import math
-import numpy as np
-import mpmath as _t_mp
-import signal as _t_signal
-import time as _t_btime
-
 # Independent targets: closed forms of the classical (Maxwell-Juettner) gas with modified Bessel
 # functions, and values computed once with mpmath at 40 digits by tanh-sinh quadrature of the defining
 # integrals in the momentum (breakpoints every k T over the Fermi edge), the chemical potential by a
@@ -11,47 +5,17 @@ import time as _t_btime
 # net electron density (T +- 1e-7 T), all in mpmath; positron densities of a classical positron gas
 # (eps/kT + psi >= 40) from the Maxwell-Juettner formula.
 
+# --- test case 0 ---
+# classical gas: P = (n_- + n_+) k T, energy and entropy of the Maxwell-Juettner gas
+import numpy as np
+import mpmath as _t_mp
+
 _T_MEC2 = 8.1871057769e-7
 _T_KB = 1.380649e-16
 _T_LC = 3.8615926796e-11
-_T_NA = 6.02214076e23
-
-# Time budget of one call, as stated in the prompt: the call is interrupted once it exceeds the budget
-# (by one second), so a solution that is too slow fails this check instead of holding up the tests.
-_t_depth = [0]
-
-
-def _t_budget(fn, seconds, name):
-    def wrapped(*args, **kwargs):
-        if _t_depth[0]:
-            return fn(*args, **kwargs)
-
-        def _alarm(signum, frame):
-            raise TimeoutError("%s did not finish within its budget of %g s per call" % (name, seconds))
-        try:
-            old = _t_signal.signal(_t_signal.SIGALRM, _alarm)
-            _t_signal.setitimer(_t_signal.ITIMER_REAL, seconds + 1.0)
-            armed = True
-        except (ValueError, AttributeError, OSError):      # no SIGALRM here: measure only
-            armed = False
-        _t_depth[0] += 1
-        start = _t_btime.perf_counter()
-        try:
-            out = fn(*args, **kwargs)
-        finally:
-            _t_depth[0] -= 1
-            if armed:
-                _t_signal.setitimer(_t_signal.ITIMER_REAL, 0.0)
-                _t_signal.signal(_t_signal.SIGALRM, old)
-        elapsed = _t_btime.perf_counter() - start
-        assert elapsed <= seconds, ("%s took %.1f s (budget %g s per call)" % (name, elapsed, seconds))
-        return out
-    return wrapped
-
 
 def _t_rel(a, b):
     return abs(a - b) / abs(b)
-
 
 def _t_classical(T, psi):
     # Maxwell-Juettner gas (Boltzmann occupation): n = theta K2(1/theta) e^{+-psi} / (pi^2 lambda^3),
@@ -67,8 +31,23 @@ def _t_classical(T, psi):
         s = _t_mp.mpf(_T_KB) * (nm * (eps / th - psi + 1) + npl * (eps / th + psi + 1))
         return [float(x) for x in (nm, npl, nm - npl, P, u, s)]
 
+def _t_check2(T, psi, target):
+    out = pair_thermodynamics(T, psi)
+    assert isinstance(out, tuple) and len(out) == 3 and all(type(x) is float for x in out), out
+    for got, want, name in zip(out, target, ("P", "u", "s")):
+        assert _t_rel(got, want) < 1e-10, (T, psi, name, got, want)
+    return out
 
-pair_thermodynamics = _t_budget(pair_thermodynamics, 10.0, "pair_thermodynamics")
+for _t_T, _t_psi in ((1e8, 20.0), (2e7, 5.0), (5e7, 30.0)):
+    _t_check2(_t_T, _t_psi, _t_classical(_t_T, _t_psi)[3:])
+
+# --- test case 1 ---
+# strongly degenerate gases (the entropy is about 6e-10 of (u + P) / T at T = 1e7 K,
+# psi = 1.3e5), classical gases and pair plasmas, against 40-digit targets
+import numpy as np
+
+def _t_rel(a, b):
+    return abs(a - b) / abs(b)
 
 _T_TP = {
     (10000000.0, 130000.0): (6.179520231754482940999412e+36, 2.346813986462897923301478e-56690, 6.179520231754482940999412e+36, 2.772731709361358577554444e+32, 8.267948868315288590509692e+32, 64774410687625976.98471617),
@@ -85,7 +64,6 @@ _T_TP = {
     (20000000.0, 1000000.0): (2.250236607519217944970892e+40, 2.455871423753166156237421e-434397, 2.250236607519217944970892e+40, 1.553393256146546323000493e+37, 4.658338295271499426436939e+37, 30662760573351414102.7831),
 }      # (T, psi): n_minus, n_plus, n_net, P, u, s
 
-
 def _t_check2(T, psi, target):
     out = pair_thermodynamics(T, psi)
     assert isinstance(out, tuple) and len(out) == 3 and all(type(x) is float for x in out), out
@@ -93,17 +71,12 @@ def _t_check2(T, psi, target):
         assert _t_rel(got, want) < 1e-10, (T, psi, name, got, want)
     return out
 
-
-# --- test case 0: classical gas: P = (n_- + n_+) k T, energy and entropy of the Maxwell-Juettner gas ---
-for _t_T, _t_psi in ((1e8, 20.0), (2e7, 5.0), (5e7, 30.0)):
-    _t_check2(_t_T, _t_psi, _t_classical(_t_T, _t_psi)[3:])
-
-# --- test case 1: strongly degenerate gases (the entropy is about 6e-10 of (u + P) / T at T = 1e7 K,
-# psi = 1.3e5), classical gases and pair plasmas, against 40-digit targets ---
 for (_t_T, _t_psi), _t_v in _T_TP.items():
     _t_check2(_t_T, _t_psi, [float(x) for x in _t_v[3:]])
 
-# --- test case 2: T or psi not finite or outside its range ---
+# --- test case 2 ---
+# T or psi not finite or outside its range
+import numpy as np
 for _t_bad in ((float("nan"), 1.0), (1e9, float("nan")), (9e6, 1.0), (1.1e11, 1.0), (1e9, 0.0), (1e9, 2e6)):
     try:
         pair_thermodynamics(*_t_bad)

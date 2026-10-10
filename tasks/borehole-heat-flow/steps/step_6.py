@@ -1,39 +1,61 @@
-"""Step 6 - present-day signature of a past surface-temperature history in a layered column."""
+"""Step 6 - full workflow: paleoclimate-corrected surface heat flow of a borehole."""
 import numpy as np
 
-SECONDS_PER_YEAR = 365.25 * 86400.0   # Julian year
+# You may call true_vertical_depth (step 1), layer_integrals (step 2),
+# paleoclimate_perturbation (step 3) and fit_heat_flow (step 4).
 
 
-def layered_paleoclimate_perturbation(z, layer_tops, layer_k, rho_c, t_years, dT):
-    """Present-day temperature perturbation (K) at depth z in a layered column.
-
-    History convention as in paleoclimate_perturbation (step 3). The ground
-    is a column of horizontal layers (tops layer_tops, the first at 0, the
-    last layer extending to infinite depth) with conductivities layer_k and a
-    uniform volumetric heat capacity rho_c; temperature and heat flux are
-    continuous at the layer tops.
+def surface_heat_flow(survey_md, survey_inc, survey_azi, log_md, log_temp,
+                      layer_top_md, layer_k, heat_production, kappa,
+                      hist_t_years, hist_dT_shape, z_min):
+    """Paleoclimate-corrected surface heat flow from an inclined borehole.
 
     Parameters
     ----------
-    z : float or array_like, depth (m) >= 0.
-    layer_tops : 1-D array_like, layer tops (m), first 0, strictly increasing.
-    layer_k : 1-D array_like, same length, conductivities (W m^-1 K^-1) > 0.
-    rho_c : float, volumetric heat capacity (J m^-3 K^-1) > 0.
-    t_years : 1-D array_like, positive, strictly increasing ends of the
-        history intervals (years before present).
-    dT : 1-D array_like, same length, departure during each interval (K).
+    survey_md, survey_inc, survey_azi : deviation survey as in step 1:
+        station MD (m, first 0 at the collar, strictly increasing),
+        inclination from vertical (degrees, 0 = straight down) and azimuth
+        (degrees clockwise from north).
+    log_md, log_temp : 1-D arrays of equal length, MD of each reading (m,
+        within the survey) and its equilibrium temperature (deg C).
+    layer_top_md, layer_k : MD of the top of each horizontal layer (m, first
+        0, strictly increasing, within the survey; the last layer extends
+        below the hole) and its conductivity (W m^-1 K^-1, > 0).
+    heat_production : uniform radiogenic heat production A (W m^-3), >= 0.
+    kappa : thermal diffusivity of the ground (m^2 s^-1), > 0.
+    hist_t_years, hist_dT_shape : ends of the history intervals (years
+        before present, positive, strictly increasing) and the surface
+        departure of the unit-amplitude history during each interval (K per
+        unit amplitude; the departure is g * hist_dT_shape[i]).
+    z_min : readings with TVD >= z_min (m) are used, shallower ones excluded.
+
+    Workflow
+    --------
+    1. TVD of every reading and every layer top (step 1).
+    2. Keep readings with TVD >= z_min.
+    3. R and S at the kept depths (step 2); P of the unit-amplitude history (step 3).
+    4. Joint least-squares estimate of T0, q0 and g (step 4).
 
     Returns
     -------
-    float for scalar z, else ndarray with the shape of z. Absolute accuracy
-    1e-8 K per kelvin of the largest |dT|; up to 1000 depths, 50 layers
-    and 20 history intervals per call.
+    dict: "T0" (deg C), "q0" (W m^-2), "amplitude" (g, K), "sigma_T0",
+    "sigma_q0", "sigma_amplitude" (1-sigma standard errors, same units),
+    "rms_residual" (K, sqrt(RSS/n_used)) as Python floats, and "n_used"
+    (int, number of readings used).
+    Accuracy: for temperatures that follow the model exactly, T0, q0 and g
+    within 1e-5 K, 1e-8 W m^-2 and 1e-4 K of the generating values and
+    rms_residual below 1e-6 K; for noisy temperatures, T0, q0 and g within
+    5e-4 K, 2e-6 W m^-2 and 2e-3 K of the exact least-squares solution, the
+    three standard errors within 2 % and rms_residual within 1 % (relative);
+    n_used exact.
 
     Raises
     ------
-    ValueError for invalid layers (not 1-D of equal length, first top not 0,
-    tops not strictly increasing, non-finite or non-positive conductivity),
-    rho_c non-finite or <= 0, an invalid history (as in step 3), or a depth
-    that is non-finite or negative.
+    ValueError if log_md and log_temp are not 1-D of equal length, if any
+    earlier step raises (invalid survey, layer tops or log depths beyond the
+    last survey station, invalid conductivities, history or kappa,
+    heat_production negative or non-finite), if fewer than 4 readings remain
+    after the z_min cut, or if T0, q0 and g are not separately resolvable
+    (criterion of step 4, e.g. an all-zero hist_dT_shape).
     """
     raise NotImplementedError

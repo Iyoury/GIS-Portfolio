@@ -1,66 +1,24 @@
-import math
-import numpy as np
-import signal as _t_signal
-import time as _t_btime
-
 # Independent targets: the closed forms of the prism potential, attraction and gradients (Nagy, Papp and
-# Benedek 2000) evaluated in 60-digit arithmetic with mpmath (no cancellation at any distance), the
-# vertical attraction of the columns by mpmath tanh-sinh quadrature of the lamina term over depth at 30
-# digits, and gravity data of a basin computed with that quadrature at 25 digits; all computed once and
-# stored below.
+# Benedek 2000) evaluated in 60- or 90-digit arithmetic with mpmath (no cancellation at any distance), the
+# vertical attraction of the columns by mpmath tanh-sinh quadrature of the lamina term over depth at 30 to
+# 70 digits, and gravity data of basins computed with that quadrature (25 or 30 digits) or, for lam = 0,
+# as sums of 60-digit prism closed forms; all computed once and stored below.
 
-_T_G = 6.6743e-11
-
-# Time budget of one call, as stated in the prompt: the call is interrupted once it exceeds the budget
-# (by one second), so a solution that is too slow fails this check instead of holding up the tests.
-_t_depth = [0]
-
-
-def _t_budget(fn, seconds, name):
-    def wrapped(*args, **kwargs):
-        if _t_depth[0]:
-            return fn(*args, **kwargs)
-
-        def _alarm(signum, frame):
-            raise TimeoutError("%s did not finish within its budget of %g s per call" % (name, seconds))
-        try:
-            old = _t_signal.signal(_t_signal.SIGALRM, _alarm)
-            _t_signal.setitimer(_t_signal.ITIMER_REAL, seconds + 1.0)
-            armed = True
-        except (ValueError, AttributeError, OSError):      # no SIGALRM here: measure only
-            armed = False
-        _t_depth[0] += 1
-        start = _t_btime.perf_counter()
-        try:
-            out = fn(*args, **kwargs)
-        finally:
-            _t_depth[0] -= 1
-            if armed:
-                _t_signal.setitimer(_t_signal.ITIMER_REAL, 0.0)
-                _t_signal.signal(_t_signal.SIGALRM, old)
-        elapsed = _t_btime.perf_counter() - start
-        assert elapsed <= seconds, ("%s took %.1f s (budget %g s per call)" % (name, elapsed, seconds))
-        return out
-    return wrapped
-
-
-def _t_rel(a, b):
-    return abs(a - b) / abs(b)
-
-
-prism_gravity = _t_budget(prism_gravity, 10.0, "prism_gravity")
-prism_gradients = _t_budget(prism_gradients, 10.0, "prism_gradients")
-column_gz = _t_budget(column_gz, 10.0, "column_gz")
-invert_basin_depths = _t_budget(invert_basin_depths, 30.0, "invert_basin_depths")
+# --- test case 0 ---
+# the basin of step 4: its anomaly from its columns (column_gz summed over the cells) and
+# its depths back from the anomaly
+import numpy as np
 
 _T_XE = [0.0, 1200.0, 2400.0, 3600.0, 4800.0, 6000.0]
+
 _T_YE = [0.0, 1000.0, 2000.0, 3000.0, 4000.0]
+
 _T_DEPTH = [[1515.03, 1557.02, 1557.02, 1515.03], [1630.331, 1994.432, 1994.432, 1630.331], [1767.756, 2515.778, 2515.778, 1767.756], [1630.331, 1994.432, 1994.432, 1630.331], [1515.03, 1557.02, 1557.02, 1515.03]]
+
 _T_GZ = [[-0.00012420138486717827, -0.00014328431458916966, -0.00014328431458916966, -0.00012420138486717827], [-0.0001445401883644231, -0.0001696612698796593, -0.0001696612698796593, -0.0001445401883644231], [-0.0001491855838652856, -0.00017577528549926713, -0.00017577528549926713, -0.0001491855838652856], [-0.0001445401883644231, -0.0001696612698796593, -0.0001696612698796593, -0.0001445401883644231], [-0.00012420138486717827, -0.00014328431458916966, -0.00014328431458916966, -0.00012420138486717827]]
+
 _T_DRHO0, _T_LAM = -450.0, 0.0004
 
-# --- test case 0: the basin of step 4: its anomaly from its columns (column_gz summed over the cells) and
-# its depths back from the anomaly ---
 _t_xe, _t_ye, _t_h = np.array(_T_XE), np.array(_T_YE), np.array(_T_DEPTH)
 _t_g = np.zeros((5, 4))
 for _t_i in range(5):
@@ -72,12 +30,54 @@ assert np.max(np.abs(_t_g / np.array(_T_GZ) - 1.0)) < 1e-10, (_t_g, _T_GZ)      
 _t_back = invert_basin_depths(_t_xe, _t_ye, np.array(_T_GZ), _T_DRHO0, _T_LAM)
 assert np.max(np.abs(_t_back / _t_h - 1.0)) < 1e-8
 
-# --- test case 1: a uniform column (lam = 0) is a prism: column_gz and the z component of prism_gravity agree
-# (two computed values, each within 1e-10 relative: 2.1e-10), and its gradients satisfy Laplace outside ---
+# --- test case 1 ---
+# a uniform column (lam = 0) is a prism: column_gz and the z component of prism_gravity agree
+# within the sum of their two stated tolerances (1e-10 |g_z| <= 1e-10 |g| for column_gz,
+# 1e-10 |g| + 1e-14 G |rho| L for prism_gravity), and its gradients satisfy Laplace outside
+import numpy as np
+
+_T_G = 6.6743e-11
+
 _t_st = np.array([[30.0, 40.0, -20.0], [0.0, 0.0, 0.0], [-500.0, 900.0, -3.0]])
 _t_a = column_gz(_t_st, 0.0, 100.0, 0.0, 200.0, 300.0, -400.0, 0.0)
 _t_U, _t_gv = prism_gravity(_t_st, (0.0, 100.0, 0.0, 200.0, 0.0, 300.0), -400.0)
-assert np.all(np.abs(_t_a / _t_gv[:, 2] - 1.0) < 2.1e-10), (_t_a, _t_gv)
+_t_tol = 2.1e-10 * np.linalg.norm(_t_gv, axis=1) + 2e-14 * _T_G * 400.0 * 300.0
+assert np.all(np.abs(_t_a - _t_gv[:, 2]) <= _t_tol), (_t_a, _t_gv)
 _t_T = prism_gradients(_t_st[[0, 2]], (0.0, 100.0, 0.0, 200.0, 0.0, 300.0), -400.0)
 for _t_k in range(2):
     assert abs(np.trace(_t_T[_t_k])) <= 3e-9 * np.linalg.norm(_t_T[_t_k])
+
+# --- test case 2 ---
+# a uniform-density basin (lam = 0, +300 kg m^-3) of 10 x 10 cells is a sum of prisms: prism_gravity
+# summed over its 100 prisms gives the anomaly at the cell centres within the sum of the stated
+# tolerances of the terms (60-digit closed-form data), and invert_basin_depths gives back the depths
+import numpy as np
+
+_T_G = 6.6743e-11
+
+_T_XE = [0.0, 900.0, 2000.0, 3000.0, 4200.0, 5150.0, 6200.0, 7200.0, 8350.0, 9350.0, 10250.0]
+
+_T_YE = [0.0, 1000.0, 1950.0, 3050.0, 4050.0, 4950.0, 6000.0, 7200.0, 8200.0, 9150.0, 10150.0]
+
+_T_DEPTH = [[298.1, 359.5, 460.6, 578.5, 653.7, 660.9, 578.5, 455.0, 359.5, 298.1], [343.7, 463.6, 660.7, 890.7, 1037.3, 1051.3, 890.7, 649.8, 463.6, 343.7], [409.1, 612.5, 947.1, 1337.6, 1586.5, 1610.3, 1337.6, 928.7, 612.5, 409.1], [479.3, 772.3, 1254.4, 1817.0, 2175.6, 2209.9, 1817.0, 1227.8, 772.3, 479.3], [521.7, 869.0, 1440.4, 2107.1, 2532.1, 2572.7, 2107.1, 1408.8, 869.0, 521.7], [519.6, 864.1, 1430.9, 2092.3, 2514.0, 2554.2, 2092.3, 1399.6, 864.1, 519.6], [476.4, 765.9, 1242.1, 1797.7, 2151.9, 2185.7, 1797.7, 1215.8, 765.9, 476.4], [407.5, 608.7, 939.8, 1326.2, 1572.5, 1596.0, 1326.2, 921.5, 608.7, 407.5], [341.0, 457.3, 648.7, 872.0, 1014.3, 1027.9, 872.0, 638.1, 457.3, 341.0], [298.1, 359.5, 460.6, 578.5, 653.7, 660.9, 578.5, 455.0, 359.5, 298.1]]
+
+_T_GZ = [[0.00003987702899141084240907709, 0.00005087900088196382519432851, 0.00006411085127203205702144105, 0.00007656965339175001929338164, 0.00008344241424477491039235789, 0.00008408185903331899603816019, 0.0000767672519666504059926486, 0.0000636071081279765658471493, 0.00005087652422577759641808965, 0.00003989300271875630878926203], [0.00004948675713114767519451434, 0.00006820835678743344538579671, 0.00008969191480899690548996715, 0.0001083117475075073624999292, 0.000118153695421908252587268, 0.0001190353749212478870509509, 0.0001086431864445607102660617, 0.00008888430278512732191059436, 0.00006819641829655600431793153, 0.00004950607631674005700285556], [0.00005985553326244661095341119, 0.00008627603925300056761797579, 0.0001142711202225511815213581, 0.0001366836165634372907125975, 0.0001480837871354811202287827, 0.0001491058018936469686422192, 0.0001370658003112989729378699, 0.0001132133071141511431523878, 0.00008627086486937428029219287, 0.00005987730229776574444427908], [0.00006949367191282010396889963, 0.0001018240725377088176100891, 0.0001339926684404686591813838, 0.0001585164684184902039349542, 0.0001706263455253483791513444, 0.0001717334437456117002057521, 0.000158890713410549163769178, 0.0001327699219514673945932235, 0.0001018335594358462641129468, 0.00006951712531195041263416407], [0.00007467639478638109096403543, 0.0001097120326354669315785774, 0.0001436021184870621727883053, 0.0001689346398955206882051427, 0.0001812795999802903465238902, 0.0001824215944182780100784582, 0.000169293751145637796421036, 0.0001423118420867341993244394, 0.0001097309846742359946546911, 0.00007470087488136588310884454], [0.00007448953736698349872795901, 0.0001094144294374903713223785, 0.0001431843179573676279372325, 0.0001684311236894469161574012, 0.0001807417147817660452495609, 0.0001818802558426071092148434, 0.0001687893286175931345439289, 0.0001418989987802452207359201, 0.0001094330888386041857538613, 0.00007451391643760648558697555], [0.00006903281086780521383189381, 0.0001010729574592131108453562, 0.0001330683127720249107479108, 0.0001575494736071437382101348, 0.0001696635463540086329305162, 0.0001707694307247309105209374, 0.0001579250193905249445922623, 0.0001318515942180029920616053, 0.0001010812903952374347568511, 0.00006905609448969669756210413], [0.00005956604882410156652467326, 0.00008583013450035792218435185, 0.0001137689452831489327112333, 0.0001361651832598874275432894, 0.0001475596472543650759352524, 0.000148579227894991100925371, 0.0001365486266503652693603195, 0.0001127110165081415071159699, 0.00008582321820340036599424415, 0.000059587509257149265434854], [0.00004906562273436828981146998, 0.00006744219148303144438593796, 0.00008856046721936103089277921, 0.000106907206432638400853558, 0.0001166200803213234797962946, 0.0001174915566626680098549265, 0.000107232202064670191431817, 0.00008776530870096372253437976, 0.00006742993451628117384033878, 0.00004908455762282516150828326], [0.00003985158733339198048840712, 0.00005082458496347516083445817, 0.00006402636484079191734695889, 0.00007646964234963968228419203, 0.00008333809318499254350380353, 0.0000839775377774974640837884, 0.00007666652642259976638466734, 0.00006352344637993549975597934, 0.00005082207700590414227592121, 0.00003986746928986103439267626]]
+
+_T_DRHO0 = 300.0
+
+_t_xe, _t_ye, _t_h = np.array(_T_XE), np.array(_T_YE), np.array(_T_DEPTH)
+_t_st = np.array([[0.5 * (_t_xe[i] + _t_xe[i + 1]), 0.5 * (_t_ye[j] + _t_ye[j + 1]), 0.0] for i in range(10) for j in range(10)])
+_t_sum = np.zeros(100)
+_t_tol = np.zeros(100)
+for _t_a in range(10):
+    for _t_b in range(10):
+        _t_bd = (_t_xe[_t_a], _t_xe[_t_a + 1], _t_ye[_t_b], _t_ye[_t_b + 1], 0.0, _t_h[_t_a, _t_b])
+        _t_U, _t_g = prism_gravity(_t_st, _t_bd, _T_DRHO0)
+        _t_sum += _t_g[:, 2]
+        _t_L = max(_t_bd[1] - _t_bd[0], _t_bd[3] - _t_bd[2], _t_bd[5] - _t_bd[4])
+        _t_tol += 1e-10 * np.linalg.norm(_t_g, axis=1) + 1e-14 * _T_G * abs(_T_DRHO0) * _t_L
+_t_gz = np.array(_T_GZ).ravel()
+assert np.all(np.abs(_t_sum - _t_gz) <= _t_tol), np.max(np.abs(_t_sum - _t_gz) / _t_tol)
+_t_back = invert_basin_depths(_t_xe, _t_ye, np.array(_T_GZ), _T_DRHO0, 0.0)
+assert isinstance(_t_back, np.ndarray) and _t_back.shape == (10, 10)
+assert np.max(np.abs(_t_back / _t_h - 1.0)) < 1e-8

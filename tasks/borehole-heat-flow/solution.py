@@ -1,26 +1,18 @@
-"""Reference solution: paleoclimate-corrected surface heat flow from an
-inclined exploration borehole.
+"""Reference solution: paleoclimate-corrected surface heat flow from an inclined exploration borehole.
 
 Pipeline
-    deviation survey -> true vertical depth (minimum curvature, exact arc
-    interpolation) -> Bullard thermal-resistance integrals over a layered
-    conductivity column -> present-day perturbation of a piecewise-constant
-    surface-temperature history -> joint linear least-squares estimate of
-    surface temperature, surface heat flow and glacial amplitude.
+    deviation survey -> true vertical depth (minimum curvature, exact arc interpolation; step 1) ->
+    Bullard thermal-resistance integrals over a layered conductivity column (step 2) -> present-day
+    half-space perturbation of a piecewise-constant surface-temperature history (step 3) -> joint linear
+    least-squares estimate of surface temperature, surface heat flow and glacial amplitude (step 4);
+    surface_heat_flow (step 6) chains these steps. Step 5 computes the paleoclimate perturbation in the
+    layered conductivity column (Laplace transform, Talbot inversion).
 """
 import numpy as np
 import math
 
-def erfc(x):
-    """Element-wise complementary error function (numpy + math only)."""
-    import math  # local import: harness may strip top-level imports
-    f = np.frompyfunc(math.erfc, 1, 1)
-    return np.asarray(f(np.asarray(x, float)), dtype=float)
 
-SECONDS_PER_YEAR = 365.25 * 86400.0
-
-
-# ---------------------------------------------------------------- step 1
+# ------------------------------------------------------------ step 1: true vertical depth
 def _unit(inc, azi):
     return np.array([np.sin(inc) * np.cos(azi), np.sin(inc) * np.sin(azi), np.cos(inc)])
 
@@ -78,7 +70,7 @@ def true_vertical_depth(survey_md, inc_deg, azi_deg, md_query):
     return float(out[0]) if q_in.ndim == 0 else out.reshape(q_in.shape)
 
 
-# ---------------------------------------------------------------- step 2
+# ------------------------------------------------------------ step 2: layer integrals R and S
 def layer_integrals(layer_top_tvd, layer_k, z):
     """Thermal resistance R(z) = int_0^z dz'/k and S(z) = int_0^z z'/k dz'."""
     tops = np.asarray(layer_top_tvd, float)
@@ -109,7 +101,16 @@ def layer_integrals(layer_top_tvd, layer_k, z):
     return R.reshape(z_in.shape), S.reshape(z_in.shape)
 
 
-# ---------------------------------------------------------------- step 3
+# ------------------------------------------------------------ step 3: half-space paleoclimate perturbation
+def _erfc_array(x):
+    """Element-wise complementary error function (numpy + math only)."""
+    f = np.frompyfunc(math.erfc, 1, 1)
+    return np.asarray(f(np.asarray(x, float)), dtype=float)
+
+
+SECONDS_PER_YEAR = 365.25 * 86400.0
+
+
 def paleoclimate_perturbation(z, t_years, dT, kappa):
     """Present-day temperature perturbation (K) at depth z (m) from a
     piecewise-constant surface-temperature history."""
@@ -132,16 +133,16 @@ def paleoclimate_perturbation(z, t_years, dT, kappa):
     out = np.zeros(zz.size)
     for i in range(t.size):
         t_new, t_old = edges[i], edges[i + 1]
-        e_old = erfc(zz / (2 * np.sqrt(kappa * t_old)))
+        e_old = _erfc_array(zz / (2 * np.sqrt(kappa * t_old)))
         if t_new == 0.0:
             e_new = np.zeros_like(zz)       # limit z / sqrt(kappa * 0) -> inf
         else:
-            e_new = erfc(zz / (2 * np.sqrt(kappa * t_new)))
+            e_new = _erfc_array(zz / (2 * np.sqrt(kappa * t_new)))
         out += d[i] * (e_old - e_new)
     return float(out[0]) if z_in.ndim == 0 else out.reshape(z_in.shape)
 
 
-# ---------------------------------------------------------------- step 4
+# ------------------------------------------------------------ step 4: joint least-squares estimate
 def fit_heat_flow(T, R, S, P, A):
     """Least-squares T = T0 + q0 R - A S + g P  ->  (T0, q0, g) + errors."""
     T, R, S, P = (np.asarray(v, float).ravel() for v in (T, R, S, P))
@@ -170,27 +171,7 @@ def fit_heat_flow(T, R, S, P, A):
             "rms_residual": float(np.sqrt(np.mean(res**2)))}
 
 
-# ---------------------------------------------------------------- main
-def surface_heat_flow(survey_md, survey_inc, survey_azi, log_md, log_temp,
-                      layer_top_md, layer_k, heat_production, kappa,
-                      hist_t_years, hist_dT_shape, z_min):
-    """Paleoclimate-corrected surface heat flow from an inclined borehole."""
-    log_md = np.asarray(log_md, float)
-    log_temp = np.asarray(log_temp, float)
-    if log_md.shape != log_temp.shape or log_md.ndim != 1:
-        raise ValueError("log arrays must be 1-D with equal length")
-    z = true_vertical_depth(survey_md, survey_inc, survey_azi, log_md)
-    tops = true_vertical_depth(survey_md, survey_inc, survey_azi, np.asarray(layer_top_md, float))
-    keep = z >= z_min
-    z, T = z[keep], log_temp[keep]
-    R, S = layer_integrals(tops, layer_k, z)
-    P = paleoclimate_perturbation(z, hist_t_years, hist_dT_shape, kappa)
-    fit = fit_heat_flow(T, R, S, P, heat_production)
-    fit["n_used"] = int(z.size)
-    return fit
-
-
-# ---------------------------------------------------------------- step 6
+# ------------------------------------------------------------ step 5: layered paleoclimate perturbation
 def _log_surface_response(z, lay, s, tops, k, rho_c):
     """log F(z, s): Laplace transform (in time) of the departure at depth z for a unit departure applied
     at the surface, F(0, s) = 1, in the layered column (z: depths, lay: their layer indices, s: complex)."""
@@ -292,3 +273,23 @@ def layered_paleoclimate_perturbation(z, layer_tops, layer_k, rho_c, t_years, dT
     out[~inside] = d[0]                                       # at the surface: the present departure
     dT_z = float(out[0]) if z_in.ndim == 0 else out.reshape(z_in.shape)
     return dT_z
+
+
+# ------------------------------------------------------------ step 6: full workflow
+def surface_heat_flow(survey_md, survey_inc, survey_azi, log_md, log_temp,
+                      layer_top_md, layer_k, heat_production, kappa,
+                      hist_t_years, hist_dT_shape, z_min):
+    """Paleoclimate-corrected surface heat flow from an inclined borehole."""
+    log_md = np.asarray(log_md, float)
+    log_temp = np.asarray(log_temp, float)
+    if log_md.shape != log_temp.shape or log_md.ndim != 1:
+        raise ValueError("log arrays must be 1-D with equal length")
+    z = true_vertical_depth(survey_md, survey_inc, survey_azi, log_md)
+    tops = true_vertical_depth(survey_md, survey_inc, survey_azi, np.asarray(layer_top_md, float))
+    keep = z >= z_min
+    z, T = z[keep], log_temp[keep]
+    R, S = layer_integrals(tops, layer_k, z)
+    P = paleoclimate_perturbation(z, hist_t_years, hist_dT_shape, kappa)
+    fit = fit_heat_flow(T, R, S, P, heat_production)
+    fit["n_used"] = int(z.size)
+    return fit

@@ -1,13 +1,14 @@
-import numpy as np
-import mpmath as _t_mp
-
 # Independent targets: closed forms, the Bateman sum evaluated in 600-digit arithmetic (it only
 # cancels in floating point), and matrix exponentials by mpmath at 300 digits.
 
+# --- test case 0 ---
+# the 238U series as a linear chain and as a branching network (with 0.02 % of 214Bi
+# decaying to 210Tl, 1.30 min, which feeds 210Pb) after 3e5 years, against the Bateman sum
+import numpy as np
+import mpmath as _t_mp
 
 def _t_rel(a, b):
     return abs(a - b) / abs(b)
-
 
 def _t_bateman(lam, n0, t, dps=600):
     # linear chain with distinct decay constants: superposition over the initially populated members
@@ -27,7 +28,6 @@ def _t_bateman(lam, n0, t, dps=600):
                 out[k] += _t_mp.mpf(float(n0[j])) * pre * tot
         return [float(x) for x in out]
 
-
 def _t_expm_apply(rates, removal, x0, t, dps=300):
     # exp(t (rates - diag(removal))) x0 with mpmath
     with _t_mp.workdps(dps):
@@ -39,7 +39,6 @@ def _t_expm_apply(rates, removal, x0, t, dps=300):
         v = _t_mp.expm(A * _t_mp.mpf(float(t))) * _t_mp.matrix([_t_mp.mpf(float(a)) for a in x0])
         return [v[i] for i in range(m)]
 
-
 def _t_check(x, target, scale):
     x = np.asarray(x)
     assert x.shape == (len(target),), x.shape
@@ -49,28 +48,8 @@ def _t_check(x, target, scale):
         else:
             assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)
 
-
-def _t_activation(lam, branching, sigma, capture_to, n0, history):
-    # each period exponentiated from the decay and capture rates at 300 digits
-    n = len(lam)
-    x = [float(a) for a in n0]
-    for duration, flux in history:
-        rates = np.zeros((n, n))
-        removal = np.zeros(n)
-        for i in range(n):
-            removal[i] = lam[i] + sigma[i] * 1e-24 * flux
-            for j in range(n):
-                rates[j, i] = branching[j][i] * lam[i]
-            if capture_to[i] >= 0:
-                rates[capture_to[i], i] += sigma[i] * 1e-24 * flux
-        x = [float(a) for a in _t_expm_apply(rates, removal, x, duration)]
-    return x
-
-
 _T_YEAR, _T_DAY, _T_MIN = 3.15576e7, 86400.0, 60.0
 
-# --- test case 0: the 238U series as a linear chain and as a branching network (with 0.02 % of 214Bi
-# decaying to 210Tl, 1.30 min, which feeds 210Pb) after 3e5 years, against the Bateman sum ---
 lam = list(np.log(2.0) / np.array([4.468e9 * _T_YEAR, 24.10 * _T_DAY, 1.17 * _T_MIN, 2.455e5 * _T_YEAR,
                                    7.538e4 * _T_YEAR, 1600.0 * _T_YEAR, 3.8235 * _T_DAY, 3.098 * _T_MIN,
                                    26.8 * _T_MIN, 19.9 * _T_MIN, 164.3e-6, 22.2 * _T_YEAR, 5.012 * _T_DAY,
@@ -93,8 +72,53 @@ target2 = [float(a) for a in _t_expm_apply(rates, lam2, np.r_[n0, 0.0], t)]
 _t_check(y, target2, 1e20)
 assert 0.0 < y[n] < 1e-3 * y[9], (y[n], y[9])
 
-# --- test case 1: flux-monitor analysis on a cobalt network after a two-cycle history: the 60Co
-# activity measured after cooling gives back the flux of the second cycle ---
+# --- test case 1 ---
+# flux-monitor analysis on a cobalt network irradiated for 3e6 s and cooled for 2e5 s: the 60Co
+# activity measured after cooling gives back the irradiation flux, and the inventory matches
+import numpy as np
+import mpmath as _t_mp
+
+def _t_rel(a, b):
+    return abs(a - b) / abs(b)
+
+def _t_expm_apply(rates, removal, x0, t, dps=300):
+    # exp(t (rates - diag(removal))) x0 with mpmath
+    with _t_mp.workdps(dps):
+        m = len(removal)
+        A = _t_mp.matrix(m, m)
+        for i in range(m):
+            for j in range(m):
+                A[i, j] = _t_mp.mpf(float(rates[i][j])) - (_t_mp.mpf(float(removal[i])) if i == j else 0)
+        v = _t_mp.expm(A * _t_mp.mpf(float(t))) * _t_mp.matrix([_t_mp.mpf(float(a)) for a in x0])
+        return [v[i] for i in range(m)]
+
+def _t_check(x, target, scale):
+    x = np.asarray(x)
+    assert x.shape == (len(target),), x.shape
+    for a, b in zip(x, target):
+        if b > 0.0 and b >= 1e-250 * scale:
+            assert _t_rel(a, b) < 1e-10, (a, b)
+        else:
+            assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)
+
+def _t_activation(lam, branching, sigma, capture_to, n0, history):
+    # each period exponentiated from the decay and capture rates at 300 digits
+    n = len(lam)
+    x = [float(a) for a in n0]
+    for duration, flux in history:
+        rates = np.zeros((n, n))
+        removal = np.zeros(n)
+        for i in range(n):
+            removal[i] = lam[i] + sigma[i] * 1e-24 * flux
+            for j in range(n):
+                rates[j, i] = branching[j][i] * lam[i]
+            if capture_to[i] >= 0:
+                rates[capture_to[i], i] += sigma[i] * 1e-24 * flux
+        x = [float(a) for a in _t_expm_apply(rates, removal, x, duration)]
+    return x
+
+_T_YEAR, _T_DAY, _T_MIN = 3.15576e7, 86400.0, 60.0
+
 lam = np.array([0.0, np.log(2.0) / (10.467 * 60.0), np.log(2.0) / (5.2714 * _T_YEAR), np.log(2.0) / (1.65 * 3600.0)])
 B = np.zeros((4, 4))
 B[2, 1] = 0.9975

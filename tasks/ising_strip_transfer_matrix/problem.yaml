@@ -2,6 +2,71 @@
 
 domain: physics
 
+subfield: "Statistical mechanics: transfer matrices, finite-size scaling and tensor networks for the 2D Ising model"
+
+tags:
+  - Ising model
+  - transfer matrix
+  - finite-size scaling
+  - conformal invariance
+  - Yang-Lee edge
+  - corner transfer matrix
+  - tensor networks
+
+expert_time_estimate_hours: 12
+
+relevant_experience: "TODO(author): describe your own relevant experience truthfully before upload"
+
+author: "Ayoub Bousfiha"
+affiliation: "Independent Researcher"
+
+difficulty_explanation: >-
+  The strip steps fail with the first route a practitioner usually takes: the energy correlation
+  length is set by the second state of the spin-flip-even sector, whereas the second and third
+  eigenvalues of the whole matrix belong to the odd sector above Tc; below Tc the two leading states
+  are degenerate to machine precision, so the strip magnetization needs states of definite parity and
+  the zero-field susceptibility cannot come from a finite difference in h. The Yang-Lee edge needs a
+  non-Hermitian eigensolver on a complex symmetric matrix, a bracket that reaches edges of order 1e-4
+  below Tc, and tracking of the leading pair only, since lower pairs leave the real axis first. Step 6
+  combines four earlier functions into finite-size exponent and central-charge estimates at the exact
+  Tc. The last step asks for f, m, chi = dm/dh and c = -T d2f/dT2 of the infinite lattice down to
+  h = 0.005 near Tc, where no diagonalizable strip is close to the bulk limit, so an infinite-lattice
+  method with a correctly normalized partition function per site and derivatives converged to 1e-5
+  relative is required.
+
+solution_explanation: >-
+  The reference builds the symmetric transfer matrix with the in-row bonds and the field shared
+  equally between the two factors, then splits it into spin-flip-even and odd blocks: f comes from the
+  top even eigenvalue, xi_spin from the top odd one, xi_energy from the second even one, and m_L is the
+  matrix element of s_0 between the top even and top odd eigenvectors of the blocks. The strip
+  susceptibility is the closed-form spectral sum over odd states of |<k|S|0>|^2 (lam0 + lam_k) /
+  (lam0 - lam_k), divided by T L. The Yang-Lee edge is the brentq root of the real part of the squared
+  difference of the two leading eigenvalues of the complex symmetric matrix, bracketed by doubling from
+  1e-12 T. Step 6 applies Cardy's relation at width L, two-width logarithmic ratios for beta/nu,
+  gamma/nu and y_h, and a 3x3 linear solve for c. Step 7 runs corner-transfer-matrix renormalization at
+  bond dimension 16 on the infinite lattice, takes f from kappa = Z(3x3) Z(4 corners) / Z(corners + 2
+  edges)**2 and m from the converged environment, and obtains chi and c by Richardson-extrapolated
+  central differences of m in h and of f in T around warm-started runs.
+
+verification_explanation: >-
+  Step 1 targets are brute-force sums over the energy written inside the tests (entry by entry for
+  L = 3, 4 and 6, over all pairs of rows at L = 10) plus hand-worked entries, including the ends of
+  the stated range (T = 0.5 and 10, |h| = 20, L = 10, largest entry exp(440)), and step 2 targets
+  are Kaufman's exact free-fermion spectrum of the periodic strip evaluated inside the tests without
+  any transfer matrix. The inline targets of steps 3 to 6 come
+  from the reference algorithms and agree with second_solution.py, which uses different methods
+  (rotation of the leading pair into parity states, an odd-sector linear solve, bisection on the
+  leading pair leaving the real axis, divided differences for c), to 1.1e-15 in m_L, 2.4e-9 relative in
+  chi, 1e-12 relative in H_edge and 4.3e-12 in the step 6 values; the step 7 and whole-task targets come
+  from corner-transfer-matrix renormalization at bond dimension 28 (the reference uses 16), which was
+  rerun for this version and reproduces them to 3e-15 in f, 7e-14 in m and 2e-8 relative in chi and c,
+  and the second solution reaches them with VUMPS and five-point stencils for chi = -d2f/dh2 and c.
+  tools/crown_check.py ran every test case alone in a fresh process for the reference (per-step files
+  and solution.py), the second solution, every named mutant (nine step mutants and one whole-task
+  mutant, each failing at least one case), a relative shift of every reference output by +-1e-12 (all
+  cases pass) and all-None and all-zero controls (no case passes). The reference and the second
+  solution were also run twice in clean processes and gave identical outputs.
+
 required_dependencies: |-
   import numpy as np
   from scipy.optimize import brentq
@@ -49,7 +114,7 @@ mutants:
     file: mutants/whole_task_field_not_scaled.py
 
 # On a new version of an uploaded task only, what kind of edit it is.
-edit_label: difficulty_increase
+edit_label: grading_fix
 
 sub_steps:
   - step_number: 1
@@ -73,16 +138,17 @@ sub_steps:
       h may be complex. Later steps call this function with a purely imaginary field
       h = 1j * H, and M must then be the complex matrix given by the same rule (symmetric, not
       Hermitian). Return M as a numpy array of shape (2**L, 2**L), every entry with relative
-      accuracy 1e-10. L is an integer with L >= 3, and T > 0.
+      accuracy 1e-10, for every integer L from 3 to 10, every T from 0.5 to 10 and every real
+      or complex h with |h| <= 20.
     function_header: |-
       def transfer_matrix(L, T, h=0.0):
           '''Symmetric row-to-row transfer matrix of the 2D Ising model on a periodic strip in a field h.
 
           Inputs:
-            L: int, width of the strip in spins, L >= 3. Spin L is the same as spin 0.
-            T: float, temperature, T > 0 (J = 1, k_B = 1).
+            L: int, width of the strip in spins, 3 <= L <= 10. Spin L is the same as spin 0.
+            T: float, temperature, 0.5 <= T <= 10 (J = 1, k_B = 1).
             h: float or complex, uniform field; the energy is E = - sum_<ij> s_i s_j - h sum_i s_i.
-               A complex h, such as 1j * H, is allowed.
+               |h| <= 20; a complex h, such as 1j * H, is allowed.
 
           Output:
             M: numpy array of shape (2**L, 2**L), complex when h is complex. Row label
@@ -98,12 +164,12 @@ sub_steps:
       bonds and the field equally between the two factors does not change the eigenvalues; it
       only makes M symmetric. For real h the eigenvalues are real; for imaginary h the matrix
       is complex symmetric and its eigenvalues need not be real.
-    n_test_cases: 3
+    n_test_cases: 5
     contract:
       quantity: "The symmetric row-to-row transfer matrix of the 2D Ising model on a periodic strip of width L in a uniform field h (real or complex)."
       assumptions: "Nearest-neighbour coupling J = 1, k_B = 1, periodic boundary across the width, rows labelled by the bit rule of the prompt, in-row bonds and field shared equally between the two factors that touch a row."
       result_kind: exact
-      valid_input_ranges: "Integer L from 3 to about 11 (memory grows as 4**L); T > 0; h real or complex."
+      valid_input_ranges: "Integer L from 3 to 10; 0.5 <= T <= 10; h real or complex with |h| <= 20 (the later steps use L up to 10, T down to 0.5, and imaginary fields up to |h| of about 11 while bracketing the Yang-Lee edge; the largest entry, exp(L (2 + |h|) / T) <= exp(440), stays finite in double precision)."
       units: "Dimensionless (Boltzmann weights)."
       output_shape: "Numpy array of shape (2**L, 2**L), symmetric; complex when h is complex."
       step_dependencies: []
@@ -390,8 +456,7 @@ sub_steps:
         chi = dm/dh at fixed T, the susceptibility (units 1/J), with relative accuracy 1e-5;
         c = -T d2f/dT2 at fixed h, the specific heat (units k_B), with relative accuracy 1e-5.
 
-      Return the tuple (f, m, chi, c) of four Python floats; each call must finish within 60 s
-      on one CPU core. Near Tc in the weakest fields the
+      Return the tuple (f, m, chi, c) of four Python floats. Near Tc in the weakest fields the
       bulk correlation length is many lattice spacings, so strips of any width that can be
       diagonalized are far from these limits, and the response functions are large and vary
       quickly with T and h.

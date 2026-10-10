@@ -9,8 +9,12 @@ Differences from solution.py (method, not formatting):
   * Paleoclimate: Duhamel convolution of the surface history with the
     half-space impulse response z/(2 sqrt(pi kappa tau^3)) exp(-z^2/4 kappa tau),
     integrated numerically (solution.py uses differences of erfc).
-  * Fit: QR-based least squares with covariance from the pseudo-inverse
-    (solution.py solves the normal equations).
+  * Fit: QR-based least squares with covariance from the inverse of the
+    triangular factor (solution.py solves the normal equations).
+  * Layered paleoclimate perturbation (step 5): one global linear system per
+    Laplace node for the scaled layer coefficients and the hyperbolic contour of
+    Weideman and Trefethen (2007) (solution.py carries the admittance with a
+    tanh recursion and inverts on the fixed Talbot contour).
 """
 import numpy as np
 from scipy.integrate import quad
@@ -153,7 +157,7 @@ def surface_heat_flow(survey_md, survey_inc, survey_azi, log_md, log_temp,
     return out
 
 
-# ---------------------------------------------------------------- step 6 (second solution)
+# ---------------------------------------------------------------- step 5 (second solution)
 def layered_paleoclimate_perturbation(z, layer_tops, layer_k, rho_c, t_years, dT):
     """Present-day departure (K) at depth z in a layered column (second solution)."""
     # Other methods: for each Laplace variable the layer coefficients come from one global linear system

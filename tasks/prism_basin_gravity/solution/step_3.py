@@ -1,5 +1,6 @@
 import numpy as np
 import math
+from scipy.optimize import least_squares
 
 G = 6.6743e-11          # m^3 kg^-1 s^-2 (CODATA 2018)
 
@@ -28,17 +29,35 @@ def _check_points(points):
     return p, single
 
 
-def _lamina(X, Y, Z):
-    # sum over the four corners of atan(x y / (Z r)) (+ at (x2, y2)), the vertical attraction / (G rho dz)
-    # of a horizontal lamina at depth Z below the station; X, Y are (2, n) corner offsets, Z (m, n) > 0
+def _lamina(X, Y, Z, wx, wy):
+    # solid angle of the horizontal rectangle at depth Z > 0 below the station, i.e. the vertical attraction
+    # / (G rho dz) of a lamina; X = (x1 - x_s, x2 - x_s), Y = (y1 - y_s, y2 - y_s) are (2, n) corner offsets,
+    # wx, wy the widths x2 - x1, y2 - y1 (n,), Z (m, n) or (m, 1). Near the rectangle: the corner sum of
+    # atan2(x y, Z r) (+ at (x2, y2)). At a horizontal distance of at least the larger width that sum cancels
+    # (terms of order 1, result of order w^2 Z / d^3: 1e-9 relative lost 1000 widths away), so there the two
+    # triangles of the rectangle are taken by the Van Oosterom-Strackee formula
+    # tan(Omega / 2) = a.(b x c) / (|a||b||c| + (a.b)|c| + (a.c)|b| + (b.c)|a|), whose triple product is
+    # Z wx wy and whose dot products are all positive that far: no cancellation at any distance.
+    X0, X1, Y0, Y1 = X[0][None, :], X[1][None, :], Y[0][None, :], Y[1][None, :]
+    Z2 = Z * Z
     tot = 0.0
-    for i in range(2):
-        for j in range(2):
-            x, y = X[i][None, :], Y[j][None, :]
-            r = np.sqrt(x * x + y * y + Z * Z)
-            s = 1.0 if (i + j) % 2 == 0 else -1.0
-            tot = tot + s * np.arctan2(x * y, Z * r)
-    return tot
+    for i, x in enumerate((X0, X1)):
+        for j, y in enumerate((Y0, Y1)):
+            r = np.sqrt(x * x + y * y + Z2)
+            tot = tot + (1.0 if (i + j) % 2 == 0 else -1.0) * np.arctan2(x * y, Z * r)
+    far = np.hypot(np.maximum(np.maximum(X0, -X1), 0.0), np.maximum(np.maximum(Y0, -Y1), 0.0)) >= np.maximum(wx, wy)
+    if not np.any(far):
+        return tot
+    ra = np.sqrt(X0 * X0 + Y0 * Y0 + Z2)
+    rb = np.sqrt(X1 * X1 + Y0 * Y0 + Z2)
+    rc = np.sqrt(X1 * X1 + Y1 * Y1 + Z2)
+    rd = np.sqrt(X0 * X0 + Y1 * Y1 + Z2)
+    num = Z * (wx * wy)
+    vo = 2.0 * (np.arctan2(num, ra * rb * rc + (X0 * X1 + Y0 * Y0 + Z2) * rc + (X0 * X1 + Y0 * Y1 + Z2) * rb
+                           + (X1 * X1 + Y0 * Y1 + Z2) * ra)
+                + np.arctan2(num, ra * rc * rd + (X0 * X1 + Y0 * Y1 + Z2) * rd + (X0 * X0 + Y0 * Y1 + Z2) * rc
+                             + (X0 * X1 + Y1 * Y1 + Z2) * ra))
+    return np.where(far, vo, tot)
 
 
 def _column_nodes(z0, h):
@@ -57,7 +76,7 @@ def column_gz(stations, x1, x2, y1, y2, depth, drho0, lam):
     """Vertical attraction of a column with density contrast drho0 exp(-lam z), 0 <= z <= depth.
 
     Inputs:
-      stations: float array of shape (3,) or (n, 3), stations (x, y, z) in m with z <= 0.
+      stations: float array of shape (3,) or (n, 3), up to 1000 stations (x, y, z) in m with z <= 0.
       x1, x2, y1, y2: floats, the column x1 <= x <= x2, y1 <= y <= y2 (m), x1 < x2, y1 < y2.
       depth: float, 0 < depth <= 5e4 (m).
       drho0: float, density contrast at the surface (kg m^-3).
@@ -65,8 +84,8 @@ def column_gz(stations, x1, x2, y1, y2, depth, drho0, lam):
 
     Output:
       gz: z component of the attraction (m s^-2, positive down for drho0 > 0); a Python float for one
-        station, a numpy array (n,) otherwise; relative error below 1e-10 at every station. Each call
-        within 10 s for up to 1000 stations.
+        station, a numpy array (n,) otherwise; relative error below 1e-10 at every station up to 1e7 m
+        from the column.
 
     Raises:
       ValueError for stations of the wrong shape, non-finite or with z > 0, a non-finite parameter,
@@ -91,7 +110,7 @@ def column_gz(stations, x1, x2, y1, y2, depth, drho0, lam):
         X = np.array([[x1 - q[0]], [x2 - q[0]]])
         Y = np.array([[y1 - q[1]], [y2 - q[1]]])
         Z = (z - q[2])[:, None]
-        L = _lamina(X, Y, Z)[:, 0]
+        L = _lamina(X, Y, Z, np.array([x2 - x1]), np.array([y2 - y1]))[:, 0]
         out[i] = G * drho0 * float(np.sum(w * np.exp(-lam * z) * L))
     gz = float(out[0]) if single else out
     return gz

@@ -9,8 +9,8 @@ def sto3g_two_electron(zetaA, zetaB, R):
     '''Two-electron repulsion integrals over the two STO-3G 1s functions.
 
     Inputs:
-      zetaA, zetaB: float, Slater exponents of the 1s functions on A (origin) and B, > 0.
-      R: float, distance between the nuclei in bohr, R > 0.
+      zetaA, zetaB: float, Slater exponents of the 1s functions on A (origin) and B, 0.5 <= zeta <= 3.
+      R: float, distance between the nuclei in bohr, 0.02 <= R <= 100.
 
     Output:
       eri: float numpy array of shape (2, 2, 2, 2), in hartree, with

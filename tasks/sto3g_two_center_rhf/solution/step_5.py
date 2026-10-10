@@ -21,9 +21,10 @@ def _s5_atom(Z, zeta):
 
 
 def _s5_fci(ZA, ZB, zetaA, zetaB, R):
-    # E_fci(R) of fci_energy (step 4): the lowest singlet of the full-CI matrix. Full CI does not depend
-    # on the orthonormal orbitals used, so the symmetric orthogonalization S^(-1/2) replaces the RHF
-    # orbitals here (the RHF scan of fci_energy is not needed for the curve).
+    # E_fci(R) of fci_energy (step 4), built from sto3g_one_electron (step 2) and sto3g_two_electron
+    # (step 3), as the step 5 prompt allows: the lowest singlet of the full-CI matrix. Full CI does not
+    # depend on the orthonormal orbitals used, so the symmetric orthogonalization S^(-1/2) replaces the
+    # RHF orbitals here (the RHF scan of fci_energy is not needed for the curve).
     S, H = sto3g_one_electron(ZA, ZB, zetaA, zetaB, R)
     eri = sto3g_two_electron(zetaA, zetaB, R)
     s_val, s_vec = np.linalg.eigh(S)

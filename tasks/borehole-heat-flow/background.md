@@ -111,6 +111,29 @@ Readings shallower than a cut-off depth are excluded. They are disturbed by
 recent (post-Little-Ice-Age) warming and by ground-water circulation in
 fractured near-surface rock.
 
+## 5. Paleoclimate perturbation in layered ground
+
+The erfc formula of section 3 gives the whole ground one diffusivity. Real Shield
+columns alternate volcanics, intrusions and metasediments with conductivities
+from about 2 to 5 W m^-1 K^-1, and the glacial signal is refracted at each
+contrast: the diffusion is faster in conductive layers, and the heat flux, not
+the temperature gradient, is continuous across an interface. With a uniform
+volumetric heat capacity rho_c, layer i has the diffusivity k_i / rho_c, and the
+departure theta obeys rho_c dtheta/dt = d/dz (k dtheta/dz) in every layer.
+Carslaw and Jaeger (1959, ch. 12) give the image series for a layer over a
+half-space; for more layers the problem is solved most directly in the Laplace
+domain, where each layer contributes exponentials in z. Paleoclimate corrections
+in layered ground differ from the half-space formula by up to tens of percent
+near strong contrasts (Beck 1977).
+
+## 6. The complete workflow
+
+Step 6 of the task chains sections 1-4 on one borehole: the readings and the
+layer contacts are converted to vertical depth with the same trajectory, the
+shallow readings are removed with a cut on vertical depth, R, S and the
+unit-amplitude perturbation P are evaluated at the remaining depths, and T0, q0
+and the glacial amplitude g are estimated jointly.
+
 ## References
 
 - Beck, A.E. (1977) Climatically perturbed temperature gradients and their effect on regional and continental heat-flow means. Tectonophysics 41, 17–39.

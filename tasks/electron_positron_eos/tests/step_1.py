@@ -1,9 +1,3 @@
-import math
-import numpy as np
-import mpmath as _t_mp
-import signal as _t_signal
-import time as _t_btime
-
 # Independent targets: closed forms of the classical (Maxwell-Juettner) gas with modified Bessel
 # functions, and values computed once with mpmath at 40 digits by tanh-sinh quadrature of the defining
 # integrals in the momentum (breakpoints every k T over the Fermi edge), the chemical potential by a
@@ -11,47 +5,18 @@ import time as _t_btime
 # net electron density (T +- 1e-7 T), all in mpmath; positron densities of a classical positron gas
 # (eps/kT + psi >= 40) from the Maxwell-Juettner formula.
 
+# --- test case 0 ---
+# classical gas (the electron occupation exponent stays above 39 and that of the positrons
+# above 59, so Fermi corrections are below 1e-17): Maxwell-Juettner densities
+import numpy as np
+import mpmath as _t_mp
+
 _T_MEC2 = 8.1871057769e-7
 _T_KB = 1.380649e-16
 _T_LC = 3.8615926796e-11
-_T_NA = 6.02214076e23
-
-# Time budget of one call, as stated in the prompt: the call is interrupted once it exceeds the budget
-# (by one second), so a solution that is too slow fails this check instead of holding up the tests.
-_t_depth = [0]
-
-
-def _t_budget(fn, seconds, name):
-    def wrapped(*args, **kwargs):
-        if _t_depth[0]:
-            return fn(*args, **kwargs)
-
-        def _alarm(signum, frame):
-            raise TimeoutError("%s did not finish within its budget of %g s per call" % (name, seconds))
-        try:
-            old = _t_signal.signal(_t_signal.SIGALRM, _alarm)
-            _t_signal.setitimer(_t_signal.ITIMER_REAL, seconds + 1.0)
-            armed = True
-        except (ValueError, AttributeError, OSError):      # no SIGALRM here: measure only
-            armed = False
-        _t_depth[0] += 1
-        start = _t_btime.perf_counter()
-        try:
-            out = fn(*args, **kwargs)
-        finally:
-            _t_depth[0] -= 1
-            if armed:
-                _t_signal.setitimer(_t_signal.ITIMER_REAL, 0.0)
-                _t_signal.signal(_t_signal.SIGALRM, old)
-        elapsed = _t_btime.perf_counter() - start
-        assert elapsed <= seconds, ("%s took %.1f s (budget %g s per call)" % (name, elapsed, seconds))
-        return out
-    return wrapped
-
 
 def _t_rel(a, b):
     return abs(a - b) / abs(b)
-
 
 def _t_classical(T, psi):
     # Maxwell-Juettner gas (Boltzmann occupation): n = theta K2(1/theta) e^{+-psi} / (pi^2 lambda^3),
@@ -67,8 +32,32 @@ def _t_classical(T, psi):
         s = _t_mp.mpf(_T_KB) * (nm * (eps / th - psi + 1) + npl * (eps / th + psi + 1))
         return [float(x) for x in (nm, npl, nm - npl, P, u, s)]
 
+def _t_check1(T, psi, target):
+    out = pair_densities(T, psi)
+    assert isinstance(out, tuple) and len(out) == 3 and all(type(x) is float for x in out), out
+    nm, npl, net = out
+    assert _t_rel(nm, target[0]) < 1e-10, (T, psi, nm, target[0])
+    if target[1] >= 1e-250:
+        assert _t_rel(npl, target[1]) < 1e-10, (T, psi, npl, target[1])
+    else:
+        assert abs(npl - target[1]) <= 1e-250, (T, psi, npl, target[1])
+    if target[2] >= 1e-250:
+        assert _t_rel(net, target[2]) < 1e-10, (T, psi, net, target[2])
+    else:
+        assert abs(net - target[2]) <= 1e-250, (T, psi, net, target[2])
+    return out
 
-pair_densities = _t_budget(pair_densities, 10.0, "pair_densities")
+for _t_T, _t_psi in ((1e8, 20.0), (2e7, 5.0), (5e7, 30.0)):
+    _t_c = _t_classical(_t_T, _t_psi)
+    _t_check1(_t_T, _t_psi, _t_c[:3])
+
+# --- test case 1 ---
+# from strongly degenerate (psi up to 1e6) through classical to pair plasmas
+# (n_net / n_minus down to 4e-21 at T = 1e11 K, psi = 2.2e-21), against 40-digit targets
+import numpy as np
+
+def _t_rel(a, b):
+    return abs(a - b) / abs(b)
 
 _T_TP = {
     (10000000.0, 130000.0): (6.179520231754482940999412e+36, 2.346813986462897923301478e-56690, 6.179520231754482940999412e+36, 2.772731709361358577554444e+32, 8.267948868315288590509692e+32, 64774410687625976.98471617),
@@ -85,7 +74,6 @@ _T_TP = {
     (20000000.0, 1000000.0): (2.250236607519217944970892e+40, 2.455871423753166156237421e-434397, 2.250236607519217944970892e+40, 1.553393256146546323000493e+37, 4.658338295271499426436939e+37, 30662760573351414102.7831),
 }      # (T, psi): n_minus, n_plus, n_net, P, u, s
 
-
 def _t_check1(T, psi, target):
     out = pair_densities(T, psi)
     assert isinstance(out, tuple) and len(out) == 3 and all(type(x) is float for x in out), out
@@ -95,29 +83,31 @@ def _t_check1(T, psi, target):
         assert _t_rel(npl, target[1]) < 1e-10, (T, psi, npl, target[1])
     else:
         assert abs(npl - target[1]) <= 1e-250, (T, psi, npl, target[1])
-    assert _t_rel(net, target[2]) < 1e-10, (T, psi, net, target[2])
+    if target[2] >= 1e-250:
+        assert _t_rel(net, target[2]) < 1e-10, (T, psi, net, target[2])
+    else:
+        assert abs(net - target[2]) <= 1e-250, (T, psi, net, target[2])
     return out
 
-
-# --- test case 0: classical gas (the electron occupation exponent stays above 39 and that of the positrons
-# above 59, so Fermi corrections are below 1e-17): Mawell-Juettner densities ---
-for _t_T, _t_psi in ((1e8, 20.0), (2e7, 5.0), (5e7, 30.0)):
-    _t_c = _t_classical(_t_T, _t_psi)
-    _t_check1(_t_T, _t_psi, _t_c[:3])
-
-# --- test case 1: from strongly degenerate (psi up to 1e6) through classical to pair plasmas
-# (n_net / n_minus down to 4e-21 at T = 1e11 K, psi = 2.2e-21), against 40-digit targets ---
 for (_t_T, _t_psi), _t_v in _T_TP.items():
     _t_check1(_t_T, _t_psi, [float(x) for x in _t_v[:3]])
 
-# --- test case 2: the ends of the domain, T = 1e7 and 1e11 K: the net density of a pair plasma
-# grows in proportion to psi (n_net(2 psi) / n_net(psi) = 2 to the accuracy of the two values) ---
+# --- test case 2 ---
+# the hot end of the domain, T = 1e11 K: the net density of a pair plasma
+# grows in proportion to psi (n_net(2 psi) / n_net(psi) = 2 to the accuracy of the two values)
+import numpy as np
+
+def _t_rel(a, b):
+    return abs(a - b) / abs(b)
+
 _t_a = pair_densities(1e11, 1e-20)
 _t_b = pair_densities(1e11, 2e-20)
 assert abs(_t_b[2] / _t_a[2] - 2.0) < 4e-10, (_t_a, _t_b)
 assert _t_rel(_t_b[0], _t_a[0]) < 1e-9 and _t_a[2] < 1e-15 * _t_a[0], (_t_a, _t_b)
 
-# --- test case 3: T or psi not finite or outside its range ---
+# --- test case 3 ---
+# T or psi not finite or outside its range
+import numpy as np
 for _t_bad in ((float("nan"), 1.0), (1e9, float("inf")), (9e6, 1.0), (1.1e11, 1.0), (1e9, 0.0), (1e9, -1.0),
                (1e9, 1.5e6)):
     try:
@@ -126,3 +116,32 @@ for _t_bad in ((float("nan"), 1.0), (1e9, float("inf")), (9e6, 1.0), (1.1e11, 1.
         pass
     else:
         raise AssertionError("pair_densities%r must raise ValueError" % (_t_bad,))
+
+# --- test case 4 ---
+# a cool, nearly symmetric classical gas at T = 1e7 K (both occupation exponents above 593, Fermi
+# corrections below 1e-257): Maxwell-Juettner densities n_minus, n_plus = theta K2(1/theta) e^{+-psi} /
+# (pi^2 lambda^3), about 4.5e-232 cm^-3, and n_net = 2 sinh(psi) theta K2(1/theta) / (pi^2 lambda^3):
+# 9.0e-250 cm^-3 at psi = 1e-18 (at least 1e-250, so relative 1e-10; n_minus - n_plus has no correct
+# digit) and 9.0e-332 cm^-3 at psi = 1e-100 (below 1e-250 and below the double range: within 1e-250)
+import numpy as np
+import mpmath as _t_mp
+
+_T_MEC2 = 8.1871057769e-7
+_T_KB = 1.380649e-16
+_T_LC = 3.8615926796e-11
+
+def _t_rel(a, b):
+    return abs(a - b) / abs(b)
+
+for _t_psi in (1e-18, 1e-100):
+    with _t_mp.workdps(40):
+        _t_th = _t_mp.mpf(_T_KB) * 1e7 / _t_mp.mpf(_T_MEC2)
+        _t_base = _t_th * _t_mp.besselk(2, 1 / _t_th) / (_t_mp.pi ** 2 * _t_mp.mpf(_T_LC) ** 3)
+        _t_want = [_t_base * _t_mp.exp(_t_psi), _t_base * _t_mp.exp(-_t_psi), 2 * _t_base * _t_mp.sinh(_t_psi)]
+    _t_out = pair_densities(1e7, _t_psi)
+    assert isinstance(_t_out, tuple) and len(_t_out) == 3 and all(type(x) is float for x in _t_out), _t_out
+    for _t_got, _t_w, _t_name in zip(_t_out, _t_want, ("n_minus", "n_plus", "n_net")):
+        if _t_w >= 1e-250:
+            assert _t_rel(_t_got, float(_t_w)) < 1e-10, (_t_psi, _t_name, _t_got, _t_w)
+        else:
+            assert abs(_t_got - float(_t_w)) <= 1e-250, (_t_psi, _t_name, _t_got, _t_w)

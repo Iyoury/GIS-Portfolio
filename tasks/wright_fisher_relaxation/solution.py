@@ -261,6 +261,8 @@ def substitution_times(N, s, u, v):
       s: float, selection coefficient of A, -0.5 <= s <= 0.5.
       u: float, mutation probability A -> a per generation, 1e-12 <= u <= 0.1.
       v: float, mutation probability a -> A per generation, 1e-12 <= v <= 0.1.
+      Inputs for which t_up or t_down would exceed 1e300 generations are outside the domain (within these
+      ranges only t_up can be that large, near N = 400, s = -0.5, u = 0.1, v = 1e-12).
 
     Output:
       (t_up, t_down): tuple of two Python floats.
@@ -420,8 +422,9 @@ def fastest_mode(N, s, u, v):
       lam_min: Python float, the smallest eigenvalue of the transition matrix P of step 1
                (wf_transition_matrix), with a relative error below 1e-8.
       mode: numpy float array of shape (N + 1,), the right eigenvector (P mode = lam_min mode), scaled so
-            that max_i |mode[i]| = 1 and its first nonzero entry is positive; every entry with an error
-            below 1e-8 times its absolute value (entries that are exactly zero returned as 0.0).
+            that max_i |mode[i]| = 1 and its first entry that is not on an absorbing state is positive;
+            every entry with an error below 1e-8 times its absolute value, except on the absorbing states,
+            where the exact entries are zero and the returned entries must be below 1e-250 in absolute value.
 
     Raises:
       ValueError if N is not an integer in [1, 400] (bool and float are not accepted), if s, u or v

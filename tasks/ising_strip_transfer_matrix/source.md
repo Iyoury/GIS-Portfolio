@@ -42,7 +42,7 @@ an independent route.
 
 | Target | Method | Check |
 |---|---|---|
-| M entries (step 1) | brute-force sum over the energy, entry by entry, inside the test; spot entries worked out by hand | exact |
+| M entries (step 1) | brute-force sum over the energy inside the test (entry by entry for L = 3, 4 and 6; over all pairs of rows, column by column, at L = 10); spot entries worked out by hand, including the ends of the stated range | reference and second solution within 3e-14 relative of a 40-digit sum over the energy at the corners of the range (L = 3, 4, 7, 10; T = 0.5, 1, Tc, 10; h = 0, 0.1, +-20, +-20i, 20 exp(i pi/3), 11i) |
 | f, xi_spin, xi_energy (step 2) | Kaufman's exact strip spectrum, now computed inside the test file in double precision (no pinned numbers); xi_energy = 1 / (2 g_1), the two lowest fermion modes q = 1 and 2L - 1; tolerances 1e-10 (f) and 1e-6 (lengths) | reference within 1.7e-8 (xi_spin at L = 10, T = 1, limited by the 1.4e-8 relative gap), elsewhere within 1e-14 |
 | m_L (step 3) | reference (separate spin-flip sector blocks) | second solution (rotation of the leading pair of the whole matrix into parity states) within 3e-16; coefficient of the slowest term of G(r) at 40 digits for L <= 6 within 1e-15 |
 | chi (step 4) | reference (spectral sum over the odd states) | second solution (odd-sector linear solve) within 2.4e-9; 40-digit finite differences of ln lam0(h) for L <= 6 within 1e-13 |
@@ -95,3 +95,106 @@ Version 8: step 7 states a time budget of 60 s per call (the reference needs at 
 timed out on step 7 without a stated budget. Step 6 states the scaling laws (Cardy's relation,
 finite-size power laws between two widths, the conformal law of the free energy for three
 widths) instead of the final estimator formulas; the expected values are unchanged.
+
+## Version 9 (grading_fix: authoring-guide conformance)
+
+1. Timing removed from the tests and the prompt.
+   - Finding: tests/step_7.py and tests/general.py wrapped every call to bulk_thermodynamics in a
+     perf_counter clock read with an assert of at most 60 s, and the step 7 prompt said "each call must
+     finish within 60 s on one CPU core".
+   - Cause: the budget was added in version 8 after two rollouts timed out; the authoring guide forbids
+     clock reads and timing asserts in tests and per-call time budgets in prompts.
+   - Change: the wrapper and the budget sentence are gone; every case calls bulk_thermodynamics directly.
+     No other prompt, docstring, scaffold, solution or mutant stated a time budget, and no size or
+     domain statement was attached to the removed sentence. The six step 7 cases and the two whole-task
+     cases keep every value check with the same targets and tolerances.
+   - Regression test: crown_check format finds no clock/timing pattern; the step 7 and general cases pass
+     for the reference and the second solution and still reject every step 7 and whole-task mutant.
+2. Test-case markers and preamble.
+   - Finding: the markers of tests/step_7.py and tests/general.py carried descriptions
+     ("# --- test case 0: exact Tc, weakest field ... ---") and both files had code before case 0.
+   - Cause: the descriptive marker style predates the parser format.
+   - Change: markers are exactly "# --- test case N ---" (0..5 for step 7, 0..1 for general), the
+     descriptions are plain comments inside each case, each case has its own import. n_test_cases of
+     step 7 stays 6. tools/selfcontain.py leaves every test file of the task unchanged (no PROBLEM line).
+   - Regression test: crown_check format reports the markers of every test file as normalized.
+3. Zero absolute tolerance in step 1.
+   - Finding: the step 1 tests used np.allclose(..., rtol=1e-10, atol=0.0).
+   - Cause: a relative-only comparison was written with an explicit zero absolute tolerance.
+   - Change: the comparison with the brute-force matrix is written as the maximum relative entry error
+     <= 1e-10 (the stated per-entry relative accuracy; every entry is an exponential, never zero, so the
+     meaning is that of the old call). The symmetry check compares two computed entries M[n, m] and
+     M[m, n], each allowed a relative error of 1e-10, so it now uses 2e-10 (it used 1e-10, which a
+     candidate within the stated accuracy could fail). The stated accuracy itself is unchanged.
+   - Regression test: step 1 passes for the reference, the second solution and the +-1e-12 shift; the
+     field_not_shared mutant still fails every case with h != 0 (cases 0, 1, 3 and 4 after item 7; case
+     2 has h = 0, where it equals the reference).
+4. Metadata and labels: subfield, tags, expert_time_estimate_hours, the relevant_experience
+   placeholder (to be written by the author), difficulty_explanation, solution_explanation,
+   verification_explanation, author and affiliation added; edit_label is grading_fix.
+5. Consistency of non-graded text: background.md still said that the last step asks for the bulk
+   magnetization only; it now names the four quantities. (The step 1 contract range is handled in
+   item 7.)
+6. Target re-verification (no target changed): the CTMRG of the step 7 reference was rerun at bond
+   dimension 28 on all eight step 7 and whole-task points; it reproduces the inline targets to
+   3e-15 in f, 7e-14 in m, 2e-10 relative in chi and 1.3e-8 relative in c. The reference and the second
+   solution agree on the step 3 to 6 test inputs to 1.1e-15 (m_L), 2.4e-9 relative (chi), 1e-12
+   relative (H_edge) and 4.3e-12 (step 6 values).
+7. Step 1 domain bounded to the validated range (found by an independent verifier after the first
+   conformance pass of this version).
+   - Finding: the step 1 prompt ("L is an integer with L >= 3, and T > 0"), the transfer_matrix
+     docstring (problem.yaml and its six copies in steps/step_1.py, solution/step_1.py, solution.py,
+     second_solution.py, mutants/step_1_field_not_shared.py and mutants/whole_task_field_not_scaled.py)
+     promised every entry to relative accuracy 1e-10 for any L >= 3, any T > 0 and any h, and the
+     contract had been widened earlier in this version from "L from 3 to about 11" to "L >= 3" to
+     match. The reference cannot meet that: the largest exponent of an entry is L (2 + |Re h|) / T,
+     so entries overflow to inf (and others underflow to 0) once it passes about 709;
+     transfer_matrix(10, 0.02) and transfer_matrix(3, 0.005) contain inf and 0 entries, and memory
+     grows as 4**L. The tests covered only L = 3, 4, 6 with T = 1.7 to 2.5.
+   - Cause: the step 1 range was never bounded; it was written as the formal definition domain rather
+     than the range that was validated and that the later steps use.
+   - Change: the prompt now says "for every integer L from 3 to 10, every T from 0.5 to 10 and every
+     real or complex h with |h| <= 20"; all seven docstring copies say 3 <= L <= 10,
+     0.5 <= T <= 10 and |h| <= 20; the contract valid_input_ranges says the same and why. The range
+     covers every call of the later steps: L up to 10 (steps 2 to 4; step 6 uses widths up to 9),
+     T down to 0.5 (step 3) and up to 10, and imaginary fields up to 1e-12 T 2**40 = 11.0 at T = 10,
+     the last point of the geometric bracket of the Yang-Lee edge in both solutions (the edge itself is
+     at most 6.13, at L = 3 and T = 10). |h| <= 20 rather than 11 keeps a margin; in this range the
+     exponent of every entry lies between -440 and 440 (largest entry exp(440) at L = 10, T = 0.5,
+     h = -20), so no entry overflows or underflows. Validation: the reference and
+     the second solution agree with a 40-digit sum over the energy (mpmath) to 3e-14 relative on every
+     entry for L = 3 and 4 and on about 300 sampled entries for L = 7 and 10, at T = 0.5, 1, Tc
+     and 10 and h = 0, 0.1, 20, -20, 20i, -20i, 20 exp(i pi/3) and 11i; the reference is exactly
+     symmetric there.
+     The reference, targets and science are unchanged.
+   - Regression test: two new self-contained cases in tests/step_1.py (n_test_cases 3 -> 5).
+     Case 3 compares the brute-force entry-by-entry sum and hand-worked entries at the low-T end
+     (L = 3, T = 0.5, h = 0.1: M[0, 0] = exp(12.6), M[7, 7] = exp(11.4), M[0, 7] = 1) and at the
+     high-T, largest-imaginary-field end (L = 3, T = 10, h = 20i: M[0, 0] = exp(0.6 + 6i),
+     M[7, 7] = exp(0.6 - 6i), M[0, 7] = 1). Case 4 takes the widest strip at the lowest temperature,
+     L = 10, T = 0.5, and compares every entry with a column-by-column sum of the energy over all
+     pairs of rows, at h = 0 (M[0, 0] = exp(40), M[0, 1] = exp(32), M[0, 1023] = 1) and at the largest
+     real field h = -20 (M[1023, 1023] = exp(440), M[0, 0] = exp(-360), M[0, 1023] = 1, symmetry to
+     2e-10). Both pass for the reference, the second solution and the +-1e-12 shift; the
+     field_not_shared mutant fails both (cases 0, 1, 3 and 4 in all); the all-None and all-zero
+     controls fail both.
+
+Rerun (after all seven items, including the two new step 1 cases): tools/crown_check.py (all modes,
+every case alone in a fresh process, -j 2) and two clean-process runs of solution.py and
+second_solution.py with identical outputs. Result:
+FORMAT OK; REF 5/5, 5/5, 6/6, 6/6, 6/6, 3/3, 6/6 for steps 1 to 7 and 2/2 for general (solution.py
+also passes every step file); SECOND the same counts, all pass; every mutant fails at least one case
+(field_not_shared 4/5, third_eigenvalue 3/5, correlation_one_row 4/6, finite_difference 4/6,
+first_complex_eigenvalue 2/6, inverted_edge_ratio 3/3, missing_corner_normalization 6/6,
+specific_heat_without_T 6/6, free_spin_susceptibility 6/6, whole_task_field_not_scaled 2/2); SHIFT
++-1e-12 all pass; the all-None and all-zero controls pass 0 cases in every step and in general;
+SUMMARY ALL OK. The run used OMP_NUM_THREADS = OPENBLAS_NUM_THREADS = MKL_NUM_THREADS = 1: on the
+shared, heavily loaded machine, a first attempt with the default multithreaded BLAS made the second
+solution's step 7 cases (VUMPS) run for more than ten minutes each, while one cold VUMPS run takes
+about 10 s single-threaded. Repeat runs in clean processes gave bit-identical outputs (reference twice
+with default threads and twice single-threaded, second solution twice single-threaded); between the
+two thread settings the reference differs by at most 1.6e-8 relative (xi_spin at L = 10, T = 1, whose
+gap is 1.4e-8 relative) and elsewhere by 1e-13 or less, far inside the stated tolerances. After item 7,
+solution.py and second_solution.py were each run twice more in clean single-threaded processes on the
+inputs of every test case of the task (the seven step 1 matrices compared through a hash of their
+bytes, 44 outputs in all); both pairs of runs were identical.

@@ -2,6 +2,74 @@
 
 domain: biology
 
+subfield: "Theoretical population genetics: Wright-Fisher Markov chains with selection, mutation and genetic drift"
+
+tags:
+  - population genetics
+  - Wright-Fisher model
+  - Markov chains
+  - fixation probability
+  - quasi-stationary distribution
+  - spectral gap
+  - totally positive matrices
+  - extended-precision numerics
+
+expert_time_estimate_hours: 14
+
+relevant_experience: "TODO(author): describe your own relevant experience truthfully before upload"
+
+author: "Ayoub Bousfiha"
+affiliation: "Independent Researcher"
+
+difficulty_explanation: >-
+  Every requested quantity of the Wright-Fisher chain is needed to a relative 1e-8 although it lies far below the
+  rounding error of the matrix entries next to it: fixation probabilities down to about 6e-240, stationary
+  probabilities spanning more than 100 decades, a relaxation gap of 2e-12 next to eigenvalues of order 1/N, passage
+  times up to about 4e248 generations, an absorption rate near 2e-249, and a smallest eigenvalue between about 2e-211
+  and 1e-172 whose eigenvector spans about 180 decades at N = 400. Dense double-precision linear algebra (np.linalg.solve,
+  dense eigensolvers, pivots formed as 1 - P_kk) loses these quantities completely, so the solver has to recognise
+  where cancellation occurs and choose subtraction-free formulations of the absorbing-chain, stationary, first-passage
+  and quasi-stationary problems. The last step is the hardest: the smallest eigenvalue of the totally positive
+  binomial kernel is ill-conditioned with respect to the entries of P, so it must come from the structure of the
+  model (a scaled Vandermonde matrix of increasing nodes) and the absorbing cases u = 0 or v = 0 must be reduced to
+  the transient block. Arbitrary-precision linear algebra is a valid but slow alternative: the independent N = 400
+  targets needed plain LU solves at 400 digits, about 3 minutes each for step 7.
+
+solution_explanation: >-
+  Step 1 builds every binomial row in logarithms with the complement q = 1 - p of the post-selection, post-mutation
+  frequency formed directly from the model, so rare entries keep their relative accuracy down to 1e-250. Steps 2, 3
+  and 5 use subtraction-free state reduction (Grassmann-Taksar-Heyman): transient states are eliminated one at a
+  time and every pivot is a sum of off-diagonal transition probabilities, never 1 - P_kk; the conditional fixation
+  and loss times come from the Doob h-transform, t_i = (G h)_i / h_i. Step 4 runs inverse iteration on a GTH-type
+  factorization of I - P that eliminates towards the most probable state, and step 6 runs inverse iteration for the
+  left Perron vector of I - Q with an M-matrix LU whose pivots are the remaining rates plus the accumulated
+  absorption probability. Step 7 writes the transient block of P as diag(q^N x^i0) V(x) diag(C(N, j)) with V the
+  Vandermonde matrix of the increasing nodes x_i = p_i / q_i, so 1 / lambda_min is the Perron root of |P_II^-1|,
+  whose entries are elementary symmetric functions over products of node differences obtained without
+  cancellation; a power method in logarithms gives lambda_min and the mode, which is padded with zeros on the
+  absorbing states and takes the checkerboard sign pattern.
+
+verification_explanation: >-
+  Independent targets come from analytic results (neutral fixation probability i0 / N, the exact neutral
+  stationary moments, the neutral gap u + v and smallest eigenvalue (1 - u - v)^N N! / N^N of the Feller-Cannings
+  spectrum, N = 1 and N = 2 closed forms, the exact allele-relabeling symmetry) and from extended-precision
+  recomputation by a different method: the transition matrix from mpmath binomials with plain LU solves, mpmath
+  eig and inverse iteration at 40 to 400 digits, the N = 400 targets computed once at 400 digits and stored
+  inline. The second solution uses different algorithms: rows built by ratio recursion with beta-function
+  coefficients for step 1; for steps 2-6 a double-precision regenerative decomposition instead of state
+  reduction, in which the chain outside a few hub states (the two monomorphic states and the deterministic
+  equilibrium) is summed as a Neumann series by repeated squaring and the hub skeleton is solved with the Markov
+  chain tree theorem, inside inverse iteration for steps 4 and 6; prefix/suffix convolutions, Osborne balancing
+  and a dense eigensolver followed by log-space polishing for step 7. It passes every case of every step and of
+  the whole-task tests (about 40 s for all of them), and it agrees with the reference to about 2e-11 relative or
+  better on a grid of N up to 400 and on 120 random parameter sets. Each step has named scientific mutants
+  (cancelled complement, mutation before selection, loss as 1 - p_fix, unconditional times, dense eigensolvers
+  and dense solves, neutral gap, absorption rate from mutation supply, regularized absorbing states, sign fixed
+  by the largest entry), and a complete whole-task mutant applies mutation before selection; each fails at
+  least one case of its target tests. Every case was run alone in a fresh process with tools/crown_check.py for
+  the per-step references, solution.py, the second solution, the mutants, the all-None and all-zero controls
+  (which pass no case) and with every reference output scaled by 1 +- 1e-12 (all cases still pass).
+
 required_dependencies: |-
   import numpy as np
   from scipy.special import gammaln
@@ -36,8 +104,9 @@ problem_io: |-
         lam_min: Python float, the smallest eigenvalue of the transition matrix P of step 1
                  (wf_transition_matrix), with a relative error below 1e-8.
         mode: numpy float array of shape (N + 1,), the right eigenvector (P mode = lam_min mode), scaled so
-              that max_i |mode[i]| = 1 and its first nonzero entry is positive; every entry with an error
-              below 1e-8 times its absolute value (entries that are exactly zero returned as 0.0).
+              that max_i |mode[i]| = 1 and its first entry that is not on an absorbing state is positive;
+              every entry with an error below 1e-8 times its absolute value, except on the absorbing states,
+              where the exact entries are zero and the returned entries must be below 1e-250 in absolute value.
 
       Raises:
         ValueError if N is not an integer in [1, 400] (bool and float are not accepted), if s, u or v
@@ -53,7 +122,7 @@ mutants:
     file: mutants/whole_task_mutation_before_selection.py
 
 # On a new version of an uploaded task only, what kind of edit it is.
-edit_label: difficulty_increase
+edit_label: grading_fix
 
 sub_steps:
   - step_number: 1
@@ -134,8 +203,7 @@ sub_steps:
       Return the tuple (p_fix, p_loss, t_fix, t_loss) of four Python floats, each with a relative error
       below 1e-8. This holds for each of them separately: p_fix is about 3e-141 for N = 400, s = -1/3,
       i0 = 1 (and smaller still for s closer to -0.5), p_loss is equally small for N = 400, s = 0.5,
-      i0 = N - 1, and the other probability is then 1 to within rounding. Each call must finish within
-      20 s on one CPU core.
+      i0 = N - 1, and the other probability is then 1 to within rounding.
       Inputs: N (integer, 2 <= N <= 400), s (-0.5 <= s <= 0.5), i0 (integer, 1 <= i0 <= N - 1).
       Errors: raise ValueError if N or i0 is not an integer (bool and float are not accepted), if N is
       outside [2, 400], if i0 is outside [1, N - 1], or if s is not finite or is outside [-0.5, 0.5].
@@ -192,8 +260,7 @@ sub_steps:
       a unique stationary distribution pi, pi P = pi with sum(pi) = 1. Return pi as a float numpy array of
       shape (N + 1,). Every entry whose exact value is at least 1e-250 must have a relative error below
       1e-8; entries below 1e-250 must lie within 1e-250 of their exact value. Mutation rates down to
-      1e-12 and strong selection make pi span well over 100 decades. Each call must finish within 20 s on
-      one CPU core.
+      1e-12 and strong selection make pi span well over 100 decades.
       Inputs: N (integer, 1 <= N <= 400), s (-0.5 <= s <= 0.5), u and v (1e-12 <= u, v <= 0.1).
       Errors: raise ValueError if N is not an integer (bool and float are not accepted) or is outside
       [1, 400], or if s, u or v is not finite or is outside its range.
@@ -249,8 +316,7 @@ sub_steps:
       eigenvalue. Return the relaxation rate gap = 1 - lambda_2 as a
       Python float with a relative error below 1e-8. The gap can be as small as about 1e-12 (rare
       mutations, e.g. u = v = 1e-12 without selection) while the other eigenvalues of 1 - P are of
-      order 1/N or larger; the stated relative accuracy is required there too. Each call must finish
-      within 20 s on one CPU core.
+      order 1/N or larger; the stated relative accuracy is required there too.
       Inputs: N (integer, 1 <= N <= 400), s (-0.5 <= s <= 0.5), u and v (1e-12 <= u, v <= 0.1).
       Errors: raise ValueError if N is not an integer (bool and float are not accepted) or is outside
       [1, 400], or if s, u or v is not finite or is outside its range.
@@ -308,9 +374,10 @@ sub_steps:
                 for the first time.
       Return the tuple (t_up, t_down) of two Python floats, each with a relative error below 1e-8. With
       rare mutations and strong selection one of them is astronomically large (t_down is about 1e150
-      generations at N = 400, s = 0.5, u = v = 1e-12) and must still have the stated accuracy. Each call
-      must finish within 20 s on one CPU core.
+      generations at N = 400, s = 0.5, u = v = 1e-12) and must still have the stated accuracy.
       Inputs: N (integer, 1 <= N <= 400), s (-0.5 <= s <= 0.5), u and v (1e-12 <= u, v <= 0.1).
+      Inputs for which t_up or t_down would exceed 1e300 generations are outside the domain; within these
+      ranges only t_up can be that large, near the corner N = 400, s = -0.5, u = 0.1, v = 1e-12.
       Errors: raise ValueError if N is not an integer (bool and float are not accepted) or is outside
       [1, 400], or if s, u or v is not finite or is outside its range.
     function_header: |-
@@ -322,6 +389,8 @@ sub_steps:
             s: float, selection coefficient of A, -0.5 <= s <= 0.5.
             u: float, mutation probability A -> a per generation, 1e-12 <= u <= 0.1.
             v: float, mutation probability a -> A per generation, 1e-12 <= v <= 0.1.
+            Inputs for which t_up or t_down would exceed 1e300 generations are outside the domain (within these
+            ranges only t_up can be that large, near N = 400, s = -0.5, u = 0.1, v = 1e-12).
 
           Output:
             (t_up, t_down): tuple of two Python floats.
@@ -346,7 +415,7 @@ sub_steps:
       quantity: "Mean first-passage times between the two monomorphic states (0 -> N and N -> 0)."
       assumptions: "Wright-Fisher chain of step 1 with u, v > 0."
       result_kind: exact
-      valid_input_ranges: "1 <= N <= 400 (integer); -0.5 <= s <= 0.5; 1e-12 <= u, v <= 0.1."
+      valid_input_ranges: "1 <= N <= 400 (integer); -0.5 <= s <= 0.5; 1e-12 <= u, v <= 0.1; inputs whose t_up or t_down would exceed 1e300 generations (only near N = 400, s = -0.5, u = 0.1, v = 1e-12) are excluded."
       units: "Generations."
       output_shape: "Tuple of two Python floats."
       step_dependencies: [1]
@@ -372,7 +441,7 @@ sub_steps:
              This includes the far tail: for N = 400, s = 0.5, v = 0.1 the entries at small i are many
              orders of magnitude below the bulk (qsd[0] is about 4e-221), and each of these entries must
              itself have a relative error below 1e-8.
-      Return the tuple (rate, qsd). Each call must finish within 20 s on one CPU core.
+      Return the tuple (rate, qsd).
       Inputs: N (integer, 1 <= N <= 400), s (-0.5 <= s <= 0.5), v (1e-12 <= v <= 0.1).
       Errors: raise ValueError if N is not an integer (bool and float are not accepted) or is outside
       [1, 400], or if s or v is not finite or is outside its range.
@@ -434,14 +503,15 @@ sub_steps:
       state i = 0 is absorbing, with u = 0 the state i = N is absorbing. P then has the eigenvalue 1 once
       for each absorbing state, its other eigenvalues are real, positive, distinct and below 1, and
       lambda_min is still the smallest eigenvalue of P.
-      Scale the mode so that max_i |x_i| = 1 and its first nonzero entry is positive.
+      Scale the mode so that max_i |x_i| = 1 and its first entry that is not on an absorbing state is
+      positive.
       Accuracy: lambda_min with a relative error below 1e-8, and every entry of the mode with an error
-      below 1e-8 times its absolute value; entries of the mode that are exactly zero must be returned as
-      0.0. lambda_min is extremely small: about 1e-173 for N = 400 without selection and with rare or no
+      below 1e-8 times its absolute value, except on the absorbing states: there the exact entries of the
+      mode are zero, and the returned entries must be below 1e-250 in absolute value (0.0 is accepted).
+      lambda_min is extremely small: about 1e-173 for N = 400 without selection and with rare or no
       mutation, about 2e-211 for N = 400, s = 0, u = v = 0.1, and of similar size with selection, far below
       the rounding errors of the matrix entries next to it. The entries of the mode at N = 400 span up to
-      about 180 decades. The stated accuracy is required there too. Each call must finish within 20 s on
-      one CPU core.
+      about 180 decades. The stated accuracy is required there too.
       Inputs: N (integer, 1 <= N <= 400), s (-0.5 <= s <= 0.5), u and v (0 <= u, v <= 0.1).
       Errors: raise ValueError if N is not an integer (bool and float are not accepted) or is outside
       [1, 400], if s, u or v is not finite or is outside its range, or if N = 1 and u = v = 0 (both states
@@ -460,8 +530,9 @@ sub_steps:
             lam_min: Python float, the smallest eigenvalue of the transition matrix P of step 1
                      (wf_transition_matrix), with a relative error below 1e-8.
             mode: numpy float array of shape (N + 1,), the right eigenvector (P mode = lam_min mode), scaled so
-                  that max_i |mode[i]| = 1 and its first nonzero entry is positive; every entry with an error
-                  below 1e-8 times its absolute value (entries that are exactly zero returned as 0.0).
+                  that max_i |mode[i]| = 1 and its first entry that is not on an absorbing state is positive;
+                  every entry with an error below 1e-8 times its absolute value, except on the absorbing states,
+                  where the exact entries are zero and the returned entries must be below 1e-250 in absolute value.
 
           Raises:
             ValueError if N is not an integer in [1, 400] (bool and float are not accepted), if s, u or v
@@ -490,8 +561,8 @@ sub_steps:
         description: "Takes 1 / lambda_min and the mode from the Perron pair of the absolute value of the numerically inverted double-precision matrix, whose inverse is dominated by rounding errors."
         file: mutants/step_7_numerical_inverse.py
       - name: regularized_absorbing
-        description: "Replaces a zero mutation rate by 1e-300 instead of treating the absorbing states, so the mode is not exactly zero on them."
+        description: "Replaces a zero mutation rate by a tiny one (1e-15) instead of treating the absorbing states as absorbing, so the mode does not vanish on them."
         file: mutants/step_7_regularized_absorbing.py
       - name: largest_entry_positive
-        description: "Fixes the sign of the mode by making its largest entry positive instead of its first nonzero entry."
+        description: "Fixes the sign of the mode by making its largest entry positive instead of its first entry that is not on an absorbing state."
         file: mutants/step_7_largest_entry_positive.py

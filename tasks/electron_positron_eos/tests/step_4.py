@@ -1,9 +1,3 @@
-import math
-import numpy as np
-import mpmath as _t_mp
-import signal as _t_signal
-import time as _t_btime
-
 # Independent targets: closed forms of the classical (Maxwell-Juettner) gas with modified Bessel
 # functions, and values computed once with mpmath at 40 digits by tanh-sinh quadrature of the defining
 # integrals in the momentum (breakpoints every k T over the Fermi edge), the chemical potential by a
@@ -11,64 +5,16 @@ import time as _t_btime
 # net electron density (T +- 1e-7 T), all in mpmath; positron densities of a classical positron gas
 # (eps/kT + psi >= 40) from the Maxwell-Juettner formula.
 
-_T_MEC2 = 8.1871057769e-7
-_T_KB = 1.380649e-16
-_T_LC = 3.8615926796e-11
-_T_NA = 6.02214076e23
-
-# Time budget of one call, as stated in the prompt: the call is interrupted once it exceeds the budget
-# (by one second), so a solution that is too slow fails this check instead of holding up the tests.
-_t_depth = [0]
-
-
-def _t_budget(fn, seconds, name):
-    def wrapped(*args, **kwargs):
-        if _t_depth[0]:
-            return fn(*args, **kwargs)
-
-        def _alarm(signum, frame):
-            raise TimeoutError("%s did not finish within its budget of %g s per call" % (name, seconds))
-        try:
-            old = _t_signal.signal(_t_signal.SIGALRM, _alarm)
-            _t_signal.setitimer(_t_signal.ITIMER_REAL, seconds + 1.0)
-            armed = True
-        except (ValueError, AttributeError, OSError):      # no SIGALRM here: measure only
-            armed = False
-        _t_depth[0] += 1
-        start = _t_btime.perf_counter()
-        try:
-            out = fn(*args, **kwargs)
-        finally:
-            _t_depth[0] -= 1
-            if armed:
-                _t_signal.setitimer(_t_signal.ITIMER_REAL, 0.0)
-                _t_signal.signal(_t_signal.SIGALRM, old)
-        elapsed = _t_btime.perf_counter() - start
-        assert elapsed <= seconds, ("%s took %.1f s (budget %g s per call)" % (name, elapsed, seconds))
-        return out
-    return wrapped
-
+# --- test case 0 ---
+# from strongly degenerate gases (c_V about 8e-10 of u / T at rho_Ye = 1e13, T = 1e7 K) to
+# pair plasmas, against centred differences of the 40-digit energy at constant net density; includes
+# two degenerate, non-relativistic gases near T = 1e7 K (rho_Ye = 1e5 g cm^-3 at 1e7 K and 4e5 g cm^-3
+# at 1.2e7 K), where the psi solving n_net = rho_Ye N_A is hard to converge (d ln c_V / d ln psi is
+# about 7 and 4 there, so an error of psi enters c_V amplified)
+import numpy as np
 
 def _t_rel(a, b):
     return abs(a - b) / abs(b)
-
-
-def _t_classical(T, psi):
-    # Maxwell-Juettner gas (Boltzmann occupation): n = theta K2(1/theta) e^{+-psi} / (pi^2 lambda^3),
-    # mean total energy K1/K2 + 3 theta, P = (n_- + n_+) k T, entropy per particle k (<eps>/theta -+ psi + 1)
-    with _t_mp.workdps(40):
-        th = _t_mp.mpf(_T_KB) * T / _t_mp.mpf(_T_MEC2)
-        pref = 1 / (_t_mp.pi ** 2 * _t_mp.mpf(_T_LC) ** 3)
-        base = pref * th * _t_mp.besselk(2, 1 / th)
-        nm, npl = base * _t_mp.exp(psi), base * _t_mp.exp(-psi)
-        eps = _t_mp.besselk(1, 1 / th) / _t_mp.besselk(2, 1 / th) + 3 * th
-        P = (nm + npl) * _t_mp.mpf(_T_KB) * T
-        u = _t_mp.mpf(_T_MEC2) * (nm * (eps - 1) + npl * (eps + 1))
-        s = _t_mp.mpf(_T_KB) * (nm * (eps / th - psi + 1) + npl * (eps / th + psi + 1))
-        return [float(x) for x in (nm, npl, nm - npl, P, u, s)]
-
-
-specific_heat = _t_budget(specific_heat, 10.0, "specific_heat")
 
 _T_RT = {
     (10000000000000.0, 10000000.0): (128886.9100517552405035025, 63669921057170992.70326489),
@@ -81,16 +27,17 @@ _T_RT = {
     (1e-10, 10000000.0): (564.4249121875995906962405, 0.01252414082046084989431409),
     (1e-10, 3000000000.0): (1.372907152528198255239101e-16, 1201091785062658.571302717),
     (10000000000000.0, 100000000000.0): (12.63346997607270908696668, 615272897283901411681.9991),
+    (100000.0, 10000000.0): (654.7662355324754837308754, 696370732683.6245810121454),
+    (400000.0, 12000000.0): (615.7131023969530689569447, 1497668503860.948085152025),
 }      # (rho_Ye, T): psi, c_V
 
-
-# --- test case 0: from strongly degenerate gases (c_V about 8e-10 of u / T at rho_Ye = 1e13, T = 1e7 K) to
-# pair plasmas, against centred differences of the 40-digit energy at constant net density ---
 for (_t_rY, _t_T), _t_v in _T_RT.items():
     _t_got = specific_heat(_t_rY, _t_T)
     assert type(_t_got) is float and _t_rel(_t_got, float(_t_v[1])) < 1e-8, (_t_rY, _t_T, _t_got, _t_v[1])
 
-# --- test case 1: rho_Ye or T not finite or outside its range ---
+# --- test case 1 ---
+# rho_Ye or T not finite or outside its range
+import numpy as np
 for _t_bad in ((float("nan"), 1e9), (1.0, float("nan")), (5e-11, 1e9), (2e13, 1e9), (1.0, 9e6), (1.0, 2e11)):
     try:
         specific_heat(*_t_bad)

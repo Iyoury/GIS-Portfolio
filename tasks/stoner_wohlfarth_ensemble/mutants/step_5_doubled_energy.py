@@ -15,10 +15,10 @@ def brown_relaxation(sigma, h):
     Output:
       (lam1, tau_int): tuple of two Python floats, in units of 1/tau_N and tau_N, respectively.
         lam1: smallest nonzero eigenvalue of the Fokker-Planck operator (relaxation rate times
-              tau_N), relative error below 1e-6.
+              tau_N), relative error below 1e-5.
         tau_int: integral relaxation time of z = cos(theta) divided by tau_N,
                  int_0^inf C(t) dt / C(0) with C(t) = <z(t) z(0)> - <z>**2 in equilibrium,
-                 relative error below 1e-6.
+                 relative error below 1e-5.
 
     Raises:
       ValueError if sigma or h is not finite, if sigma is outside [0, 60] or if |h| > 0.9.
@@ -29,6 +29,8 @@ def brown_relaxation(sigma, h):
         raise ValueError("sigma and h must be finite")
     if not (0.0 <= sigma <= 60.0) or abs(h) > 0.9:
         raise ValueError("need 0 <= sigma <= 60 and |h| <= 0.9")
+    # MUTANT: barrier energy taken as 2 sigma (1 - z^2 - 2 h z) (E = 2 K V e read as K V e times 2)
+    sigma = 2.0 * sigma
     # piecewise Chebyshev representation in theta (z = cos theta); every panel keeps its own
     # relative accuracy, so the exponentially different well weights are resolved
     C = np.polynomial.chebyshev
@@ -112,7 +114,5 @@ def brown_relaxation(sigma, h):
     # integral from z = -1 is a sum over the shallow side only and is accurate
     Q, _ = cum_from_right(W * (Z - zbar) * S)
     tau = 2.0 * total(Q * Q / (S * W)) / total(W * (Z - zbar) ** 2 * S)
-    # MUTANT: time unit taken from dW/dt = d/dz[...] (factor 1/2 of Brown's equation dropped)
-    lam, tau = 2.0 * lam, 0.5 * tau
     result = (float(lam), float(tau))
     return result

@@ -169,3 +169,85 @@ Version 10 (content-check fixes):
   above 0.5 (asserted in the test; 0.5 is reached at about 1.6454e14).
 - Steps 1-3: one-nuclide cases at exp(-575.636) = 1.01e-250 S, just above the threshold of the relative
   rule (pure decay, decay without source, burnup).
+
+## Version 13 (grading_fix: authoring-guide conformance)
+
+Audit of every file against the current authoring guide. The science, the reference algorithms, the
+targets, the tolerances of the individual outputs and the domain are unchanged.
+
+- Test-case format and self-contained cases (tests/step_1.py to step_4.py, tests/general.py).
+  - Finding: the markers read "# --- test case N: description ---" instead of the parser format
+    "# --- test case N ---", and the imports, the target helpers (_t_check, _t_bateman, _t_expm_apply,
+    _t_activation, _t_activity, _t_roundtrip) and the nuclide constants were defined once before case 0.
+    tests/step_1.py case 5 used _t_fact, imported only in case 1. tests/step_4.py defined _T_DAY twice
+    and gold constants that no case used.
+  - Cause: the files were written for a whole-file run, before the per-case parser format.
+  - Change: markers normalized to "# --- test case N ---" (0..n-1) with the description kept as
+    comments; every case now carries its own imports, helpers and constants (tools/selfcontain.py, then
+    checked by hand); step 1 case 5 imports factorial itself; the duplicate and unused step 4 constants
+    were removed. No case was dropped, merged or split: n_test_cases stays 7, 6, 6, 6.
+  - Regression test: tools/crown_check.py runs every case alone in a fresh process. Before the change the
+    reference passed 1/7, 1/6, 1/6, 0/6 and 0/2 cases (NameError on the shared helpers); after it, all.
+- Comparison of two computed outputs (tests/step_3.py case 3).
+  - Finding: the invariance check (a period split into two halves, or a zero-length period inserted)
+    compared two outputs of the candidate with the single-output tolerance 1e-10.
+  - Cause: each output may carry the stated error, so their difference may reach about twice it.
+  - Change: the pair is compared with twice the stated tolerance (relative 2e-10; absolute
+    2 max(1e-250 S, 1e-300)) and the shape of the output is asserted.
+  - Regression test: reference, second solution and the +-1e-12 shift pass case 3.
+- Floating-point equality in target generation (tests/step_2.py case 0).
+  - Finding: the closed-form target branched on "_t_lam == 0.0" (not an assertion).
+  - Change: written as "if _t_lam > 0.0 ... else ..." (same meaning, lam >= 0), so no float equality
+    pattern remains in the tests. No assertion compares floats exactly or with zero tolerance.
+- Stated but untested error rules.
+  - Finding: the prompts promise ValueError for a non-finite initial amount and a non-finite t (step 1),
+    a non-finite entry (step 2), a capture_to of the wrong shape (step 3) and non-finite flux bounds
+    (step 4); none of these inputs was tested.
+  - Change: one entry each added to the existing error cases: n0 = [1, NaN] and t = NaN (step 1 case 6),
+    n0 = [1, NaN] (step 2 case 5), capture_to of length 1 for n = 2 (step 3 case 5), flux_lo = NaN
+    (step 4 case 5). Reference and second solution raise ValueError for each.
+- tests/general.py case 1: the comment called the history "two-cycle" and the flux "of the second cycle";
+  the history is one irradiation (3e6 s) and one cooling (2e5 s). Comment corrected; test unchanged.
+- Step 2 prompt and contract: the prompt said "Generalize step 1 (chain_inventory)", naming a function that
+  step 2 does not use, while its step_dependencies is []. It now reads "Generalize the linear chain of
+  step 1 to a branching network with constant production."
+- Metadata added to problem.yaml: subfield, tags, expert_time_estimate_hours, relevant_experience (a
+  placeholder for the author), difficulty_explanation, solution_explanation, verification_explanation,
+  author, affiliation, and edit_label: grading_fix.
+- Mutants built from a stale reference (mutants/step_4_linear_response.py,
+  mutants/whole_task_barn_in_square_metres.py).
+  - Finding (independent verifier): both mutants had been copied from monitor_flux as it was before
+    version 11. Besides the named mistake, each kept two old defects that version 11 fixed in the
+    reference: the v10 domain rule ln A(flux_lo) >= ln(1e-250 lam[k] sum(n0)), whose right-hand side
+    underflows to ln 0 = -inf for a small lam[k], and ln(lam[k] x[k]), whose product can underflow. A
+    mutant should introduce one explainable scientific mistake. The step 4 mutant's failure of case 5 came
+    from the stale domain rule, not from the linear-response mistake.
+  - Cause: the reference was fixed in version 11 but the mutant files were not regenerated from it.
+  - Change: both files were regenerated from the current reference and differ from it in one line only
+    (diff checked): step 4 replaces the brentq root by flux = flux_lo exp(ln activity - ln A(flux_lo))
+    (activity assumed proportional to the flux); the whole-task mutant replaces sigma 1e-24 by
+    sigma 1e-28 in activation_inventory. Names, descriptions and problem.yaml entries are unchanged.
+  - Regression test: per case, with the crown_check harness: the old step 4 mutant failed cases 0, 1, 2,
+    3, 5; its stale code alone (brentq restored) fails case 5 only ("A(flux_lo) below 1e-250 lam[k]
+    sum(n0) with a tiny lam[k] must raise ValueError"); the regenerated mutant fails cases 0, 1, 2, 3
+    (the flux-inversion round trips, where burnup of 198Au, the flux**2 growth of 199Au or the domain
+    ends make the activity not proportional to the flux) and passes case 5, as it should. The old whole-task mutant's
+    stale code alone fails no general case; the regenerated mutant fails general case 1.
+- Checked without change: no timing assert, clock read or per-call time budget in any test, prompt,
+  docstring or solution; every solution import (numpy, scipy.optimize.brentq, mpmath) is declared in
+  required_dependencies; the per-step solutions do not redefine earlier step functions; every step has a
+  complete contract and at least one named mutant, and there is a whole-task mutant.
+
+Rerun: tools/crown_check.py, all modes, every case alone in a fresh process:
+- FORMAT OK.
+- REF: step 1 7/7, step 2 6/6, step 3 6/6, step 4 6/6, general 2/2 (solution.py also passes every step file).
+- SECOND: 7/7, 6/6, 6/6, 6/6, general 2/2.
+- Mutants: float_bateman fails 5/7 (cases 1-5), step 1 squared_diagonal 3/7 (3, 4, 5),
+  transposed_branching 4/6 (1-4), step 2 squared_diagonal 2/6 (3, 4), barn_in_square_metres 4/6
+  (0, 1, 2, 4), linear_response 4/6 (0, 1, 2, 3), whole-task barn mutant 1/2 general cases (1); every
+  mutant differs from its reference in its named mistake only.
+- SHIFT +-1e-12: every case passes.
+- Controls: all-None and all-zero stubs pass 0 cases in every step and in general.
+- solution.py, the concatenated solution/step_*.py and second_solution.py were each run twice in clean
+  processes and once with single-threaded BLAS on the 238U series, a random network, the gold monitor and
+  two flux inversions: identical outputs (bitwise) in every run.

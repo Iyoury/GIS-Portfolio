@@ -5,33 +5,47 @@ from scipy.integrate import quad
 from scipy.integrate import solve_ivp
 
 
+# 20-point Gauss-Legendre rule on [0, 1], used by the composite quadrature of boys_function
+_G1_X, _G1_W = np.polynomial.legendre.leggauss(20)
+_G1_X, _G1_W = 0.5 * (_G1_X + 1.0), 0.5 * _G1_W
+
+
 def boys_function(n_max, t):
     '''Boys functions F_n(t) = integral from 0 to 1 of u**(2n) exp(-t u**2) du for n = 0..n_max.'''
-    # Other method: the regularized lower incomplete gamma function,
-    # F_n(t) = Gamma(n + 1/2) P(n + 1/2, t) / (2 t**(n + 1/2)), and a two-term series for tiny t.
-    from scipy.special import gammainc, gammaln
+    # Other method: direct quadrature of the defining integral (no series, no recursion, no erf,
+    # no incomplete gamma function). The integrand u**(2n) exp(-t u**2) is negligible beyond
+    # u = 13 / sqrt(t) (below 1e-60 of the integral for every n <= 16), so the integral is taken over
+    # [0, min(1, 13 / sqrt(t))], split into 8 equal panels with the 20-point Gauss-Legendre rule each:
+    # in v = sqrt(t) u every panel spans at most 1.7 units of a smooth integrand, and for t -> 0 the
+    # rule is exact for the polynomial u**(2n).
     if isinstance(n_max, bool) or not isinstance(n_max, (int, np.integer)) or not (0 <= n_max <= 16):
         raise ValueError("n_max must be an integer from 0 to 16")
     t_arr = np.asarray(t, dtype=float)
     if not np.all(np.isfinite(t_arr)) or np.any(t_arr < 0.0) or np.any(t_arr > 1e6):
         raise ValueError("t must be finite with 0 <= t <= 1e6")
-    F = np.empty(t_arr.shape + (int(n_max) + 1,))
-    tiny = t_arr < 1e-9
-    ts = np.where(tiny, 1.0, t_arr)
+    flat = t_arr.ravel()
+    top = np.where(flat > 169.0, 13.0 / np.sqrt(np.maximum(flat, 169.0)), 1.0)
+    panels = 8
+    nodes = ((np.arange(panels)[:, None] + _G1_X[None, :]) / panels).ravel()
+    wts = np.tile(_G1_W, panels) / panels
+    u = top[:, None] * nodes[None, :]
+    u2 = u * u
+    term = (top[:, None] * wts[None, :]) * np.exp(-flat[:, None] * u2)
+    F = np.empty((flat.size, int(n_max) + 1))
     for n in range(int(n_max) + 1):
-        a = n + 0.5
-        val = gammainc(a, ts) * np.exp(gammaln(a) - a * np.log(ts)) / 2.0
-        F[..., n] = np.where(tiny, 1.0 / (2 * n + 1) - t_arr / (2 * n + 3), val)
-    return F
+        F[:, n] = np.sum(term, axis=1)
+        term = term * u2
+    return F.reshape(t_arr.shape + (int(n_max) + 1,))
 
 
 def sto3g_one_electron(ZA, ZB, zetaA, zetaB, R):
     '''Overlap and core-Hamiltonian matrices for two atoms with one STO-3G 1s function each.
 
     Inputs:
-      ZA, ZB: float, nuclear charges of atom A (at the origin) and atom B (at distance R on z), > 0.
-      zetaA, zetaB: float, Slater exponents of the 1s functions on A and B, > 0.
-      R: float, distance between the nuclei in bohr, R > 0.
+      ZA, ZB: float, nuclear charges of atom A (at the origin) and atom B (at distance R on z),
+              1 <= Z <= 3.
+      zetaA, zetaB: float, Slater exponents of the 1s functions on A and B, 0.5 <= zeta <= 3.
+      R: float, distance between the nuclei in bohr, 0.02 <= R <= 100.
 
     Output:
       (S, H): two float numpy arrays of shape (2, 2). Index 0 is the function on A and
@@ -111,8 +125,8 @@ def sto3g_two_electron(zetaA, zetaB, R):
     '''Two-electron repulsion integrals over the two STO-3G 1s functions.
 
     Inputs:
-      zetaA, zetaB: float, Slater exponents of the 1s functions on A (origin) and B, > 0.
-      R: float, distance between the nuclei in bohr, R > 0.
+      zetaA, zetaB: float, Slater exponents of the 1s functions on A (origin) and B, 0.5 <= zeta <= 3.
+      R: float, distance between the nuclei in bohr, 0.02 <= R <= 100.
 
     Output:
       eri: float numpy array of shape (2, 2, 2, 2), in hartree, with
@@ -185,7 +199,7 @@ def sto3g_two_electron(zetaA, zetaB, R):
 
 
 def fci_energy(ZA, ZB, zetaA, zetaB, R):
-    '''Full-CI and closed-shell RHF ground-state energies of a two-electron diatomic in STO-3G.'''
+    '''Singlet ground-state full-CI and closed-shell RHF energies of a two-electron diatomic in STO-3G.'''
     # Other methods: RHF by direct minimisation over the single orbital-mixing angle (no Fock
     # matrix, no SCF loop); full CI in the Loewdin-orthogonalized atomic orbitals instead of
     # the RHF molecular orbitals.
@@ -328,10 +342,21 @@ def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
     return levels
 
 
-from functools import lru_cache
-
 # Second solution, step 6: Obara-Saika recursions instead of McMurchie-Davidson Hermite
 # expansions; kinetic energy as (1/2) sum_i <d_i a | d_i b>.
+
+
+def _g6_memo(f):
+    # memoization of the recursive integral functions (keyed by their positional arguments)
+    cache = {}
+
+    def wrapped(*args):
+        if args not in cache:
+            cache[args] = f(*args)
+        return cache[args]
+    return wrapped
+
+
 _T_AL = np.array([0.109818, 0.405771, 2.22766])
 _T_DC = np.array([0.444635, 0.535328, 0.154329])
 
@@ -355,7 +380,7 @@ def _g6_ovl1d(a, la, Ax, b, lb, Bx):
     p = a + b
     P = (a * Ax + b * Bx) / p
 
-    @lru_cache(None)
+    @_g6_memo
     def S(i, j):
         if i < 0 or j < 0:
             return 0.0
@@ -391,7 +416,7 @@ def _g6_V(a, la, A, b, lb, B, C):
     K = np.exp(-a * b / p * np.sum((A - B) ** 2))
     T = p * np.sum((P - C) ** 2)
 
-    @lru_cache(None)
+    @_g6_memo
     def V(l1, l2, m):
         if min(l1) < 0 or min(l2) < 0:
             return 0.0
@@ -431,7 +456,7 @@ def _g6_ERI(a, la, A, b, lb, B, c, lc, C, d, ld, D):
     def dec(l, i):
         return tuple(x - (k == i) for k, x in enumerate(l))
 
-    @lru_cache(None)
+    @_g6_memo
     def I(l1, l2, l3, l4, m):
         ls = (l1, l2, l3, l4)
         if any(min(l) < 0 for l in ls):

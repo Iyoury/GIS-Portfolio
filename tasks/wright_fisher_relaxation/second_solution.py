@@ -62,36 +62,166 @@ def wf_transition_matrix(N, s, u, v):
     return P
 
 
-def _mp_transition(N, s, u, v):
-    # transition matrix in the current mpmath precision, straight from the binomial law
-    s, u, v = mp.mpf(s), mp.mpf(u), mp.mpf(v)
-    P = mp.matrix(N + 1, N + 1)
-    for i in range(N + 1):
-        den = N + s * i
-        p_sel = (1 + s) * i / den
-        q_sel = mp.mpf(N - i) / den
-        p = (1 - u) * p_sel + v * q_sel
-        q = u * p_sel + (1 - v) * q_sel
-        for j in range(N + 1):
-            P[i, j] = mp.binomial(N, j) * (p ** j if j else 1) * (q ** (N - j) if j < N else 1)
-    return P
+# Steps 2-6, other method (regenerative decomposition, double precision, no elimination of states one at a
+# time). A few hub states are chosen from the model: the two monomorphic states and the state closest to the
+# stable equilibrium of the deterministic selection-mutation map. Outside the hubs the chain is killed quickly
+# (it reaches a hub, or an absorbing state, within O(N) generations on average), so its fundamental matrix
+# G = sum_k K^k is the Neumann series of the restricted matrix K, summed by repeated squaring: only products
+# and sums of nonnegative numbers, which keep a small relative error in every entry. Everything slow (rare
+# mutations, strong selection, astronomically small or large results) is confined to the skeleton chain on
+# the 1 to 3 hub states, whose transition probabilities between distinct hubs, P_HH + P_HF G P_FH, and exit
+# probabilities are again sums of nonnegative terms; its stationary law and its fundamental matrix come from
+# the Markov chain tree theorem (sums over spanning trees and forests of products of these probabilities),
+# never from 1 - P_kk. Absorption probabilities, passage times, the stationary distribution and the
+# eigen-iterations of steps 4 and 6 are assembled from these pieces.
+
+def _wf_kernel(N, s, u, v):
+    # the transition matrix used by steps 2-6: exact integer binomial coefficients, entries from logarithms,
+    # complements q formed directly from the model
+    i = np.arange(N + 1, dtype=float)
+    den = N + s * i
+    p_sel = (1.0 + s) * i / den
+    q_sel = (N - i) / den
+    p = (1.0 - u) * p_sel + v * q_sel
+    q = u * p_sel + (1.0 - v) * q_sel
+    binom = [1]
+    for j in range(N):
+        binom.append(binom[-1] * (N - j) // (j + 1))
+    lc = np.log(np.array([float(c) for c in binom]))
+    j = np.arange(N + 1, dtype=float)[None, :]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        lp = np.where(j > 0, j * np.log(p)[:, None], 0.0)
+        lq = np.where(j < N, (N - j) * np.log(q)[:, None], 0.0)
+    return np.exp(lc[None, :] + lp + lq)
 
 
-def _mp_adaptive(compute):
-    # run compute() in increasing precision until two runs agree to 1e-13 in every component that is
-    # not below 1e-250 (rounding in a plain LU destroys the small components first)
-    old = None
-    dps = 40
-    while True:
-        with mp.workdps(dps):
-            new = [mp.mpf(x) for x in compute()]
-        if old is not None and all((abs(a) < mp.mpf("1e-250") and abs(b) < mp.mpf("1e-250"))
-                                   or abs(a - b) <= mp.mpf("1e-13") * abs(b) for a, b in zip(old, new)):
-            return [float(x) for x in new]
-        old = new
-        dps *= 2
-        if dps > 3000:
-            raise RuntimeError("no convergence in extended precision")
+def _hub_states(N, s, u, v):
+    # the monomorphic states and the grid state nearest to the stable equilibrium of p -> p_mut(p), where
+    # p_mut(p) - p changes sign from + to - (at most one such point for these maps)
+    p = np.arange(N + 1) / N
+    den = 1.0 + s * p
+    p_sel = (1.0 + s) * p / den
+    drift = (1.0 - u) * p_sel + v * (1.0 - p) / den - p
+    hubs = {0, N}
+    for k in range(N):
+        if drift[k] > 0.0 and drift[k + 1] <= 0.0:
+            hubs.add(k if abs(drift[k]) <= abs(drift[k + 1]) else k + 1)
+    return hubs
+
+
+def _neumann_sum(K, max_doublings=20):
+    # G = sum_{k >= 0} K^k for a quickly killed chain: G <- G + K^(2^m) G with K^(2^(m+1)) = (K^(2^m))^2,
+    # stopped once the new terms are below 1e-17 of every entry
+    n = K.shape[0]
+    if n == 0:
+        return np.zeros((0, 0))
+    G = np.eye(n) + K
+    T = K
+    for _ in range(max_doublings):
+        T = T @ T
+        add = T @ G
+        G = G + add
+        if np.all(add <= 1e-17 * G + 1e-290):
+            return G
+    raise RuntimeError("the chain outside the hub states is not killed quickly")
+
+
+def _successor_maps(nodes, choices):
+    # every map that sends each node to one of choices other than itself
+    if not nodes:
+        yield {}
+        return
+    for rest in _successor_maps(nodes[1:], choices):
+        for c in choices:
+            if c != nodes[0]:
+                out = dict(rest)
+                out[nodes[0]] = c
+                yield out
+
+
+def _root(succ, a):
+    # follow the successor map from a; None if it runs into a cycle
+    seen = set()
+    while a in succ:
+        if a in seen:
+            return None
+        seen.add(a)
+        a = succ[a]
+    return a
+
+
+def _tree_stationary(W):
+    # Markov chain tree theorem: pi_r is proportional to the sum, over the spanning trees directed towards r,
+    # of the products of the transition probabilities W[a, b] along their edges
+    h = W.shape[0]
+    pi = np.zeros(h)
+    for r in range(h):
+        others = [a for a in range(h) if a != r]
+        for succ in _successor_maps(others, range(h)):
+            if all(_root(succ, a) == r for a in others):
+                pi[r] += np.prod([W[a, succ[a]] for a in others])
+    return pi
+
+
+def _forest_inverse(W, e):
+    # (D - W)^-1 with D = diag(sum_b W[a, b] + e[a]) (W without diagonal, e the exit probabilities), by the
+    # all-minors matrix-tree theorem: the determinant is the sum over spanning forests directed towards the
+    # exit, entry (i, j) the sum over forests with roots {exit, j} in which the path from i ends at j
+    h = len(e)
+    nodes = list(range(h))
+    out = h
+
+    def weight(succ):
+        return np.prod([e[a] if succ[a] == out else W[a, succ[a]] for a in succ])
+
+    det = sum(weight(succ) for succ in _successor_maps(nodes, range(h + 1))
+              if all(_root(succ, a) == out for a in nodes))
+    inv = np.zeros((h, h))
+    for j in nodes:
+        others = [a for a in nodes if a != j]
+        for succ in _successor_maps(others, range(h + 1)):
+            ends = {a: _root(succ, a) for a in nodes}
+            if any(r is None for r in ends.values()):
+                continue
+            w = weight(succ)
+            for i in nodes:
+                if ends[i] == j:
+                    inv[i, j] += w
+    return inv / det
+
+
+def _decompose(N, P, hubs, absorbing=()):
+    # hub list H, the other transient states F and the fundamental matrix of the chain killed outside F
+    H = sorted(set(hubs) - set(absorbing))
+    F = [i for i in range(N + 1) if i not in hubs and i not in absorbing]
+    G = _neumann_sum(P[np.ix_(F, F)])
+    return H, F, G
+
+
+def _skeleton(P, H, F, G):
+    # A = P_HF G (expected visits to F before the next hub or exit), W = jump probabilities between distinct
+    # hubs of the chain watched on the hubs
+    A = P[np.ix_(H, F)] @ G
+    W = P[np.ix_(H, H)] + A @ P[np.ix_(F, H)]
+    np.fill_diagonal(W, 0.0)
+    return A, W
+
+
+def _stationary_from(N, P, H, F, G):
+    A, W = _skeleton(P, H, F, G)
+    pi = np.zeros(N + 1)
+    pi_H = _tree_stationary(W)
+    pi[H] = pi_H
+    pi[F] = pi_H @ A                     # pi_F = pi_H P_HF (I - P_FF)^-1
+    return pi / pi.sum()
+
+
+def _killed_skeleton(P, H, F, G, target):
+    # the chain watched on the hubs H and killed at target: (I - S)^-1 by the forest formula, with the exit
+    # probabilities P_H,target + P_HF G P_F,target
+    A, W = _skeleton(P, H, F, G)
+    e = P[H, target] + A @ P[F, target]
+    return A, _forest_inverse(W, e)
 
 
 def fixation_statistics(N, s, i0):
@@ -123,23 +253,19 @@ def fixation_statistics(N, s, i0):
     s = float(s)
     if not (np.isfinite(s) and -0.5 <= s <= 0.5):
         raise ValueError("need -0.5 <= s <= 0.5")
-    # Other method: the four linear systems of the absorbing chain solved by LU in extended precision.
-    def compute():
-        P = _mp_transition(N, s, 0.0, 0.0)
-        M = mp.matrix(N - 1, N - 1)
-        fix, loss = mp.matrix(N - 1, 1), mp.matrix(N - 1, 1)
-        for a in range(1, N):
-            fix[a - 1], loss[a - 1] = P[a, N], P[a, 0]
-            for b in range(1, N):
-                M[a - 1, b - 1] = (1 if a == b else 0) - P[a, b]
-        h_fix = mp.lu_solve(M, fix)
-        h_loss = mp.lu_solve(M, loss)
-        g_fix = mp.lu_solve(M, h_fix)
-        g_loss = mp.lu_solve(M, h_loss)
-        k = i0 - 1
-        return [h_fix[k], h_loss[k], g_fix[k] / h_fix[k], g_loss[k] / h_loss[k]]
-
-    result = tuple(_mp_adaptive(compute))
+    # Other method: without mutation the interior states are left within O(N) generations, so the
+    # fundamental matrix G = (I - Q)^-1 of the interior states is the Neumann series of Q itself; the
+    # absorption probabilities are G P[., N] and G P[., 0], and the conditional times (Doob h-transform)
+    # (G h)_i0 / h_i0.
+    P = _wf_kernel(N, s, 0.0, 0.0)
+    F = list(range(1, N))
+    G = _neumann_sum(P[np.ix_(F, F)])
+    h_fix = G @ P[F, N]
+    h_loss = G @ P[F, 0]
+    g_fix = G @ h_fix
+    g_loss = G @ h_loss
+    k = i0 - 1
+    result = (float(h_fix[k]), float(h_loss[k]), float(g_fix[k] / h_fix[k]), float(g_loss[k] / h_loss[k]))
     return result
 
 
@@ -171,20 +297,12 @@ def stationary_distribution(N, s, u, v):
         raise ValueError("s, u and v must be finite")
     if not (-0.5 <= s <= 0.5 and 1e-12 <= u <= 0.1 and 1e-12 <= v <= 0.1):
         raise ValueError("need -0.5 <= s <= 0.5 and 1e-12 <= u, v <= 0.1")
-    # Other method: pi (I - P) = 0 with the first equation replaced by sum(pi) = 1, solved by LU in
-    # extended precision.
-    def compute():
-        P = _mp_transition(N, s, u, v)
-        n = N + 1
-        M = mp.matrix(n, n)
-        for i in range(n):
-            for j in range(n):
-                M[i, j] = 1 if i == 0 else (1 if i == j else 0) - P[j, i]
-        rhs = mp.matrix(n, 1)
-        rhs[0] = 1
-        return list(mp.lu_solve(M, rhs))
-
-    pi = np.array(_mp_adaptive(compute))
+    # Other method: pi on the hubs from the tree theorem of the hub skeleton, pi elsewhere as the expected
+    # visits between hub visits, pi_F = pi_H P_HF G.
+    P = _wf_kernel(N, s, u, v)
+    hubs = _hub_states(N, s, u, v)
+    H, F, G = _decompose(N, P, hubs)
+    pi = _stationary_from(N, P, H, F, G)
     return pi
 
 
@@ -216,35 +334,38 @@ def relaxation_rate(N, s, u, v):
         raise ValueError("s, u and v must be finite")
     if not (-0.5 <= s <= 0.5 and 1e-12 <= u <= 0.1 and 1e-12 <= v <= 0.1):
         raise ValueError("need -0.5 <= s <= 0.5 and 1e-12 <= u, v <= 0.1")
-    # Other method: inverse iteration in extended precision on the deflated matrix
-    # I - P + 1 pi^T, whose eigenvalues are 1 and the nonzero eigenvalues of I - P.
-    def compute():
-        P = _mp_transition(N, s, u, v)
-        n = N + 1
-        M = mp.matrix(n, n)
-        for i in range(n):
-            for j in range(n):
-                M[i, j] = 1 if i == 0 else (1 if i == j else 0) - P[j, i]
-        rhs = mp.matrix(n, 1)
-        rhs[0] = 1
-        pi = mp.lu_solve(M, rhs)
-        D = mp.matrix(n, n)
-        for i in range(n):
-            for j in range(n):
-                D[i, j] = (1 if i == j else 0) - P[i, j] + pi[j]
-        y = mp.matrix([mp.mpf(i) - (n - 1) / mp.mpf(2) for i in range(n)])
-        gap = None
-        for _ in range(2000):
-            x = mp.lu_solve(D, y)
-            size = max(abs(t) for t in x)
-            new = 1 / size
-            y = x / size
-            if gap is not None and abs(new - gap) <= mp.mpf(10) ** (-mp.mp.dps // 2) * new:
-                break
-            gap = new
-        return [new]
+    # Other method: inverse iteration on I - P where every solve of (I - P) x = y (pi . y = 0) is done by the
+    # hub decomposition: x = 0 on the most probable hub r, the other hubs from the forest inverse of the
+    # skeleton killed at r, the remaining states from G; then the component along 1 is removed.
+    P = _wf_kernel(N, s, u, v)
+    hubs = _hub_states(N, s, u, v)
+    H, F, G = _decompose(N, P, hubs)
+    pi = _stationary_from(N, P, H, F, G)
+    r = max(H, key=lambda i: pi[i])
+    Hr = [i for i in H if i != r]
+    A, Linv = _killed_skeleton(P, Hr, F, G, r)
+    P_FH = P[np.ix_(F, Hr)]
 
-    gap = _mp_adaptive(compute)[0]
+    def solve(y):
+        x = np.zeros(N + 1)
+        x_H = Linv @ (y[Hr] + A @ y[F])
+        x[Hr] = x_H
+        x[F] = G @ (y[F] + P_FH @ x_H)
+        return x - pi @ x
+
+    y = np.arange(N + 1, dtype=float)
+    y = y - pi @ y
+    y = y / np.abs(y).max()
+    gap_old = None
+    for _ in range(2000):
+        x = solve(y)
+        size = np.abs(x).max()
+        gap = 1.0 / size
+        y = x / size
+        if gap_old is not None and abs(gap - gap_old) <= 1e-14 * gap:
+            break
+        gap_old = gap
+    gap = float(gap)
     return gap
 
 
@@ -256,6 +377,8 @@ def substitution_times(N, s, u, v):
       s: float, selection coefficient of A, -0.5 <= s <= 0.5.
       u: float, mutation probability A -> a per generation, 1e-12 <= u <= 0.1.
       v: float, mutation probability a -> A per generation, 1e-12 <= v <= 0.1.
+      Inputs for which t_up or t_down would exceed 1e300 generations are outside the domain (within these
+      ranges only t_up can be that large, near N = 400, s = -0.5, u = 0.1, v = 1e-12).
 
     Output:
       (t_up, t_down): tuple of two Python floats.
@@ -280,22 +403,19 @@ def substitution_times(N, s, u, v):
         raise ValueError("s, u and v must be finite")
     if not (-0.5 <= s <= 0.5 and 1e-12 <= u <= 0.1 and 1e-12 <= v <= 0.1):
         raise ValueError("need -0.5 <= s <= 0.5 and 1e-12 <= u, v <= 0.1")
-    # Other method: the two hitting-time systems solved by LU in extended precision.
-    def compute():
-        P = _mp_transition(N, s, u, v)
-        out = []
-        for target, start in ((N, 0), (0, N)):
-            others = [i for i in range(N + 1) if i != target]
-            M = mp.matrix(N, N)
-            rhs = mp.matrix(N, 1)
-            for a, i in enumerate(others):
-                rhs[a] = 1
-                for b, j in enumerate(others):
-                    M[a, b] = (1 if i == j else 0) - P[i, j]
-            out.append(mp.lu_solve(M, rhs)[others.index(start)])
-        return out
-
-    result = tuple(_mp_adaptive(compute))
+    # Other method: the chain killed at the target, watched on the remaining hubs; the time spent per visit
+    # of a hub is 1 + (expected visits to the other states before the next hub or the target), and the
+    # forest inverse of that skeleton turns these into mean passage times.
+    P = _wf_kernel(N, s, u, v)
+    hubs = _hub_states(N, s, u, v)
+    _, F, G = _decompose(N, P, hubs)
+    times = []
+    for target, start in ((N, 0), (0, N)):
+        H = sorted(hubs - {target})
+        A, Linv = _killed_skeleton(P, H, F, G, target)
+        x_H = Linv @ (1.0 + A.sum(axis=1))
+        times.append(float(x_H[H.index(start)]))
+    result = (times[0], times[1])
     return result
 
 
@@ -330,29 +450,36 @@ def quasi_stationary(N, s, v):
         raise ValueError("s and v must be finite")
     if not (-0.5 <= s <= 0.5 and 1e-12 <= v <= 0.1):
         raise ValueError("need -0.5 <= s <= 0.5 and 1e-12 <= v <= 0.1")
-    # Other method: inverse iteration on (I - Q)^T by plain LU in extended precision, the precision doubled
-    # until two runs agree.
-    def compute():
-        P = _mp_transition(N, s, 0.0, v)
-        M = mp.matrix(N, N)
-        for i in range(N):
-            for j in range(N):
-                M[j, i] = (1 if i == j else 0) - P[i, j]
-        x = mp.matrix([mp.mpf(1) / N] * N)
-        rate = None
-        for _ in range(5000):
-            y = mp.lu_solve(M, x)
-            total = sum(y)
-            x_new = y / total
-            done = rate is not None and all(abs(x_new[i] - x[i]) <= mp.mpf(10) ** (-mp.mp.dps // 2) * x_new[i]
-                                            for i in range(N))
-            x, rate = x_new, 1 / total
-            if done:
-                break
-        return [rate] + [x[i] for i in range(N)]
+    # Other method: inverse iteration for the left Perron vector, y (I - Q) = x solved by the hub
+    # decomposition with exit at the absorbing state N (all terms nonnegative):
+    # y_H = (x_H + x_F G P_FH) (I - S)^-1 and y_F = (x_F + y_H P_HF) G.
+    P = _wf_kernel(N, s, 0.0, v)
+    hubs = _hub_states(N, s, 0.0, v)
+    H, F, G = _decompose(N, P, hubs, absorbing=(N,))
+    A, Linv = _killed_skeleton(P, H, F, G, N)
+    P_HF = P[np.ix_(H, F)]
+    P_FH = P[np.ix_(F, H)]
 
-    out = _mp_adaptive(compute)
-    result = (float(out[0]), np.array(out[1:]))
+    def solve_left(x):
+        y = np.zeros(N)
+        y_H = (x[H] + (x[F] @ G) @ P_FH) @ Linv
+        y[H] = y_H
+        y[F] = (x[F] + y_H @ P_HF) @ G
+        return y
+
+    x = np.full(N, 1.0 / N)
+    rate = None
+    for _ in range(20000):
+        y = solve_left(x)
+        total = y.sum()
+        rate = 1.0 / total
+        x_new = y / total
+        big = x_new > 1e-280
+        settled = np.all(np.abs(x_new[big] - x[big]) <= 1e-14 * x_new[big])
+        x = x_new
+        if settled:
+            break
+    result = (float(rate), x)
     return result
 
 

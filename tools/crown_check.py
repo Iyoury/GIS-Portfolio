@@ -12,7 +12,8 @@ Modes
   ref      : solution/step_k.py on tests/step_k.py; solution.py on tests/general.py
   second   : second_solution.py on every step's cases and on general
   mut      : every step mutant must fail >= 1 case of its step; every whole mutant >= 1 general case
-  shift    : reference outputs scaled by (1 +- 1e-12) must still pass every case
+  shift    : reference outputs (real and complex) scaled by (1 +- 1e-12) must still pass every step case and,
+             with every evaluated function shifted, every general case
   controls : all-None and all-zero stubs must not pass any computed-value case (reported per step)
 """
 import os
@@ -36,11 +37,14 @@ import numpy as _ck_np
 def _ck_pert(v, s):
     if isinstance(v, bool) or v is None:
         return v
+    if isinstance(v, (_ck_np.floating, _ck_np.complexfloating)):
+        return type(v)(v * (1.0 + s))
     if isinstance(v, float):
         return float(v * (1.0 + s))
-    if isinstance(v, _ck_np.floating):
-        return type(v)(v * (1.0 + s))
-    if isinstance(v, _ck_np.ndarray) and _ck_np.issubdtype(v.dtype, _ck_np.floating):
+    if isinstance(v, complex):
+        return complex(v * (1.0 + s))
+    if isinstance(v, _ck_np.ndarray) and (_ck_np.issubdtype(v.dtype, _ck_np.floating)
+                                         or _ck_np.issubdtype(v.dtype, _ck_np.complexfloating)):
         return v * (1.0 + s)
     if isinstance(v, tuple):
         return tuple(_ck_pert(x, s) for x in v)
@@ -154,6 +158,10 @@ def mode_format(t):
     pre, _ = cases_of(t.p(g))
     if re.search(r"^\s*(import|from|def|class|[A-Za-z_]\w*\s*=)", pre, re.M):
         probs.append("general: code before the first test case")
+    final = t.funcs[max(t.funcs)]
+    for i, c in enumerate(cases_of(t.p(g))[1]):
+        if not re.search(r"\b" + re.escape(final) + r"\s*\(", c):
+            probs.append(f"general case {i} never calls the final function {final}")
     for m in y.get("mutants", []) or []:
         if "file" not in m or not os.path.exists(t.p(m["file"])):
             probs.append(f"whole mutant {m.get('name')}: missing file")
@@ -238,6 +246,12 @@ def main():
                 bad = [(i, e) for i, ok, e in res if not ok]
                 print(f"SHIFT {sgn:+d}e-12 step {k}: {len(res) - len(bad)}/{len(res)} pass", *[f"| case {i}: {e}" for i, e in bad])
                 summary.append(not bad)
+            wraps = PERT + "".join(f"\n_ck_orig_{f} = {f}\ndef {f}(*a, **kw):\n    return _ck_pert(_ck_orig_{f}(*a, **kw), {sgn}e-12)\n"
+                                   for f in t.funcs.values())
+            res = run_many(t, "", jobs_for_cases(t.src("solution.py") + wraps, gen, t), pool)
+            bad = [(i, e) for i, ok, e in res if not ok]
+            print(f"SHIFT {sgn:+d}e-12 general (every evaluated function): {len(res) - len(bad)}/{len(res)} pass", *[f"| case {i}: {e}" for i, e in bad])
+            summary.append(not bad)
     if "controls" in modes:
         for val in ("None", "0.0"):
             for s in t.steps:

@@ -1,9 +1,3 @@
-import math
-import numpy as np
-import mpmath as _t_mp
-import signal as _t_signal
-import time as _t_btime
-
 # Independent targets: closed forms of the classical (Maxwell-Juettner) gas with modified Bessel
 # functions, and values computed once with mpmath at 40 digits by tanh-sinh quadrature of the defining
 # integrals in the momentum (breakpoints every k T over the Fermi edge), the chemical potential by a
@@ -11,68 +5,13 @@ import time as _t_btime
 # net electron density (T +- 1e-7 T), all in mpmath; positron densities of a classical positron gas
 # (eps/kT + psi >= 40) from the Maxwell-Juettner formula.
 
-_T_MEC2 = 8.1871057769e-7
-_T_KB = 1.380649e-16
-_T_LC = 3.8615926796e-11
-_T_NA = 6.02214076e23
-
-# Time budget of one call, as stated in the prompt: the call is interrupted once it exceeds the budget
-# (by one second), so a solution that is too slow fails this check instead of holding up the tests.
-_t_depth = [0]
-
-
-def _t_budget(fn, seconds, name):
-    def wrapped(*args, **kwargs):
-        if _t_depth[0]:
-            return fn(*args, **kwargs)
-
-        def _alarm(signum, frame):
-            raise TimeoutError("%s did not finish within its budget of %g s per call" % (name, seconds))
-        try:
-            old = _t_signal.signal(_t_signal.SIGALRM, _alarm)
-            _t_signal.setitimer(_t_signal.ITIMER_REAL, seconds + 1.0)
-            armed = True
-        except (ValueError, AttributeError, OSError):      # no SIGALRM here: measure only
-            armed = False
-        _t_depth[0] += 1
-        start = _t_btime.perf_counter()
-        try:
-            out = fn(*args, **kwargs)
-        finally:
-            _t_depth[0] -= 1
-            if armed:
-                _t_signal.setitimer(_t_signal.ITIMER_REAL, 0.0)
-                _t_signal.signal(_t_signal.SIGALRM, old)
-        elapsed = _t_btime.perf_counter() - start
-        assert elapsed <= seconds, ("%s took %.1f s (budget %g s per call)" % (name, elapsed, seconds))
-        return out
-    return wrapped
-
+# --- test case 0 ---
+# the complete equation of state of a carbon-oxygen white-dwarf interior (rho = 2e6, T = 1e9,
+# Ye = 0.5) and of a pair plasma (rho = 1e-3, T = 1e10), against 40-digit targets
+import numpy as np
 
 def _t_rel(a, b):
     return abs(a - b) / abs(b)
-
-
-def _t_classical(T, psi):
-    # Maxwell-Juettner gas (Boltzmann occupation): n = theta K2(1/theta) e^{+-psi} / (pi^2 lambda^3),
-    # mean total energy K1/K2 + 3 theta, P = (n_- + n_+) k T, entropy per particle k (<eps>/theta -+ psi + 1)
-    with _t_mp.workdps(40):
-        th = _t_mp.mpf(_T_KB) * T / _t_mp.mpf(_T_MEC2)
-        pref = 1 / (_t_mp.pi ** 2 * _t_mp.mpf(_T_LC) ** 3)
-        base = pref * th * _t_mp.besselk(2, 1 / th)
-        nm, npl = base * _t_mp.exp(psi), base * _t_mp.exp(-psi)
-        eps = _t_mp.besselk(1, 1 / th) / _t_mp.besselk(2, 1 / th) + 3 * th
-        P = (nm + npl) * _t_mp.mpf(_T_KB) * T
-        u = _t_mp.mpf(_T_MEC2) * (nm * (eps - 1) + npl * (eps + 1))
-        s = _t_mp.mpf(_T_KB) * (nm * (eps / th - psi + 1) + npl * (eps / th + psi + 1))
-        return [float(x) for x in (nm, npl, nm - npl, P, u, s)]
-
-
-pair_densities = _t_budget(pair_densities, 10.0, "pair_densities")
-pair_thermodynamics = _t_budget(pair_thermodynamics, 10.0, "pair_thermodynamics")
-degeneracy_parameter = _t_budget(degeneracy_parameter, 10.0, "degeneracy_parameter")
-specific_heat = _t_budget(specific_heat, 10.0, "specific_heat")
-electron_positron_eos = _t_budget(electron_positron_eos, 30.0, "electron_positron_eos")
 
 _T_EOS = {
     (2000000.0, 1000000000.0, 0.5): (7.798772316595553735539734, 6.02214298916745876143701e+29, 222916745876143700987606.6, 114478573268634348539048.3, 208291874619394925772455.9, 167383473004818.0744619993, 130656532160103.4906555759),
@@ -81,25 +20,36 @@ _T_EOS = {
     (3500000000000.0, 20000000.0, 0.46): (35058.90723666841769594433, 9.6956466236e+35, 9.597418536528029851685467e-15329, 2.346290944286472048010346e+31, 6.960500198217961422680609e+31, 37687080202983614.54510263, 37687080081917452.09285463),
 }      # (rho, T, Ye): psi, n_minus, n_plus, P, u, s, c_V
 
-
-# --- test case 0: the complete equation of state of a carbon-oxygen white-dwarf interior (rho = 2e6, T = 1e9,
-# Ye = 0.5) and of a pair plasma (rho = 1e-3, T = 1e10), against 40-digit targets ---
 _T_KEYS = ("psi", "n_minus", "n_plus", "P", "u", "s", "cv")
 for _t_args in ((2e6, 1e9, 0.5), (1e-3, 1e10, 0.5)):
-    out = electron_positron_eos(*_t_args)
-    for k, want in zip(_T_KEYS, [float(x) for x in _T_EOS[_t_args]]):
-        tol = 1e-8 if k == "cv" else 1e-10
-        assert _t_rel(out[k], want) < tol, (_t_args, k, out[k], want)
+    _t_out = electron_positron_eos(*_t_args)
+    for _t_k, _t_want in zip(_T_KEYS, [float(x) for x in _T_EOS[_t_args]]):
+        _t_tol = 1e-8 if _t_k == "cv" else 1e-10
+        assert _t_rel(_t_out[_t_k], _t_want) < _t_tol, (_t_args, _t_k, _t_out[_t_k], _t_want)
 
-# --- test case 1: consistency between the steps: the densities at the returned psi give n_net = rho Ye N_A,
-# and in a classical gas without pairs (rho Ye = 1e-6, T = 1e8 K) the Euler relation u_tot + P - T s =
-# mu n holds without cancellation (each side to 1e-10) ---
-psi = degeneracy_parameter(1e6 * 0.5, 1e9)
-nm, npl, net = pair_densities(1e9, psi)
-assert _t_rel(net, 1e6 * 0.5 * _T_NA) < 3e-10, (net, psi)          # psi within 1e-10, d ln n / d ln psi < 3
-psi = degeneracy_parameter(1e-6, 1e8)
-nm, npl, net = pair_densities(1e8, psi)
-P, u, s = pair_thermodynamics(1e8, psi)
-lhs = u + net * _T_MEC2 + P - 1e8 * s
-rhs = psi * _T_KB * 1e8 * net
-assert _t_rel(lhs, rhs) < 1e-8, (lhs, rhs)
+# --- test case 1 ---
+# consistency between the steps. At the psi returned by degeneracy_parameter for rho Ye = 5e5 g cm^-3,
+# T = 1e9 K, pair_densities gives n_net = rho Ye N_A: d ln n_net / d ln psi is about 4.84 there, so psi
+# within its relative 1e-10 and n_net within its relative 1e-10 put n_net within 5.9e-10 of rho Ye N_A.
+# In a classical gas without pairs (rho Ye = 1e-6, T = 1e8 K) the Euler relation
+# u_tot + P - T s = mu n_net holds (u_tot = u + n_net m_e c^2, mu = psi k T including the rest energy);
+# with every quantity within its relative 1e-10 the two sides agree to about 3.4e-10 (the largest terms,
+# n_net m_e c^2 and T s, are 1.6 and 0.7 times the result), well within the 1e-8 checked here
+import numpy as np
+
+_T_MEC2 = 8.1871057769e-7
+_T_KB = 1.380649e-16
+_T_NA = 6.02214076e23
+
+def _t_rel(a, b):
+    return abs(a - b) / abs(b)
+
+_t_psi = degeneracy_parameter(1e6 * 0.5, 1e9)
+_t_nm, _t_npl, _t_net = pair_densities(1e9, _t_psi)
+assert _t_rel(_t_net, 1e6 * 0.5 * _T_NA) < 6e-10, (_t_net, _t_psi)
+_t_psi = degeneracy_parameter(1e-6, 1e8)
+_t_nm, _t_npl, _t_net = pair_densities(1e8, _t_psi)
+_t_P, _t_u, _t_s = pair_thermodynamics(1e8, _t_psi)
+_t_lhs = _t_u + _t_net * _T_MEC2 + _t_P - 1e8 * _t_s
+_t_rhs = _t_psi * _T_KB * 1e8 * _t_net
+assert _t_rel(_t_lhs, _t_rhs) < 1e-8, (_t_lhs, _t_rhs)

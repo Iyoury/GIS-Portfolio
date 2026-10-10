@@ -46,7 +46,11 @@ small difference for HeH+ comes from the approximate erf used in their program).
 
 Two electrons in two spatial functions span three singlet configurations (both in one
 orbital, both in the other, one in each). Diagonalizing the Hamiltonian in this space is
-full CI, the exact answer in the basis. Near equilibrium it lies below RHF by the
+full CI, the exact answer in the basis for the singlet. The fourth two-electron state, the
+triplet with one electron in each orbital, is spatially antisymmetric; for the exact
+Hamiltonian it lies above the singlet ground state, but in this small Gaussian basis it can
+fall below the lowest singlet for diffuse exponents at stretched R, so the singlet has to be
+selected explicitly. Near equilibrium it lies below RHF by the
 correlation energy; on stretching, RHF keeps a fixed ionic weight and goes to a wrong
 limit, while full CI separates into the lowest fragment arrangement. For H2 at 1.4 bohr
 with zeta = 1.24, Szabo and Ostlund give -1.1373 hartree (full CI) and -1.1167 (RHF).

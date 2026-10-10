@@ -62,9 +62,10 @@ def sto3g_one_electron(ZA, ZB, zetaA, zetaB, R):
     '''Overlap and core-Hamiltonian matrices for two atoms with one STO-3G 1s function each.
 
     Inputs:
-      ZA, ZB: float, nuclear charges of atom A (at the origin) and atom B (at distance R on z), > 0.
-      zetaA, zetaB: float, Slater exponents of the 1s functions on A and B, > 0.
-      R: float, distance between the nuclei in bohr, R > 0.
+      ZA, ZB: float, nuclear charges of atom A (at the origin) and atom B (at distance R on z),
+              1 <= Z <= 3.
+      zetaA, zetaB: float, Slater exponents of the 1s functions on A and B, 0.5 <= zeta <= 3.
+      R: float, distance between the nuclei in bohr, 0.02 <= R <= 100.
 
     Output:
       (S, H): two float numpy arrays of shape (2, 2). Index 0 is the function on A and
@@ -107,8 +108,8 @@ def sto3g_two_electron(zetaA, zetaB, R):
     '''Two-electron repulsion integrals over the two STO-3G 1s functions.
 
     Inputs:
-      zetaA, zetaB: float, Slater exponents of the 1s functions on A (origin) and B, > 0.
-      R: float, distance between the nuclei in bohr, R > 0.
+      zetaA, zetaB: float, Slater exponents of the 1s functions on A (origin) and B, 0.5 <= zeta <= 3.
+      R: float, distance between the nuclei in bohr, 0.02 <= R <= 100.
 
     Output:
       eri: float numpy array of shape (2, 2, 2, 2), in hartree, with
@@ -148,17 +149,18 @@ def sto3g_two_electron(zetaA, zetaB, R):
 
 
 def fci_energy(ZA, ZB, zetaA, zetaB, R):
-    '''Full-CI and closed-shell RHF ground-state energies of a two-electron diatomic in STO-3G.
+    '''Singlet ground-state full-CI and closed-shell RHF energies of a two-electron diatomic in STO-3G.
 
     Inputs:
-      ZA, ZB: float, nuclear charges (for example 1, 1 for H2 and 2, 1 for HeH+), > 0.
-      zetaA, zetaB: float, Slater exponents of the 1s functions on A and B, > 0.
-      R: float, distance between the nuclei in bohr, R > 0.
+      ZA, ZB: float, nuclear charges (for example 1, 1 for H2 and 2, 1 for HeH+), 1 <= Z <= 3.
+      zetaA, zetaB: float, Slater exponents of the 1s functions on A and B, 0.5 <= zeta <= 3.
+      R: float, distance between the nuclei in bohr, 0.1 <= R <= 100.
 
     Output:
       (E_fci, E_rhf): tuple of two Python floats, total energies in hartree (electronic
       energy plus the nuclear repulsion ZA * ZB / R), absolute errors below 1e-9.
-        E_fci: lowest eigenvalue of the electronic Hamiltonian in the space of all
+        E_fci: lowest singlet eigenvalue of the electronic Hamiltonian (spatial two-electron
+               function symmetric under exchange of the electrons) in the space of all
                two-electron states built from the two basis functions (full CI).
         E_rhf: closed-shell restricted Hartree-Fock ground-state energy.
     '''
@@ -224,9 +226,10 @@ def _s5_atom(Z, zeta):
 
 
 def _s5_fci(ZA, ZB, zetaA, zetaB, R):
-    # E_fci(R) of fci_energy (step 4): the lowest singlet of the full-CI matrix. Full CI does not depend
-    # on the orthonormal orbitals used, so the symmetric orthogonalization S^(-1/2) replaces the RHF
-    # orbitals here (the RHF scan of fci_energy is not needed for the curve).
+    # E_fci(R) of fci_energy (step 4), built from sto3g_one_electron (step 2) and sto3g_two_electron
+    # (step 3), as the step 5 prompt allows: the lowest singlet of the full-CI matrix. Full CI does not
+    # depend on the orthonormal orbitals used, so the symmetric orthogonalization S^(-1/2) replaces the
+    # RHF orbitals here (the RHF scan of fci_energy is not needed for the curve).
     S, H = sto3g_one_electron(ZA, ZB, zetaA, zetaB, R)
     eri = sto3g_two_electron(zetaA, zetaB, R)
     s_val, s_vec = np.linalg.eigh(S)

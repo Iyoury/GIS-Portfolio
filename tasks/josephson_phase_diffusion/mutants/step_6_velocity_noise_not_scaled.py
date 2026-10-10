@@ -61,7 +61,7 @@ def rcsj_voltage(i, theta, beta_c):
     Output:
       (v, r_d): tuple of two Python floats.
         v: mean phase velocity lim <phi(tau)> / tau = <V> / (I_c R) in the stationary state,
-           error below 1e-7 * |v| + 1e-12 (v = 0.0 exactly at i = 0).
+           error below 1e-7 * |v| + 1e-12 (v = 0 at i = 0, so |v| <= 1e-12 there).
         r_d: differential resistance dv/di (units of R), relative error below 1e-5.
 
     Raises:

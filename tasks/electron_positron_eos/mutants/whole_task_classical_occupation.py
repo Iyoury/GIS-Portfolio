@@ -110,9 +110,9 @@ def pair_densities(T, psi):
 
     Output:
       (n_minus, n_plus, n_net): Python floats in cm^-3, n = (1 / (pi^2 lambda^3)) int p^2 f dp with
-        lambda = hbar / (m_e c); n_net = n_minus - n_plus. n_minus and n_net with a relative error
-        below 1e-10; n_plus with a relative error below 1e-10 when at least 1e-250 cm^-3, otherwise
-        within 1e-250 cm^-3. Each call within 10 s.
+        lambda = hbar / (m_e c); n_net = n_minus - n_plus. n_minus with a relative error below
+        1e-10; n_plus and n_net each with a relative error below 1e-10 when at least 1e-250 cm^-3,
+        otherwise within 1e-250 cm^-3.
 
     Raises:
       ValueError if T or psi is not finite, if T is outside [1e7, 1e11] or psi is not in (0, 1e6].
@@ -144,7 +144,7 @@ def pair_thermodynamics(T, psi):
     Output:
       (P, u, s): Python floats. P the pressure (erg cm^-3); u the energy density (erg cm^-3): kinetic
         energy of the electrons plus kinetic energy and 2 m_e c^2 per positron; s the entropy density
-        (erg K^-1 cm^-3). Each with a relative error below 1e-10. Each call within 10 s.
+        (erg K^-1 cm^-3). Each with a relative error below 1e-10.
 
     Raises:
       ValueError if T or psi is not finite, if T is outside [1e7, 1e11] or psi is not in (0, 1e6].
@@ -170,7 +170,7 @@ def degeneracy_parameter(rho_Ye, T):
 
     Output:
       psi: Python float, psi > 0 with n_net(T, psi) = rho_Ye N_A (n_net of pair_densities), with a
-        relative error below 1e-10. Each call within 10 s.
+        relative error below 1e-10.
 
     Raises:
       ValueError if rho_Ye or T is not finite or is outside its range.
@@ -190,22 +190,31 @@ def degeneracy_parameter(rho_Ye, T):
         E, w, _ = _nodes(theta, psi)
         return _log_net(theta, psi, E, w) - lt
 
-    # n_net increases with psi; bracket in ln psi, then bisection safeguarded secant
+    # n_net increases with psi; bracket in ln psi, then bisection safeguarded false position with the
+    # Illinois modification (the weight glo or ghi of an end kept twice in a row is halved), so that the
+    # bracket shrinks from both sides; plain false position can stall with one end fixed
     llo, lhi = math.log(1e-300), 0.0
     flo, fhi = f(llo), f(lhi)
     while fhi < 0:
         llo, flo = lhi, fhi
         lhi += 1.0
         fhi = f(lhi)
+    glo, ghi, kept = flo, fhi, 0
     for _ in range(300):
-        lm = llo - flo * (lhi - llo) / (fhi - flo)
+        lm = llo - glo * (lhi - llo) / (ghi - glo)
         if not (llo < lm < lhi) or lhi - llo > 0.5:
             lm = 0.5 * (llo + lhi)
         fm = f(lm)
         if fm > 0:
-            lhi, fhi = lm, fm
+            lhi, fhi, ghi = lm, fm, fm
+            if kept == -1:
+                glo *= 0.5
+            kept = -1
         else:
-            llo, flo = lm, fm
+            llo, flo, glo = lm, fm, fm
+            if kept == 1:
+                ghi *= 0.5
+            kept = 1
         if fm == 0 or lhi - llo < 1e-14 or min(abs(flo), abs(fhi)) < 1e-15:
             break
     psi = math.exp(lhi if abs(fhi) < abs(flo) else llo)
@@ -221,7 +230,7 @@ def specific_heat(rho_Ye, T):
 
     Output:
       cv: Python float, (d u_tot / d T) at constant n_net in erg K^-1 cm^-3, u_tot the total energy
-        density including the rest energies; relative error below 1e-8. Each call within 10 s.
+        density including the rest energies; relative error below 1e-8.
 
     Raises:
       ValueError if rho_Ye or T is not finite or is outside its range.
@@ -263,8 +272,11 @@ def electron_positron_eos(rho, T, Ye):
       Ye: float, electrons per baryon, 0 < Ye <= 1; 1e-10 <= rho Ye <= 1e13.
 
     Output:
-      dict with the Python floats "psi", "n_minus", "n_plus", "P", "u", "s", "cv" (units and accuracy
-        as in steps 1-4). Each call within 30 s.
+      dict with the Python floats "psi", "n_minus", "n_plus", "P", "u", "s", "cv" (units as in steps
+        1-4). Accuracy with respect to the exact values for the given (rho, T, Ye): psi, n_minus, P, u, s
+        relative 1e-10; n_plus relative 1e-10 when at least 1e-250 cm^-3, otherwise within 1e-250 cm^-3;
+        cv relative 1e-8. This includes the error propagated from psi, which n_minus, n_plus, P, u and s
+        amplify up to about 600 times, so psi must be found to about 1e-13 relative.
 
     Raises:
       ValueError if rho, T or Ye is not finite, if Ye is not in (0, 1], or if T or rho Ye is outside

@@ -6,10 +6,10 @@ def transfer_matrix(L, T, h=0.0):
     '''Symmetric row-to-row transfer matrix of the 2D Ising model on a periodic strip in a field h.
 
     Inputs:
-      L: int, width of the strip in spins, L >= 3. Spin L is the same as spin 0.
-      T: float, temperature, T > 0 (J = 1, k_B = 1).
+      L: int, width of the strip in spins, 3 <= L <= 10. Spin L is the same as spin 0.
+      T: float, temperature, 0.5 <= T <= 10 (J = 1, k_B = 1).
       h: float or complex, uniform field; the energy is E = - sum_<ij> s_i s_j - h sum_i s_i.
-         A complex h, such as 1j * H, is allowed.
+         |h| <= 20; a complex h, such as 1j * H, is allowed.
 
     Output:
       M: numpy array of shape (2**L, 2**L), complex when h is complex. Row label

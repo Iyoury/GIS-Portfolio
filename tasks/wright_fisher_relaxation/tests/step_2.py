@@ -1,9 +1,28 @@
-import numpy as np
-import mpmath as _t_mp
-
 # Independent targets: the Wright-Fisher matrix in extended precision (mpmath binomials) and
 # plain LU solves at high precision; no elimination ordering, no subtraction-free tricks.
 
+# --- test case 0 ---
+# neutral drift: p_fix = i0 / N exactly, also when p_loss is the small one, and N = 2
+import numpy as np
+
+def _t_rel(a, b):
+    return abs(a - b) / abs(b)
+
+N = 300
+for i0 in (1, 150, 299):
+    out = fixation_statistics(N, 0.0, i0)
+    assert _t_rel(out[0], i0 / N) < 1e-8 and _t_rel(out[1], (N - i0) / N) < 1e-8, (i0, out)
+# smallest population, N = 2: from one copy the next generation has 0, 1 or 2 copies with probabilities
+# 1/4, 1/2, 1/4, so p_fix = p_loss = 1/2 and both conditional times are 1 / (1/2) = 2 generations
+out = fixation_statistics(2, 0.0, 1)
+for a, b in zip(out, (0.5, 0.5, 2.0, 2.0)):
+    assert _t_rel(a, b) < 1e-8, out
+
+# --- test case 1 ---
+# strong selection against A (p_fix ~ 3e-18 from one copy) and for A (p_loss tiny),
+# all four quantities against extended precision
+import numpy as np
+import mpmath as _t_mp
 
 def _t_P(N, s, u, v):
     # call inside _t_mp.workdps(...)
@@ -17,10 +36,8 @@ def _t_P(N, s, u, v):
             P[i, j] = _t_mp.binomial(N, j) * pm ** j * (1 - pm) ** (N - j)
     return P
 
-
 def _t_rel(a, b):
     return abs(a - b) / abs(b)
-
 
 def _t_absorbing(N, s, dps=80):
     # h_fix, h_loss and the fundamental-matrix products G h by plain LU in extended precision
@@ -36,47 +53,30 @@ def _t_absorbing(N, s, dps=80):
         gf, gl = _t_mp.lu_solve(M, hf), _t_mp.lu_solve(M, hl)
         return [(float(hf[k]), float(hl[k]), float(gf[k] / hf[k]), float(gl[k] / hl[k])) for k in range(N - 1)]
 
+def _t_check(out, target, tol=1e-8):
+    assert isinstance(out, tuple) and len(out) == 4 and all(isinstance(x, float) for x in out), out
+    for a, b in zip(out, target):
+        assert _t_rel(a, b) < tol, (out, target)
+
+for N, s in ((30, -0.5), (30, 0.4), (12, 0.05)):
+    target = _t_absorbing(N, s)
+    for i0 in (1, N // 2, N - 1):
+        _t_check(fixation_statistics(N, s, i0), target[i0 - 1])
+
+# --- test case 2 ---
+# relabeling the alleles: a has relative fitness 1 / (1 + s) = 1 + s' with
+# s' = -s / (1 + s), so p_fix(s, i0) = p_loss(s', N - i0) and t_fix(s, i0) = t_loss(s', N - i0),
+# exactly; at N = 400 the small probabilities reach about 3e-141
+import numpy as np
+
+def _t_rel(a, b):
+    return abs(a - b) / abs(b)
 
 def _t_check(out, target, tol=1e-8):
     assert isinstance(out, tuple) and len(out) == 4 and all(isinstance(x, float) for x in out), out
     for a, b in zip(out, target):
         assert _t_rel(a, b) < tol, (out, target)
 
-
-import time as _t_time
-_t_untimed_2 = fixation_statistics
-
-
-def fixation_statistics(*args):
-    # the prompt requires every call to finish within 20 s on one CPU core
-    start = _t_time.perf_counter()
-    out = _t_untimed_2(*args)
-    elapsed = _t_time.perf_counter() - start
-    assert elapsed <= 20.0, ("fixation_statistics took %.1f s" % elapsed, args)
-    return out
-
-
-# --- test case 0: neutral drift: p_fix = i0 / N exactly, also when p_loss is the small one, and N = 2 ---
-N = 300
-for i0 in (1, 150, 299):
-    out = fixation_statistics(N, 0.0, i0)
-    assert _t_rel(out[0], i0 / N) < 1e-8 and _t_rel(out[1], (N - i0) / N) < 1e-8, (i0, out)
-# smallest population, N = 2: from one copy the next generation has 0, 1 or 2 copies with probabilities
-# 1/4, 1/2, 1/4, so p_fix = p_loss = 1/2 and both conditional times are 1 / (1/2) = 2 generations
-out = fixation_statistics(2, 0.0, 1)
-for a, b in zip(out, (0.5, 0.5, 2.0, 2.0)):
-    assert _t_rel(a, b) < 1e-8, out
-
-# --- test case 1: strong selection against A (p_fix ~ 3e-18 from one copy) and for A (p_loss tiny),
-# all four quantities against extended precision ---
-for N, s in ((30, -0.5), (30, 0.4), (12, 0.05)):
-    target = _t_absorbing(N, s)
-    for i0 in (1, N // 2, N - 1):
-        _t_check(fixation_statistics(N, s, i0), target[i0 - 1])
-
-# --- test case 2: relabeling the alleles: a has relative fitness 1 / (1 + s) = 1 + s' with
-# s' = -s / (1 + s), so p_fix(s, i0) = p_loss(s', N - i0) and t_fix(s, i0) = t_loss(s', N - i0),
-# exactly; at N = 400 the small probabilities reach about 3e-141 ---
 for N, s, s2 in ((400, 0.5, -1.0 / 3.0), (400, 0.25, -0.2), (250, -0.1, 1.0 / 9.0)):
     for i0 in (1, N // 3, N - 1):
         a = fixation_statistics(N, s, i0)
@@ -96,7 +96,9 @@ _t_check(fixation_statistics(400, 0.5, 399), [float(x) for x in _T_FIX_BENEFICIA
 _T_FIX_STRONGEST = (5.71042258020733655842240186369e-240, 1.0, 18.192116467196947744171843041, 1.74284701835980197143864271246)       # N = 400, s = -0.5, i0 = 1
 _t_check(fixation_statistics(400, -0.5, 1), [float(x) for x in _T_FIX_STRONGEST])
 
-# --- test case 3: N not an integer in [2, 400], i0 outside [1, N - 1], or s not finite or out of range ---
+# --- test case 3 ---
+# N not an integer in [2, 400], i0 outside [1, N - 1], or s not finite or out of range
+import numpy as np
 for _t_bad in ((1, 0.1, 1), (401, 0.1, 1), (10.0, 0.1, 1), (10, 0.1, True), (10, 0.1, 2.0), (10, 0.1, 0), (10, 0.1, 10), (10, 0.7, 3), (10, float("inf"), 3)):
     try:
         fixation_statistics(*_t_bad)

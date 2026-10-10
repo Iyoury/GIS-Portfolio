@@ -29,9 +29,10 @@ Checks used while building the task:
   is [[1 - v, v], [u, 1 - u]].
 - Reference: subtraction-free elimination (state reduction) for the absorption probabilities and
   times, the stationary distribution, the relaxation rate (inverse iteration on a GTH-factored
-  I - P, eliminating towards the most probable state) and the passage times. Second solution:
-  the same linear systems solved by plain LU in mpmath, with the precision doubled until two runs
-  agree to 1e-13. The two agree to about 1e-14 relative on all tested cases.
+  I - P, eliminating towards the most probable state) and the passage times. Second solution
+  (versions 1-12; replaced for steps 2-6 in version 13, see there): the same linear systems solved
+  by plain LU in mpmath, with the precision doubled until two runs agree to 1e-13. The two agree to
+  about 1e-14 relative on all tested cases.
 - Analytic checks:
   - neutral fixation probability i0 / N;
   - exact neutral first two stationary moments;
@@ -151,3 +152,191 @@ the two agree to 2e-13 at N = 400. Targets: mpmath eig plus shifted inverse iter
 for (400, 0.5, 1e-12, 1e-12), (400, -0.5, 0.1, 1e-12), (400, 0.3, 0, 0) and (400, -0.4, 0, 0.05); the
 reference agrees to 3e-13 (eigenvalues) and 8e-13 (entries). New mutants: regularized absorbing states
 (u, v -> 1e-300) and sign fixed by the largest entry.
+
+## Version 12 (grading_fix: authoring-guide conformance)
+
+v11 is queued for rollouts on the platform; this version is prepared next to it and changes no science,
+reference algorithm, target value or domain.
+
+1. Test-case format and self-contained cases.
+   - Finding: the markers read "# --- test case N: description ---", and every test file had a shared
+     preamble (imports, the mpmath transition matrix, the extended-precision solvers, the check helpers)
+     before case 0; in tests/general.py the helper _t_qsd sat between cases 2 and 3. A case run alone
+     could not execute.
+   - Cause: the files were written to be executed as a whole.
+   - Change: markers are exactly "# --- test case N ---" (0..n-1) with the description as comments below;
+     every case carries its own imports, helpers and setup (tools/selfcontain.py, no case uses a name
+     defined only in another case); _t_qsd is now inside general case 3. The provenance comments stay as
+     leading comments. No check was dropped; n_test_cases unchanged (5, 4, 5, 5, 5, 5, 6; general 5).
+   - Regression test: crown_check format (markers, n_test_cases, no code before case 0) and every case
+     run alone in a fresh process.
+2. Per-call time budget.
+   - Finding: the prompts of steps 2-7 said "Each call must finish within 20 s on one CPU core", and
+     tests/step_2..7 wrapped the evaluated function in perf_counter timing asserts.
+   - Cause: the budget (version 3) was meant to exclude extended-precision brute force.
+   - Change: the sentence is removed from the six prompts (no size statement was attached to it; the
+     domain statements stay) and the wrappers and "import time" are removed from the tests. The N = 400
+     cases remain as value tests.
+   - Regression test: crown_check format (no clock reads); all cases still pass for the reference.
+3. Exact zeros in step 7.
+   - Finding: the prompt required "entries of the mode that are exactly zero must be returned as 0.0",
+     and the tests asserted mode[N] == 0.0, mode[0] == 0.0 and compared zero targets with a zero
+     tolerance (|got - 0| <= 1e-8 * 0).
+   - Cause: exact floating-point equality on computed outputs.
+   - Change: step_description_prompt, function_header, problem_io and the docstrings of steps/step_7.py,
+     solution/step_7.py, solution.py and the step-7 mutants now state that on the absorbing states the
+     exact entries of the mode are zero and the returned entries must be below 1e-250 in absolute value
+     (0.0 is accepted). 1e-250 is the floor already used in steps 1, 3 and 6, and it separates these
+     entries from every true nonzero entry: over a grid of s in {-0.5, -0.2, 0, 0.2, 0.5} and u, v in
+     {0, 1e-12, 0.1} at N = 400 the smallest nonzero |entry| of the reference mode is 3.3e-176. The sign
+     convention "first nonzero entry is positive" became "first entry that is not on an absorbing state
+     is positive", which is the same for the exact mode but stays unambiguous once tiny nonzero values
+     are accepted on absorbing states. The tests build the absorbing-state mask from u and v
+     (_t_absorbing_mask), require |entry| <= 1e-250 there and the relative 1e-8 (2.1e-8 for the
+     relabeling comparison) elsewhere; the relabeling case fixes the sign of the reversed mode by its
+     first entry off the absorbing states.
+   - Regression test: tests/step_7.py cases 0-4; the reference and the second solution pass, the
+     mutant of item 4 fails.
+4. Mutant regularized_absorbing.
+   - Finding: with the 1e-250 bound, replacing u = 0 or v = 0 by 1e-300 leaves the absorbing-state
+     entries near 1e-300, inside the bound; that mutant still failed, but only because its own sign
+     normalization picked those tiny entries (checked by running it on every case of tests/step_7.py).
+   - Change: the regularization is now 1e-15 (a tiny mutation rate used instead of treating the absorbing
+     states), and its description in problem.yaml says so.
+   - Regression test: crown_check mut: it fails cases 0-4 of tests/step_7.py.
+5. Size of tests/step_7.py.
+   - Finding: the four N = 400 eigenvectors were stored in full (4 x 401 entries, about 44 KB).
+   - Change: each now stores the entries i = 0, 8, 16, ..., 400 and the entries next to an absorbing state
+     (51 to 53 per vector) as "index:value" strings, identical to the stored 400-digit-run values (checked
+     string by string against v11), and the candidate entries at those indices are compared. The file went
+     from 50.3 KB to 19.7 KB. The 400-digit provenance comment is kept.
+   - Regression test: case 3 of tests/step_7.py; reference, second solution and shift check pass, the
+     dense_eigenvalues, numerical_inverse, regularized_absorbing and largest_entry_positive mutants fail it.
+6. Tolerances in tests/general.py that did not match the stated accuracy.
+   - Finding: case 0 (gap = 1 / t_up + 1 / t_down) and case 2 (t_up = 1 / (N v p_fix)) compare two
+     computed outputs, each allowed 1e-8, plus a rare-mutation link that holds to about 2e-10, with 1e-8;
+     case 4 required the residual |P mode - lam_min mode| <= 1e-12 max(|P| |mode|) and |max |mode| - 1| <
+     1e-12, while the stated accuracy of every entry of the mode is 1e-8 relative (a mode with entries
+     correct to 5e-9 meets the specification and fails 1e-12).
+   - Change: 2.1e-8 for the two links (as in step 5, case 3), 2.1e-8 for the residual (bound about
+     1.01e-8 from the stated accuracies of mode, lam_min and P) and 1e-8 for the normalization.
+   - Regression test: general cases 0, 2 and 4 for the reference and the second solution; the whole-task
+     mutant still fails them.
+7. Whole-task mutant incomplete.
+   - Finding: mutants/whole_task_mutation_before_selection.py defined only the functions of steps 1-5,
+     so general cases 3 and 4 failed by NameError rather than by the scientific error.
+   - Change: it now also defines quasi_stationary (the reference algorithm on its mutated matrix) and
+     fastest_mode with the mutation-before-selection frequencies (selection acting on the mutated
+     frequency, node differences (1 + s)(m_a - m_k) / ((1 + s m_a)(1 + s m_k))); at N = 5-7 its eigenpair
+     is exact for its own matrix (residual about 1e-16) and differs from the reference.
+   - Regression test: crown_check mut: it fails all 5 general cases.
+8. Metadata: subfield, tags, expert_time_estimate_hours, the relevant_experience placeholder for the
+   author, difficulty_explanation, solution_explanation, verification_explanation, author and
+   affiliation added; edit_label grading_fix.
+
+Rerun: tools/crown_check.py on the whole folder, all modes, every case alone in a fresh process (results
+below), and solution.py (N = 400 inputs of every step) and second_solution.py (N = 24) run twice in
+clean processes, solution.py also with one BLAS thread: bit-identical outputs.
+
+crown_check results (each case alone in a fresh process, -j 2):
+- format: OK (relevant_experience is a placeholder for the author to fill in).
+- ref: every step 5/5, 4/4, 5/5, 5/5, 5/5, 5/5, 6/6 and general 5/5 pass; solution.py also passes every
+  step file.
+- second: step 1 5/5, step 7 6/6 and general 5/5 pass; steps 2-6 pass 2/4, 4/5, 3/5, 4/5, 3/5, and the 8
+  other cases (step 2 cases 0 and 2, step 3 case 3, step 4 cases 1 and 3, step 5 case 2, step 6 cases 1
+  and 3) stop at the checker's 900 s per-case limit: they call steps 2-6 several times at N = 250 to 400,
+  and the second solution's plain LU in pure-Python mpmath at up to several hundred digits (precision
+  doubled until two runs agree) needs much longer there. This limitation exists since the large-N cases
+  were added (versions 3 and 4); the 20 s timing asserts used until version 11 would have failed these
+  cases as well (each of them takes more than 900 s for at most 21 calls).
+  At that size the analytic results, the relabeling symmetry and the stored 400-digit targets are the
+  independent checks of the reference.
+- mut: every step mutant fails at least one case (step 1: [0, 2, 3] and [0, 1, 2, 3]; step 2: [1, 2] and
+  [1, 2]; step 3: [0, 2, 3]; step 4: [1, 2, 3] and [2]; step 5: [0, 1, 2, 3]; step 6: [1, 2, 3] and
+  [1, 2, 3]; step 7: [1, 2, 3, 4], [1, 2, 3, 4], [0, 1, 2, 3, 4] and [0, 1, 2, 3, 4]); the whole-task
+  mutant fails general [0, 1, 2, 3, 4].
+- shift: every reference output scaled by 1 + 1e-12 and by 1 - 1e-12: every case passes.
+- controls: all-None and all-zero stubs pass no case of any step or of the general tests.
+
+## Version 13 (grading_fix: authoring-guide conformance)
+
+Prepared next to the queued v11 like version 12. No reference algorithm, target value, tolerance, test case or
+mutant changed; the second solution of steps 2-6 is new, and the domain statement of step 5 excludes the inputs
+whose result is not representable.
+
+1. Second solution of steps 2-6 never ran on the large-N cases.
+   - Finding (independent verification of version 12): crown_check second stopped 8 of the 24 step 2-6 cases
+     at its 900 s per-case limit (step 2 cases 0 and 2, step 3 case 3, step 4 cases 1 and 3, step 5 case 2,
+     step 6 cases 1 and 3), so the alternative method was never compared with any case at N >= 250, not even
+     the analytic neutral case of step 2 (N = 300). The guide's self-review item "a valid alternative passes"
+     was unverified there.
+   - Cause: steps 2-6 of second_solution.py solved every linear system by plain LU in pure-Python mpmath with
+     the precision doubled until two runs agreed; the cost grows like N^3 times the number of digits
+     (fixation_statistics(50, -0.5, 1) took 2.5 s, at N = 100 about 20 s, at N = 400 of the order of an hour
+     per call), so splitting the cases could not help.
+   - Change: steps 2-6 of second_solution.py now use a double-precision regenerative (hub) decomposition, a
+     different method from the reference's state reduction (no state is eliminated one at a time, no pivot is
+     formed):
+     - hub states: 0, N and the grid state nearest to the stable equilibrium of the deterministic map
+       p -> p_mut(p) (where p_mut(p) - p changes sign from + to -); outside the hubs (and the absorbing
+       states) the chain reaches a hub or an absorbing state within O(N) generations on average;
+     - the fundamental matrix G = sum_k K^k of the chain restricted to the other states is its Neumann
+       series, summed by repeated squaring (G <- G + K^(2^m) G, K^(2^(m+1)) = (K^(2^m))^2, 7 to 14 doublings
+       at N = 400, at most 20 allowed, otherwise an error is raised): only products and sums of nonnegative
+       numbers;
+     - the skeleton chain on the 1 to 3 hubs (jump probabilities P_HH + P_HF G P_FH between distinct hubs,
+       exit probabilities P_H,t + P_HF G P_F,t) is solved by the Markov chain tree theorem: its stationary
+       law as sums over spanning trees, its fundamental matrix (I - S)^-1 by the all-minors forest formula;
+       1 - S_kk is never formed;
+     - step 2: h = G P[., N], G P[., 0] over the interior states (no hub needed without mutation) and the
+       conditional times (G h) / h; step 3: pi_H from the tree theorem, pi_F = pi_H P_HF G; step 5: mean
+       passage times from the forest inverse of the skeleton killed at the target; steps 4 and 6: inverse
+       iteration (as the reference, which is the natural eigen-iteration) whose linear solves are done by
+       this decomposition (step 4 grounded at the most probable hub, step 6 a left solve with exit at N);
+     - the transition matrix for steps 2-6 is built with exact integer binomial coefficients (relative
+       error about 1.5e-13 against 60-digit mpmath rows at N = 400; the second solution's own step-1
+       function, a ratio recursion, has about 4e-12, which is within the step-1 tolerance but leaves less
+       margin after propagation).
+     Steps 1 and 7 of the second solution are unchanged.
+   - Regression test: crown_check second, every case alone in a fresh process: all 40 step cases and 5
+     general cases pass (about 40 s in total, previously more than two hours with 8 time-outs). Beyond the
+     tests, the second solution was compared with the reference on a grid (N in {1, 2, 5, 20, 60, 150, 400}
+     for steps 3-6 with s in {-0.5, -0.2, 0, 0.2, 0.5} and u, v in {1e-12, 1e-6, 1e-3, 0.1}; N up to 400 and
+     three i0 for step 2) and on 120 random parameter sets (N in [1, 400], s uniform, u and v log-uniform in
+     [1e-12, 0.1], with extra weight on u = 0.1 and v = 1e-12): largest relative difference 2.1e-12 (step 2),
+     5.2e-12 (step 3), 4.8e-12 (step 4), 6.0e-12 (step 5) and 5.2e-12 (step 6) on the grid and 2.2e-11 over the
+     random sets (entries below 1e-250 within 1e-250); the doubling bound was never reached.
+2. Passage times above the double-precision range.
+   - Finding: the grid of item 1 showed that substitution_times(400, -0.5, 0.1, 1e-12) has t_up above the
+     largest double (about 1.8e308): the reference returns nan there, the second solution inf. The step-5
+     prompt nevertheless promised a relative error of 1e-8 for every input in the stated ranges.
+   - Cause: the domain statement did not exclude results that cannot be represented.
+   - Change: the step-5 prompt, its function_header, the contract (valid_input_ranges) and the docstrings of
+     steps/step_5.py, solution/step_5.py, solution.py, second_solution.py, mutants/step_5_dense_solve.py and
+     mutants/whole_task_mutation_before_selection.py state that inputs for which t_up or t_down would exceed
+     1e300 generations are outside the domain, and that within the ranges this happens only to t_up near the
+     corner N = 400, s = -0.5, u = 0.1, v = 1e-12. A scan with the second solution over N in {300, 330, 360,
+     380, 390, 400}, s in {-0.5, -0.48, -0.46, -0.44, -0.4, 0.4, 0.5}, u in {0.05, ..., 0.1}, v in {1e-12,
+     1e-6, 1e-3, 0.01, 0.1} and the swapped (u, v) found t_up >= 1e300 only for N >= 380, s <= -0.48,
+     u >= 0.07, v <= 1e-3, and every other value below 9.2e299 (t_down never above 1e290). No test uses these
+     inputs (the largest tested time is 4.4e248), so no test changed.
+   - Regression test: crown_check format and ref (unchanged results).
+3. Metadata: verification_explanation describes the new second solution and that it passes every case;
+   edit_label stays grading_fix.
+
+Rerun: tools/crown_check.py on the whole folder, all modes, every case alone in a fresh process (-j 2), and
+solution.py and second_solution.py (13 calls covering every step, up to N = 400) run twice in clean processes
+and once with one BLAS thread: both are bit-identical between the two clean runs; solution.py is also
+bit-identical with one BLAS thread, second_solution.py within 6e-16 relative of its multithreaded result (BLAS
+summation order in the matrix products).
+
+crown_check results:
+- format: OK (relevant_experience is a placeholder for the author to fill in).
+- ref: every step 5/5, 4/4, 5/5, 5/5, 5/5, 5/5, 6/6 and general 5/5 pass.
+- second: every step 5/5, 4/4, 5/5, 5/5, 5/5, 5/5, 6/6 and general 5/5 pass (no time-out; version 12 had 8).
+- mut: every step mutant fails at least one case (step 1: [0, 2, 3] and [0, 1, 2, 3]; step 2: [1, 2] and
+  [1, 2]; step 3: [0, 2, 3]; step 4: [1, 2, 3] and [2]; step 5: [0, 1, 2, 3]; step 6: [1, 2, 3] and
+  [1, 2, 3]; step 7: [1, 2, 3, 4], [1, 2, 3, 4], [0, 1, 2, 3, 4] and [0, 1, 2, 3, 4]); the whole-task
+  mutant fails general [0, 1, 2, 3, 4].
+- shift: every reference output scaled by 1 + 1e-12 and by 1 - 1e-12: every step case passes.
+- controls: all-None and all-zero stubs pass no case of any step or of the general tests.

@@ -266,6 +266,8 @@ def substitution_times(N, s, u, v):
       s: float, selection coefficient of A, -0.5 <= s <= 0.5.
       u: float, mutation probability A -> a per generation, 1e-12 <= u <= 0.1.
       v: float, mutation probability a -> A per generation, 1e-12 <= v <= 0.1.
+      Inputs for which t_up or t_down would exceed 1e300 generations are outside the domain (within these
+      ranges only t_up can be that large, near N = 400, s = -0.5, u = 0.1, v = 1e-12).
 
     Output:
       (t_up, t_down): tuple of two Python floats.
@@ -323,3 +325,193 @@ def substitution_times(N, s, u, v):
         times.append(float(x[start]))
     result = (times[0], times[1])
     return result
+
+
+def quasi_stationary(N, s, v):
+    '''Quasi-stationary distribution and absorption rate with one-way mutation a -> A.
+
+    Inputs:
+      N: int, population size, 1 <= N <= 400.
+      s: float, selection coefficient of A, -0.5 <= s <= 0.5.
+      v: float, mutation probability a -> A per generation, 1e-12 <= v <= 0.1 (u = 0: no mutation A -> a).
+
+    Output:
+      (rate, qsd): rate is a Python float, the probability per generation that a population in the
+        quasi-stationary state fixes A, rate = 1 - rho with rho the largest eigenvalue of the transition
+        matrix restricted to i = 0, ..., N - 1; relative error below 1e-8, however small it is.
+        qsd is a numpy array of shape (N,), the quasi-stationary distribution over i = 0, ..., N - 1
+        (left eigenvector of that restricted matrix for rho, summing to 1); every entry whose exact value
+        is positive and at least 1e-250 has a relative error below 1e-8, every other entry lies within
+        1e-250 of its exact value.
+
+    Raises:
+      ValueError if N is not an integer in [1, 400] (bool and float are not accepted), or if s or v is
+      not finite or is outside its range.
+    '''
+    if isinstance(N, (bool, np.bool_)) or not isinstance(N, (int, np.integer)):
+        raise ValueError("N must be an integer")
+    N = int(N)
+    if not 1 <= N <= 400:
+        raise ValueError("need 1 <= N <= 400")
+    s, v = float(s), float(v)
+    if not (np.isfinite(s) and np.isfinite(v)):
+        raise ValueError("s and v must be finite")
+    if not (-0.5 <= s <= 0.5 and 1e-12 <= v <= 0.1):
+        raise ValueError("need -0.5 <= s <= 0.5 and 1e-12 <= v <= 0.1")
+    P = wf_transition_matrix(N, s, 0.0, v)
+    n = N
+    # L = I - Q on the transient states is a nonsingular M-matrix: its off-diagonal entries are -P_ij
+    # and its row sums are the absorption probabilities P_iN >= 0. Gaussian elimination in the order
+    # 0, 1, ..., n - 1 is done with the pivot of every reduced row formed as the sum of its remaining
+    # off-diagonal rates plus its accumulated absorption probability (never as 1 - P_kk), so every
+    # factor is a sum or product of nonnegative numbers.
+    A = P[:n, :n].copy()
+    np.fill_diagonal(A, 0.0)
+    esc = P[:n, N].copy()
+    piv = np.zeros(n)
+    upper = [None] * n
+    lower = [None] * n
+    for k in range(n):
+        piv[k] = A[k, k + 1:].sum() + esc[k]
+        upper[k] = A[k, k + 1:].copy()
+        lower[k] = A[k + 1:, k] / piv[k]
+        A[k + 1:, k + 1:] += np.outer(lower[k], upper[k])
+        esc[k + 1:] += lower[k] * esc[k]
+        A[np.arange(k + 1, n), np.arange(k + 1, n)] = 0.0
+
+    # L = (I - lower part) diag(piv) (I - upper part / piv); L^T y = x is solved by a forward sweep with the
+    # upper factor and a backward sweep with the lower one, both with nonnegative coefficients only
+    Umat = np.zeros((n, n))
+    Lmat = np.zeros((n, n))
+    for k in range(n):
+        Umat[k, k + 1:] = upper[k]
+        Lmat[k + 1:, k] = lower[k]
+
+    def solve_t(x):
+        w = np.zeros(n)
+        for j in range(n):
+            w[j] = (x[j] + Umat[:j, j] @ w[:j]) / piv[j]
+        y = np.zeros(n)
+        for k in range(n - 1, -1, -1):
+            y[k] = w[k] + Lmat[k + 1:, k] @ y[k + 1:]
+        return y
+
+    # inverse iteration for the left Perron vector: x <- y / sum(y) with L^T y = x; at convergence
+    # y = x / rate, so rate = sum(x) / sum(y) (both sums of positive terms)
+    # (every entry of x must settle, not only the rate: tiny entries converge last in relative terms)
+    x = np.full(n, 1.0 / n)
+    for it in range(20000):
+        y = solve_t(x)
+        total = y.sum()
+        rate = 1.0 / total
+        x_new = y / total
+        big = x_new > 1e-280
+        settled = np.all(np.abs(x_new[big] - x[big]) <= 1e-14 * x_new[big])
+        x = x_new
+        if settled:
+            break
+    result = (float(rate), x)
+    return result
+
+
+def fastest_mode(N, s, u, v):
+    '''Smallest eigenvalue of the Wright-Fisher transition matrix and its right eigenvector.
+
+    Inputs:
+      N: int, population size, 1 <= N <= 400.
+      s: float, selection coefficient of A, -0.5 <= s <= 0.5.
+      u, v: float, mutation probabilities A -> a and a -> A per generation, 0 <= u, v <= 0.1
+            (v = 0 makes i = 0 absorbing, u = 0 makes i = N absorbing).
+
+    Output:
+      lam_min: Python float, the smallest eigenvalue of the transition matrix P of step 1
+               (wf_transition_matrix), with a relative error below 1e-8.
+      mode: numpy float array of shape (N + 1,), the right eigenvector (P mode = lam_min mode), scaled so
+            that max_i |mode[i]| = 1 and its first entry that is not on an absorbing state is positive;
+            every entry with an error below 1e-8 times its absolute value, except on the absorbing states,
+            where the exact entries are zero and the returned entries must be below 1e-250 in absolute value.
+
+    Raises:
+      ValueError if N is not an integer in [1, 400] (bool and float are not accepted), if s, u or v
+      is not finite or is outside its range, or if N = 1 and u = v = 0.
+    '''
+    if isinstance(N, (bool, np.bool_)) or not isinstance(N, (int, np.integer)):
+        raise ValueError("N must be an integer")
+    N = int(N)
+    if not 1 <= N <= 400:
+        raise ValueError("need 1 <= N <= 400")
+    s, u, v = float(s), float(u), float(v)
+    if not (np.isfinite(s) and np.isfinite(u) and np.isfinite(v)):
+        raise ValueError("s, u and v must be finite")
+    if not (-0.5 <= s <= 0.5 and 0.0 <= u <= 0.1 and 0.0 <= v <= 0.1):
+        raise ValueError("need -0.5 <= s <= 0.5 and 0 <= u, v <= 0.1")
+    if N == 1 and u == 0.0 and v == 0.0:
+        raise ValueError("with N = 1 and u = v = 0 both states are absorbing")
+    i = np.arange(N + 1)
+    p = i / N
+    # MUTANT: mutation applied before selection (m = frequency after mutation, then selection on m)
+    m_mut = (1.0 - u) * p + v * (1.0 - p)
+    m_cmp = u * p + (1.0 - v) * (1.0 - p)
+    den = 1.0 + s * m_mut
+    pm = (1.0 + s) * m_mut / den
+    qm = m_cmp / den
+    # P[i, j] = C(N, j) p_i**j q_i**(N - j) = q_i**N x_i**j C(N, j) with x_i = p_i / q_i increasing in i, so
+    # P = diag(q**N) V diag(C) with V the Vandermonde matrix of the nodes x_i. An absorbing state (i = 0 when
+    # v = 0, i = N when u = 0) has the row e_i: it contributes the eigenvalue 1, and every right eigenvector
+    # with an eigenvalue below 1 vanishes there (x_i = lambda x_i). The transient block I = {i0, ..., i1} has
+    # the same structure, P_II = diag(q_i**N x_i**i0) V(x_I) diag(C(N, j)), x_I > 0 (j = i0, ..., i1), and
+    # the eigenvectors of P with eigenvalues below 1 are those of P_II padded with zeros.
+    # lambda_min is tiny (about N! / N**N), far below what a dense eigensolver resolves next to the
+    # eigenvalue 1, and its eigenvector has entries spanning hundreds of decades. Instead, 1 / lambda_min is
+    # the Perron root of |P_II^-1|: the inverse of a Vandermonde matrix with positive increasing nodes has
+    # the checkerboard sign pattern, so J P_II^-1 J (J = diag((-1)**k)) is positive and similar to
+    # P_II^-1, its Perron vector y gives the mode J y, and its entries follow from the inverse Vandermonde
+    # matrix, |V^-1|[j, a] = e_{m-1-j}(x without x_a) / prod_{k != a} |x_a - x_k|, with e the elementary
+    # symmetric functions (sums of products of positive nodes) and the node differences
+    # x_a - x_k = (p_a - p_k) / (q_a q_k) formed without cancellation from
+    # p_a - p_k = (1 - u - v)(1 + s)(a - k) / (N den_a den_k). Every quantity is a sum or product
+    # of positive terms with small relative errors, and so are the Perron root and the entries of the
+    # Perron vector of a positive matrix. Everything is kept in logarithms.
+    i0 = 0 if v > 0.0 else 1
+    i1 = N if u > 0.0 else N - 1
+    I = np.arange(i0, i1 + 1)
+    m = I.size
+    lq = np.log(qm[I])
+    lx = np.log(pm[I]) - lq
+    di = np.abs(I[:, None] - I[None, :]).astype(float)
+    np.fill_diagonal(di, 1.0)
+    ldx = (np.log1p(-(u + v)) + np.log1p(s) + np.log(di / N) - np.log(den[I])[:, None] - np.log(den[I])[None, :]
+           - lq[:, None] - lq[None, :])
+    np.fill_diagonal(ldx, 0.0)
+    lprod = ldx.sum(axis=1)
+    LE = np.empty((m, m))
+    for a in range(m):
+        e = np.full(m, -np.inf)
+        e[0] = 0.0
+        for k in range(m):
+            if k != a:
+                e[1:] = np.logaddexp(e[1:], lx[k] + e[:-1])
+        LE[a] = e
+    lC = gammaln(N + 1) - gammaln(I + 1) - gammaln(N - I + 1)
+    # |P_II^-1|[j, a] = e_{m-1-j}(x without x_a) / (C(N, i0 + j) prod_{k != a}|x_a - x_k| q_a^N x_a^i0)
+    LM = LE[:, ::-1].T - lC[:, None] - (lprod + N * lq + i0 * lx)[None, :]
+    # power method in logarithms; it contracts like lambda_min / (second smallest eigenvalue)
+    y = np.zeros(m)
+    hist = []
+    for it in range(200000):
+        t = LM + y[None, :]
+        mx = t.max(axis=1)
+        z = mx + np.log(np.exp(t - mx[:, None]).sum(axis=1))
+        r = z.max()
+        dy = np.max(np.abs((z - r) - y)) if it else np.inf
+        y = z - r
+        hist.append(r)
+        if len(hist) >= 4 and max(abs(hist[-1] - h) for h in hist[-4:-1]) <= 1e-14 * max(1.0, abs(r)) and dy <= 1e-11:
+            break
+    lam_min = float(np.exp(-r))
+    mode = np.zeros(N + 1)
+    sign = np.where(np.arange(m) % 2 == 0, 1.0, -1.0)
+    mode[I] = sign * np.exp(y - y.max())
+    first = mode[np.nonzero(mode)[0][0]]
+    mode = mode / np.sign(first)
+    return lam_min, mode

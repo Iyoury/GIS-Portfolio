@@ -13,8 +13,8 @@ def escape_barriers(h, psi):
       psi: float, angle in radians between the field axis and the easy axis, 0 <= psi <= pi/2.
 
     Output:
-      (low, high): two values with the shape of np.asarray(h), numpy float scalars for a
-      scalar h. low <= high are
+      (low, high): two values with the shape of np.asarray(h): float numpy arrays, or float
+      scalars (Python float or numpy floating) for a scalar h. low <= high are
       e(theta_max) - e(theta_min) for the two energy maxima, theta_min being the original
       minimum of the descending branch. Absolute error below 1e-8 when
       h_sw(psi) - |h| >= 1e-3.

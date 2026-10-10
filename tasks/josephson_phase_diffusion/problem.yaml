@@ -2,6 +2,77 @@
 
 domain: physics
 
+subfield: "Condensed matter physics: thermal phase diffusion and noise in overdamped and underdamped Josephson junctions"
+
+tags:
+  - Josephson junction
+  - phase diffusion
+  - Fokker-Planck equation
+  - Kramers equation
+  - giant diffusion
+  - matrix continued fraction
+  - noise thermometry
+
+expert_time_estimate_hours: 14
+
+relevant_experience: "TODO(author): describe your own relevant experience truthfully before upload"
+
+author: "Ayoub Bousfiha"
+affiliation: "Independent Researcher"
+
+difficulty_explanation: >-
+  Below the critical current at low noise the mean voltage and the effective diffusion coefficient are
+  exponentially small (about 1e-17 at some tested points), yet they must keep a relative error below 1e-9, so
+  a double-precision Fourier or finite-difference solution of the Fokker-Planck equation, whose error is
+  only absolute, fails there; the solver has to use the exact Stratonovich and Reimann integral
+  representations with quadrature adapted to the boundary layer of width theta / i, or extended-precision
+  continued fractions. Out of equilibrium the diffusion coefficient is not theta dv/di (Einstein relation),
+  and locating the flat giant-diffusion maximum to 1e-6 in bias needs D_eff or its derivative far more
+  accurately than that. The thermometry step inverts an exponentially sensitive voltage over theta in
+  [0.02, 50] with a stated endpoint rule and needs d ln v / d ln theta, which step 1 does not provide; the
+  array step requires each junction's own noise strength theta0 / c_k and its own reduced time, so the
+  voltage noise scales with c_k r_k, not (c_k r_k)**2. The final RCSJ step has no closed form: the
+  stationary Kramers equation in phase and velocity must be solved to a relative 1e-7 at strong inertia and
+  weak noise, where a time integration started on one branch of the hysteretic current-voltage curve does
+  not reach the stationary average.
+
+solution_explanation: >-
+  mean_voltage evaluates the Stratonovich formula v = 2 pi (1 - exp(-2 pi i / theta)) / S, where S is a
+  double integral of Boltzmann factors of the tilted washboard, with the periodic trapezoid rule in the
+  position and composite 10-point Gauss-Legendre panels in the shift graded geometrically toward the
+  boundary layer of width theta / i; dv/di comes from differentiating the same quadrature in i.
+  effective_diffusion uses the Reimann et al. formula D = theta <I_+**2 I_-> / <I_+>**3 with the same
+  quadrature, and diffusion_peak solves d ln D / di = 0 with brentq on (0.5, 3), the derivative taken
+  analytically under the integrals. noise_temperature applies the stated endpoint rule at theta = 0.02 and
+  50, solves ln v(theta) = ln v by brentq in ln theta, and obtains kappa from the analytic theta-derivative
+  of the Stratonovich integrals. array_criterion finds the criterion current by brentq on the summed
+  junction voltages c_k r_k v(J / c_k, theta0 / c_k) and sums r_k dv_k/di and 2 c_k r_k D_k for the
+  differential resistance and the zero-frequency voltage noise. rcsj_voltage expands the stationary Kramers
+  equation in Hermite functions of the velocity (110 terms) and Fourier modes of the phase (|p| <= 56),
+  solves the resulting Brinkman hierarchy by a matrix continued fraction with dv/di carried analytically
+  through the same recursion, and calls mean_voltage for beta_c = 0.
+
+verification_explanation: >-
+  Every test computes its own target independently of the reference: the stationary Fokker-Planck density
+  and the homogenization corrector as continued fractions in mpmath extended precision (30 + 1.8 / theta
+  digits), the single-integral Bessel form of the Ambegaokar-Halperin voltage at 40 digits, the closed
+  forms at i = 0 (1 / I_0(1/theta)**2 and the Lifson-Jackson D), Newton-step criteria on those targets for
+  the diffusion peak and the array criterion current, a 60-digit central difference for kappa, and for the
+  RCSJ step a Hermite expansion centred at the shifted velocity 0.6 i with a larger truncation (150 Hermite
+  terms, |p| <= 72) and a central difference for dv/di. second_solution.py uses Fourier-Galerkin solves
+  with extended-precision tridiagonal elimination for steps 1 to 5 (secant iterations for the peak,
+  Illinois regula falsi for the temperature, safeguarded Newton for the criterion current) and a Hermite
+  basis centred at the overdamped mean velocity (130 terms, |p| <= 64) for step 6, and passes every test
+  case. Each step has named scientific mutants (forward slips only, Kramers rates, Einstein relation,
+  maximum of dv/di instead of D_eff, Kramers-rate inversion, inverted or Arrhenius sensitivity, squared
+  voltage scale, no inertia, unscaled velocity noise, missing thermal-velocity scale) and there is a
+  whole-task unscaled-velocity-noise mutant; each fails at least one case of its target tests.
+  tools/crown_check.py ran every test case alone in a fresh process (step k with reference steps 1..k-1 as
+  context, general cases with solution.py) for the reference, the second solution and the mutants, checked
+  that scaling every reference output by 1 +- 1e-12 still passes every case, and checked that all-None and
+  all-zero controls pass no case; solution.py and second_solution.py were each run twice in clean
+  processes and gave identical outputs.
+
 required_dependencies: |-
   import numpy as np
   import mpmath as mp
@@ -49,7 +120,7 @@ problem_io: |-
       Output:
         (v, r_d): tuple of two Python floats.
           v: mean phase velocity lim <phi(tau)> / tau = <V> / (I_c R) in the stationary state,
-             error below 1e-7 * |v| + 1e-12 (v = 0.0 exactly at i = 0).
+             error below 1e-7 * |v| + 1e-12 (v = 0 at i = 0, so |v| <= 1e-12 there).
           r_d: differential resistance dv/di (units of R), relative error below 1e-5.
 
       Raises:
@@ -67,7 +138,7 @@ mutants:
     file: mutants/whole_task_velocity_noise_not_scaled.py
 
 # On a new version of an uploaded task only, what kind of edit it is.
-edit_label: difficulty_increase
+edit_label: grading_fix
 
 sub_steps:
   - step_number: 1
@@ -81,7 +152,8 @@ sub_steps:
       directions must be included exactly: below the critical current (|i| < 1) and at low
       noise v is exponentially small, and it must still be returned with the stated relative
       accuracy (a method whose absolute error is only near machine precision is not enough).
-      v is odd in i and r_d is even in i; at i = 0 return v = 0.0 exactly.
+      v is odd in i and r_d is even in i; at i = 0 the junction is in equilibrium and v = 0,
+      to be returned with |v| <= 1e-12.
 
       Inputs: i (float, |i| <= 10) and theta (float, 0.02 <= theta <= 50). Return the tuple
       (v, r_d) of two Python floats, v with a relative error below 1e-9 and r_d with a relative
@@ -100,8 +172,8 @@ sub_steps:
             (v, r_d): tuple of two Python floats.
               v: mean phase velocity lim <phi(tau)> / tau = <V> / (I_c R).
               r_d: differential resistance dv/di (in units of R).
-              Relative errors below 1e-9 for v (v = 0 exactly at i = 0) and below 1e-8
-              for r_d.
+              Relative errors below 1e-9 for v and below 1e-8 for r_d; at i = 0,
+              v = 0 within an absolute 1e-12.
 
           Raises:
             ValueError if i or theta is not finite, if |i| > 10 or if theta is outside
@@ -420,20 +492,19 @@ sub_steps:
       is unique and the dc voltage is its mean phase velocity. Compute that stationary
       v = lim <phi(tau)> / tau exactly (no Kramers, small-noise or small-beta_c approximation) and
       the differential resistance r_d = dv/di. beta_c = 0 is the overdamped junction of
-      mean_voltage (step 1). v is odd and r_d is even in i; at i = 0 return v = 0.0 exactly.
+      mean_voltage (step 1). v is odd and r_d is even in i; at i = 0, v = 0 (so there |v| <= 1e-12
+      by the tolerance below).
 
-      In the bistable range (strong inertia and weak noise, for example beta_c = 2, theta = 0.1,
-      i = 0.7) a junction started in the running state stays there for a time that grows
-      exponentially as theta decreases, while the stationary state is dominated by the locked
-      state: the required v is the average over the unique stationary distribution of
-      (phi, dphi/dtau), not the voltage of either branch, and a finite time integration does not
-      reach it. Below the critical current at weak noise v can be very small (of order 1e-9 at
-      i = 0.05, theta = 0.1, beta_c = 2).
+      In the bistable range (strong inertia and weak noise) a junction started in the running
+      state stays there for a time that grows exponentially as theta decreases, while the
+      stationary state can be dominated by the locked state: the required v is the average over
+      the unique stationary distribution of (phi, dphi/dtau), not the voltage of either branch,
+      and a finite time integration does not reach it. Below the critical current at weak noise
+      and strong inertia v can be very small (of order 1e-9 and below).
 
       Inputs: i (float, |i| <= 2.5), theta (float, 0.1 <= theta <= 2) and beta_c (float, either
       exactly 0 or 0.1 <= beta_c <= 2). Return the tuple (v, r_d) of two Python floats, v with an
-      error below 1e-7 * |v| + 1e-12 and r_d with a relative error below 1e-5. Each call must
-      finish within 30 s on one CPU core.
+      error below 1e-7 * |v| + 1e-12 and r_d with a relative error below 1e-5.
       Errors: raise ValueError if an input is not finite, if |i| > 2.5, if theta is outside
       [0.1, 2], or if beta_c is neither 0 nor in [0.1, 2].
     function_header: |-
@@ -449,7 +520,7 @@ sub_steps:
           Output:
             (v, r_d): tuple of two Python floats.
               v: mean phase velocity lim <phi(tau)> / tau = <V> / (I_c R) in the stationary state,
-                 error below 1e-7 * |v| + 1e-12 (v = 0.0 exactly at i = 0).
+                 error below 1e-7 * |v| + 1e-12 (v = 0 at i = 0, so |v| <= 1e-12 there).
               r_d: differential resistance dv/di (units of R), relative error below 1e-5.
 
           Raises:

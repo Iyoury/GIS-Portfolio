@@ -23,10 +23,13 @@ No public code was copied.
 
 All data are **synthetic**. Real boreholes do not come with a known true heat
 flow, and the tests need an analytic truth. There is **no external data
-file**: `tests/general.py` regenerates the three boreholes itself, with fixed
-seeds and only numpy and math, before calling `surface_heat_flow`. The
-generating parameters (the truth) and the stored least-squares targets are
-constants in that file. The solver never sees it.
+file**: each borehole case of `tests/step_6.py` and `tests/general.py`
+regenerates its borehole itself, with fixed seeds and only numpy and math,
+before calling `surface_heat_flow`. The generating parameters (the truth) are
+constants in `tests/step_6.py` and `tests/general.py`, and the least-squares
+targets of the noisy holes are recomputed inside each case from the
+generator's own model terms (`numpy.linalg.lstsq`, pseudo-inverse
+covariance). The solver never sees these files.
 
 | Borehole | Seed | Length (MD) | Inclination | q0 (W m^-2) | T0 (°C) | g (K) | A (µW m^-3) | κ (m^2 s^-1) | Logging noise |
 |---|---|---|---|---|---|---|---|---|---|
@@ -53,17 +56,20 @@ solutions:
 
 1. **TVD** comes from 64-point Gauss–Legendre integration of the vertical
    component of the great-circle tangent.
-2. **R and S** come from adaptive quadrature of the layered profile.
+2. **R and S** come from adaptive quadrature of the layered profile (the
+   copy in the test files uses the exact layer sums; see below).
 3. **P** comes from its own erfc implementation.
 4. **Noise:** seeded Gaussian noise is added to the temperatures.
 
 The authoring generator (`generate_test_data.py`) is reproduced verbatim
 below. It used adaptive quadrature for R and S and wrote an HDF5 file during
-authoring. The copy embedded in `tests/general.py` uses the exact layer sums
-instead of quadrature and needs no data file. Both produce identical inputs:
-the maximum difference over every array of the three boreholes is below
-1e-11. The stored targets were then computed with both solutions (see the
-evidence section).
+authoring. The copy embedded in the borehole cases of `tests/step_6.py` and
+`tests/general.py` uses the exact layer sums instead of quadrature and needs
+no data file. Both produce identical inputs: the maximum difference over
+every array of the three boreholes is below 1e-11 (1.4e-14 when re-measured
+in version 10). No target is computed with solution.py or
+second_solution.py; both are compared with these targets (see the evidence
+section).
 
 ```python
 """Synthetic inclined-borehole datasets for the borehole-heat-flow task.
@@ -223,11 +229,20 @@ if __name__ == "__main__":
 - The two three-dimensional cases (a build-and-turn segment, and a turn at
   constant inclination) were computed with the closed-form ratio factor. They
   were checked by 48-point Gauss–Legendre integration of the tangent and agree
-  to 1e-9 m.
+  to 1e-9 m; the stored 8-decimal values agree with adaptive quadrature of
+  the arc tangent to 5e-9 m (their rounding).
+- A constant-azimuth segment with inclination linear in MD has the closed
+  form (sin I(m) − sin I1)/k, evaluated in the test without cancellation
+  (the array-query case and the three tiny-dogleg cases on a 20 km segment).
+- Eight random three-dimensional surveys (seeds 1–8) are compared with
+  adaptive quadrature (`scipy.integrate.quad`) of the down component of the
+  great-circle tangent, computed inside each case.
 
-**Step 2, layer_integrals.** All expected values are hand-computed closed
-forms. One case checks that R gives the harmonic, not the arithmetic,
-effective conductivity.
+**Step 2, layer_integrals.** The fixed cases are hand-computed closed forms;
+one checks that R gives the harmonic, not the arithmetic, effective
+conductivity. Six random layered columns (seeds 11–16) are compared with
+adaptive quadrature (`scipy.integrate.quad`) of 1/k and z/k computed inside
+each case.
 
 **Step 3, paleoclimate_perturbation.**
 
@@ -235,34 +250,49 @@ effective conductivity.
   the analytic erfc forms, computed in the test with `math.erfc`.
 - The multi-step history was checked by numerical Duhamel convolution with
   the half-space impulse response z/(2√(πκτ³)) exp(−z²/4κτ) in log-time.
-  The two agree to 1e-9 K.
+  The two agree to 1e-9 K; the stored 8-decimal values agree with the
+  convolution to 5e-9 K (their rounding).
 - Linearity in the departure and decay with depth are analytic properties.
 
 **Step 4, fit_heat_flow.**
 
-- Exact recovery on a noise-free synthetic profile.
+- Exact recovery of the generating parameters on noise-free synthetic
+  profiles (including the four-reading design and the heat-production sign
+  case).
 - On a noisy profile, the estimates and covariance are compared with
   `numpy.linalg.lstsq` computed inside the test.
+- The resolvability threshold uses a P column built in the test with
+  prescribed scaled singular values (see the v5 error-contract section).
 
-**Whole task (general.py).**
+**Step 5, layered_paleoclimate_perturbation.** The targets and their
+provenance are listed in the Version 8 section (now `tests/step_5.py`); five
+of the stored 90-digit values were recomputed independently in version 10.
 
-- *noiseless*: the truth is the generator input. The reference solution
-  recovers q0 = 0.041 to 1e-16 W m^-2.
+**Step 6 and whole task (`tests/step_6.py`, `tests/general.py`).**
+
+- *noiseless*: the truth is the generator input. solution.py recovers
+  q0 = 0.041 to 4e-15 W m^-2 and second_solution.py to 3e-16 W m^-2
+  (re-measured in version 10).
 - *noisy* and *deep*: **no value is taken from the reference solution.** The
-  expected estimates are recomputed at test time inside `tests/general.py`
-  (`_independent_fit`). They come from `numpy.linalg.lstsq`, with the
-  covariance from the pseudo-inverse, applied to the generator's own model
-  terms: Gauss–Legendre TVD, exact layer sums for R and S, and `math.erfc`
-  for P. They agree with `solution.py` and `second_solution.py` to 1e-10 W
-  m^-2 and 1e-7 K. These values are valid for the stated 1-D model: conduction
-  only, horizontal layers, uniform κ, and OLS with n − 3 degrees of freedom.
+  expected estimates are recomputed at test time inside each case of
+  `tests/step_6.py` and `tests/general.py` (`_independent_fit`). They come
+  from `numpy.linalg.lstsq`, with the covariance from the pseudo-inverse,
+  applied to the generator's own model terms: Gauss–Legendre TVD, exact layer
+  sums for R and S, and `math.erfc` for P. They agree with `solution.py` and
+  `second_solution.py` to 1e-10 W m^-2 and 1e-7 K (re-measured in version 10:
+  1e-14 W m^-2 on q0, 4e-13 K on T0, 3e-12 K on g). These values are valid
+  for the stated 1-D model: conduction only, horizontal layers, uniform κ,
+  and OLS with n − 3 degrees of freedom.
 - *n_used* is the count of readings whose generator TVD is ≥ z_min, by
-  definition. The value 46 in `test_z_min_is_applied_in_vertical_depth` is
-  the count of generator TVDs in [150, 350) m.
-- The same records (target, test, method, note, validity) are listed in the
-  `target_provenance` field of problem.yaml.
-- The generator truth lies within 4σ of the estimates. For the noisy hole,
-  q0 differs by 1.1σ and g by 0.7σ.
+  definition. The value 46 in step 6 case 5 / general case 5 (z_min applied
+  in vertical depth) is the count of generator TVDs in [150, 350) m of the
+  noisy hole (an MD cut would remove 40 readings).
+- The same records (target, test, method, note, validity) were listed in the
+  `target_provenance` field of the old-format problem.yaml; since version 10
+  they are in the header comments of `tests/step_6.py` and `tests/general.py`.
+- For the noisy and deep holes, the generator truth lies within 4σ of the
+  estimates (checked in their cases). For the noisy hole, q0 differs by 1.1σ
+  and g by 0.7σ; for the deep hole, by 0.6σ and 0.2σ.
 
 **Limitations.**
 
@@ -317,7 +347,7 @@ Every stated ValueError has a test built by construction (no value from the refe
 - step 4: the resolvability threshold is enforced from both sides: a P column built in the test as
   0.01 R plus a tiny component outside span{1, R}, scaled by the test's own singular values to a
   smallest scaled singular value of 3e-9 (rejected) and 3e-8 (fitted, finite results);
-- step 5 / whole task: a survey not starting at MD 0, a non-increasing survey, a non-increasing
+- step 5 (the workflow; step 6 since version 10) / whole task: a survey not starting at MD 0, a non-increasing survey, a non-increasing
   history and a NaN history time all propagate as ValueError through surface_heat_flow.
 
 ## Registered mutants (problem.yaml)
@@ -349,11 +379,11 @@ Undefined cases are rejected with ValueError, as the prompt states:
 
 A test covers each case.
 
-Version 7: the dogleg rejection band is inclusive (a dogleg exactly 1e-6 rad from 180 degrees is rejected, as the prompt says); the step 1 and step 2 tests assert the container types (ndarray with the query shape; tuple of two Python floats or of two ndarrays); step 5 tests invalid layer conductivities (zero, negative, non-finite, wrong length) through the whole workflow; the overview no longer mentions how the task is graded.
+Version 7: the dogleg rejection band is inclusive (a dogleg exactly 1e-6 rad from 180 degrees is rejected, as the prompt says); the step 1 and step 2 tests assert the container types (ndarray with the query shape; tuple of two Python floats or of two ndarrays); step 5 (the workflow; step 6 since version 10) tests invalid layer conductivities (zero, negative, non-finite, wrong length) through the whole workflow; the overview no longer mentions how the task is graded.
 
 ## Version 8 (difficulty increase; v7 rollouts solved 8/8)
 
-New step 6, `layered_paleoclimate_perturbation(z, layer_tops, layer_k, rho_c, t_years, dT)`: the
+New step 6 (step 5 since version 10), `layered_paleoclimate_perturbation(z, layer_tops, layer_k, rho_c, t_years, dT)`: the
 present-day paleoclimate departure in the layered conductivity column (diffusivity k_i / rho_c in each
 layer, temperature and heat flux continuous at the tops), to 1e-8 K per kelvin of the largest |dT|, within
 10 s for up to 1000 depths, 50 layers and 20 history intervals. The erfc formula of step 3 no longer
@@ -367,7 +397,7 @@ applies. Steps 1-5 and the workflow are unchanged.
   intervals.
 - Second solution: one global linear system per Laplace node for the scaled layer coefficients, and the
   hyperbolic contour of Weideman and Trefethen (2007); agrees with the reference to about 1e-9.
-- Targets (tests/step_6.py): the erfc half-space for a uniform column; the image series of Carslaw and
+- Targets (tests/step_6.py at the time, now tests/step_5.py): the erfc half-space for a uniform column; the image series of Carslaw and
   Jaeger (1959, sec. 12.8) for a layer over a half-space, alpha = (e1 - e2)/(e1 + e2) with the
   effusivities e = sqrt(k rho_c), evaluated in the test with math.erfc (a poorly conducting, a highly
   conducting and a thin cover); and for a five-layer Shield column with the glacial history of the task
@@ -378,9 +408,174 @@ applies. Steps 1-5 and the workflow are unchanged.
   of the exact transform in double precision (fails the 1e-8 K requirement); all fail.
 - Comparisons between two computed outputs use twice the per-output tolerance.
 
-Version 9 (content-check fixes on v8): step 6 no longer reads the clock; the prompt states the size it must
+Version 9 (content-check fixes on v8; step numbers of v8-v9: step 5 = surface_heat_flow, step 6 =
+layered_paleoclimate_perturbation, swapped in version 10): step 6 no longer reads the clock; the prompt states the size it must
 handle (1000 depths, 50 layers, 20 intervals in one call) and that case is now checked on values (50 equal
 conductivities against the erfc half-space, varying conductivities against single-depth calls). Step 6 also
 rejects two-dimensional and empty layer arrays in the tests. Step 4 fits a resolvable four-reading design
 (smallest valid n). Step 5 has a vertical hole (TVD = MD exactly) with a reading exactly at z_min, which must
 be kept (n_used = 131).
+
+## Version 10 (grading_fix: authoring-guide conformance)
+
+Audit of v9 against docs/CROWN_AUTHORING_GUIDE.md. The science, the reference algorithms, the targets and the
+domain are unchanged; the v9 changes (no clock reads, the n = 4 fit, the inclusive reading at z_min, the 2-D and
+empty layer arrays of the layered step) are kept. Each item gives the finding, its cause, the change and the
+regression check.
+
+1. Old task schema. Finding: problem.yaml used the pre-skeleton schema (problem_name, problem_id, id, task_id,
+   title, subdomain, keywords, language, python_version, dependencies, test_dependencies, result_type,
+   general_solution, main_problem, integration, top-level function_header/return_line, general_mutants,
+   whole_task_mutants, main_mutants, target_provenance, problem_background_main; per step name, function,
+   description, depends_on, inputs, outputs, valid_range, accuracy, errors, step_name, function_name).
+   Cause: the task predates the current skeleton. Change: problem.yaml rewritten with the skeleton keys
+   (domain, metadata, required_dependencies, problem_description_main, problem_io, general_tests,
+   second_solution, mutants, edit_label, sub_steps with step_number, scaffold, solution, tests,
+   step_description_prompt, function_header, return_line, step_background, n_test_cases, contract, mutants).
+   The agent-visible content of the dropped fields (conventions, inputs and units, valid ranges, accuracy,
+   errors) is now in problem_description_main, the step prompts and the function headers; the background is
+   in background.md (new sections on the layered column and on the workflow); the target provenance is in
+   the header comments of the test files and in this file. Regression: crown_check format OK.
+2. Final step. Finding: the guide requires the final step to deliver the integrated result with the
+   problem_io signature, but step 6 was layered_paleoclimate_perturbation while problem_io is
+   surface_heat_flow (step 5). Change: the two steps swap numbers: step 5 is now
+   layered_paleoclimate_perturbation (steps/, solution/, tests/, mutants/ renamed accordingly) and step 6 is
+   surface_heat_flow, with step_dependencies [1, 2, 3, 4]. No function, prompt content or target changed.
+   Regression: crown_check ref/second per step.
+3. Test-case format. Finding: the tests used a pytest stand-in, _resolve()/importlib module lookup and
+   _crown_run_all(). Change: every test function and every parametrized value is now a self-contained
+   "# --- test case N ---" case (own imports, helpers and data generation; tools/selfcontain.py reported no
+   problem) that calls the evaluated function by name. The ValueError parametrizations of each test function
+   are merged into one case per file (a loop over the invalid inputs), so that computed values dominate each
+   step: unmerged, step 5 would have had 15 and step 6 16 validation cases out of 22. The no-op _timed()
+   wrapper left from v8 is gone. n_test_cases: 22, 11, 11, 7, 8, 7; tests/general.py has 6 cases. Every check
+   of v9 is kept. Regression: every case run alone in a fresh process (crown_check).
+4. Per-step solutions. Finding: solution/step_5.py (the workflow) redefined the functions of steps 1-4, and
+   solution/step_1, 2, 4 carried unused copies of an erfc helper and SECONDS_PER_YEAR. Change: each
+   solution/step_k.py defines only its own function and private helpers; the erfc helper is the private
+   _erfc_array of step 3; solution.py defines every function once. Regression: crown_check ref (per-step
+   context and solution.py on every step file).
+5. Dependencies. Finding: second_solution.py imports scipy.integrate.quad, which was not declared. Change:
+   required_dependencies = import numpy as np / import math / from scipy.integrate import quad.
+6. Mutants. Finding: mutants were inline code; the inline step mutants were older copies that also lacked
+   the v5 finite-value checks (two differences from the reference instead of one), and the workflow mutants
+   redefined every function. Change: one file per mutant in mutants/, rebuilt from the current reference with
+   exactly one scientific error; the step 6 mutants define only surface_heat_flow; the four whole-task
+   mutants are complete solutions. Regression: crown_check mut (table below).
+7. Exact float comparisons. Finding: assert_allclose(..., rtol=0) in step 1 and "== 0.0" branches in the
+   target helpers of steps 1 and 5. Change: max-abs comparisons; the branches test "<= 0.0" on arguments that
+   are non-negative (dogleg from atan2 of a norm, depths >= 0), same meaning.
+8. Tolerances inconsistent with the stated accuracy (rule: prompt, docstring and tests state the same numbers;
+   two computed outputs are compared with twice the single-output tolerance).
+   - Step 1: assert_allclose(atol=1e-6) kept its default rtol = 1e-7, which allowed 6e-5 m at 600 m against
+     the stated absolute 1e-6 m; now max-abs <= 1e-6 m. The array-call against scalar-call comparison used
+     1e-9 m and now uses 2e-6 m. The 8-decimal three-dimensional targets were re-checked by adaptive
+     quadrature of the arc tangent (agreement 5e-9 m).
+   - Step 2: the harmonic-mean case compared 1000/R absolutely to 1e-9 (a relative 6e-10, tighter than the
+     stated relative 1e-9); now R = 600 m^2 K W^-1 to a relative 1e-9. The absolute floor 1e-12 that the
+     tests allow at z = 0 (where R = S = 0) is now stated in the prompt and the docstring.
+   - Step 3: the 2-D case compares two computed outputs with 5e-6 K (twice 2.5e-6 K, largest |dT| = 2.5 K)
+     instead of 2.5e-6 K; the other allclose checks are explicit max-abs checks with the same numbers.
+   - Step 4: no accuracy was visible; the tests used 1e-8 K / 1e-11 W m^-2 for noise-free recovery and
+     1e-9 K / 1e-12 W m^-2 against numpy.linalg.lstsq. Stated now: T0 and g within 1e-9 K, q0 within
+     1e-12 W m^-2 of the exact least-squares solution, the standard errors within a relative 1e-6 and
+     rms_residual within 1e-9 K; the noise-free checks use the same numbers. Normal equations, QR, SVD,
+     pinv and lstsq agree to 1e-11 K and 1e-14 W m^-2 on these designs (condition number 9e3), so the
+     stated numbers keep a margin above 100 for any stable method.
+   - Step 6 / whole task: the accuracy (noise-free: 1e-5 K, 1e-8 W m^-2, 1e-4 K, rms below 1e-6 K; noisy:
+     5e-4 K, 2e-6 W m^-2, 2e-3 K against the exact least-squares solution, standard errors 2 %, rms 1 %,
+     n_used exact) was only in main_problem; it is now in the step 6 prompt, its function header and
+     problem_io. No number changed.
+9. Visible specification. Finding: the step 6 inputs, units, valid ranges and errors were only in hidden
+   fields; the docstrings of steps 1-3 omitted the non-finite rejections stated in the prompts; step 4 did
+   not state that n = 4 is valid or that every value is a Python float; step 4 declared dependencies on
+   steps 1-3 although it calls no earlier function. Change: stated in the prompts and headers; step 4
+   step_dependencies is [] (its prompt says it receives the arrays). Contracts with the seven keys were added
+   to every step. The example amplitude in the step 6 input description is now g = 4 (it was 6.5, the
+   generating amplitude of one test borehole).
+10. Stated but untested. Finding: step 5 promised ValueError for a non-finite layer top, a non-finite history
+    time and 2-D history arrays, and step 6 for a non-finite heat production, without a test. Change: these
+    inputs were added to the merged ValueError cases (step 5 case 7, step 6 case 4); reference and second
+    solution raise.
+11. Controls. Finding: an all-zero stub passed the step 1 scalar case (TVD 0 at MD 0), and the step 3
+    equal-steps case compared two outputs only (0 = 0 passes). Change: the step 1 case also checks a scalar
+    query at MD 64 m (64 cos 30 deg), and the step 3 case checks the single step against
+    -2 erfc(z / (2 sqrt(kappa t))). Regression: crown_check controls pass no case.
+12. Metadata. subfield, tags, expert_time_estimate_hours (10: the v8 layered step made the former 4 h
+    unrealistic), relevant_experience placeholder for the author, difficulty, solution and verification
+    explanations, author, affiliation and edit_label grading_fix. The second-solution docstring now says that
+    its covariance comes from the inverse triangular factor of QR (not from a pseudo-inverse) and describes its
+    layered method.
+13. Target-provenance text of this file (independent verification after the conformance pass). Finding: the
+    Data section still said that tests/general.py alone regenerates the boreholes, that the least-squares
+    targets are stored constants there, and that "the stored targets were then computed with both solutions";
+    the evidence section cited the pytest function test_z_min_is_applied_in_vertical_depth and said the
+    noiseless reference recovers q0 to 1e-16 W m^-2; the version 8 note located the layered targets in
+    tests/step_6.py; the evidence for steps 1 and 2 named only the closed forms. Cause: these paragraphs were
+    written for the v7-v9 test files (HDF5 era, pytest functions, the old step numbers) and were not updated
+    with the test files in this version. In the current files nothing is stored for the workflow: every
+    borehole case of tests/step_6.py and tests/general.py regenerates its hole and recomputes the noisy-hole
+    targets with _independent_fit (numpy.linalg.lstsq, pseudo-inverse covariance) on the generator's own
+    terms, and no target comes from solution.py or second_solution.py. Change (text only; no test, target,
+    prompt or code changed): the Data paragraph names both test files and says the noisy-hole targets are
+    recomputed inside each case; "No target is computed with solution.py or second_solution.py; both are
+    compared with these targets" replaces the sentence on stored targets; the evidence section cites step 6
+    case 5 / general case 5, adds the random-survey and random-column quadrature targets of steps 1 and 2,
+    the step 4 noise-free and threshold constructions and a pointer to the step 5 evidence, gives the
+    re-measured numbers, and restricts the 4-sigma statement to the noisy and deep holes (the noiseless
+    standard errors are round-off, about 1e-16, and that hole is checked against the truth directly); the v5, v7, v8 and v9 notes mark their old step numbers (workflow = step 5 then;
+    layered step = step 6 in v8-v9; tests/step_6.py of v8 is now tests/step_5.py). Regression: every number
+    quoted was re-measured in a clean process: the embedded generator against the authoring generator above
+    (scipy quad for R and S) differs by at most 1.4e-14 over every input array of the three boreholes;
+    solution.py and second_solution.py agree with _independent_fit to 1e-14 W m^-2 (q0), 4e-13 K (T0) and
+    3e-12 K (g), and recover the noiseless q0 = 0.041 to 4e-15 and 3e-16 W m^-2; the noisy hole lies 1.1
+    sigma (q0) and 0.7 sigma (g) from the truth; 46 generator TVDs of the noisy hole lie in [150, 350) m
+    against 40 MDs; the step 1 three-dimensional and the step 3 multistep 8-decimal targets agree with
+    adaptive quadrature and with the Duhamel convolution to 5e-9 (their rounding). crown_check rerun in all
+    modes (table below).
+
+Additional verification run for this version: five stored 90-digit targets of the layered step (Abitibi
+column at 75, 650 and 1500 m; contrasted column at 61 and 400 m) were recomputed with an independent forward
+transfer-matrix propagation of (F, k dF/dz) from the surface in mpmath at 40 digits with mpmath's Talbot
+inversion; they agree with the stored values to 5e-17 K. solution.py and second_solution.py were each run
+twice in clean processes (and once with one BLAS/OpenMP thread) on the three synthetic boreholes, the
+1000-depth / 50-layer / 20-interval layered case and a three-dimensional survey: identical outputs (SHA-256 of
+the results) in every run.
+
+crown_check (tools/crown_check.py, every case alone in a fresh process, -j 2), final run of this version
+(rerun in all modes after item 13, summary ALL OK; the clean-process repeat runs of both solutions above were
+also repeated and gave identical SHA-256 digests):
+
+| Mode | Result |
+|---|---|
+| format | OK |
+| REF steps 1-6, general (solution.py) | 22/22, 11/11, 11/11, 7/7, 8/8, 7/7, 6/6 |
+| SECOND steps 1-6, general | 22/22, 11/11, 11/11, 7/7, 8/8, 7/7, 6/6 |
+| SHIFT +-1e-12 | all cases pass in every step |
+| CONTROL None / 0.0 | 0 cases pass in every step and in general |
+
+| Where | Mutant | Cases failed |
+|---|---|---|
+| step 1 | linear_tvd_between_stations | 15 of 22 |
+| step 1 | balanced_tangential | 12 of 22 |
+| step 2 | arithmetic_conductivity | 9 of 11 |
+| step 2 | heat_production_integral_missing_half | 9 of 11 |
+| step 3 | years_not_converted | 8 of 11 |
+| step 3 | erfc_missing_factor_2 | 8 of 11 |
+| step 3 | interval_sign_reversed | 9 of 11 |
+| step 4 | heat_production_sign | 4 of 7 |
+| step 4 | dof_n | 1 of 7 (the covariance case) |
+| step 5 | mean_diffusivity_halfspace | 4 of 8 |
+| step 5 | local_diffusivity_halfspace | 4 of 8 |
+| step 5 | stehfest_double_precision | 6 of 8 |
+| step 6 | measured_depth_as_depth | 6 of 7 |
+| step 6 | no_paleoclimate_correction | 5 of 7 |
+| step 6 | single_mean_conductivity | 6 of 7 |
+| step 6 | z_min_on_measured_depth | 5 of 7 |
+| whole task | whole_task_measured_depth_as_depth | 6 of 6 |
+| whole task | whole_task_no_paleoclimate_correction | 4 of 6 |
+| whole task | whole_task_single_mean_conductivity | 4 of 6 |
+| whole task | whole_task_z_min_on_measured_depth | 5 of 6 |
+
+The mutant table of "Registered mutants (problem.yaml)" above uses the v5-v7 test functions and step
+numbers (workflow = step 5 then); this table replaces it.

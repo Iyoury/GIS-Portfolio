@@ -1,13 +1,17 @@
 import numpy as np
 import math
+from scipy.integrate import quad
+from scipy.optimize import least_squares
 
 
 def prism_gravity(points, bounds, rho):
     """Potential and attraction of a right rectangular prism of uniform density.
 
     Inputs:
-      points: float array of shape (3,) or (n, 3), observation points (x, y, z) in m, z positive down.
-      bounds: (x1, x2, y1, y2, z1, z2), the prism x1 <= x <= x2, y1 <= y <= y2, z1 <= z <= z2 (m).
+      points: float array of shape (3,) or (n, 3), up to 1000 points, observation points (x, y, z) in m,
+        z positive down.
+      bounds: (x1, x2, y1, y2, z1, z2), the prism x1 <= x <= x2, y1 <= y <= y2, z1 <= z <= z2 (m), its
+        longest edge at most 1000 times its shortest.
       rho: float, density (kg m^-3).
 
     Output:
@@ -15,7 +19,7 @@ def prism_gravity(points, bounds, rho):
         z component positive down). Python float and array (3,) for one point, arrays (n,) and (n, 3)
         otherwise. U with a relative error below 1e-10; each component of g within
         1e-10 |g| + 1e-14 G |rho| L (L the longest edge), at every point, inside, on the surface or
-        outside at any distance. Each call within 10 s for up to 1000 points.
+        outside at any distance up to a million times the diagonal of the prism.
 
     Raises:
       ValueError for invalid bounds (not six finite numbers with x1 < x2, y1 < y2, z1 < z2), a

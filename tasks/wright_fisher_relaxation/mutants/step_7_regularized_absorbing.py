@@ -17,8 +17,9 @@ def fastest_mode(N, s, u, v):
       lam_min: Python float, the smallest eigenvalue of the transition matrix P of step 1
                (wf_transition_matrix), with a relative error below 1e-8.
       mode: numpy float array of shape (N + 1,), the right eigenvector (P mode = lam_min mode), scaled so
-            that max_i |mode[i]| = 1 and its first nonzero entry is positive; every entry with an error
-            below 1e-8 times its absolute value (entries that are exactly zero returned as 0.0).
+            that max_i |mode[i]| = 1 and its first entry that is not on an absorbing state is positive;
+            every entry with an error below 1e-8 times its absolute value, except on the absorbing states,
+            where the exact entries are zero and the returned entries must be below 1e-250 in absolute value.
 
     Raises:
       ValueError if N is not an integer in [1, 400] (bool and float are not accepted), if s, u or v
@@ -36,8 +37,9 @@ def fastest_mode(N, s, u, v):
         raise ValueError("need -0.5 <= s <= 0.5 and 0 <= u, v <= 0.1")
     if N == 1 and u == 0.0 and v == 0.0:
         raise ValueError("with N = 1 and u = v = 0 both states are absorbing")
-    # absorbing states avoided by replacing a zero mutation rate with a negligible one
-    u, v = max(u, 1e-300), max(v, 1e-300)
+    # absorbing states avoided by replacing a zero mutation rate with a tiny one (1e-15), as if a
+    # negligible back mutation made the chain irreducible
+    u, v = max(u, 1e-15), max(v, 1e-15)
     i = np.arange(N + 1)
     p = i / N
     den = 1.0 + s * p

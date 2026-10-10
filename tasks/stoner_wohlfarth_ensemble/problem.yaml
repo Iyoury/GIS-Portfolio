@@ -2,6 +2,84 @@
 
 domain: materials
 
+subfield: "Magnetism of fine particles: Stoner-Wohlfarth hysteresis, Neel-Brown thermal switching and Brown relaxation"
+
+tags:
+  - Stoner-Wohlfarth model
+  - magnetic hysteresis
+  - thermal activation
+  - dynamic coercivity
+  - Fokker-Planck equation
+  - Neel-Brown relaxation
+
+expert_time_estimate_hours: 12
+
+relevant_experience: "TODO(author): describe your own relevant experience truthfully before upload"
+
+difficulty_explanation: |-
+  The task chains the zero-temperature metastable branch of a Stoner-Wohlfarth particle (the
+  local, not the global, energy minimum, followed down to the astroid switching field), the two
+  escape barriers from the occupied minimum, the survival probability under a linear field sweep
+  with Arrhenius escape over both maxima and the median and mean switching fields, and ends with
+  the dynamic coercive field of a weighted ensemble, which needs the branch, the barriers and the
+  survival probability of every particle together. The branch must be chosen correctly at every
+  field angle, including the degenerate end points psi = 0 and psi = pi/2, where a floating-point
+  h_sw slightly below 1 already matters for f0 / rate up to 1e13. The survival probability needs a
+  quadrature with a purely relative tolerance, because only an escape integral of order rate / f0
+  matters, and the mean switching field follows from the identity E[H_s] = h_sw - int P dh rather
+  than from a density that is sharply peaked. Step 5 stands apart from the chain and computes the
+  exact relaxation from Brown's Fokker-Planck equation; it is hard because of exponential scale
+  separation, not because of extra digits: lam1 falls to about 1e-24 at sigma = 60 next to
+  eigenvalues of order 100, and in a strong field the shallow well holds a Boltzmann weight near
+  1e-94, so a double-precision matrix eigensolver or a smooth starting vector loses the slow mode
+  unless the formulation keeps relative accuracy in both wells.
+
+solution_explanation: |-
+  Step 1 brackets the followed minimum between its fold angle -arctan(tan(psi)**(1/3)) and psi with
+  Brent's method, with h_sw = (cos(psi)**(2/3) + sin(psi)**(2/3))**(-3/2), and uses the map
+  theta -> theta + pi (field h to -h) beyond -h_sw. Step 2 gets the four extrema from a quartic in a
+  shifted tan(theta/2) (companion-matrix eigenvalues polished by Newton steps), separates minima from
+  maxima by the alternating sign of e'' and measures both barriers from the minimum with cos(theta) > 0.
+  Step 3 integrates exp(-2 a low) + exp(-2 a high) from h to h_sw with an adaptive quadrature at
+  relative tolerance 1e-12 and returns exp(-(f0 / rate) I); step 4 solves (f0 / rate) I = ln 2 for the
+  median with Brent's method and evaluates E[H_s] = h_sw - int P dh on a composite Gauss-Legendre window
+  sized from the local escape rate. Step 5 writes Brown's equation in Sturm-Liouville form with the
+  Boltzmann weight w, represents functions by piecewise Chebyshev interpolation in theta, and runs
+  inverse iteration in which every step is two cumulative integrals (the flux taken from the nearer end
+  on each side of the barrier, the start vector a step at the barrier); lam1 is the Rayleigh quotient
+  of positive integrals and tau_int comes from Garanin's quadrature. The final step 6 builds the
+  expected ensemble magnetization and switched weight from steps 1 and 3 (the other minimum's
+  magnetization is minus the branch value at -h) and finds both zero crossings with Brent's method.
+
+verification_explanation: |-
+  Every test case computes its own target without calling the reference: steps 1 and 2 use a
+  20000-point grid search for the extrema of e on the circle refined by bisection, with h_sw from a
+  golden-section search along the equilibrium curve (no astroid formula), plus the closed-form barriers
+  at psi = 0 and pi/2; steps 3 and 4 use the closed erfc / inverse-erfc forms at psi = 0 and pi/2 and,
+  at other angles, an adaptive quadrature or one ODE run on the grid barriers and a Newton step that
+  must not move the returned median; step 5 uses an extended-precision (mpmath) Legendre-polynomial
+  expansion of Brown's operator solved by banded elimination, independent of the Chebyshev
+  Sturm-Liouville reference. Step 6 and the whole-task tests (ensemble_switching of solution.py) use a
+  Newton step with analytic derivatives on the independently computed ensemble magnetization and
+  switched weight and, for a particle at psi = 0 alone or paired with a hard-axis particle at
+  psi = pi/2, closed forms built on the erfc survival probability. second_solution.py changes the
+  method step by step: quartic roots in tan(theta/2) with h_sw from the fold of the equilibrium curve
+  instead of bracketing with the astroid formula (step 1), bracketing of each extremum instead of the
+  companion-matrix quartic (step 2), one DOP853 ODE run instead of adaptive quadrature (step 3), one ODE
+  run with dense output and bisection instead of Brent's method and a composite Gauss-Legendre window
+  (step 4), and per-particle ODE runs with bisection instead of Brent's method over nested quadratures
+  (step 6); for step 5 it uses the same Legendre/mpmath code as the test oracle, so the independent
+  comparison there is reference against oracle. tools/crown_check.py ran every case alone in a fresh
+  process: each reference step with the earlier reference steps as context, solution.py on the
+  whole-task and all step tests, the second solution on every case, ten step mutants and one whole-task
+  mutant (each fails at least one case), the reference outputs scaled by 1 + 1e-12 and by 1 - 1e-12
+  (every case passes), and all-None and all-zero stubs (no case passes). Each solution was also run
+  twice in clean processes on the same inputs and gave identical outputs.
+
+author: "Ayoub Bousfiha"
+
+affiliation: "Independent Researcher"
+
 required_dependencies: |-
   import numpy as np
   from scipy.optimize import brentq
@@ -27,30 +105,36 @@ problem_description_main: |-
   earlier, by thermal activation over an energy barrier. We follow particles during a
   descending field sweep, from a very large positive field down at a constant rate, and
   compute the zero-temperature branch, the energy barriers, the probability that a
-  particle has not switched yet, the statistics of its switching field and the dynamic
-  coercive field of a small ensemble. The last step replaces the Arrhenius picture by the exact
-  relaxation of a particle whose field lies along its easy axis: the slowest relaxation rate
-  and the integral relaxation time from Brown's Fokker-Planck equation for the magnetization
-  direction. All fields are in units of H_K and all magnetizations in units of M_s.
+  particle has not switched yet and the statistics of its switching field; the final step
+  combines the branch, the barriers and the survival probability into the dynamic coercive
+  field of a small ensemble. Step 5 stands apart from this chain and goes beyond the
+  Arrhenius picture: the exact relaxation of a particle whose field lies along its easy axis,
+  with the slowest relaxation rate and the integral relaxation time from Brown's Fokker-Planck
+  equation for the magnetization direction. All fields are in units of H_K and all magnetizations in units of M_s.
 
 problem_io: |-
-  def brown_relaxation(sigma, h):
-      '''Exact thermal relaxation of one particle with its field along the easy axis (Brown's equation).
+  def ensemble_switching(psis, weights, a, f0, rate):
+      '''Dynamic coercive field and half-switching field of an ensemble during the sweep.
 
       Inputs:
-        sigma: float, K V / (k_B T), 0 <= sigma <= 60.
-        h: float, reduced field H / H_K along the easy axis, -0.9 <= h <= 0.9.
+        psis: 1-D array of easy-axis angles in radians, each in [0, pi/2].
+        weights: 1-D array of the same length, nonnegative, not all zero (normalized by
+                 their sum).
+        a: float, thermal stability ratio K V / (k_B T), 40 <= a <= 1000.
+        f0: float, attempt frequency in 1/s, > 0.
+        rate: float, sweep rate |dh/dt| in units of H_K per second, > 0, with
+              1e5 <= f0 / rate <= 1e13.
 
       Output:
-        (lam1, tau_int): tuple of two Python floats, in units of 1/tau_N and tau_N, respectively.
-          lam1: smallest nonzero eigenvalue of the Fokker-Planck operator (relaxation rate times
-                tau_N), relative error below 1e-5.
-          tau_int: integral relaxation time of z = cos(theta) divided by tau_N,
-                   int_0^inf C(t) dt / C(0) with C(t) = <z(t) z(0)> - <z>**2 in equilibrium,
-                   relative error below 1e-5.
+        (h_c, h_half): tuple of two floats, absolute errors below 1e-6.
+          h_c: the ensemble magnetization is zero at h = -h_c during the sweep.
+          h_half: half of the total weight has left its original minimum at h = -h_half.
 
       Raises:
-        ValueError if sigma or h is not finite, if sigma is outside [0, 60] or if |h| > 0.9.
+        ValueError if psis and weights are not 1-D arrays of the same nonzero length, if
+        a psi is outside [0, pi/2], if a weight is negative or not finite, if the weights
+        add up to zero, if a, f0 or rate is not a positive finite number, if a is outside
+        [40, 1000] or if f0 / rate is outside [1e5, 1e13].
       '''
 
 general_tests: tests/general.py
@@ -58,12 +142,12 @@ general_tests: tests/general.py
 second_solution: second_solution.py
 
 mutants:
-  - name: whole_task_doubled_energy
-    description: "Uses 2 sigma instead of sigma as the barrier scale in Brown's equation (the energy is K V (1 - z^2 - 2 h z), not twice that), so both relaxation quantities of the last step are wrong."
-    file: mutants/whole_task_doubled_energy.py
+  - name: whole_task_barriers_from_global_minimum
+    description: "Measures the escape barriers from the deeper (global) energy minimum instead of the original minimum the particle occupies; the survival probability built on them and both ensemble fields of the final step inherit the error (the particle hardly ever escapes before its minimum disappears)."
+    file: mutants/whole_task_barriers_from_global_minimum.py
 
 # On a new version of an uploaded task only, what kind of edit it is.
-edit_label: difficulty_increase
+edit_label: grading_fix
 
 sub_steps:
   - step_number: 1
@@ -84,7 +168,6 @@ sub_steps:
       Inputs: h (float) and psi (float, radians, 0 <= psi <= pi/2). Return m as a Python
       float with an absolute error below 1e-8 for every h with |h + h_sw(psi)| >= 1e-3;
       closer to the jump no accuracy is required.
-      Each call must finish within 20 s on one CPU core.
       Errors: raise ValueError if psi is outside [0, pi/2] or h is not finite.
     function_header: |-
       def branch_magnetization(h, psi):
@@ -143,9 +226,9 @@ sub_steps:
       of the two maxima, as a tuple (low, high) with low <= high.
 
       h may be a float or a numpy array of any shape. Return two values with the shape of
-      np.asarray(h) (float numpy arrays, or numpy floats for a plain number), each entry
-      with an absolute error below 1e-8 whenever h_sw(psi) - |h| >= 1e-3.
-      Each call must finish within 20 s on one CPU core.
+      np.asarray(h) (float numpy arrays, or float scalars, Python float or numpy floating,
+      for a scalar h), each entry with an absolute error below 1e-8 whenever
+      h_sw(psi) - |h| >= 1e-3.
       Errors: raise ValueError if psi is outside [0, pi/2], if any h is not finite, or if
       any h has |h| >= h_sw(psi) (only one minimum exists there).
     function_header: |-
@@ -157,8 +240,8 @@ sub_steps:
             psi: float, angle in radians between the field axis and the easy axis, 0 <= psi <= pi/2.
 
           Output:
-            (low, high): two values with the shape of np.asarray(h), numpy float scalars for a
-            scalar h. low <= high are
+            (low, high): two values with the shape of np.asarray(h): float numpy arrays, or float
+            scalars (Python float or numpy floating) for a scalar h. low <= high are
             e(theta_max) - e(theta_min) for the two energy maxima, theta_min being the original
             minimum of the descending branch. Absolute error below 1e-8 when
             h_sw(psi) - |h| >= 1e-3.
@@ -180,8 +263,8 @@ sub_steps:
       result_kind: exact
       valid_input_ranges: 0 <= psi <= pi/2; |h| < h_sw(psi), accuracy required for h_sw(psi) - |h| >= 1e-3.
       units: Units of 2 K V (reduced energy).
-      output_shape: Tuple of two numpy float arrays with the shape of np.asarray(h), or two numpy float scalars for a scalar h.
-      step_dependencies: []
+      output_shape: Tuple of two float numpy arrays with the shape of np.asarray(h), or two float scalars (Python float or numpy floating) for a scalar h.
+      step_dependencies: [1]
     mutants:
       - name: barrier_from_global_minimum
         description: Measures the barriers from the deepest minimum instead of the original minimum the particle occupies.
@@ -206,7 +289,6 @@ sub_steps:
       field reaches h, as a Python float with an absolute error below 1e-8. The domain is
       40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13 (bounds included); there the particle has
       left with a probability far above 1/2 before its original minimum disappears.
-      Each call must finish within 20 s on one CPU core.
       Errors: raise ValueError if psi is outside [0, pi/2], if h is not finite, if a, f0 or
       rate is not a positive finite number, if a is outside [40, 1000] or if f0 / rate is
       outside [1e5, 1e13].
@@ -267,7 +349,6 @@ sub_steps:
       40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13, for every psi in [0, pi/2] including both
       end points; in it the survival probability falls below 1/2 before -h_sw(psi), so the
       median is a field inside (-h_sw, h_sw).
-      Each call must finish within 60 s on one CPU core.
       Errors: raise ValueError if psi is outside [0, pi/2], if a, f0 or rate is not a
       positive finite number, if a is outside [40, 1000] or if f0 / rate is outside
       [1e5, 1e13].
@@ -304,7 +385,7 @@ sub_steps:
       valid_input_ranges: 0 <= psi <= pi/2; 40 <= a <= 1000; 1e5 <= f0 / rate <= 1e13.
       units: Units of H_K.
       output_shape: Tuple of two Python floats.
-      step_dependencies: [2]
+      step_dependencies: [2, 3]
     mutants:
       - name: wrong_mean_formula
         description: Takes the mean switching field as the integral of the survival probability minus h_sw instead of h_sw minus that integral.
@@ -315,14 +396,111 @@ sub_steps:
     solution: solution/step_5.py
     tests: tests/step_5.py
     step_description_prompt: |-
-      Now take an ensemble of non-interacting particles with the same a, f0 and rate and
-      easy axes at the angles psis[i], with weights weights[i] (the weights are normalized
-      by their sum), all following the sweep of step 3. A particle that is still in its
-      original minimum has the field-axis magnetization of that minimum
-      (branch_magnetization, step 1); a particle that has left it sits in the other energy
-      minimum and has the field-axis magnetization of that minimum. The ensemble
-      magnetization is the weighted mean of the expected field-axis magnetizations of the
-      particles, with the probabilities of survival_probability (step 3).
+      Leave the Arrhenius rate with its assumed attempt frequency f0 and treat thermal switching
+      exactly for one particle whose field is along its easy axis (psi = 0). With
+      z = cos(theta), the distribution W(z, t) of the magnetization direction (normalized,
+      int_{-1}^{1} W dz = 1) obeys Brown's Fokker-Planck equation, which for this axially
+      symmetric case reads
+
+        2 tau_N dW/dt = d/dz [ (1 - z**2) ( dW/dz + W d(beta E)/dz ) ],
+        beta E(z) = sigma (1 - z**2 - 2 h z),
+
+      with sigma = K V / (k_B T) (the a of the earlier steps), h = H / H_K along the easy axis and
+      tau_N the free-diffusion time of the magnetization (its value does not matter here; all
+      times are in units of tau_N). Its stationary solution is the Boltzmann distribution
+      exp(-beta E) / Z. Compute
+
+        lam1: the smallest nonzero eigenvalue of this Fokker-Planck operator, i.e. the slowest
+              relaxation rate of any initial distribution towards equilibrium, in units of 1/tau_N;
+        tau_int: the integral relaxation time of z, int_0^inf C(t) dt / C(0) with the equilibrium
+              correlation function C(t) = <z(t) z(0)> - <z>**2, in units of tau_N.
+
+      At sigma = 0 both equal 1. For large sigma lam1 is exponentially small (about 1e-24 at
+      sigma = 60, h = 0) and must still have the stated relative accuracy. In a strong field one
+      well holds only a tiny part of the equilibrium probability (a relative Boltzmann weight near
+      exp(-4 sigma |h|), about 1e-94 at sigma = 60, |h| = 0.9), yet the slowest mode can live in
+      it, and tau_int then differs from 1 / lam1 by orders of magnitude.
+
+      Useful exact forms: with the Boltzmann weight w(z) = exp(-beta E(z)) and W = w g, the equation
+      becomes the self-adjoint Sturm-Liouville form 2 tau_N dg/dt = (1 / w) d/dz[(1 - z**2) w dg/dz],
+      so lam1 is the smallest positive lam with d/dz[(1 - z**2) w dg/dz] = -2 lam w g for a g that stays
+      bounded at z = -1 and z = 1. The integral relaxation time has the exact quadrature (Garanin)
+        tau_int = 2 int_{-1}^{1} Q(z)**2 / ((1 - z**2) w(z)) dz / int_{-1}^{1} (z - <z>)**2 w(z) dz,
+        Q(z) = int_{-1}^{z} (z' - <z>) w(z') dz',
+      with <z> the equilibrium mean of z.
+
+      Inputs: sigma (float, 0 <= sigma <= 60) and h (float, -0.9 <= h <= 0.9). Return the tuple
+      (lam1, tau_int) of two Python floats, each with a relative error below 1e-5 on the whole domain,
+      the hardest corner sigma = 60 with |h| = 0.9 included.
+      Errors: raise ValueError if sigma or h is not finite, if sigma is outside [0, 60] or if
+      |h| > 0.9.
+    function_header: |-
+      def brown_relaxation(sigma, h):
+          '''Exact thermal relaxation of one particle with its field along the easy axis (Brown's equation).
+
+          Inputs:
+            sigma: float, K V / (k_B T), 0 <= sigma <= 60.
+            h: float, reduced field H / H_K along the easy axis, -0.9 <= h <= 0.9.
+
+          Output:
+            (lam1, tau_int): tuple of two Python floats, in units of 1/tau_N and tau_N, respectively.
+              lam1: smallest nonzero eigenvalue of the Fokker-Planck operator (relaxation rate times
+                    tau_N), relative error below 1e-5.
+              tau_int: integral relaxation time of z = cos(theta) divided by tau_N,
+                       int_0^inf C(t) dt / C(0) with C(t) = <z(t) z(0)> - <z>**2 in equilibrium,
+                       relative error below 1e-5.
+
+          Raises:
+            ValueError if sigma or h is not finite, if sigma is outside [0, 60] or if |h| > 0.9.
+          '''
+    return_line: return result
+    step_background: |-
+      Brown (1963) derived the Fokker-Planck equation for the magnetization of a single-domain
+      particle; for an axially symmetric potential it reduces to one variable z = cos(theta). Its
+      eigenvalues are the relaxation rates; the smallest nonzero one is the switching rate, which
+      Brown's high-barrier formula approximates by (2 / sqrt(pi)) sigma**1.5 exp(-sigma) at h = 0.
+      The integral relaxation time weights all modes by their contribution to z; at strong fields
+      the intrawell modes of the deep well dominate it (Coffey, Kalmykov and Garanin). Matrix
+      methods in Legendre polynomials and integral formulas with Boltzmann weights are both used;
+      in double precision a plain matrix eigensolver cannot resolve an eigenvalue 1e-24 next to
+      eigenvalues of order 100, and representations that mix the two wells lose the shallow one.
+    n_test_cases: 6
+    contract:
+      quantity: "Smallest nonzero eigenvalue and integral relaxation time of Brown's Fokker-Planck equation for a uniaxial particle with its field along the easy axis."
+      assumptions: "Axially symmetric Brown equation in z = cos(theta), beta E = sigma (1 - z^2 - 2 h z), time in units of tau_N; exact, no high-barrier approximation."
+      result_kind: exact
+      valid_input_ranges: "0 <= sigma <= 60, -0.9 <= h <= 0.9."
+      units: "lam1 in 1/tau_N, tau_int in tau_N."
+      output_shape: "Tuple of two Python floats (lam1, tau_int)."
+      step_dependencies: []
+    mutants:
+      - name: brown_asymptote
+        description: "Uses Brown's high-barrier formula for lam1 and 1 / lam1 for tau_int."
+        file: mutants/step_5_brown_asymptote.py
+      - name: tau_from_slowest_mode
+        description: "Takes tau_int as 1 / lam1, ignoring the intrawell modes that dominate it in strong fields."
+        file: mutants/step_5_tau_from_slowest_mode.py
+      - name: missing_half
+        description: "Drops the factor 2 tau_N of Brown's equation, so lam1 is doubled and tau_int halved."
+        file: mutants/step_5_missing_half.py
+      - name: doubled_energy
+        description: "Uses 2 sigma instead of sigma as the barrier scale in Brown's equation (the energy is K V (1 - z^2 - 2 h z), not twice that), so both relaxation quantities are wrong."
+        file: mutants/step_5_doubled_energy.py
+
+  - step_number: 6
+    scaffold: steps/step_6.py
+    solution: solution/step_6.py
+    tests: tests/step_6.py
+    step_description_prompt: |-
+      Back to the field sweep of steps 3 and 4. Take an ensemble of non-interacting particles
+      with the same a, f0 and rate and easy axes at the angles psis[i], with weights
+      weights[i] (the weights are normalized by their sum), all following the sweep of
+      step 3. A particle that is still in its original minimum has the field-axis
+      magnetization of that minimum (branch_magnetization, step 1); a particle that has
+      left it sits in the other energy minimum and has the field-axis magnetization of that
+      minimum. The ensemble magnetization is the weighted mean of the expected field-axis
+      magnetizations of the particles, with the probabilities of survival_probability
+      (step 3).
 
       Return the tuple (h_c, h_half) of two Python floats: h_c is the dynamic coercive
       field, the ensemble magnetization being zero at h = -h_c, and h_half is defined by
@@ -330,7 +508,6 @@ sub_steps:
       with an absolute error below 1e-6. Angles may be anywhere in [0, pi/2], end points
       included, and single weights may be zero (such a particle does not count); a, f0 and
       rate have the domain of step 3, 40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13.
-      Each call must finish within 60 s on one CPU core.
       Errors: raise ValueError if psis and weights are not 1-D arrays of the same nonzero
       length, if a psi is outside [0, pi/2], if a weight is negative or not finite, if the
       weights add up to zero, if a, f0 or rate is not a positive finite number, if a is
@@ -377,97 +554,4 @@ sub_steps:
     mutants:
       - name: athermal_particles
         description: Uses the zero-temperature branch for every particle (no thermal escape before -h_sw).
-        file: mutants/step_5_athermal_particles.py
-
-  - step_number: 6
-    scaffold: steps/step_6.py
-    solution: solution/step_6.py
-    tests: tests/step_6.py
-    step_description_prompt: |-
-      Leave the Arrhenius rate with its assumed attempt frequency f0 and treat thermal switching
-      exactly for one particle whose field is along its easy axis (psi = 0). With
-      z = cos(theta), the distribution W(z, t) of the magnetization direction (normalized,
-      int_{-1}^{1} W dz = 1) obeys Brown's Fokker-Planck equation, which for this axially
-      symmetric case reads
-
-        2 tau_N dW/dt = d/dz [ (1 - z**2) ( dW/dz + W d(beta E)/dz ) ],
-        beta E(z) = sigma (1 - z**2 - 2 h z),
-
-      with sigma = K V / (k_B T) (the a of the earlier steps), h = H / H_K along the easy axis and
-      tau_N the free-diffusion time of the magnetization (its value does not matter here; all
-      times are in units of tau_N). Its stationary solution is the Boltzmann distribution
-      exp(-beta E) / Z. Compute
-
-        lam1: the smallest nonzero eigenvalue of this Fokker-Planck operator, i.e. the slowest
-              relaxation rate of any initial distribution towards equilibrium, in units of 1/tau_N;
-        tau_int: the integral relaxation time of z, int_0^inf C(t) dt / C(0) with the equilibrium
-              correlation function C(t) = <z(t) z(0)> - <z>**2, in units of tau_N.
-
-      At sigma = 0 both equal 1. For large sigma lam1 is exponentially small (about 1e-24 at
-      sigma = 60, h = 0) and must still have the stated relative accuracy. In a strong field one
-      well holds only a tiny part of the equilibrium probability (a relative Boltzmann weight near
-      exp(-4 sigma |h|), about 1e-94 at sigma = 60, |h| = 0.9), yet the slowest mode can live in
-      it, and tau_int then differs from 1 / lam1 by orders of magnitude.
-
-      Useful exact forms: with the Boltzmann weight w(z) = exp(-beta E(z)) and W = w g, the equation
-      becomes the self-adjoint Sturm-Liouville form 2 tau_N dg/dt = (1 / w) d/dz[(1 - z**2) w dg/dz],
-      so lam1 is the smallest positive lam with d/dz[(1 - z**2) w dg/dz] = -2 lam w g for a g that stays
-      bounded at z = -1 and z = 1. The integral relaxation time has the exact quadrature (Garanin)
-        tau_int = 2 int_{-1}^{1} Q(z)**2 / ((1 - z**2) w(z)) dz / int_{-1}^{1} (z - <z>)**2 w(z) dz,
-        Q(z) = int_{-1}^{z} (z' - <z>) w(z') dz',
-      with <z> the equilibrium mean of z.
-
-      Inputs: sigma (float, 0 <= sigma <= 60) and h (float, -0.9 <= h <= 0.9). Return the tuple
-      (lam1, tau_int) of two Python floats, each with a relative error below 1e-5. Each call must
-      finish within 60 s on one CPU core (the hardest cases, sigma = 60 with |h| = 0.9, included).
-      Errors: raise ValueError if sigma or h is not finite, if sigma is outside [0, 60] or if
-      |h| > 0.9.
-    function_header: |-
-      def brown_relaxation(sigma, h):
-          '''Exact thermal relaxation of one particle with its field along the easy axis (Brown's equation).
-
-          Inputs:
-            sigma: float, K V / (k_B T), 0 <= sigma <= 60.
-            h: float, reduced field H / H_K along the easy axis, -0.9 <= h <= 0.9.
-
-          Output:
-            (lam1, tau_int): tuple of two Python floats, in units of 1/tau_N and tau_N, respectively.
-              lam1: smallest nonzero eigenvalue of the Fokker-Planck operator (relaxation rate times
-                    tau_N), relative error below 1e-5.
-              tau_int: integral relaxation time of z = cos(theta) divided by tau_N,
-                       int_0^inf C(t) dt / C(0) with C(t) = <z(t) z(0)> - <z>**2 in equilibrium,
-                       relative error below 1e-5.
-
-          Raises:
-            ValueError if sigma or h is not finite, if sigma is outside [0, 60] or if |h| > 0.9.
-          '''
-    return_line: return result
-    step_background: |-
-      Brown (1963) derived the Fokker-Planck equation for the magnetization of a single-domain
-      particle; for an axially symmetric potential it reduces to one variable z = cos(theta). Its
-      eigenvalues are the relaxation rates; the smallest nonzero one is the switching rate, which
-      Brown's high-barrier formula approximates by (2 / sqrt(pi)) sigma**1.5 exp(-sigma) at h = 0.
-      The integral relaxation time weights all modes by their contribution to z; at strong fields
-      the intrawell modes of the deep well dominate it (Coffey, Kalmykov and Garanin). Matrix
-      methods in Legendre polynomials and integral formulas with Boltzmann weights are both used;
-      in double precision a plain matrix eigensolver cannot resolve an eigenvalue 1e-24 next to
-      eigenvalues of order 100, and representations that mix the two wells lose the shallow one.
-    n_test_cases: 6
-    contract:
-      quantity: "Smallest nonzero eigenvalue and integral relaxation time of Brown's Fokker-Planck equation for a uniaxial particle with its field along the easy axis."
-      assumptions: "Axially symmetric Brown equation in z = cos(theta), beta E = sigma (1 - z^2 - 2 h z), time in units of tau_N; exact, no high-barrier approximation."
-      result_kind: exact
-      valid_input_ranges: "0 <= sigma <= 60, -0.9 <= h <= 0.9."
-      units: "lam1 in 1/tau_N, tau_int in tau_N."
-      output_shape: "Tuple of two Python floats (lam1, tau_int)."
-      step_dependencies: []
-    mutants:
-      - name: brown_asymptote
-        description: "Uses Brown's high-barrier formula for lam1 and 1 / lam1 for tau_int."
-        file: mutants/step_6_brown_asymptote.py
-      - name: tau_from_slowest_mode
-        description: "Takes tau_int as 1 / lam1, ignoring the intrawell modes that dominate it in strong fields."
-        file: mutants/step_6_tau_from_slowest_mode.py
-      - name: missing_half
-        description: "Drops the factor 2 tau_N of Brown's equation, so lam1 is doubled and tau_int halved."
-        file: mutants/step_6_missing_half.py
+        file: mutants/step_6_athermal_particles.py

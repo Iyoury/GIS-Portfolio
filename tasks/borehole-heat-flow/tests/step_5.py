@@ -1,347 +1,281 @@
-"""Step 5 tests (full workflow): surface_heat_flow on three synthetic inclined boreholes
-regenerated in this file with fixed seeds (no external data file)."""
-import importlib
+# Tests for step 5: layered_paleoclimate_perturbation (paleoclimate signal in a layered column).
+# Targets: the erfc half-space for a uniform column, the image series of Carslaw and Jaeger (1959, sec. 12.8)
+# for a layer over a half-space evaluated with math.erfc, and 90-digit mpmath values (transfer-matrix
+# transform, mpmath Talbot inversion) stored inline for two multilayer columns. Accuracy 1e-8 K per kelvin
+# of the largest |dT|; comparisons between two computed outputs use twice that.
+
+# --- test case 0 ---
+# uniform column is the half space
 import math
-
 import numpy as np
-# pytest is not installed in the grading image: a small stand-in provides
-# pytest.mark.parametrize and pytest.raises, and the tests run on import.
-import contextlib as _contextlib
 
-class _Mark:
-    @staticmethod
-    def parametrize(names, values, ids=None):
-        def deco(fn):
-            fn._crown_params = (names, list(values))
-            return fn
-        return deco
+YEAR = 365.25 * 86400.0
 
-class _PytestShim:
-    mark = _Mark()
-
-    @staticmethod
-    @_contextlib.contextmanager
-    def raises(exc):
-        try:
-            yield
-        except exc:
-            return
-        raise AssertionError(f"{getattr(exc, '__name__', exc)} was not raised")
-
-pytest = _PytestShim()
-_PYTEST_SHIM = True
-
-
-def _resolve(name, modules):
-    """Find the function under test: same namespace first, then modules."""
-    g = globals()
-    if name in g and callable(g[name]):
-        return g[name]
-    for m in modules:
-        try:
-            mod = importlib.import_module(m)
-        except Exception:
-            continue
-        if hasattr(mod, name):
-            return getattr(mod, name)
-    raise ImportError(f"function {name!r} not found")
-
-
-ARGS = ["survey_md", "survey_inc", "survey_azi", "log_md", "log_temp", "layer_top_md",
-        "layer_k", "heat_production", "kappa", "hist_t_years", "hist_dT_shape", "z_min"]
-OUT = {"T0", "q0", "amplitude", "sigma_T0", "sigma_q0", "sigma_amplitude",
-       "rms_residual", "n_used"}
-
-
-def _f():
-    return _resolve("surface_heat_flow", ("step_5", "steps.step_5", "solution.step_5", "solution", "main"))
-
-
-# ---------------------------------------------------------------------------
-# Synthetic boreholes, regenerated here with fixed seeds (numpy + math only).
-# This is the generator documented in source.md with the adaptive quadrature
-# for R and S replaced by the exact layer sums; both agree to < 1e-12.
-# ---------------------------------------------------------------------------
-_YEAR = 365.25 * 86400.0
-_GL_X, _GL_W = np.polynomial.legendre.leggauss(64)
-_HIST_T = [1.0e4, 1.0e5, 1.2e5]
-_HIST_SHAPE = [0.0, -1.0, 0.25]
-_Z_MIN = 150.0
-
-
-def _g_tangent(inc, azi):
-    return np.array([np.sin(inc) * np.cos(azi), np.sin(inc) * np.sin(azi), np.cos(inc)])
-
-
-def _g_tvd(md, inc_deg, azi_deg, m):
-    inc, azi = np.radians(inc_deg), np.radians(azi_deg)
-    total = 0.0
-    for i in range(len(md) - 1):
-        a, b = md[i], min(md[i + 1], m)
-        if b <= a:
-            break
-        t1, t2 = _g_tangent(inc[i], azi[i]), _g_tangent(inc[i + 1], azi[i + 1])
-        beta = np.arccos(np.clip(t1 @ t2, -1, 1))
-        L = md[i + 1] - md[i]
-        s = 0.5 * (b - a) * _GL_X + 0.5 * (b + a)
-        f = (s - a) / L
-        if beta < 1e-12:
-            tz = np.full_like(s, t1[2])
-        else:
-            tz = (np.sin((1 - f) * beta) * t1[2] + np.sin(f * beta) * t2[2]) / np.sin(beta)
-        total += 0.5 * (b - a) * np.sum(_GL_W * tz)
-    return total
-
-
-def _g_RS(z, tops, k):
-    R = S = 0.0
-    bots = list(tops[1:]) + [math.inf]
-    for top, bot, kk in zip(tops, bots, k):
-        b = min(max(z, top), bot)
-        R += (b - top) / kk
-        S += (b * b - top * top) / (2 * kk)
-    return R, S
-
-
-def _g_P(z, shape, kappa):
-    edges = [0.0] + [t * _YEAR for t in _HIST_T]
-    out = 0.0
-    for i, d in enumerate(shape):
+def _halfspace(z, kappa, t_years, dT):
+    edges = [0.0] + [t * YEAR for t in t_years]
+    if z <= 0.0:                      # z >= 0: the surface value
+        return dT[0]
+    tot = 0.0
+    for i, d in enumerate(dT):
         e_old = math.erfc(z / (2 * math.sqrt(kappa * edges[i + 1])))
-        e_new = 0.0 if edges[i] == 0 else math.erfc(z / (2 * math.sqrt(kappa * edges[i])))
-        out += d * (e_old - e_new)
-    return out
+        e_new = 0.0 if i == 0 else math.erfc(z / (2 * math.sqrt(kappa * edges[i])))
+        tot += d * (e_old - e_new)
+    return tot
 
+# equal conductivities in every layer: kappa = k / rho_c everywhere, the erfc solution of step 3
+tops, k, rho_c = [0.0, 300.0, 800.0], [3.0, 3.0, 3.0], 2.5e6
+t_y, d = [1e3, 1.1e4, 9e4, 1.3e5], [0.8, 0.0, -1.0, 0.3]
+z = [0.0, 1.0, 50.0, 299.9, 300.0, 300.1, 700.0, 1500.0, 3000.0]
+got = np.asarray(layered_paleoclimate_perturbation(np.array(z), tops, k, rho_c, t_y, d))
+exp = [_halfspace(v, 3.0 / 2.5e6, t_y, d) for v in z]
+assert np.max(np.abs(got - np.array(exp))) < 1e-8      # 1e-8 K per K of the largest |dT|
 
-def _g_survey(total, step, inc0, inc1, azi0, azi1, wobble, seed):
-    rng = np.random.default_rng(seed)
-    md = np.arange(0, total + 1e-9, step)
-    f = md / total
-    inc = inc0 + (inc1 - inc0) * f + wobble * np.sin(6 * f) * rng.uniform(0.5, 1)
-    azi = azi0 + (azi1 - azi0) * f**1.3
-    return md, inc, azi
+# --- test case 1 ---
+# layer over half space [case = (2.0, 5.0, 400.0)]
+import math
+import numpy as np
 
+YEAR = 365.25 * 86400.0
 
-_CASES = {
-    "noiseless": dict(seed=1, survey=(1500, 30, 35, 44, 180, 196, 2.0, 1),
-                      layers=([0, 180, 420, 610, 900, 1150, 1330], [2.9, 3.4, 2.6, 4.6, 3.1, 2.4, 3.8]),
-                      A=0.6e-6, kappa=1.2e-6, q0=0.041, T0=5.2, g=6.5, log_step=5.0, log_top=20.0, noise=0.0),
-    "noisy": dict(seed=20260929, survey=(1800, 25, 28, 40, 330, 350, 1.5, 2),
-                  layers=([0, 120, 350, 700, 820, 1210, 1500], [3.3, 2.7, 3.9, 2.5, 4.4, 3.0, 2.8]),
-                  A=0.9e-6, kappa=1.1e-6, q0=0.037, T0=4.1, g=7.8, log_step=5.0, log_top=15.0, noise=0.005),
-    "deep": dict(seed=4242, survey=(2400, 50, 8, 15, 90, 110, 1.0, 3),
-                 layers=([0, 260, 900, 1400, 2000], [3.6, 2.9, 3.2, 2.6, 3.5]),
-                 A=1.8e-6, kappa=1.3e-6, q0=0.052, T0=3.6, g=5.0, log_step=10.0, log_top=30.0, noise=0.010),
-}
-
-# Target provenance. No expected value is taken from the reference solution.
-#  * noiseless hole: targets are the generator inputs q0, T0, g (analytic truth).
-#  * noisy / deep holes: targets are recomputed below, at test time, by ordinary least
-#    squares (numpy.linalg.lstsq, covariance from the pseudo-inverse) on the generator's OWN
-#    model terms: TVD from Gauss-Legendre integration of the tangent, R and S from exact layer
-#    sums, P from math.erfc. Valid for the stated 1-D conductive model with horizontal layers
-#    and uniform diffusivity; the least-squares covariance is the usual s^2 (G^T G)^-1 with
-#    s^2 = RSS/(n-3).
-#  * n_used: count of readings whose generator TVD is >= z_min (definition).
-_TARGET_PROVENANCE = {
-    "q0, T0, amplitude (noiseless)": ("generator inputs", "analytic truth",
-                                      "noise-free data following the stated model"),
-    "q0, T0, amplitude, sigmas, rms (noisy, deep)": (
-        "independent OLS on generator-side model terms (lstsq + pinv)",
-        "agrees with the reference to 1e-10 W m^-2 and 1e-7 K",
-        "1-D conduction, horizontal layers, uniform kappa; Gaussian noise"),
-    "n_used": ("count of generator TVD >= z_min", "definition", "always"),
-}
-
-
-def _independent_fit(z, T, R, S, P, A, z_min):
-    keep = z >= z_min
-    G = np.column_stack([np.ones(int(keep.sum())), R[keep], P[keep]])
-    y = T[keep] + A * S[keep]
-    m, *_ = np.linalg.lstsq(G, y, rcond=None)
-    res = y - G @ m
-    n = y.size
-    Gp = np.linalg.pinv(G)
-    C = (res @ res) / (n - 3) * (Gp @ Gp.T)
-    return {"T0": m[0], "q0": m[1], "amplitude": m[2], "sigma_T0": math.sqrt(C[0, 0]),
-            "sigma_q0": math.sqrt(C[1, 1]), "sigma_amplitude": math.sqrt(C[2, 2]),
-            "rms_residual": math.sqrt(res @ res / n), "n_used": int(n)}
-
-
-_CACHE = {}
-
-
-def _load(name):
-    """Return (argument list for surface_heat_flow, attributes dict)."""
-    if name not in _CACHE:
-        c = _CASES[name]
-        rng = np.random.default_rng(c["seed"])
-        md, inc, azi = _g_survey(*c["survey"])
-        tops_md, k = (np.asarray(v, float) for v in c["layers"])
-        log_md = np.arange(c["log_top"], md[-1] + 1e-9, c["log_step"])
-        tops = [_g_tvd(md, inc, azi, m) for m in tops_md]
-        T = np.empty(log_md.size)
-        zs, Rs, Ss, Ps = (np.empty(log_md.size) for _ in range(4))
-        for j, m in enumerate(log_md):
-            z = _g_tvd(md, inc, azi, m)
-            R, S = _g_RS(z, tops, k)
-            P = _g_P(z, _HIST_SHAPE, c["kappa"])
-            zs[j], Rs[j], Ss[j], Ps[j] = z, R, S, P
-            T[j] = c["T0"] + c["q0"] * R - c["A"] * S + c["g"] * P
-        if c["noise"] > 0:
-            T = T + c["noise"] * rng.standard_normal(T.size)
-        args = [md, inc, azi, log_md, T, tops_md, k, c["A"], c["kappa"],
-                np.array(_HIST_T), np.array(_HIST_SHAPE), _Z_MIN]
-        attrs = {"true_q0": c["q0"], "true_T0": c["T0"], "true_amplitude": c["g"], "z_min": _Z_MIN}
-        ref = _independent_fit(zs, T, Rs, Ss, Ps, c["A"], _Z_MIN)
-        attrs.update({"ref_" + key: v for key, v in ref.items()})
-        _CACHE[name] = (args, attrs)
-    args, attrs = _CACHE[name]
-    return [a.copy() if isinstance(a, np.ndarray) else a for a in args], dict(attrs)
-
-
-def test_output_contract():
-    d, a = _load("noisy")
-    r = _f()(*d)
-    assert isinstance(r, dict) and OUT <= set(r)
-    for k in OUT - {"n_used"}:
-        assert type(r[k]) is float, k      # plain Python floats as stated
-    assert isinstance(r["n_used"], int)
-    assert int(round(float(r["n_used"]))) == int(a["ref_n_used"])
-    for k in OUT - {"n_used"}:
-        assert np.isfinite(float(r[k]))
-
-
-def test_noiseless_hole_returns_generator_parameters():
-    # analytic truth: temperatures generated from q0 = 0.041 W/m2, T0 = 5.2 C,
-    # glacial amplitude 6.5 K on an independently integrated trajectory
-    d, a = _load("noiseless")
-    r = _f()(*d)
-    assert abs(r["q0"] - a["true_q0"]) < 1e-8
-    assert abs(r["T0"] - a["true_T0"]) < 1e-5
-    assert abs(r["amplitude"] - a["true_amplitude"]) < 1e-4
-    assert r["rms_residual"] < 1e-6
-    assert int(round(float(r["n_used"]))) == int(a["ref_n_used"])
-
-
-@pytest.mark.parametrize("name", ["noisy", "deep"])
-def test_noisy_holes_match_least_squares_solution(name):
-    d, a = _load(name)
-    r = _f()(*d)
-    assert int(round(float(r["n_used"]))) == int(a["ref_n_used"])
-    assert abs(r["q0"] - a["ref_q0"]) < 2e-6
-    assert abs(r["T0"] - a["ref_T0"]) < 5e-4
-    assert abs(r["amplitude"] - a["ref_amplitude"]) < 2e-3
-    for k in ("sigma_q0", "sigma_T0", "sigma_amplitude"):
-        assert abs(r[k] / a["ref_" + k] - 1) < 0.02
-    assert abs(r["rms_residual"] / a["ref_rms_residual"] - 1) < 0.01
-    # the generator truth is consistent with the reported uncertainty
-    assert abs(r["q0"] - a["true_q0"]) < 4 * r["sigma_q0"]
-    assert abs(r["amplitude"] - a["true_amplitude"]) < 4 * r["sigma_amplitude"]
-
-
-@pytest.mark.parametrize("case", ["log_len", "few_after_cut", "zero_shape", "top_beyond_hole",
-                                  "negative_A", "bad_kappa", "log_beyond_hole", "bad_survey_start",
-                                  "bad_survey_order", "hist_not_increasing", "hist_nan",
-                                  "log_two_d", "k_zero", "k_negative", "k_nan", "k_len"])
-def test_invalid_inputs_raise(case):
-    d, _ = _load("noisy")
-    i = {a: j for j, a in enumerate(ARGS)}
-    if case == "log_len":
-        d[i["log_temp"]] = d[i["log_temp"]][:-1]
-    elif case == "few_after_cut":
-        d[i["z_min"]] = 1e5
-    elif case == "zero_shape":
-        d[i["hist_dT_shape"]] = np.zeros_like(d[i["hist_dT_shape"]])
-    elif case == "top_beyond_hole":
-        tops = np.array(d[i["layer_top_md"]], float)
-        tops[-1] = d[i["survey_md"]][-1] + 100.0
-        d[i["layer_top_md"]] = tops
-    elif case == "negative_A":
-        d[i["heat_production"]] = -1e-6
-    elif case == "bad_kappa":
-        d[i["kappa"]] = 0.0
-    elif case == "bad_survey_start":
-        md = np.array(d[i["survey_md"]], float); md[0] = 5.0
-        d[i["survey_md"]] = md
-    elif case == "bad_survey_order":
-        md = np.array(d[i["survey_md"]], float); md[1], md[2] = md[2], md[1]
-        d[i["survey_md"]] = md
-    elif case == "hist_not_increasing":
-        t = np.array(d[i["hist_t_years"]], float); t[1] = t[0]
-        d[i["hist_t_years"]] = t
-    elif case == "hist_nan":
-        t = np.array(d[i["hist_t_years"]], float); t[1] = float("nan")
-        d[i["hist_t_years"]] = t
-    elif case == "log_two_d":
-        # equal shapes, but two-dimensional: the log arrays must be 1-D
-        d[i["log_md"]] = np.asarray(d[i["log_md"]], float)[None, :]
-        d[i["log_temp"]] = np.asarray(d[i["log_temp"]], float)[None, :]
-    elif case in ("k_zero", "k_negative", "k_nan"):
-        # a layer conductivity that step 2 must reject (0, negative, non-finite)
-        k = np.array(d[i["layer_k"]], float)
-        k[1] = {"k_zero": 0.0, "k_negative": -2.0, "k_nan": float("nan")}[case]
-        d[i["layer_k"]] = k
-    elif case == "k_len":
-        d[i["layer_k"]] = np.array(d[i["layer_k"]], float)[:-1]          # one conductivity per layer
-    else:
-        md = np.array(d[i["log_md"]], float)
-        md[-1] = d[i["survey_md"]][-1] + 5.0
-        d[i["log_md"]] = md
-    with pytest.raises(ValueError):
-        _f()(*d)
-
-
-def test_z_min_is_applied_in_vertical_depth():
-    # raising z_min by 200 m of TVD removes exactly the readings between the two cuts
-    d, a = _load("noisy")
-    i = {x: j for j, x in enumerate(ARGS)}
-    r1 = _f()(*d)
-    d[i["z_min"]] = float(a["z_min"]) + 200.0
-    r2 = _f()(*d)
-    # 46 log readings of this hole have 150 m <= TVD < 350 m (40 would be removed by an MD cut)
-    assert int(round(float(r1["n_used"]))) - int(round(float(r2["n_used"]))) == 46
-    assert abs(r2["q0"] - a["true_q0"]) < 4 * r2["sigma_q0"]
-
-
-def test_reading_exactly_at_z_min_is_kept():
-    # vertical hole: TVD = MD exactly, so the reading at MD 200 m sits exactly at z_min = 200 m and is kept
-    md = np.array([0.0, 500.0, 1000.0, 1500.0])
-    inc = np.zeros(4)
-    azi = np.zeros(4)
-    log_md = np.arange(10.0, 1500.0 + 1e-9, 10.0)
-    tops_md, k = np.array([0.0, 300.0, 800.0]), np.array([2.8, 3.6, 3.1])
-    A, kappa = 0.8e-6, 1.2e-6
-    T = np.empty(log_md.size)
-    for j, z in enumerate(log_md):
-        R, S = _g_RS(z, list(tops_md), list(k))
-        T[j] = 6.0 + 0.045 * R - A * S + 5.5 * _g_P(z, _HIST_SHAPE, kappa)
-    args = [md, inc, azi, log_md, T, tops_md, k, A, kappa, np.array(_HIST_T), np.array(_HIST_SHAPE), 200.0]
-    r = _f()(*args)
-    assert int(round(float(r["n_used"]))) == int(np.sum(log_md >= 200.0)) == 131
-    assert abs(r["q0"] - 0.045) < 1e-8
-
-
-def _crown_run_all():
-    failures = []
-    for _name, _fn in list(globals().items()):
-        if not (_name.startswith("test_") and callable(_fn)):
-            continue
-        params = getattr(_fn, "_crown_params", None)
-        if params is None:
-            calls = [((), _name)]
+def _two_layer_step(x, t, l, k1, k2, rho_c):
+    # surface raised by 1 K a time t (s) ago over a layer 0 < z < l (k1) on a half-space (k2):
+    # alpha = (e1 - e2) / (e1 + e2), e = sqrt(k rho_c) the thermal effusivity
+    a1, a2 = k1 / rho_c, k2 / rho_c
+    al = (math.sqrt(k1 * rho_c) - math.sqrt(k2 * rho_c)) / (math.sqrt(k1 * rho_c) + math.sqrt(k2 * rho_c))
+    tot, n = 0.0, 0
+    while True:
+        if x <= l:
+            term = (-al) ** n * (math.erfc((2 * n * l + x) / (2 * math.sqrt(a1 * t)))
+                                 + al * math.erfc((2 * (n + 1) * l - x) / (2 * math.sqrt(a1 * t))))
         else:
-            names, values = params
-            n_args = len([s for s in names.split(",") if s.strip()])
-            calls = [((v,) if n_args == 1 else tuple(v), f"{_name}[{k}]") for k, v in enumerate(values)]
-        for args, label in calls:
-            try:
-                _fn(*args)
-            except Exception as err:  # noqa: BLE001
-                failures.append(f"{label}: {type(err).__name__}: {err}")
-    if failures:
-        raise AssertionError("failed tests:\n" + "\n".join(failures))
+            term = (1 + al) * (-al) ** n * math.erfc(((2 * n + 1) * l / math.sqrt(a1) + (x - l) / math.sqrt(a2))
+                                                     / (2 * math.sqrt(t)))
+        tot += term
+        n += 1
+        if abs(al) ** n < 1e-18 or n > 2000:
+            return tot
 
+def _two_layer(x, l, k1, k2, rho_c, t_years, dT):
+    if x <= 0.0:                      # x >= 0: the surface value
+        return dT[0]
+    edges = [0.0] + [t * YEAR for t in t_years]
+    tot = 0.0
+    for i, d in enumerate(dT):
+        u_old = _two_layer_step(x, edges[i + 1], l, k1, k2, rho_c)
+        u_new = 0.0 if i == 0 else _two_layer_step(x, edges[i], l, k1, k2, rho_c)
+        tot += d * (u_old - u_new)
+    return tot
 
-if _PYTEST_SHIM:
-    _crown_run_all()
+case = (2.0, 5.0, 400.0)
+# a poorly and a highly conducting cover, and a thin cover: image series of the step response
+k1, k2, l = case
+rho_c, t_y, d = 2.4e6, [300.0, 1.2e4, 1.0e5, 1.25e5], [0.5, 0.0, -6.0, 1.5]
+z = [0.0, 3.0, 0.5 * l, 0.999 * l, l, 1.001 * l, 2.0 * l, l + 900.0, l + 2500.0]
+got = np.asarray(layered_paleoclimate_perturbation(np.array(z), [0.0, l], [k1, k2], rho_c, t_y, d))
+exp = [_two_layer(v, l, k1, k2, rho_c, t_y, d) for v in z]
+assert np.max(np.abs(got - np.array(exp))) < 6e-8      # 1e-8 K per K, largest |dT| = 6
+
+# --- test case 2 ---
+# layer over half space [case = (6.0, 0.8, 400.0)]
+import math
+import numpy as np
+
+YEAR = 365.25 * 86400.0
+
+def _two_layer_step(x, t, l, k1, k2, rho_c):
+    # surface raised by 1 K a time t (s) ago over a layer 0 < z < l (k1) on a half-space (k2):
+    # alpha = (e1 - e2) / (e1 + e2), e = sqrt(k rho_c) the thermal effusivity
+    a1, a2 = k1 / rho_c, k2 / rho_c
+    al = (math.sqrt(k1 * rho_c) - math.sqrt(k2 * rho_c)) / (math.sqrt(k1 * rho_c) + math.sqrt(k2 * rho_c))
+    tot, n = 0.0, 0
+    while True:
+        if x <= l:
+            term = (-al) ** n * (math.erfc((2 * n * l + x) / (2 * math.sqrt(a1 * t)))
+                                 + al * math.erfc((2 * (n + 1) * l - x) / (2 * math.sqrt(a1 * t))))
+        else:
+            term = (1 + al) * (-al) ** n * math.erfc(((2 * n + 1) * l / math.sqrt(a1) + (x - l) / math.sqrt(a2))
+                                                     / (2 * math.sqrt(t)))
+        tot += term
+        n += 1
+        if abs(al) ** n < 1e-18 or n > 2000:
+            return tot
+
+def _two_layer(x, l, k1, k2, rho_c, t_years, dT):
+    if x <= 0.0:                      # x >= 0: the surface value
+        return dT[0]
+    edges = [0.0] + [t * YEAR for t in t_years]
+    tot = 0.0
+    for i, d in enumerate(dT):
+        u_old = _two_layer_step(x, edges[i + 1], l, k1, k2, rho_c)
+        u_new = 0.0 if i == 0 else _two_layer_step(x, edges[i], l, k1, k2, rho_c)
+        tot += d * (u_old - u_new)
+    return tot
+
+case = (6.0, 0.8, 400.0)
+# a poorly and a highly conducting cover, and a thin cover: image series of the step response
+k1, k2, l = case
+rho_c, t_y, d = 2.4e6, [300.0, 1.2e4, 1.0e5, 1.25e5], [0.5, 0.0, -6.0, 1.5]
+z = [0.0, 3.0, 0.5 * l, 0.999 * l, l, 1.001 * l, 2.0 * l, l + 900.0, l + 2500.0]
+got = np.asarray(layered_paleoclimate_perturbation(np.array(z), [0.0, l], [k1, k2], rho_c, t_y, d))
+exp = [_two_layer(v, l, k1, k2, rho_c, t_y, d) for v in z]
+assert np.max(np.abs(got - np.array(exp))) < 6e-8      # 1e-8 K per K, largest |dT| = 6
+
+# --- test case 3 ---
+# layer over half space [case = (1.2, 4.4, 35.0)]
+import math
+import numpy as np
+
+YEAR = 365.25 * 86400.0
+
+def _two_layer_step(x, t, l, k1, k2, rho_c):
+    # surface raised by 1 K a time t (s) ago over a layer 0 < z < l (k1) on a half-space (k2):
+    # alpha = (e1 - e2) / (e1 + e2), e = sqrt(k rho_c) the thermal effusivity
+    a1, a2 = k1 / rho_c, k2 / rho_c
+    al = (math.sqrt(k1 * rho_c) - math.sqrt(k2 * rho_c)) / (math.sqrt(k1 * rho_c) + math.sqrt(k2 * rho_c))
+    tot, n = 0.0, 0
+    while True:
+        if x <= l:
+            term = (-al) ** n * (math.erfc((2 * n * l + x) / (2 * math.sqrt(a1 * t)))
+                                 + al * math.erfc((2 * (n + 1) * l - x) / (2 * math.sqrt(a1 * t))))
+        else:
+            term = (1 + al) * (-al) ** n * math.erfc(((2 * n + 1) * l / math.sqrt(a1) + (x - l) / math.sqrt(a2))
+                                                     / (2 * math.sqrt(t)))
+        tot += term
+        n += 1
+        if abs(al) ** n < 1e-18 or n > 2000:
+            return tot
+
+def _two_layer(x, l, k1, k2, rho_c, t_years, dT):
+    if x <= 0.0:                      # x >= 0: the surface value
+        return dT[0]
+    edges = [0.0] + [t * YEAR for t in t_years]
+    tot = 0.0
+    for i, d in enumerate(dT):
+        u_old = _two_layer_step(x, edges[i + 1], l, k1, k2, rho_c)
+        u_new = 0.0 if i == 0 else _two_layer_step(x, edges[i], l, k1, k2, rho_c)
+        tot += d * (u_old - u_new)
+    return tot
+
+case = (1.2, 4.4, 35.0)
+# a poorly and a highly conducting cover, and a thin cover: image series of the step response
+k1, k2, l = case
+rho_c, t_y, d = 2.4e6, [300.0, 1.2e4, 1.0e5, 1.25e5], [0.5, 0.0, -6.0, 1.5]
+z = [0.0, 3.0, 0.5 * l, 0.999 * l, l, 1.001 * l, 2.0 * l, l + 900.0, l + 2500.0]
+got = np.asarray(layered_paleoclimate_perturbation(np.array(z), [0.0, l], [k1, k2], rho_c, t_y, d))
+exp = [_two_layer(v, l, k1, k2, rho_c, t_y, d) for v in z]
+assert np.max(np.abs(got - np.array(exp))) < 6e-8      # 1e-8 K per K, largest |dT| = 6
+
+# --- test case 4 ---
+# multilayer columns
+import numpy as np
+
+_T_ABITIBI = {1.0: -0.0008520484521674185183899386, 75.0: -0.06374574375906197936180743, 150.0: -0.1265498095117345146312706, 300.0: -0.1864289701210462478056366, 420.0: -0.230553633845341526486891, 650.0: -0.3377790202469069022517831, 900.0: -0.4209209384432630549218601, 1100.0: -0.4649965444213023133078132, 1500.0: -0.4847821038676746412810152, 2500.0: -0.3593394742270351026293501}
+
+_T_CONTRAST = {5.0: 1.074603418068411517440318, 30.0: 0.4517810019483242366355346, 60.0: -0.2713805757456721570727339, 61.0: -0.2742609672749097256974367, 130.0: -0.4567504980928152345608845, 199.0: -0.6059285087183417791936461, 200.0: -0.6078422224580352027394069, 400.0: -1.475117606748449669874537, 900.0: -2.388730544290318546369798}
+
+# a five-layer Shield column with the glacial history of the task, and a strongly contrasted column
+# (k from 0.8 to 6.5) with a recent warming: values against 90-digit targets
+got = layered_paleoclimate_perturbation(np.array([float(v) for v in _T_ABITIBI]), [0, 150, 420, 900, 1300], [2.3, 4.6, 3.1, 2.8, 3.5],
+             2.5e6, [1e4, 1e5, 1.2e5], [0.0, -1.0, 0.25])
+assert np.max(np.abs(np.asarray(got) - np.array(list(_T_ABITIBI.values())))) < 1e-8
+got = layered_paleoclimate_perturbation(np.array([float(v) for v in _T_CONTRAST]), [0, 60, 200], [0.8, 6.5, 2.0], 2.1e6,
+             [500.0, 1.2e4, 9e4], [1.2, -0.4, -5.5])
+assert np.max(np.abs(np.asarray(got) - np.array(list(_T_CONTRAST.values())))) < 5.5e-8
+
+# --- test case 5 ---
+# shape scalar and surface
+import numpy as np
+# the output keeps the full shape of z; a scalar depth gives a float; z = 0 gives dT[0]
+tops, k, rc, t_y, d = [0, 150, 420], [2.3, 4.6, 3.1], 2.5e6, [2e3, 2.5e4, 1.1e5], [0.6, -2.5, 0.4]
+z = np.array([[0.0, 150.0, 400.0], [900.0, 1600.0, 3000.0]])
+got = layered_paleoclimate_perturbation(z, tops, k, rc, t_y, d)
+assert isinstance(got, np.ndarray) and got.shape == (2, 3)
+one = layered_paleoclimate_perturbation(400.0, tops, k, rc, t_y, d)
+assert type(one) is float
+assert abs(got[0, 2] - one) < 5e-8          # two computed outputs, each within 2.5e-8
+assert abs(got[0, 0] - 0.6) < 2.5e-8
+
+# --- test case 6 ---
+# many depths layers and intervals
+import math
+import numpy as np
+
+YEAR = 365.25 * 86400.0
+
+def _halfspace(z, kappa, t_years, dT):
+    edges = [0.0] + [t * YEAR for t in t_years]
+    if z <= 0.0:                      # z >= 0: the surface value
+        return dT[0]
+    tot = 0.0
+    for i, d in enumerate(dT):
+        e_old = math.erfc(z / (2 * math.sqrt(kappa * edges[i + 1])))
+        e_new = 0.0 if i == 0 else math.erfc(z / (2 * math.sqrt(kappa * edges[i])))
+        tot += d * (e_old - e_new)
+    return tot
+
+# 1000 depths, 50 layers and 20 history intervals in one call. With one conductivity in every layer
+# the column is a half-space (erfc solution); with varying conductivities every depth agrees with a
+# single-depth call
+z = np.linspace(0.0, 3000.0, 1000)
+t_y, d = np.logspace(2.0, 5.5, 20), np.sin(np.arange(20.0))
+tops = np.linspace(0.0, 2450.0, 50)
+out = np.asarray(layered_paleoclimate_perturbation(z, tops, np.full(50, 2.9), 2.4e6, t_y, d))
+assert out.shape == (1000,)
+want = np.array([_halfspace(float(x), 2.9 / 2.4e6, list(t_y), list(d)) for x in z])
+assert np.max(np.abs(out - want)) < 1e-8 * np.max(np.abs(d))
+k = np.linspace(1.5, 5.0, 50)
+out = np.asarray(layered_paleoclimate_perturbation(z, tops, k, 2.4e6, t_y, d))
+assert out.shape == (1000,) and np.all(np.isfinite(out))
+for j in (0, 137, 500, 999):
+    one = layered_paleoclimate_perturbation(float(z[j]), tops, k, 2.4e6, t_y, d)
+    assert abs(out[j] - one) < 2e-8 * np.max(np.abs(d)), (j, out[j], one)
+
+# --- test case 7 ---
+# invalid raises
+import numpy as np
+for case in ["top0", "order", "k0", "knan", "len", "rc", "rcnan", "t0", "t_order", "dT_nan", "hist_len", "zneg", "znan", "two_d", "empty", "top_nan", "t_nan", "hist_two_d"]:
+    _t_msg = " (case %r)" % (case,)
+    z, tops, k, rc, t, d = 100.0, [0.0, 200.0], [2.0, 3.0], 2.5e6, [1e3, 1e4], [0.5, -1.0]
+    if case == "top0":
+        tops = [10.0, 200.0]
+    elif case == "order":
+        tops = [0.0, 200.0, 150.0]
+        k = [2.0, 3.0, 2.5]
+    elif case == "k0":
+        k = [2.0, 0.0]
+    elif case == "knan":
+        k = [2.0, float("nan")]
+    elif case == "len":
+        k = [2.0]
+    elif case == "rc":
+        rc = 0.0
+    elif case == "rcnan":
+        rc = float("nan")
+    elif case == "t0":
+        t = [0.0, 1e4]
+    elif case == "t_order":
+        t = [1e4, 1e3]
+    elif case == "dT_nan":
+        d = [0.5, float("nan")]
+    elif case == "hist_len":
+        d = [0.5]
+    elif case == "zneg":
+        z = -1.0
+    elif case == "two_d":
+        tops, k = [[0.0, 200.0]], [[2.0, 3.0]]          # equal shapes, but not 1-D
+    elif case == "empty":
+        tops, k = [], []                                 # no layer at all
+    elif case == "top_nan":
+        tops, k = [0.0, float("nan"), 500.0], [2.0, 3.0, 2.5]
+    elif case == "t_nan":
+        t = [1e3, float("nan")]
+    elif case == "hist_two_d":
+        t, d = [[1e3, 1e4]], [[0.5, -1.0]]               # equal shapes, but not 1-D
+    else:
+        z = float("nan")
+    try:
+        layered_paleoclimate_perturbation(z, tops, k, rc, t, d)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("layered_paleoclimate_perturbation must raise ValueError" + _t_msg)

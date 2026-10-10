@@ -18,17 +18,17 @@ def true_vertical_depth(survey_md, inc_deg, azi_deg, md_query):
 
     Returns
     -------
-    float for scalar md_query, otherwise ndarray with the shape of md_query.
-    Accuracy: 1e-6 m (the minimum-curvature path is exact; no approximation
-    between stations is permitted).
+    Python float for scalar md_query, otherwise a numpy float array with the
+    shape of md_query. Absolute accuracy 1e-6 m (the minimum-curvature path
+    is exact; no approximation between stations is permitted).
 
     Raises
     ------
     ValueError if the survey arrays are not 1-D of equal length, have fewer
-    than 2 stations, do not start at MD 0 or do not increase strictly, if any
-    inclination is outside [0, 180), if the dogleg between two consecutive
-    stations is within 1e-6 rad of 180 degrees (opposite directions: the arc
-    is undefined), or if any query depth is non-finite or outside
-    [0, survey_md[-1]].
+    than 2 stations, contain a non-finite value, do not start at MD 0 or do
+    not increase strictly, if any inclination is outside [0, 180), if the
+    dogleg between two consecutive stations is within 1e-6 rad of 180 degrees
+    (opposite directions: the arc is undefined), or if any query depth is
+    non-finite or outside [0, survey_md[-1]].
     """
     raise NotImplementedError

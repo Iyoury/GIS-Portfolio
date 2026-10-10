@@ -110,7 +110,7 @@ def degeneracy_parameter(rho_Ye, T):
 
     Output:
       psi: Python float, psi > 0 with n_net(T, psi) = rho_Ye N_A (n_net of pair_densities), with a
-        relative error below 1e-10. Each call within 10 s.
+        relative error below 1e-10.
 
     Raises:
       ValueError if rho_Ye or T is not finite or is outside its range.
@@ -130,22 +130,31 @@ def degeneracy_parameter(rho_Ye, T):
         E, w, _xm = _nodes(theta, psi)
         return math.log(PREF * float(np.sum(w * _occ(_xm)[0]))) - lt
 
-    # n_net increases with psi; bracket in ln psi, then bisection safeguarded secant
+    # n_net increases with psi; bracket in ln psi, then bisection safeguarded false position with the
+    # Illinois modification (the weight glo or ghi of an end kept twice in a row is halved), so that the
+    # bracket shrinks from both sides; plain false position can stall with one end fixed
     llo, lhi = math.log(1e-300), 0.0
     flo, fhi = f(llo), f(lhi)
     while fhi < 0:
         llo, flo = lhi, fhi
         lhi += 1.0
         fhi = f(lhi)
+    glo, ghi, kept = flo, fhi, 0
     for _ in range(300):
-        lm = llo - flo * (lhi - llo) / (fhi - flo)
+        lm = llo - glo * (lhi - llo) / (ghi - glo)
         if not (llo < lm < lhi) or lhi - llo > 0.5:
             lm = 0.5 * (llo + lhi)
         fm = f(lm)
         if fm > 0:
-            lhi, fhi = lm, fm
+            lhi, fhi, ghi = lm, fm, fm
+            if kept == -1:
+                glo *= 0.5
+            kept = -1
         else:
-            llo, flo = lm, fm
+            llo, flo, glo = lm, fm, fm
+            if kept == 1:
+                ghi *= 0.5
+            kept = 1
         if fm == 0 or lhi - llo < 1e-14 or min(abs(flo), abs(fhi)) < 1e-15:
             break
     psi = math.exp(lhi if abs(fhi) < abs(flo) else llo)

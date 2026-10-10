@@ -14,13 +14,15 @@ def layer_integrals(layer_top_tvd, layer_k, z):
 
     Returns
     -------
-    (R, S) : R in m^2 K W^-1, S in m^3 K W^-1; floats for scalar z, otherwise
-    arrays with the shape of z. Relative accuracy 1e-9.
+    (R, S) : R in m^2 K W^-1, S in m^3 K W^-1; two Python floats for scalar
+    z, otherwise two numpy float arrays with the shape of z. Relative
+    accuracy 1e-9 (absolute 1e-12 at z = 0, where R = S = 0).
 
     Raises
     ------
-    ValueError if the layer arrays are not 1-D of equal length, if the first
-    top is not 0 or tops do not increase strictly, if any conductivity is
-    non-finite or <= 0, or if any depth is non-finite or negative.
+    ValueError if the layer arrays are not 1-D of equal length, if any top is
+    non-finite, if the first top is not 0 or tops do not increase strictly,
+    if any conductivity is non-finite or <= 0, or if any depth is non-finite
+    or negative.
     """
     raise NotImplementedError

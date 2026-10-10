@@ -1,15 +1,5 @@
-"""Reference for step 2."""
+"""Reference for step 2: depth functions R(z) and S(z) of the steady layered geotherm."""
 import numpy as np
-import math
-
-_erfc = np.frompyfunc(math.erfc, 1, 1)
-
-
-def erfc(x):
-    """Element-wise complementary error function (numpy + math only)."""
-    return np.asarray(_erfc(np.asarray(x, float)), dtype=float)
-
-SECONDS_PER_YEAR = 365.25 * 86400.0
 
 
 def layer_integrals(layer_top_tvd, layer_k, z):

@@ -1,15 +1,17 @@
 import numpy as np
 import math
-import warnings
-from scipy.integrate import quad, IntegrationWarning
-from scipy.optimize import root
+from scipy.integrate import quad
+from scipy.optimize import least_squares
 
 # Second solution: the closed forms evaluated point by point with compensated summation of the eight
-# corner terms (math.fsum) and a 24^3-point Gauss-Legendre volume rule beyond three diagonals; the columns
-# by adaptive QUADPACK integration over depth with geometric breakpoints; the basin depths by
-# scipy.optimize.root (hybrid Powell) with the analytic Jacobian.
+# corner terms (math.fsum) and a 24^3-point Gauss-Legendre volume rule beyond three diagonals, an elongated
+# prism (diag^3 / volume > 100) being bisected recursively along its longest edge; the columns by adaptive
+# QUADPACK integration over depth with geometric breakpoints, the lamina term taken by a 24 x 24
+# Gauss-Legendre rule over the lamina beyond two lamina diagonals; the basin depths by trust-region
+# reflective least squares (scipy) in the slab-equivalent thicknesses, then Newton iterations with
+# least-squares steps (numpy.linalg.lstsq), on a forward model with 16-point Gauss-Legendre panels at
+# h 2^-k (k = 24 .. 0) and the analytic Jacobian.
 
-warnings.simplefilter("ignore", IntegrationWarning)
 G = 6.6743e-11
 _X24, _W24 = np.polynomial.legendre.leggauss(24)
 
@@ -103,19 +105,46 @@ def _isfar(q, b):
     return math.dist(q, c) >= 3.0 * D
 
 
+_K2 = 100.0      # largest diag^3 / volume of a box whose corner sums are used directly
+
+
+def _shape(b):
+    e = (b[1] - b[0], b[3] - b[2], b[5] - b[4])
+    return (e[0] ** 2 + e[1] ** 2 + e[2] ** 2) ** 1.5 / (e[0] * e[1] * e[2])
+
+
+def _piece(q, b):
+    # (U, attraction, T) of the unit-density box b at q: 24^3-point rule beyond three diagonals, corner sums
+    # for a compact box (diag^3 / volume <= _K2), otherwise bisection of the longest edge (the cut moved to
+    # 3/8 or 5/8 of the edge when q lies within 1/8 of its middle, so that q is never on a cut)
+    if _isfar(q, b):
+        u, gg, T = _gl(q, b)
+        return u, np.asarray(gg), np.asarray(T)
+    if _shape(b) <= _K2:
+        s, t = _closed(q, b)
+        xx, yy, zz, xy, xz, yz = t
+        return s[0], -np.array(s[1:]), np.array([[xx, xy, xz], [xy, yy, yz], [xz, yz, zz]])
+    e = [b[1] - b[0], b[3] - b[2], b[5] - b[4]]
+    k = int(np.argmax(e))
+    lo = b[2 * k]
+    mid = lo + 0.5 * e[k]
+    if abs(q[k] - mid) < e[k] / 8:
+        mid = lo + (3 if q[k] >= mid else 5) * e[k] / 8
+    b1, b2 = list(b), list(b)
+    b1[2 * k + 1] = mid
+    b2[2 * k] = mid
+    r1, r2 = _piece(q, b1), _piece(q, b2)
+    return r1[0] + r2[0], r1[1] + r2[1], r1[2] + r2[2]
+
+
 def prism_gravity(points, bounds, rho):
     p, single = _pts(points)
     b, rho = _bounds(bounds, rho)
     U = np.empty(len(p))
     g = np.empty((len(p), 3))
     for n, q in enumerate(p):
-        if _isfar(q, b):
-            u, gg, _ = _gl(q, b)
-            U[n], g[n] = G * rho * u, G * rho * gg
-        else:
-            s, _ = _closed(q, b)
-            U[n] = G * rho * s[0]
-            g[n] = -G * rho * np.array(s[1:])
+        u, gg, _ = _piece(tuple(q), b)
+        U[n], g[n] = G * rho * u, G * rho * gg
     return (float(U[0]), g[0]) if single else (U, g)
 
 
@@ -128,12 +157,7 @@ def prism_gradients(points, bounds, rho):
         strict = b[0] < q[0] < b[1] and b[2] < q[1] < b[3] and b[4] < q[2] < b[5]
         if inside and not strict:
             raise ValueError("the gradients are not defined on the surface of the prism")
-        if _isfar(q, b):
-            out[n] = G * rho * _gl(q, b)[2]
-        else:
-            _, t = _closed(q, b)
-            xx, yy, zz, xy, xz, yz = t
-            out[n] = G * rho * np.array([[xx, xy, xz], [xy, yy, yz], [xz, yz, zz]])
+        out[n] = G * rho * _piece(tuple(q), b)[2]
     return out[0] if single else out
 
 
@@ -148,9 +172,25 @@ def _lam_term(x1, x2, y1, y2, Z):
 
 def _col(q, x1, x2, y1, y2, h, drho0, lam):
     X1, X2, Y1, Y2 = x1 - q[0], x2 - q[0], y1 - q[1], y2 - q[1]
-    f = lambda z: math.exp(-lam * z) * _lam_term(X1, X2, Y1, Y2, z - q[2])
+    dxh, dyh = max(X1, -X2, 0.0), max(Y1, -Y2, 0.0)
+    if math.hypot(dxh, dyh) >= 2.0 * math.hypot(x2 - x1, y2 - y1):
+        # far from the column the corner sum of the lamina term cancels; integrate Z / r^3 over the lamina
+        # with a 24 x 24 Gauss-Legendre rule instead
+        xs = (0.5 * (x2 - x1) * _X24 + 0.5 * (x1 + x2) - q[0])[:, None]
+        ys = (0.5 * (y2 - y1) * _X24 + 0.5 * (y1 + y2) - q[1])[None, :]
+        W = 0.25 * (x2 - x1) * (y2 - y1) * _W24[:, None] * _W24[None, :]
+        R2 = xs * xs + ys * ys
+
+        def f(z):
+            Z = z - q[2]
+            return math.exp(-lam * z) * float(np.sum(W * Z / (R2 + Z * Z) ** 1.5))
+    else:
+        def f(z):
+            return math.exp(-lam * z) * _lam_term(X1, X2, Y1, Y2, z - q[2])
     br = [0.0] + [h * 2.0 ** (-k) for k in range(50, -1, -1)]
-    return G * drho0 * math.fsum(quad(f, a, c, epsabs=0.0, epsrel=1e-13, limit=200)[0] for a, c in zip(br[:-1], br[1:]))
+    # full_output=1: QUADPACK reports roundoff-limited panels in its output instead of warning
+    return G * drho0 * math.fsum(quad(f, a, c, epsabs=0.0, epsrel=1e-13, limit=200, full_output=1)[0]
+                                 for a, c in zip(br[:-1], br[1:]))
 
 
 def column_gz(stations, x1, x2, y1, y2, depth, drho0, lam):
@@ -210,14 +250,39 @@ def invert_basin_depths(x_edges, y_edges, gz_obs, drho0, lam):
     def jac(h):
         return np.stack([G * drho0 * math.exp(-lam * h[j]) * lam_terms(np.array([h[j]]), j)[0] for j in range(xc.size)], axis=1)
 
-    h = -np.log1p(-d * lam) / lam if lam > 0 else d.copy()
     gobs = go.ravel()
-    for _ in range(60):
-        step = np.linalg.lstsq(jac(h), forward(h) - gobs, rcond=None)[0]
+    sc = float(np.max(np.abs(gobs)))
+    wmin = min(float(np.min(np.diff(xe))), float(np.min(np.diff(ye))))
+    # global phase: trust-region reflective least squares (scipy) in the slab-equivalent thicknesses
+    # u = (1 - exp(-lam h)) / lam (u = h for lam = 0), bounded by 1.5 times the largest depth of the domain
+    hcap = 1.5 * min(5e4, 3.0 * wmin, 2.0 / lam if lam > 0 else math.inf)
+    to_u = (lambda hh: -np.expm1(-lam * hh) / lam) if lam > 0 else (lambda hh: np.asarray(hh, float))
+    to_h = (lambda uu: -np.log1p(-lam * uu) / lam) if lam > 0 else (lambda uu: np.asarray(uu, float))
+    ucap = float(to_u(np.array(hcap)))
+    u0 = np.minimum(d, ucap * (1.0 - 1e-9))
+    sol = least_squares(lambda uu: (forward(to_h(uu)) - gobs) / sc, u0,
+                        jac=lambda uu: jac(to_h(uu)) * np.exp(lam * to_h(uu))[None, :] / sc,
+                        bounds=(0.0, ucap), method="trf", xtol=1e-14, ftol=1e-14, gtol=1e-14, max_nfev=1000)
+    # polishing: Newton iterations on the depths with least-squares steps, halved until the residual
+    # does not grow
+    h = np.maximum(to_h(sol.x), 1e-9 * wmin)
+    r = forward(h) - gobs
+    for _ in range(40):
+        step = np.linalg.lstsq(jac(h), r, rcond=None)[0]
         t = 1.0
-        while np.any(h - t * step <= 0):
+        while True:
+            hn = h - t * step
+            if np.all(hn > 0):
+                rn = forward(hn) - gobs
+                if np.linalg.norm(rn) <= np.linalg.norm(r):
+                    break
             t *= 0.5
-        h = h - t * step
-        if np.max(np.abs(t * step) / h) < 1e-14:
+            if t < 1e-10:
+                break
+        if t < 1e-10:
+            break
+        done = np.max(np.abs(hn - h) / hn) < 1e-14
+        h, r = hn, rn
+        if done:
             break
     return h.reshape(nx, ny)

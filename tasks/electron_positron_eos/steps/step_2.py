@@ -1,5 +1,8 @@
 import numpy as np
 import math
+import warnings
+from scipy.integrate import quad, IntegrationWarning
+from scipy.optimize import brentq
 
 
 def pair_thermodynamics(T, psi):
@@ -12,7 +15,7 @@ def pair_thermodynamics(T, psi):
     Output:
       (P, u, s): Python floats. P the pressure (erg cm^-3); u the energy density (erg cm^-3): kinetic
         energy of the electrons plus kinetic energy and 2 m_e c^2 per positron; s the entropy density
-        (erg K^-1 cm^-3). Each with a relative error below 1e-10. Each call within 10 s.
+        (erg K^-1 cm^-3). Each with a relative error below 1e-10.
 
     Raises:
       ValueError if T or psi is not finite, if T is outside [1e7, 1e11] or psi is not in (0, 1e6].

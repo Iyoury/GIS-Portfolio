@@ -12,6 +12,8 @@ def substitution_times(N, s, u, v):
       s: float, selection coefficient of A, -0.5 <= s <= 0.5.
       u: float, mutation probability A -> a per generation, 1e-12 <= u <= 0.1.
       v: float, mutation probability a -> A per generation, 1e-12 <= v <= 0.1.
+      Inputs for which t_up or t_down would exceed 1e300 generations are outside the domain (within these
+      ranges only t_up can be that large, near N = 400, s = -0.5, u = 0.1, v = 1e-12).
 
     Output:
       (t_up, t_down): tuple of two Python floats.
