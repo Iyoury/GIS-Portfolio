@@ -45,3 +45,19 @@ Le 0/8 de la v3 venait de la clé, pas des agents : un cas « verifier correctne
 aurait rejeté. Une fois la clé corrigée, quatre sondes Opus locales ont passé la v4 en 21 à 29
 commandes : chaque complication spécifiée est lisible par un agent qui lit tout. La marge de
 difficulté honnête est dans le jugement (points 2 et 5), pas dans l'empilement de conventions.
+
+## Leçon du cas carottes orientées (v4 à v5)
+
+La v4, entièrement spécifiée, a été résolue 2/3 par la sonde de facilité (Opus, effort faible).
+La v5 ajoute un jugement non écrit mais lisible dans les données : un trou sans levé de déviation
+dont les six voisins montrent qu'il dévie, et dont la déviation se retrouve en ajustant ses
+structures aux familles. Le vérificateur juge l'orientation dans chaque trou (porte par trou), de
+sorte que tenir ce trou droit coûte la tâche (14-26° au 80e percentile contre 5° pour la
+référence). Deux sondes Opus locales (effort par défaut) l'ont trouvé seules, dont une sans la
+moindre phrase du README : le point est équitable (point 2) mais un Opus appliqué le découvre ;
+la sonde de facilité à effort faible tranchera. Trois pièges de générateur corrigés au passage :
+passes inversées adjacentes (une passe bonne coincée entre deux stretches est indécidable), trou
+atteignant la verticale (taux non identifiables), structure à cheval sur une limite de passe
+(passe de la profondeur consignée, pas de la profondeur interne). Règle retenue : quand les deux
+implémentations se trompent au même endroit, c'est le générateur ou la porte qu'il faut corriger,
+pas les solveurs.
