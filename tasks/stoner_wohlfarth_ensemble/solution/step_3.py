@@ -18,7 +18,8 @@ def survival_probability(h, psi, a, f0, rate):
 
     Output:
       P: float in [0, 1], P = 1 for h >= h_sw(psi) and P = 0 for h <= -h_sw(psi).
-         Absolute error below 1e-8.
+         Absolute error below 1e-8; for 0 < psi < pi/2 not required at fields less than
+         1e-6 below h_sw(psi).
 
     Raises:
       ValueError if psi is outside [0, pi/2], if h is not finite, if a, f0 or rate is

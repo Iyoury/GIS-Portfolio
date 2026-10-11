@@ -3,30 +3,129 @@ from scipy.optimize import brentq
 import mpmath as mp
 
 
-def _mp_expm_apply(rates, removal, x0, t):
-    # exp(t A) x0 for A = rates - diag(removal) by mpmath's expm, the precision doubled until two runs
-    # agree to 1e-13 in every entry above 1e-250 of the scale sum(x0)
-    m = len(removal)
-    scale = float(sum(x0))
-    old = None
-    dps = 40
+def _topological_order(rates):
+    # Kahn's algorithm on the edges i -> j with rates[j][i] > 0 (the caller has checked acyclicity)
+    n = len(rates)
+    indeg = [sum(1 for i in range(n) if rates[j][i] > 0.0) for j in range(n)]
+    order, ready = [], [j for j in range(n) if indeg[j] == 0]
+    while ready:
+        i = ready.pop()
+        order.append(i)
+        for j in range(n):
+            if rates[j][i] > 0.0:
+                indeg[j] -= 1
+                if indeg[j] == 0:
+                    ready.append(j)
+    return order
+
+
+def _exp_poly_amounts(order, rates, removal, x0, src, t, dps):
+    # Generalized Bateman solution: every amount is a finite sum of terms c t**p exp(-a t), where a runs
+    # over the removal rates of the nuclide and of its ancestors (0 for the constant source). Going down
+    # the network in topological order, x_j = x0_j exp(-r_j t) + int_0^t exp(-r_j (t - s)) g_j(s) ds with
+    # the feeding g_j = sum_i rates[j, i] x_i + src_j, and each term of g_j integrates in closed form:
+    #   a == r_j: t**p exp(-a t)  ->  t**(p + 1) / (p + 1) exp(-r_j t)
+    #   a != r_j: t**p exp(-a t)  ->  p! / d**(p + 1) [exp(-r_j t) - exp(-a t) sum_m (d t)**m / m!], d = a - r_j
+    # (equal rates exactly, nearly equal ones, or a short time, through large terms that cancel in the sum).
+    # Next to every coefficient c a bound m >= |c| on the magnitudes it was summed from is carried along
+    # (the same operations on absolute values), so that the rounding error of every amount is bounded by
+    # a modest multiple of eps * sum_a exp(-a t) sum_p m t**p, however strongly the terms cancel.
+    n = len(removal)
+    with mp.workdps(dps):
+        T = mp.mpf(t)
+        terms = [None] * n
+        out = [mp.mpf(0)] * n
+        mag = [mp.mpf(0)] * n
+        expo = {}
+        for j in order:
+            g = {}
+            for i in range(n):
+                w = rates[j][i]
+                if w > 0.0 and terms[i]:
+                    W = mp.mpf(w)
+                    for a, (cs, ms) in terms[i].items():
+                        acc, macc = g.setdefault(a, ([], []))
+                        while len(acc) < len(cs):
+                            acc.append(mp.mpf(0))
+                            macc.append(mp.mpf(0))
+                        for p, (c, m) in enumerate(zip(cs, ms)):
+                            acc[p] += W * c
+                            macc[p] += W * m
+            if src[j] > 0.0:
+                acc, macc = g.setdefault(0.0, ([mp.mpf(0)], [mp.mpf(0)]))
+                acc[0] += mp.mpf(src[j])
+                macc[0] += mp.mpf(src[j])
+            rj = removal[j]
+            xj = {rj: ([mp.mpf(x0[j])], [mp.mpf(x0[j])])}
+            for a, (cs, ms) in g.items():
+                if a == rj:
+                    acc, macc = xj[rj]
+                    while len(acc) < len(cs) + 1:
+                        acc.append(mp.mpf(0))
+                        macc.append(mp.mpf(0))
+                    for p, (c, m) in enumerate(zip(cs, ms)):
+                        acc[p + 1] += c / (p + 1)
+                        macc[p + 1] += m / (p + 1)
+                else:
+                    d = mp.mpf(a) - mp.mpf(rj)
+                    acc_a, macc_a = xj.setdefault(a, ([], []))
+                    while len(acc_a) < len(cs):
+                        acc_a.append(mp.mpf(0))
+                        macc_a.append(mp.mpf(0))
+                    for p, (c, m) in enumerate(zip(cs, ms)):
+                        if m == 0:
+                            continue
+                        scale = mp.factorial(p) / d ** (p + 1)
+                        f, mf = c * scale, m * abs(scale)
+                        xj[rj][0][0] += f
+                        xj[rj][1][0] += mf
+                        dm = mp.mpf(1)
+                        for q in range(p + 1):
+                            acc_a[q] -= f * dm / mp.factorial(q)
+                            macc_a[q] += mf * abs(dm) / mp.factorial(q)
+                            dm *= d
+            terms[j] = xj
+            val, size = mp.mpf(0), mp.mpf(0)
+            for a, (cs, ms) in xj.items():
+                if a not in expo:
+                    expo[a] = mp.exp(-mp.mpf(a) * T)
+                poly, mpoly, tp = mp.mpf(0), mp.mpf(0), mp.mpf(1)
+                for c, m in zip(cs, ms):
+                    poly += c * tp
+                    mpoly += m * tp
+                    tp *= T
+                val += expo[a] * poly
+                size += expo[a] * mpoly
+            out[j] = val
+            mag[j] = size
+        return out, mag, mp.eps
+
+
+def _exp_poly_apply(rates, removal, x0, src, t):
+    # amounts at time t of dx/dt = rates x - diag(removal) x + src on an acyclic network. Running error
+    # bound: every coefficient comes out of at most a few thousand correctly rounded operations (at most
+    # 30 levels of convolution, each with sums of at most about 30 * 30 terms), so the error of an amount
+    # is taken as 1e5 eps times its magnitude sum; the precision is raised until that bound is below
+    # 1e-14 of the amount or of the absolute floor max(1e-250 S, 1e-300) (S = sum(x0) + t sum(src)).
+    rates = [[float(v) for v in row] for row in np.asarray(rates, dtype=float)]
+    removal = [float(v) for v in removal]
+    x0 = [float(v) for v in x0]
+    src = [float(v) for v in src]
+    order = _topological_order(rates)
+    scale = sum(x0) + t * sum(src)
+    dps = 30
     while True:
+        vals, mags, eps = _exp_poly_amounts(order, rates, removal, x0, src, t, dps)
         with mp.workdps(dps):
-            A = mp.matrix(m, m)
-            for i in range(m):
-                for j in range(m):
-                    A[i, j] = mp.mpf(rates[i][j]) - (mp.mpf(removal[i]) if i == j else 0)
-            E = mp.expm(A * mp.mpf(t))
-            v = E * mp.matrix([mp.mpf(a) for a in x0])
-            new = [v[i] for i in range(m)]
-        if old is not None:
-            floor = mp.mpf(1e-250) * scale
-            if all(abs(a - b) <= mp.mpf("1e-13") * abs(b) or (abs(a) < floor and abs(b) < floor)
-                   for a, b in zip(old, new)):
-                return np.array([float(a) for a in new])
-        old = new
-        dps *= 2
-        if dps > 5000:
+            floor = max(mp.mpf(1e-250) * mp.mpf(scale), mp.mpf(1e-300))
+            worst = mp.mpf(0)
+            for v, m in zip(vals, mags):
+                worst = max(worst, mp.mpf(1e5) * eps * m / max(abs(v), floor))
+        if worst <= mp.mpf("1e-14"):
+            return np.array([float(v) for v in vals])
+        # raise the precision by the digits still missing, plus a margin of 10 digits
+        dps = int(dps + max(mp.log10(worst / mp.mpf("1e-14")), 0) + 10)
+        if dps > 40000:
             raise RuntimeError("no convergence in extended precision")
 
 
@@ -40,9 +139,9 @@ def chain_inventory(lam, n0, t):
       t: elapsed time, 0 <= t <= 1e20 (same unit of time).
 
     Output:
-      x: numpy array of shape (n,), the numbers of atoms at time t. With S = sum(n0): every entry whose
-         exact value is positive and at least 1e-250 * S has a relative error below 1e-10; every other
-         entry (exact zeros included) lies within max(1e-250 * S, 1e-300) of the exact value.
+      x: numpy array of shape (n,), the numbers of atoms at time t. With S = sum(n0) and
+         F = max(1e-250 * S, 1e-300): every entry whose exact value is at least F has a relative error
+         below 1e-10; every other entry (exact zeros included) lies within F of the exact value.
 
     Raises:
       ValueError if lam and n0 are not 1-D arrays of the same length between 1 and 30, if an entry of
@@ -62,15 +161,15 @@ def chain_inventory(lam, n0, t):
     t = float(t)
     if not (np.isfinite(t) and 0.0 <= t <= 1e20):
         raise ValueError("need 0 <= t <= 1e20")
-    # Other method: the chain matrix exponential by mpmath (Pade / Taylor with scaling and squaring) in
-    # adaptively increased precision.
+    # Other method: the Bateman solution in its general (exponential-polynomial) form, built member by
+    # member and evaluated in adaptively increased precision; equal decay constants are handled exactly.
     n = lam.size
     if t == 0.0:
         x = n0.copy()
         return x
     rates = np.zeros((n, n))
     rates[np.arange(1, n), np.arange(n - 1)] = lam[:-1]
-    x = _mp_expm_apply(rates, lam, n0, t)
+    x = _exp_poly_apply(rates, lam, n0, np.zeros(n), t)
     return x
 
 
@@ -88,10 +187,9 @@ def network_inventory(lam, branching, source, n0, t):
       t: elapsed time, 0 <= t <= 1e20, with sum(n0) + t * sum(source) <= 1e100.
 
     Output:
-      x: numpy array of shape (n,), the numbers of atoms at time t. With S = sum(n0) + t * sum(source):
-         every entry whose exact value is positive and at least 1e-250 * S has a relative error below
-         1e-10; every other entry (exact zeros included) lies within max(1e-250 * S, 1e-300) of the exact
-         value.
+      x: numpy array of shape (n,), the numbers of atoms at time t. With S = sum(n0) + t * sum(source)
+         and F = max(1e-250 * S, 1e-300): every entry whose exact value is at least F has a relative error
+         below 1e-10; every other entry (exact zeros included) lies within F of the exact value.
 
     Raises:
       ValueError if the arrays do not have these shapes (1 <= n <= 30), if an entry is negative or not
@@ -131,15 +229,12 @@ def network_inventory(lam, branching, source, n0, t):
         indeg = indeg - edges[:, free].sum(axis=1)
     if not removed.all():
         raise ValueError("the decay network has a cycle")
-    # Other method: the augmented rate matrix exponentiated by mpmath in adaptively increased precision.
+    # Other method: the generalized Bateman solution (sums of t**p exp(-a t) terms) built in topological
+    # order, the constant production entering as a term with a = 0, in adaptively increased precision.
     if t == 0.0:
         x = n0.copy()
         return x
-    rates = np.zeros((n + 1, n + 1))
-    rates[:n, :n] = branching * lam[None, :]
-    rates[:n, n] = source
-    y0 = np.r_[n0, 1.0]
-    x = _mp_expm_apply(rates, np.r_[lam, 0.0], y0, t)[:n]
+    x = _exp_poly_apply(branching * lam[None, :], lam, n0, source, t)
     return x
 
 
@@ -157,10 +252,9 @@ def activation_inventory(lam, branching, sigma, capture_to, n0, history):
                flux in neutrons / (cm^2 s) (0 <= flux <= 1e18; flux 0 is a cooling period).
 
     Output:
-      x: numpy array of shape (n,), the numbers of atoms at the end of the history. With S = sum(n0):
-         every entry whose exact value is positive and at least 1e-250 * S has a relative error below
-         1e-10; every other entry (exact zeros included) lies within max(1e-250 * S, 1e-300) of the exact
-         value.
+      x: numpy array of shape (n,), the numbers of atoms at the end of the history. With S = sum(n0) and
+         F = max(1e-250 * S, 1e-300): every entry whose exact value is at least F has a relative error
+         below 1e-10; every other entry (exact zeros included) lies within F of the exact value.
 
     Raises:
       ValueError for inputs outside these ranges or of the wrong shape, for a capture_to entry that is not
@@ -221,15 +315,15 @@ def activation_inventory(lam, branching, sigma, capture_to, n0, history):
         raise ValueError("the decay and capture network has a cycle")
     if any(np.any(lam + sigma * 1e-24 * flux > 1e10) for _, flux in steps):
         raise ValueError("lam + sigma * flux must not exceed 1e10 per s")
-    # Other method: each period is exponentiated directly from the decay and capture rates in extended
-    # precision (no branching fractions).
+    # Other method: each period is solved directly from the decay and capture rates (no branching
+    # fractions) by the generalized Bateman solution in extended precision.
     x = n0.copy()
     for duration, flux in steps:
         if duration == 0.0:
             continue
         capture_rate = sigma * 1e-24 * flux
         rates = branching * lam[None, :] + capture * capture_rate[None, :]
-        x = _mp_expm_apply(rates, lam + capture_rate, x, duration)
+        x = _exp_poly_apply(rates, lam + capture_rate, x, np.zeros(n), duration)
     return x
 
 
@@ -254,17 +348,20 @@ def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activi
            caller guarantees that the activity A(flux) is strictly increasing on this interval.
 
     Output:
-      flux: Python float, the flux in neutrons / (cm^2 s) with A(flux) = activity; relative error below
-            1e-8 wherever d ln A / d ln flux >= 0.5 at the solution.
+      flux: Python float, the flux in neutrons / (cm^2 s) with A(flux) = activity, A computed with
+            activation_inventory (step 3); relative error below 1e-8 wherever d ln A / d ln flux >= 0.5
+            at the solution, for activities of any size within the domain.
 
     Raises:
       ValueError for nuclide data as in step 3, for times, k, activity or flux bounds outside these
-      ranges, if A(flux_lo) < 1e-250 * lam[k] * sum(n0) (the measured nuclide must hold at least 1e-250
-      of the initial atoms at flux_lo), or if activity lies outside [A(flux_lo), A(flux_hi)] by more
-      than a relative 1e-9.
+      ranges (NaN and infinite values included), if A(flux_lo) < lam[k] * max(1e-250 * sum(n0), 1e-300)
+      (at flux_lo the measured nuclide must hold at least 1e-250 of the initial atoms and at least 1e-300
+      atoms), or if activity lies outside [A(flux_lo), A(flux_hi)] by more than a relative 1e-9.
       An activity with |ln(activity / A(end))| <= 1e-9 for an end of the interval, on either side of
-      it, gives that end. The end values carry rounding errors, so the tolerance holds up to 1e-12 in ln:
-      for 1e-9 - 1e-12 < |ln| <= 1e-9 + 1e-12 the end, the root and (outside the interval) ValueError are all correct.
+      it, gives that end (flux_lo is checked first); the end is returned as the given bound itself, equal
+      to it to a relative 1e-11. A is known to a relative 1e-10 (the accuracy of step 3), so the
+      tolerance holds up to 1e-10 in ln: for 1e-9 - 1e-10 < |ln| <= 1e-9 + 1e-10 the end, the root and
+      (outside the interval) ValueError are all correct.
     '''
     t_irr, t_cool, activity = float(t_irr), float(t_cool), float(activity)
     flux_lo, flux_hi = float(flux_lo), float(flux_hi)
@@ -291,8 +388,9 @@ def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activi
     fa, fb = log_activity(a) - target, log_activity(b) - target
     x_lo = activation_inventory(lam, branching, sigma, capture_to, n0, [(t_irr, flux_lo), (t_cool, 0.0)])[k]
     s0 = float(np.sum(n0))
-    if not (s0 > 0.0 and x_lo > 0.0 and np.log(x_lo) - np.log(s0) >= -250.0 * np.log(10.0)):
-        raise ValueError("A(flux_lo) is below 1e-250 * lam[k] * sum(n0)")
+    # domain: x[k](flux_lo) >= max(1e-250 sum(n0), 1e-300), in logarithms (lam[k] times it may underflow)
+    if not (s0 > 0.0 and x_lo > 0.0 and np.log(x_lo) >= max(np.log(s0) - 250.0 * np.log(10.0), -300.0 * np.log(10.0))):
+        raise ValueError("A(flux_lo) is below lam[k] * max(1e-250 * sum(n0), 1e-300)")
     if abs(fa) <= 1e-9:
         return float(flux_lo)
     if abs(fb) <= 1e-9:

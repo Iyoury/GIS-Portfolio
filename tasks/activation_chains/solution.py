@@ -13,9 +13,9 @@ def chain_inventory(lam, n0, t):
       t: elapsed time, 0 <= t <= 1e20 (same unit of time).
 
     Output:
-      x: numpy array of shape (n,), the numbers of atoms at time t. With S = sum(n0): every entry whose
-         exact value is positive and at least 1e-250 * S has a relative error below 1e-10; every other
-         entry (exact zeros included) lies within max(1e-250 * S, 1e-300) of the exact value.
+      x: numpy array of shape (n,), the numbers of atoms at time t. With S = sum(n0) and
+         F = max(1e-250 * S, 1e-300): every entry whose exact value is at least F has a relative error
+         below 1e-10; every other entry (exact zeros included) lies within F of the exact value.
 
     Raises:
       ValueError if lam and n0 are not 1-D arrays of the same length between 1 and 30, if an entry of
@@ -86,10 +86,9 @@ def network_inventory(lam, branching, source, n0, t):
       t: elapsed time, 0 <= t <= 1e20, with sum(n0) + t * sum(source) <= 1e100.
 
     Output:
-      x: numpy array of shape (n,), the numbers of atoms at time t. With S = sum(n0) + t * sum(source):
-         every entry whose exact value is positive and at least 1e-250 * S has a relative error below
-         1e-10; every other entry (exact zeros included) lies within max(1e-250 * S, 1e-300) of the exact
-         value.
+      x: numpy array of shape (n,), the numbers of atoms at time t. With S = sum(n0) + t * sum(source)
+         and F = max(1e-250 * S, 1e-300): every entry whose exact value is at least F has a relative error
+         below 1e-10; every other entry (exact zeros included) lies within F of the exact value.
 
     Raises:
       ValueError if the arrays do not have these shapes (1 <= n <= 30), if an entry is negative or not
@@ -178,10 +177,9 @@ def activation_inventory(lam, branching, sigma, capture_to, n0, history):
                flux in neutrons / (cm^2 s) (0 <= flux <= 1e18; flux 0 is a cooling period).
 
     Output:
-      x: numpy array of shape (n,), the numbers of atoms at the end of the history. With S = sum(n0):
-         every entry whose exact value is positive and at least 1e-250 * S has a relative error below
-         1e-10; every other entry (exact zeros included) lies within max(1e-250 * S, 1e-300) of the exact
-         value.
+      x: numpy array of shape (n,), the numbers of atoms at the end of the history. With S = sum(n0) and
+         F = max(1e-250 * S, 1e-300): every entry whose exact value is at least F has a relative error
+         below 1e-10; every other entry (exact zeros included) lies within F of the exact value.
 
     Raises:
       ValueError for inputs outside these ranges or of the wrong shape, for a capture_to entry that is not
@@ -278,17 +276,20 @@ def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activi
            caller guarantees that the activity A(flux) is strictly increasing on this interval.
 
     Output:
-      flux: Python float, the flux in neutrons / (cm^2 s) with A(flux) = activity; relative error below
-            1e-8 wherever d ln A / d ln flux >= 0.5 at the solution.
+      flux: Python float, the flux in neutrons / (cm^2 s) with A(flux) = activity, A computed with
+            activation_inventory (step 3); relative error below 1e-8 wherever d ln A / d ln flux >= 0.5
+            at the solution, for activities of any size within the domain.
 
     Raises:
       ValueError for nuclide data as in step 3, for times, k, activity or flux bounds outside these
-      ranges, if A(flux_lo) < 1e-250 * lam[k] * sum(n0) (the measured nuclide must hold at least 1e-250
-      of the initial atoms at flux_lo), or if activity lies outside [A(flux_lo), A(flux_hi)] by more
-      than a relative 1e-9.
+      ranges (NaN and infinite values included), if A(flux_lo) < lam[k] * max(1e-250 * sum(n0), 1e-300)
+      (at flux_lo the measured nuclide must hold at least 1e-250 of the initial atoms and at least 1e-300
+      atoms), or if activity lies outside [A(flux_lo), A(flux_hi)] by more than a relative 1e-9.
       An activity with |ln(activity / A(end))| <= 1e-9 for an end of the interval, on either side of
-      it, gives that end. The end values carry rounding errors, so the tolerance holds up to 1e-12 in ln:
-      for 1e-9 - 1e-12 < |ln| <= 1e-9 + 1e-12 the end, the root and (outside the interval) ValueError are all correct.
+      it, gives that end (flux_lo is checked first); the end is returned as the given bound itself, equal
+      to it to a relative 1e-11. A is known to a relative 1e-10 (the accuracy of step 3), so the
+      tolerance holds up to 1e-10 in ln: for 1e-9 - 1e-10 < |ln| <= 1e-9 + 1e-10 the end, the root and
+      (outside the interval) ValueError are all correct.
     '''
     t_irr, t_cool, activity = float(t_irr), float(t_cool), float(activity)
     flux_lo, flux_hi = float(flux_lo), float(flux_hi)
@@ -317,14 +318,14 @@ def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activi
     lo, hi = np.log(flux_lo), np.log(flux_hi)
     target = np.log(activity)
     f_lo, f_hi = log_activity(lo) - target, log_activity(hi) - target
-    # domain: at flux_lo the measured nuclide must hold at least 1e-250 of the initial atoms (the range in
-    # which step 3 promises relative accuracy); below it the activity is not determined well enough
-    # A(flux_lo) >= 1e-250 lam[k] sum(n0) is x[k] >= 1e-250 sum(n0); compare the atoms in separate
-    # logarithms, since 1e-250 * lam[k] * sum(n0) itself can underflow to 0 for a small lam[k]
+    # domain: at flux_lo the measured nuclide must hold at least F = max(1e-250 sum(n0), 1e-300) atoms, the
+    # range in which step 3 promises a relative 1e-10 (below F only an absolute error F, and amounts below
+    # about 2e-308 are subnormal doubles); A(flux_lo) >= lam[k] F is x[k] >= F. Compare the atoms in
+    # logarithms, since lam[k] * F itself can underflow to 0 for a small lam[k]
     x_lo = activation_inventory(lam, branching, sigma, capture_to, n0, [(t_irr, flux_lo), (t_cool, 0.0)])[k]
     s0 = float(np.sum(n0))
-    if not (s0 > 0.0 and x_lo > 0.0 and np.log(x_lo) >= np.log(1e-250) + np.log(s0)):
-        raise ValueError("A(flux_lo) is below 1e-250 * lam[k] * sum(n0)")
+    if not (s0 > 0.0 and x_lo > 0.0 and np.log(x_lo) >= max(np.log(1e-250) + np.log(s0), np.log(1e-300))):
+        raise ValueError("A(flux_lo) is below lam[k] * max(1e-250 * sum(n0), 1e-300)")
     # the interval is closed: an activity within a relative 1e-9 of an end value, on either side, gives
     # that end; otherwise it must lie strictly between the two end values
     if abs(f_lo) <= 1e-9:

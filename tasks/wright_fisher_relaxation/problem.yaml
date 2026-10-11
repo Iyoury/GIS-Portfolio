@@ -24,16 +24,16 @@ affiliation: "Independent Researcher"
 difficulty_explanation: >-
   Every requested quantity of the Wright-Fisher chain is needed to a relative 1e-8 although it lies far below the
   rounding error of the matrix entries next to it: fixation probabilities down to about 6e-240, stationary
-  probabilities spanning more than 100 decades, a relaxation gap of 2e-12 next to eigenvalues of order 1/N, passage
-  times up to about 4e248 generations, an absorption rate near 2e-249, and a smallest eigenvalue between about 2e-211
-  and 1e-172 whose eigenvector spans about 180 decades at N = 400. Dense double-precision linear algebra (np.linalg.solve,
-  dense eigensolvers, pivots formed as 1 - P_kk) loses these quantities completely, so the solver has to recognise
-  where cancellation occurs and choose subtraction-free formulations of the absorbing-chain, stationary, first-passage
-  and quasi-stationary problems. The last step is the hardest: the smallest eigenvalue of the totally positive
-  binomial kernel is ill-conditioned with respect to the entries of P, so it must come from the structure of the
-  model (a scaled Vandermonde matrix of increasing nodes) and the absorbing cases u = 0 or v = 0 must be reduced to
-  the transient block. Arbitrary-precision linear algebra is a valid but slow alternative: the independent N = 400
-  targets needed plain LU solves at 400 digits, about 3 minutes each for step 7.
+  probabilities spanning more than 200 decades, a relaxation gap down to 2e-12 next to eigenvalues of order 1/N,
+  passage times above 1e248 generations, an absorption rate down to about 2e-249, and a smallest eigenvalue between
+  about 1e-225 and 1e-172 at N = 400 whose eigenvector spans up to about 175 decades. Dense double-precision linear
+  algebra (np.linalg.solve, dense eigensolvers, pivots formed as 1 - P_kk) loses these quantities completely, so the
+  solver has to recognise where cancellation occurs and choose subtraction-free formulations of the absorbing-chain,
+  stationary, first-passage and quasi-stationary problems. The last step is the hardest: the smallest eigenvalue of
+  the totally positive binomial kernel is ill-conditioned with respect to the entries of P, so it must come from the
+  structure of the model (a scaled Vandermonde matrix of increasing nodes) and the absorbing cases u = 0 or v = 0
+  must be reduced to the transient block. Arbitrary-precision linear algebra is a valid but slow alternative: the
+  independent N = 400 targets needed plain LU factorizations at 400 digits, about 4 minutes each.
 
 solution_explanation: >-
   Step 1 builds every binomial row in logarithms with the complement q = 1 - p of the post-selection, post-mutation
@@ -47,28 +47,49 @@ solution_explanation: >-
   Vandermonde matrix of the increasing nodes x_i = p_i / q_i, so 1 / lambda_min is the Perron root of |P_II^-1|,
   whose entries are elementary symmetric functions over products of node differences obtained without
   cancellation; a power method in logarithms gives lambda_min and the mode, which is padded with zeros on the
-  absorbing states and takes the checkerboard sign pattern.
+  absorbing states and takes the checkerboard sign pattern with + on the first transient state (the stated
+  normalisation, set by position rather than read from a computed entry). For N = 1 with mutation in both
+  directions the exact 2 x 2 eigenpair (1 - u - v with the eigenvector (v, -u)) is used, because there the power
+  method would contract only like the ratio 1 - u - v of the two eigenvalues.
 
 verification_explanation: >-
   Independent targets come from analytic results (neutral fixation probability i0 / N, the exact neutral
   stationary moments, the neutral gap u + v and smallest eigenvalue (1 - u - v)^N N! / N^N of the Feller-Cannings
   spectrum, N = 1 and N = 2 closed forms, the exact allele-relabeling symmetry) and from extended-precision
   recomputation by a different method: the transition matrix from mpmath binomials with plain LU solves, mpmath
-  eig and inverse iteration at 40 to 400 digits, the N = 400 targets computed once at 400 digits and stored
-  inline. The second solution uses different algorithms: rows built by ratio recursion with beta-function
-  coefficients for step 1; for steps 2-6 a double-precision regenerative decomposition instead of state
-  reduction, in which the chain outside a few hub states (the two monomorphic states and the deterministic
-  equilibrium) is summed as a Neumann series by repeated squaring and the hub skeleton is solved with the Markov
-  chain tree theorem, inside inverse iteration for steps 4 and 6; prefix/suffix convolutions, Osborne balancing
-  and a dense eigensolver followed by log-space polishing for step 7. It passes every case of every step and of
-  the whole-task tests (about 40 s for all of them), and it agrees with the reference to about 2e-11 relative or
-  better on a grid of N up to 400 and on 120 random parameter sets. Each step has named scientific mutants
-  (cancelled complement, mutation before selection, loss as 1 - p_fix, unconditional times, dense eigensolvers
-  and dense solves, neutral gap, absorption rate from mutation supply, regularized absorbing states, sign fixed
-  by the largest entry), and a complete whole-task mutant applies mutation before selection; each fails at
-  least one case of its target tests. Every case was run alone in a fresh process with tools/crown_check.py for
-  the per-step references, solution.py, the second solution, the mutants, the all-None and all-zero controls
-  (which pass no case) and with every reference output scaled by 1 +- 1e-12 (all cases still pass).
+  eig and inverse iteration at 40 to 400 digits, the N = 400 targets of steps 2 to 7 computed once at 400 digits
+  and stored inline. The whole-task tests call every step, compare the final function (and the gap, passage
+  times, stationary and quasi-stationary distributions) with extended precision, and check identities between the
+  steps: the stationary distribution and, with u = 0, the quasi-stationary distribution are orthogonal to the
+  fastest mode, lambda_min lies below 1 - gap and below 1 - rate, and with rare mutations gap = 1 / t_up + 1 / t_down,
+  t_up = 1 / (N v p_fix) and rate * t_up = 1. The second solution uses different algorithms: rows built by ratio
+  recursion with beta-function coefficients for step 1; for steps 2-6 a double-precision regenerative decomposition
+  instead of state reduction, in which the chain outside a few hub states (the two monomorphic states and the
+  deterministic equilibrium) is summed as a Neumann series by repeated squaring and the hub skeleton is solved with
+  the Markov chain tree theorem, inside the same outer inverse iteration as the reference for steps 4 and 6; for
+  step 7 inverse iteration whose linear solves use the Bjorck-Pereyra algorithm (Newton divided differences) in
+  log-magnitude arithmetic with known alternating signs, without the explicit inverse and the elementary symmetric
+  functions of the reference. Step 7 of both solutions rests on the same factorization of the transient block into
+  diagonal and Vandermonde factors with node differences formed without cancellation (the structure of the model,
+  which a double-precision method needs), so the step-7 evidence that does not use this structure is the neutral
+  closed form, the N = 1 closed form and the mpmath eig and 400-digit inverse-iteration targets. The second solution
+  passes every case of every step and of the whole-task tests; its step 7 agrees with the reference to 8.5e-12
+  relative or better on a grid of N from 1 to 400 with u, v including 0 and to 1.4e-12 on 120 random parameter sets
+  (exact zeros on the absorbing states), and its steps 2-6 agreed to about 2e-11 in the version-13 comparison (those
+  functions are unchanged). The magnitudes stated in the step-5 and step-7 prompts come from scans (source.md, version
+  14, items 9 and 10): for step 7, whose positive rates are bounded below by 1e-12 like those of steps 3-6, a grid with
+  u, v in {0, 1e-12, 2e-12, 1e-11, ..., 0.1} at N = 200 to 400 (second solution) and at N = 400 (reference) gives
+  lambda_min between 1.357e-225 and 9.603e-173 at N = 400, a span of the mode of at most 175.5 decades and a smallest
+  entry off the absorbing states of 3.3e-176; for step 5, lines through the extreme corner and 1200 random inputs
+  near it (second solution, reference spot checks) put every t_up above 1e300 inside the stated region, and t_down
+  stays far below 1e300.
+  Each step has named scientific mutants (cancelled complement, mutation before selection, loss as 1 - p_fix,
+  unconditional times, dense eigensolvers and dense solves, neutral gap, absorption rate from mutation supply,
+  regularized absorbing states, sign fixed by the largest entry), and a complete whole-task mutant applies mutation
+  before selection; each fails at least one case of its target tests. Every case was run alone in a fresh process
+  with tools/crown_check.py for the per-step references, solution.py, the second solution, the mutants, the
+  all-None and all-zero controls (which pass no case), with every step output scaled by 1 +- 1e-12 and with every
+  evaluated function so scaled in the whole-task tests (all cases still pass).
 
 required_dependencies: |-
   import numpy as np
@@ -97,7 +118,7 @@ problem_io: |-
       Inputs:
         N: int, population size, 1 <= N <= 400.
         s: float, selection coefficient of A, -0.5 <= s <= 0.5.
-        u, v: float, mutation probabilities A -> a and a -> A per generation, 0 <= u, v <= 0.1
+        u, v: float, mutation probabilities A -> a and a -> A per generation, each either 0 or in [1e-12, 0.1]
               (v = 0 makes i = 0 absorbing, u = 0 makes i = N absorbing).
 
       Output:
@@ -110,7 +131,8 @@ problem_io: |-
 
       Raises:
         ValueError if N is not an integer in [1, 400] (bool and float are not accepted), if s, u or v
-        is not finite or is outside its range, or if N = 1 and u = v = 0.
+        is not finite or is outside its range (0 < u < 1e-12 and 0 < v < 1e-12 included), or if N = 1
+        and u = v = 0.
       '''
 general_tests: tests/general.py
 
@@ -201,9 +223,9 @@ sub_steps:
         t_fix:  the mean number of generations until fixation, conditional on fixation;
         t_loss: the mean number of generations until loss, conditional on loss.
       Return the tuple (p_fix, p_loss, t_fix, t_loss) of four Python floats, each with a relative error
-      below 1e-8. This holds for each of them separately: p_fix is about 3e-141 for N = 400, s = -1/3,
-      i0 = 1 (and smaller still for s closer to -0.5), p_loss is equally small for N = 400, s = 0.5,
-      i0 = N - 1, and the other probability is then 1 to within rounding.
+      below 1e-8. This holds for each of them separately: with strong selection at N = 400 the smaller of
+      the two probabilities can be far below 1e-100 (p_fix comes down to about 6e-240 within the stated
+      ranges), and the other probability is then 1 to within rounding.
       Inputs: N (integer, 2 <= N <= 400), s (-0.5 <= s <= 0.5), i0 (integer, 1 <= i0 <= N - 1).
       Errors: raise ValueError if N or i0 is not an integer (bool and float are not accepted), if N is
       outside [2, 400], if i0 is outside [1, N - 1], or if s is not finite or is outside [-0.5, 0.5].
@@ -314,9 +336,9 @@ sub_steps:
       distance to equilibrium of a generic initial distribution (one with a nonzero component along
       the second eigenvector) eventually decays like lambda_2**t, where lambda_2 is the second largest
       eigenvalue. Return the relaxation rate gap = 1 - lambda_2 as a
-      Python float with a relative error below 1e-8. The gap can be as small as about 1e-12 (rare
-      mutations, e.g. u = v = 1e-12 without selection) while the other eigenvalues of 1 - P are of
-      order 1/N or larger; the stated relative accuracy is required there too.
+      Python float with a relative error below 1e-8. With rare mutation in both directions the gap is
+      tiny (it comes down to about 2e-12 within the stated ranges) while the other eigenvalues of 1 - P
+      are of order 1/N or larger; the stated relative accuracy is required there too.
       Inputs: N (integer, 1 <= N <= 400), s (-0.5 <= s <= 0.5), u and v (1e-12 <= u, v <= 0.1).
       Errors: raise ValueError if N is not an integer (bool and float are not accepted) or is outside
       [1, 400], or if s, u or v is not finite or is outside its range.
@@ -373,11 +395,12 @@ sub_steps:
         t_down: the expected number of generations for a population fixed for A (i = N) to reach i = 0
                 for the first time.
       Return the tuple (t_up, t_down) of two Python floats, each with a relative error below 1e-8. With
-      rare mutations and strong selection one of them is astronomically large (t_down is about 1e150
-      generations at N = 400, s = 0.5, u = v = 1e-12) and must still have the stated accuracy.
+      rare mutations and strong selection one of them is astronomically large (above 1e248 generations
+      for some inputs at N = 400) and must still have the stated accuracy.
       Inputs: N (integer, 1 <= N <= 400), s (-0.5 <= s <= 0.5), u and v (1e-12 <= u, v <= 0.1).
       Inputs for which t_up or t_down would exceed 1e300 generations are outside the domain; within these
-      ranges only t_up can be that large, near the corner N = 400, s = -0.5, u = 0.1, v = 1e-12.
+      ranges only t_up can be that large, and only for large N with A strongly deleterious, frequent mutation
+      A -> a and rare mutation a -> A (only if N >= 370, s <= -0.46, u >= 0.06 and v <= 3e-3 all hold).
       Errors: raise ValueError if N is not an integer (bool and float are not accepted) or is outside
       [1, 400], or if s, u or v is not finite or is outside its range.
     function_header: |-
@@ -390,7 +413,7 @@ sub_steps:
             u: float, mutation probability A -> a per generation, 1e-12 <= u <= 0.1.
             v: float, mutation probability a -> A per generation, 1e-12 <= v <= 0.1.
             Inputs for which t_up or t_down would exceed 1e300 generations are outside the domain (within these
-            ranges only t_up can be that large, near N = 400, s = -0.5, u = 0.1, v = 1e-12).
+            ranges only t_up can be that large, and only if N >= 370, s <= -0.46, u >= 0.06 and v <= 3e-3).
 
           Output:
             (t_up, t_down): tuple of two Python floats.
@@ -398,8 +421,8 @@ sub_steps:
                     for the first time.
               t_down: mean number of generations for a population fixed for A (i = N) to reach i = 0 for
                       the first time.
-              Each with a relative error below 1e-8, however large (t_down is about 1e150 at
-              N = 400, s = 0.5, u = v = 1e-12).
+              Each with a relative error below 1e-8, however large (above 1e248 generations for some
+              inputs at N = 400).
 
           Raises:
             ValueError if N is not an integer in [1, 400], or if s, u or v is not finite or is outside its
@@ -415,7 +438,7 @@ sub_steps:
       quantity: "Mean first-passage times between the two monomorphic states (0 -> N and N -> 0)."
       assumptions: "Wright-Fisher chain of step 1 with u, v > 0."
       result_kind: exact
-      valid_input_ranges: "1 <= N <= 400 (integer); -0.5 <= s <= 0.5; 1e-12 <= u, v <= 0.1; inputs whose t_up or t_down would exceed 1e300 generations (only near N = 400, s = -0.5, u = 0.1, v = 1e-12) are excluded."
+      valid_input_ranges: "1 <= N <= 400 (integer); -0.5 <= s <= 0.5; 1e-12 <= u, v <= 0.1; inputs whose t_up or t_down would exceed 1e300 generations (only t_up, and only if N >= 370, s <= -0.46, u >= 0.06 and v <= 3e-3) are excluded."
       units: "Generations."
       output_shape: "Tuple of two Python floats."
       step_dependencies: [1]
@@ -433,14 +456,14 @@ sub_steps:
       permanent: i = N is absorbing in the chain of step 1 (wf_transition_matrix). Let Q be the transition
       matrix restricted to i = 0, ..., N - 1 and rho its largest eigenvalue. Compute:
         rate: 1 - rho, the per-generation probability that a population in the quasi-stationary state fixes
-              A, as a Python float with a relative error below 1e-8, however small it is (about 1e-246 for
-              N = 400, s = -0.5, v = 1e-9);
+              A, as a Python float with a relative error below 1e-8, however small it is (it comes down to
+              about 2e-249 within the stated ranges);
         qsd: the quasi-stationary distribution, the left eigenvector of Q for rho normalized to sum 1, a
              numpy array of shape (N,). Every entry whose exact value is positive and at least 1e-250 must
              have a relative error below 1e-8; every other entry must lie within 1e-250 of its exact value.
-             This includes the far tail: for N = 400, s = 0.5, v = 0.1 the entries at small i are many
-             orders of magnitude below the bulk (qsd[0] is about 4e-221), and each of these entries must
-             itself have a relative error below 1e-8.
+             This includes the far tail: at N = 400 the distribution can span more than 200 decades, its
+             tail lying many orders of magnitude below the bulk, and each tail entry of at least 1e-250
+             must itself have a relative error below 1e-8.
       Return the tuple (rate, qsd).
       Inputs: N (integer, 1 <= N <= 400), s (-0.5 <= s <= 0.5), v (1e-12 <= v <= 0.1).
       Errors: raise ValueError if N is not an integer (bool and float are not accepted) or is outside
@@ -495,11 +518,13 @@ sub_steps:
     tests: tests/step_7.py
     step_description_prompt: |-
       All eigenvalues of the transition matrix P of step 1 (wf_transition_matrix) are real, positive and
-      distinct when u, v > 0 (step 4). The largest is 1 and governs equilibrium; the smallest, lambda_min,
-      is the factor by which the fastest-decaying mode of the chain shrinks in one generation. Return
+      distinct when u, v > 0 (as stated in step 4). The largest is 1 and governs equilibrium; the
+      smallest, lambda_min, is the factor by which the fastest-decaying mode of the chain shrinks in one
+      generation. Return
       lambda_min and that mode, the right eigenvector x of P with P x = lambda_min x (entry i for the
       allele count i = 0, ..., N).
-      Here mutation may also be switched off in one or both directions, 0 <= u, v <= 0.1: with v = 0 the
+      Here mutation may also be switched off in one or both directions: each of u and v is either 0 or
+      between 1e-12 and 0.1 (a positive rate has the same lower bound 1e-12 as in steps 3-6). With v = 0 the
       state i = 0 is absorbing, with u = 0 the state i = N is absorbing. P then has the eigenvalue 1 once
       for each absorbing state, its other eigenvalues are real, positive, distinct and below 1, and
       lambda_min is still the smallest eigenvalue of P.
@@ -508,14 +533,13 @@ sub_steps:
       Accuracy: lambda_min with a relative error below 1e-8, and every entry of the mode with an error
       below 1e-8 times its absolute value, except on the absorbing states: there the exact entries of the
       mode are zero, and the returned entries must be below 1e-250 in absolute value (0.0 is accepted).
-      lambda_min is extremely small: about 1e-173 for N = 400 without selection and with rare or no
-      mutation, about 2e-211 for N = 400, s = 0, u = v = 0.1, and of similar size with selection, far below
-      the rounding errors of the matrix entries next to it. The entries of the mode at N = 400 span up to
-      about 180 decades. The stated accuracy is required there too.
-      Inputs: N (integer, 1 <= N <= 400), s (-0.5 <= s <= 0.5), u and v (0 <= u, v <= 0.1).
+      lambda_min is extremely small: at N = 400 it lies between about 1e-225 and 1e-172 over the stated
+      ranges of s, u and v, far below the rounding errors of the matrix entries next to it, and the entries
+      of the mode span up to about 175 decades. The stated accuracy is required there too.
+      Inputs: N (integer, 1 <= N <= 400), s (-0.5 <= s <= 0.5), u and v (each either 0 or in [1e-12, 0.1]).
       Errors: raise ValueError if N is not an integer (bool and float are not accepted) or is outside
-      [1, 400], if s, u or v is not finite or is outside its range, or if N = 1 and u = v = 0 (both states
-      absorbing, P is the identity).
+      [1, 400], if s, u or v is not finite or is outside its range (in particular if 0 < u < 1e-12 or
+      0 < v < 1e-12), or if N = 1 and u = v = 0 (both states absorbing, P is the identity).
     function_header: |-
       def fastest_mode(N, s, u, v):
           '''Smallest eigenvalue of the Wright-Fisher transition matrix and its right eigenvector.
@@ -523,7 +547,7 @@ sub_steps:
           Inputs:
             N: int, population size, 1 <= N <= 400.
             s: float, selection coefficient of A, -0.5 <= s <= 0.5.
-            u, v: float, mutation probabilities A -> a and a -> A per generation, 0 <= u, v <= 0.1
+            u, v: float, mutation probabilities A -> a and a -> A per generation, each either 0 or in [1e-12, 0.1]
                   (v = 0 makes i = 0 absorbing, u = 0 makes i = N absorbing).
 
           Output:
@@ -536,7 +560,8 @@ sub_steps:
 
           Raises:
             ValueError if N is not an integer in [1, 400] (bool and float are not accepted), if s, u or v
-            is not finite or is outside its range, or if N = 1 and u = v = 0.
+            is not finite or is outside its range (0 < u < 1e-12 and 0 < v < 1e-12 included), or if N = 1
+            and u = v = 0.
           '''
     return_line: return lam_min, mode
     step_background: |-
@@ -547,9 +572,9 @@ sub_steps:
     n_test_cases: 6
     contract:
       quantity: Smallest eigenvalue of the Wright-Fisher transition matrix and its right eigenvector.
-      assumptions: Wright-Fisher chain of step 1 with 0 <= u, v <= 0.1; absorbing states when u = 0 or v = 0; real positive eigenvalues.
+      assumptions: Wright-Fisher chain of step 1 with u and v each either 0 or in [1e-12, 0.1]; absorbing states when u = 0 or v = 0; real positive eigenvalues.
       result_kind: exact
-      valid_input_ranges: 1 <= N <= 400 (integer); -0.5 <= s <= 0.5; 0 <= u, v <= 0.1; not N = 1 with u = v = 0.
+      valid_input_ranges: 1 <= N <= 400 (integer); -0.5 <= s <= 0.5; u and v each either 0 or in [1e-12, 0.1] (0 < u < 1e-12 and 0 < v < 1e-12 excluded); not N = 1 with u = v = 0.
       units: Per generation (dimensionless factor); mode dimensionless.
       output_shape: Tuple (Python float, numpy float array of shape (N + 1,)).
       step_dependencies: [1]

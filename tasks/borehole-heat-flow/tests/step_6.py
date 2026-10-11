@@ -5,7 +5,10 @@
 #  * noise-free holes: the targets are the generating q0, T0, g (analytic truth);
 #  * noisy holes: the targets are recomputed inside the case by ordinary least squares (numpy.linalg.lstsq,
 #    covariance s^2 (G^T G)^-1 from the pseudo-inverse, s^2 = RSS / (n - 3)) on the generator's own model terms;
-#  * n_used: the count of readings whose generator TVD is >= z_min.
+#  * n_used: the count of readings whose generator TVD is >= z_min;
+#  * vertical noise-free holes (TVD = MD): the collar reading (TVD 0 on any trajectory) exactly at z_min = 0
+#    (step 6), and a cut that leaves exactly 4 readings (valid) or 3 (ValueError);
+#  * the rms residual of the noisy hole against its 5 mK logging noise.
 
 # --- test case 0 ---
 # output contract
@@ -137,6 +140,10 @@ assert isinstance(r["n_used"], int)
 assert int(round(float(r["n_used"]))) == int(a["ref_n_used"])
 for k in OUT - {"n_used"}:
     assert np.isfinite(float(r[k]))
+# the residuals of the fit are the 5 mK logging noise of this hole: the rms residual of the n_used = 326
+# readings estimates sigma sqrt((n - 3) / n) with a relative scatter of about 1 / sqrt(2 (n - 3)) = 4 %;
+# the 15 % band is about four times that scatter
+assert abs(r["rms_residual"] / 0.005 - 1) < 0.15
 
 # --- test case 1 ---
 # noiseless hole returns generator parameters
@@ -531,7 +538,7 @@ assert abs(r["q0"] - a["true_q0"]) < 4 * r["sigma_q0"]
 assert abs(r["amplitude"] - a["true_amplitude"]) < 4 * r["sigma_amplitude"]
 
 # --- test case 4 ---
-# invalid inputs raise
+# invalid inputs raise; four readings is the smallest valid fit
 import math
 import numpy as np
 
@@ -705,6 +712,29 @@ for case in ["log_len", "few_after_cut", "zero_shape", "top_beyond_hole", "negat
     else:
         raise AssertionError("surface_heat_flow must raise ValueError" + _t_msg)
 
+# smallest valid workflow: on a vertical hole (TVD = MD) whose temperatures follow the model exactly, a
+# cut that keeps exactly 4 readings is valid and recovers the generating values; a cut that keeps 3 raises
+md = np.array([0.0, 500.0, 1000.0, 1500.0])
+log_md = np.array([60.0, 240.0, 450.0, 800.0, 1150.0, 1500.0])
+tops_md, k = np.array([0.0, 300.0, 800.0]), np.array([2.8, 3.6, 3.1])
+A, kappa = 0.8e-6, 1.2e-6
+T = np.empty(log_md.size)
+for j, z in enumerate(log_md):
+    R, S = _g_RS(z, list(tops_md), list(k))
+    T[j] = 6.0 + 0.045 * R - A * S + 5.5 * _g_P(z, _HIST_SHAPE, kappa)
+base = [md, np.zeros(4), np.zeros(4), log_md, T, tops_md, k, A, kappa, np.array(_HIST_T), np.array(_HIST_SHAPE)]
+r = surface_heat_flow(*base, 300.0)
+assert int(round(float(r["n_used"]))) == 4
+assert abs(r["q0"] - 0.045) < 1e-8
+assert abs(r["T0"] - 6.0) < 1e-5
+assert abs(r["amplitude"] - 5.5) < 1e-4
+try:
+    surface_heat_flow(*base, 500.0)
+except ValueError:
+    pass
+else:
+    raise AssertionError("surface_heat_flow must raise ValueError (3 readings left after the cut)")
+
 # --- test case 5 ---
 # z min is applied in vertical depth
 import math
@@ -865,18 +895,22 @@ def _g_P(z, shape, kappa):
         out += d * (e_old - e_new)
     return out
 
-# vertical hole: TVD = MD exactly, so the reading at MD 200 m sits exactly at z_min = 200 m and is kept
+# The collar reading (MD 0) has TVD 0 on every trajectory, since the TVD is measured from the collar, so
+# with z_min = 0 it lies exactly at the cut and must be kept: all 151 readings are used (a strict cut
+# TVD > z_min would drop it). The temperatures of this vertical hole follow the model exactly.
 md = np.array([0.0, 500.0, 1000.0, 1500.0])
 inc = np.zeros(4)
 azi = np.zeros(4)
-log_md = np.arange(10.0, 1500.0 + 1e-9, 10.0)
+log_md = np.arange(0.0, 1500.0 + 1e-9, 10.0)
 tops_md, k = np.array([0.0, 300.0, 800.0]), np.array([2.8, 3.6, 3.1])
 A, kappa = 0.8e-6, 1.2e-6
 T = np.empty(log_md.size)
 for j, z in enumerate(log_md):
     R, S = _g_RS(z, list(tops_md), list(k))
     T[j] = 6.0 + 0.045 * R - A * S + 5.5 * _g_P(z, _HIST_SHAPE, kappa)
-args = [md, inc, azi, log_md, T, tops_md, k, A, kappa, np.array(_HIST_T), np.array(_HIST_SHAPE), 200.0]
+args = [md, inc, azi, log_md, T, tops_md, k, A, kappa, np.array(_HIST_T), np.array(_HIST_SHAPE), 0.0]
 r = surface_heat_flow(*args)
-assert int(round(float(r["n_used"]))) == int(np.sum(log_md >= 200.0)) == 131
+assert int(round(float(r["n_used"]))) == log_md.size == 151
 assert abs(r["q0"] - 0.045) < 1e-8
+assert abs(r["T0"] - 6.0) < 1e-5
+assert abs(r["amplitude"] - 5.5) < 1e-4

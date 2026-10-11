@@ -17,10 +17,9 @@ def network_inventory(lam, branching, source, n0, t):
       t: elapsed time, 0 <= t <= 1e20, with sum(n0) + t * sum(source) <= 1e100.
 
     Output:
-      x: numpy array of shape (n,), the numbers of atoms at time t. With S = sum(n0) + t * sum(source):
-         every entry whose exact value is positive and at least 1e-250 * S has a relative error below
-         1e-10; every other entry (exact zeros included) lies within max(1e-250 * S, 1e-300) of the exact
-         value.
+      x: numpy array of shape (n,), the numbers of atoms at time t. With S = sum(n0) + t * sum(source)
+         and F = max(1e-250 * S, 1e-300): every entry whose exact value is at least F has a relative error
+         below 1e-10; every other entry (exact zeros included) lies within F of the exact value.
 
     Raises:
       ValueError if the arrays do not have these shapes (1 <= n <= 30), if an entry is negative or not

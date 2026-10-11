@@ -81,7 +81,8 @@ for _t_q, _t_c, _t_g in _T_COL[-3:]:
     assert _t_rel(_t_got, _t_g) < 1e-10, (_t_q, _t_got, _t_g)
 
 # --- test case 2 ---
-# several stations at once give an array of shape (n,)
+# several stations at once give an array of shape (n,) with the same accuracy: 5 stations, and
+# 1000 stations (the 14 stored stations of the first column, near and far, repeated)
 import numpy as np
 
 def _t_rel(a, b):
@@ -119,6 +120,20 @@ _t_got = column_gz(_t_sts, *_t_c)
 assert isinstance(_t_got, np.ndarray) and _t_got.shape == (5,)
 for _t_k in range(5):
     assert _t_rel(_t_got[_t_k], _T_COL[_t_k][2]) < 1e-10
+
+# far stations of the same column, (station, (x1, x2, y1, y2, depth, drho0, lam), g_z)
+_T_FAR4 = [
+    ((1000000.0, 0.0, -10.0), (0.0, 100.0, 0.0, 200.0, 3000.0, -400.0, 0.0005), -9.528197775184432784315993e-16),
+    ((300000.0, 0.0, 0.0), (0.0, 100.0, 0.0, 200.0, 3000.0, -400.0, 0.0005), -3.49926655192019535846358e-14),
+    ((-200000.0, 300000.0, -50.0), (0.0, 100.0, 0.0, 200.0, 3000.0, -400.0, 0.0005), -2.104190721207262204386987e-14),
+    ((50000.0, 100.0, 0.0), (0.0, 100.0, 0.0, 200.0, 3000.0, -400.0, 0.0005), -7.561610095541915956120658e-12),
+]
+
+_t_rows = ((_T_COL[:10] + _T_FAR4) * 72)[:1000]
+_t_got = column_gz(np.array([r[0] for r in _t_rows], float), *_t_c)
+assert isinstance(_t_got, np.ndarray) and _t_got.shape == (1000,)
+for _t_k, (_t_q, _t_cc, _t_g) in enumerate(_t_rows):
+    assert _t_rel(_t_got[_t_k], _t_g) < 1e-10, (_t_q, _t_got[_t_k], _t_g)
 
 # --- test case 3 ---
 # invalid stations or parameters raise ValueError

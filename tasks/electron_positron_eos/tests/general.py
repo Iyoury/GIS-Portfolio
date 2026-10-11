@@ -28,28 +28,47 @@ for _t_args in ((2e6, 1e9, 0.5), (1e-3, 1e10, 0.5)):
         assert _t_rel(_t_out[_t_k], _t_want) < _t_tol, (_t_args, _t_k, _t_out[_t_k], _t_want)
 
 # --- test case 1 ---
-# consistency between the steps. At the psi returned by degeneracy_parameter for rho Ye = 5e5 g cm^-3,
-# T = 1e9 K, pair_densities gives n_net = rho Ye N_A: d ln n_net / d ln psi is about 4.84 there, so psi
-# within its relative 1e-10 and n_net within its relative 1e-10 put n_net within 5.9e-10 of rho Ye N_A.
-# In a classical gas without pairs (rho Ye = 1e-6, T = 1e8 K) the Euler relation
-# u_tot + P - T s = mu n_net holds (u_tot = u + n_net m_e c^2, mu = psi k T including the rest energy);
-# with every quantity within its relative 1e-10 the two sides agree to about 3.4e-10 (the largest terms,
-# n_net m_e c^2 and T s, are 1.6 and 0.7 times the result), well within the 1e-8 checked here
+# thermodynamic consistency of the complete equation of state of a hot, partly pair-populated gas
+# (rho = 1e6 g cm^-3, T = 3e9 K, Ye = 0.5: psi about 0.65, n_plus / n_minus about 0.29), all from
+# electron_positron_eos. Each bound below is the first-order error budget when every returned quantity has
+# its stated accuracy (psi, n_minus, n_plus, P, u, s relative 1e-10, cv relative 1e-8), computed from the
+# returned values:
+#  (a) charge neutrality n_minus - n_plus = rho Ye N_A, within 1e-10 (n_minus + n_plus) / (rho Ye N_A)
+#      (about 1.8e-10 here);
+#  (b) the Euler relation u_tot + P - T s = mu n_net, with u_tot = u + n_net m_e c^2, n_net = rho Ye N_A and
+#      mu = psi k T (rest energy included), within 1e-10 (|u| + |P| + T |s| + |mu n_net|) / |mu n_net|
+#      (n_net m_e c^2 is exact; about 2.6e-9 here);
+#  (c) c_V = (d u / d T) and c_V = T (d s / d T) at constant rho and Ye (constant n_net), by the five-point
+#      centred difference with h = 5e-3 T of the returned u and s, within 1e-8 (c_V itself)
+#      + c 1e-10 (|X(T+2h)| + 8 |X(T+h)| + 8 |X(T-h)| + |X(T-2h)|) / (12 h c_V) (X = u with c = 1, or s with
+#      c = T; about 6.5e-9 and 1.0e-8 here) + 1.2e-8 for the truncation error of the stencil (its h^4 term,
+#      4.8e-9 for u and 6.0e-9 for s at this state, measured from the difference formula at h and 2 h,
+#      whose ratio is 16)
 import numpy as np
 
 _T_MEC2 = 8.1871057769e-7
 _T_KB = 1.380649e-16
 _T_NA = 6.02214076e23
 
-def _t_rel(a, b):
-    return abs(a - b) / abs(b)
-
-_t_psi = degeneracy_parameter(1e6 * 0.5, 1e9)
-_t_nm, _t_npl, _t_net = pair_densities(1e9, _t_psi)
-assert _t_rel(_t_net, 1e6 * 0.5 * _T_NA) < 6e-10, (_t_net, _t_psi)
-_t_psi = degeneracy_parameter(1e-6, 1e8)
-_t_nm, _t_npl, _t_net = pair_densities(1e8, _t_psi)
-_t_P, _t_u, _t_s = pair_thermodynamics(1e8, _t_psi)
-_t_lhs = _t_u + _t_net * _T_MEC2 + _t_P - 1e8 * _t_s
-_t_rhs = _t_psi * _T_KB * 1e8 * _t_net
-assert _t_rel(_t_lhs, _t_rhs) < 1e-8, (_t_lhs, _t_rhs)
+_t_rho, _t_T, _t_Ye = 1e6, 3e9, 0.5
+_t_n = _t_rho * _t_Ye * _T_NA
+_t_o = electron_positron_eos(_t_rho, _t_T, _t_Ye)
+# (a) charge neutrality
+_t_tol = 1e-10 * (abs(_t_o["n_minus"]) + abs(_t_o["n_plus"])) / _t_n
+assert abs((_t_o["n_minus"] - _t_o["n_plus"]) / _t_n - 1.0) < _t_tol, (_t_o, _t_tol)
+# (b) Euler relation
+_t_utot = _t_o["u"] + _t_n * _T_MEC2
+_t_lhs = _t_utot + _t_o["P"] - _t_T * _t_o["s"]
+_t_rhs = _t_o["psi"] * _T_KB * _t_T * _t_n
+_t_tol = 1e-10 * (abs(_t_o["u"]) + abs(_t_o["P"]) + _t_T * abs(_t_o["s"]) + abs(_t_rhs)) / abs(_t_rhs)
+assert abs(_t_lhs / _t_rhs - 1.0) < _t_tol, (_t_lhs, _t_rhs, _t_tol)
+# (c) c_V as the temperature derivative of u and T times that of s, at constant rho Ye
+_t_h = 5e-3 * _t_T
+_t_v = {_t_k: electron_positron_eos(_t_rho, _t_T + _t_k * _t_h, _t_Ye) for _t_k in (-2, -1, 1, 2)}
+for _t_key, _t_scale in (("u", 1.0), ("s", _t_T)):
+    _t_x = {_t_k: _t_v[_t_k][_t_key] for _t_k in _t_v}
+    _t_d = _t_scale * (-_t_x[2] + 8.0 * _t_x[1] - 8.0 * _t_x[-1] + _t_x[-2]) / (12.0 * _t_h)
+    _t_noise = _t_scale * 1e-10 * (abs(_t_x[2]) + 8.0 * abs(_t_x[1]) + 8.0 * abs(_t_x[-1])
+                                   + abs(_t_x[-2])) / (12.0 * _t_h)
+    _t_tol = 1e-8 + _t_noise / abs(_t_o["cv"]) + 1.2e-8
+    assert abs(_t_d / _t_o["cv"] - 1.0) < _t_tol, (_t_key, _t_d, _t_o["cv"], _t_tol)

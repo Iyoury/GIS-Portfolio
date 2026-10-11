@@ -39,14 +39,33 @@ Consistency checks run while building the task:
   layer) and the high-precision Fourier continued fractions agree to about 1e-13
   (relative) on 40 random points over |i| <= 10, 0.02 <= theta <= 50, including
   exponentially small voltages (down to about 1e-17) and diffusion coefficients.
-- The second solution is independent of the reference: it solves the stationary
-  Fokker-Planck equation and the homogenization cell problem by Galerkin (Fourier)
-  truncation with tridiagonal eliminations in extended precision, gets dv/di from the
-  linearized system, evaluates D_eff = theta int (1 + chi')**2 p from the Fourier
-  coefficients, finds the diffusion peak by a double-precision scan followed by secant
-  iterations on high-precision differences, the noise temperature by Illinois regula falsi in 1 / theta with the thermometric
-  sensitivity from the Galerkin system differentiated in theta, and the
-  criterion current by safeguarded Newton iterations on ln V.
+  Rechecked in version 12 on a new set of 40 random points (8 of them below the critical
+  current at theta <= 0.05): largest relative difference 4.4e-15 for v, 3.6e-14 for dv/di and
+  1.3e-15 for D_eff, with v and D_eff down to about 3e-25.
+- The second solution (since version 12) uses a third exact representation for steps 1 to 5,
+  independent of both the reference and the test targets. The Jacobi-Anger expansion
+  exp(z cos x) = sum_m I_m(z) e^{imx}, z = 1 / theta, makes every shift integral of the
+  Stratonovich and Reimann formulas elementary: v = a / Phi with
+  Phi = I_0(z)**2 + 2 sum_{n>=1} (-1)**n I_n(z)**2 b**2 / (b**2 + n**2), a = |i|, b = a / theta
+  (the Ambegaokar-Halperin voltage as a Bessel series), and D_eff = theta <W Gp**2 Gm> / Phi**3,
+  a mean of products of Bessel-Fourier series (W = exp(-z cos x), Gp and Gm the shift integrals
+  of I_+ and I_- up to a common factor) formed by exact integer convolutions. The alternating
+  sums cancel by up to about 0.87 / theta digits and are evaluated in mpmath at
+  30 + 1.8 / theta digits (at theta = 0.02, D_eff was found to need about 50 digits, i.e. about
+  16 + 0.87 / theta). Derivatives in i and theta are analytic in the series. The diffusion peak
+  is found by a grid scan and Illinois regula falsi on d ln D / di, the noise temperature by
+  Illinois regula falsi in 1 / theta, the criterion current by safeguarded Newton iterations on
+  ln V. On 16 nonzero-bias (i, theta) points of the step 1 tests and the 16 of step 2 (v and
+  D_eff down to about 1e-17) it reproduces the continued-fraction values to the last
+  double-precision bit, at i = 0 it reproduces 1 / I_0(1/theta)**2 and the Lifson-Jackson D to
+  2.3e-15 relative, and it agrees with the reference to 4e-15 in i_peak and to about 1e-13 relative
+  in every step 3 to 5 output. For step 6 it solves the Kramers hierarchy by a matrix
+  continued fraction in a real (1, cos p x, sin p x) Fourier basis with Hermite functions
+  centred at the overdamped mean velocity (N = 130, |p| <= 64), evaluated at the complex bias
+  i + 1e-20 j: the real part is v and the imaginary part divided by 1e-20 is dv/di
+  (complex-step differentiation, no difference error). Before version 12 the second solution
+  solved the Fourier-Galerkin system of the test targets by tridiagonal elimination (see the
+  version 12 note).
 
 ## How the test targets are obtained
 
@@ -60,10 +79,10 @@ No target is copied from the reference solution. Every test computes its own tar
 | D_eff (steps 2, 3, 5) | homogenization: D = theta int (1 + chi')**2 p dx with the corrector chi and the density p both from continued fractions in extended precision; Fourier convolution for the average | about 1e-15 relative |
 | D_eff at i = 0 (step 2) | Lifson-Jackson, theta / I_0(1/theta)**2 | exact |
 | diffusion peak (step 3) | one Newton step on dD/di = 0 with central differences (h = 2e-5) of the continued-fraction D must move i_peak by less than 1e-6; D lower at i_peak +- 0.05 | truncation of the differences below 1e-8 |
-| noise temperature (step 4) | the voltage is generated at a known theta (including the endpoints 0.02 and 50) by the continued fraction (or the Bessel integral); the returned theta must recover it | relative 1e-7 |
+| noise temperature (step 4) | the voltage is generated at a known theta (including the endpoints 0.02 and 50) by the continued fraction (or the Bessel integral); the returned theta must recover it. The endpoint rule is defined with the voltages of mean_voltage (step 1) at theta = 0.02 and 50, so its probe voltages are built from mean_voltage, which the case first checks against the continued fraction to its stated 1e-9 | relative 1e-7; probes 0.9e-11 (accepted) and 1.1e-11 (rejected) beyond the endpoint voltage |
 | thermometric sensitivity kappa (step 4) | central difference of ln v in ln theta with step 1e-15 theta, the continued fraction evaluated at 60 + 1.8 / theta digits | about 1e-15 relative |
 | array criterion (step 5) | one Newton step on V(J) = v_crit with V and dV/dJ from the continued fractions must move j_star by less than 1e-9 relative; r_diff and s_v compared with the continued-fraction sums; for one junction or identical junctions j_star is known from the Bessel-integral voltage | relative 1e-9 / 1e-8 |
-| v and dv/di with capacitance (step 6, general) | Kramers equation in Hermite functions centred at the shifted velocity v0 = 0.6 i (N = 150, |p| <= 72), its own matrix continued fraction; dv/di by a central difference (h = 1e-4); beta_c = 0 against the overdamped continued fraction | unchanged to 5e-9 relative against N = 220, |p| <= 110 (version 7) |
+| v and dv/di with capacitance (step 6, general) | Kramers equation in Hermite functions centred at the shifted velocity v0 = 0.6 i (N = 120, |p| <= 60), its own matrix continued fraction; dv/di by the fourth-order five-point central difference (h = 1e-3); beta_c = 0 against the overdamped continued fraction; in the general test also rcsj_voltage(i, theta, 0) against mean_voltage | against N = 220, |p| <= 110 with the same stencil on the 13 tested points: v within 5e-5 of its tolerance, dv/di within 1.7e-7 relative at the smallest tested voltage (rounding in the shifted basis) and within 1e-12 elsewhere; against the analytic dv/di of the reference within about 3e-7 at that voltage (stencil truncation 2.6e-7 plus rounding) and 1e-9 elsewhere (version 12; before version 12: N = 150, |p| <= 72 and a central difference h = 1e-4, see the version 12 note) |
 
 ## Version 3 changes
 
@@ -124,12 +143,22 @@ locked branch, which a finite time integration started in one branch does not re
 time budget of 30 s per call (the reference needs about 0.25 s), asserted on every call
 in the step 6 and whole-task tests.
 
+## Version 10 changes
+
+Step 6: the 30 s per-call time budget stated in version 9 was enforced in the tests (every
+rcsj_voltage call in tests/step_6.py and tests/general.py was wrapped in a perf_counter timer
+with an assert), and the parenthetical "(the tests make about 15 calls)" was removed from the
+step 6 prompt as test-strategy wording. (Recorded here in version 12; before that this version
+was mentioned only in the version 11 introduction. Both the budget sentence and the timing
+assert were removed again in version 11.)
+
 ## Version 11 (grading_fix: authoring-guide conformance)
 
 Audit of every file against the current authoring guide. The science, the reference algorithms, the
 targets, the tolerances of the individual outputs and the domain are unchanged. (The version 10 upload
 asserted the step 6 time budget in the tests and removed the sentence about the number of test calls from
-the step 6 prompt; it is recorded in the version 9 note above.)
+the step 6 prompt; see the version 10 note above, added in version 12. The Cause and Regression test lines
+marked "added in version 12" below complete entries that originally gave only the change.)
 
 - Per-call time limit (step 6 prompt, tests/step_6.py, tests/general.py).
   - Finding: the step 6 prompt required "Each call must finish within 30 s on one CPU core", and the step 6
@@ -160,22 +189,35 @@ the step 6 prompt; it is recorded in the version 9 note above.)
     stated errors.
   - Change: relative 2e-9 for v and 2e-8 for r_d (twice the single-output tolerances).
   - Regression test: reference, second solution and shift pass case 3.
-- Tolerance stated in the prompt applied exactly (tests/step_6.py case 1): the beta_c = 0 check used a pure
-  relative 1e-7 on v; it now uses the stated 1e-7 |v| + 1e-12 (no practical change at v of order 0.5).
+- Tolerance stated in the prompt applied exactly (tests/step_6.py case 1).
+  - Finding: the beta_c = 0 check used a pure relative 1e-7 on v.
+  - Cause (added in version 12): the check predates the absolute part of the tolerance stated in version 9.
+  - Change: it now uses the stated 1e-7 |v| + 1e-12 (no practical change at v of order 0.5).
+  - Regression test (added in version 12): step 6 case 1 passed for the reference, the second solution and
+    the +-1e-12 shift in the version 11 crown_check run listed below.
 - Hidden test inputs in the step 6 prompt.
   - Finding: the prompt named the bistable example "beta_c = 2, theta = 0.1, i = 0.7" and the small-voltage
     example "i = 0.05, theta = 0.1, beta_c = 2", both of which are test inputs.
+  - Cause (added in version 12): the example coordinates had been taken from the test points when the
+    sentences were written in version 9.
   - Change: the statements are kept without the coordinates ("in the bistable range (strong inertia and
     weak noise) ... the stationary state can be dominated by the locked state"; "below the critical current
     at weak noise and strong inertia v can be very small (of order 1e-9 and below)"). The reference gives
     v = 4.55e-9 at (0.05, 0.1, 2) and 6.5e-10 at (0.01, 0.1, 2), so the second statement holds.
+  - Regression test (added in version 12): a search of every prompt, problem_io and function header for the
+    coordinates of the step 6 and general test points finds none (run in version 12); REF and SECOND passed
+    unchanged in the version 11 run.
 - Stated but untested error rules.
   - Finding: the prompts promise ValueError for a non-finite i (step 4), a non-finite theta0 (step 5) and a
     non-finite theta or beta_c (step 6); none of these inputs was tested. A NaN theta0 or theta passes a
     plain range comparison, so these are distinct behaviours.
+  - Cause (added in version 12): the error lists of the prompts had been written without a matching test
+    entry for every clause.
   - Change: one entry each added to the existing error cases: (nan, 0.1) in step 4 case 4, theta0 = nan in
     step 5 case 5, (0.5, nan, 1.0) and (0.5, 0.3, inf) in step 6 case 3. Reference and second solution raise
     ValueError for each.
+  - Regression test (added in version 12): those error cases passed for the reference and the second
+    solution and failed for the all-None and all-zero controls in the version 11 run.
 - Test-case format and self-contained cases (all test files).
   - Finding: the markers read "# --- test case N: description ---" instead of "# --- test case N ---", and
     the imports and target helpers (_t_cf, _t_v_bessel, _t_rel, _t_check_peak, _t_kappa, _t_check_temp,
@@ -187,14 +229,25 @@ the step 6 prompt; it is recorded in the version 9 note above.)
     or split: n_test_cases stays 5, 5, 4, 5, 6, 4 and general has 2 cases.
   - Regression test: before the change, crown_check (every case alone in a fresh process) passed only the
     error-input case of each step and 0/2 general cases (NameError on the shared helpers); after it, all.
-- Test header comment: the garbled recurrence "c_{n+1} + (2 theta n + 2 j i) c_{n-1}... in the form" now
-  reads c_{n+1} + a_n c_n - c_{n-1} = 0 with a_n = 2 theta n + 2 j i (the recurrence the helpers solve).
-- source.md target table: the step lists no longer claim that the overdamped targets are used in the
-  general tests (general.py tests only rcsj_voltage since version 5), and a row for the step 6 / general
-  RCSJ oracle was added.
-- Metadata added to problem.yaml: subfield, tags, expert_time_estimate_hours, relevant_experience (a
-  placeholder for the author), difficulty_explanation, solution_explanation, verification_explanation,
-  author, affiliation; edit_label is now grading_fix.
+- Test header comment.
+  - Finding: the garbled recurrence "c_{n+1} + (2 theta n + 2 j i) c_{n-1}... in the form".
+  - Cause (added in version 12): an editing error in an earlier version of the header comment.
+  - Change: it now reads c_{n+1} + a_n c_n - c_{n-1} = 0 with a_n = 2 theta n + 2 j i (the recurrence the
+    helpers solve).
+  - Regression test (added in version 12): comment only; no check changed (REF and SECOND unchanged).
+- source.md target table.
+  - Finding: the step lists claimed that the overdamped targets are used in the general tests, and the
+    step 6 / general RCSJ oracle had no row.
+  - Cause (added in version 12): the table was not updated when version 5 made rcsj_voltage the final step.
+  - Change: general.py is described as testing only rcsj_voltage, and a row for the RCSJ oracle was added.
+  - Regression test (added in version 12): documentation only; checked against tests/general.py by hand.
+- Metadata.
+  - Finding: the current template asks for subfield, tags, expert_time_estimate_hours, relevant_experience,
+    difficulty_explanation, solution_explanation, verification_explanation, author and affiliation.
+  - Cause (added in version 12): the task predates these template fields.
+  - Change: the fields were added to problem.yaml (relevant_experience as a placeholder for the author);
+    edit_label is now grading_fix.
+  - Regression test (added in version 12): crown_check format reported no missing metadata field.
 - Checked without change: every solution import (numpy, mpmath, scipy.optimize.brentq) is declared in
   required_dependencies; the per-step solutions do not redefine earlier step functions and do no top-level
   computation; every step has a complete contract and at least one named mutant, and there is a whole-task
@@ -216,3 +269,153 @@ Rerun: tools/crown_check.py, all modes, every case alone in a fresh process (OPE
   processes on twelve calls covering all six functions: identical outputs in each pair of runs, and
   solution.py and the per-step files agree bitwise. With multi-threaded BLAS the step 6 voltage at
   (0.05, 0.1, 2) changed in the ninth significant digit (absolute 2e-17), far inside the stated tolerance.
+
+## Version 12 (grading_fix: authoring-guide conformance, pass 2)
+
+Second conformance pass, driven by the findings of an independent verifier on version 11. The model, the
+reference algorithms (solution.py and solution/step_*.py, apart from the step 4 docstring and one comment),
+the domain and every stated tolerance are unchanged. edit_label stays grading_fix.
+
+- Second solution shared the test targets' method (second_solution.py; rule: a genuinely different method).
+  - Finding: for steps 1 to 5 the second solution solved, by Thomas elimination, the same truncated Fourier
+    tridiagonal system that the test helper _t_cf solves as a continued fraction, with the same working
+    digits and truncation formulas and the same corrector formula for D_eff; for step 6 its dv/di was the
+    same central difference (h = 1e-4) as the step 6 target. A pass of the second solution therefore added
+    little evidence beyond the reference-versus-target comparison.
+  - Cause: the second solution had been chosen to differ from the reference (quadrature) without checking
+    its independence from the targets (continued fractions).
+  - Change: new second solution. Steps 1 to 5: the Jacobi-Anger Bessel series of the Stratonovich and
+    Reimann integrals, described under "Consistency checks" above (v = a / Phi as a Bessel series, D_eff as
+    a mean of products of Bessel-Fourier series formed by exact integer convolutions, analytic derivatives,
+    mpmath at 30 + 1.8 / theta digits; the precision was set after finding that D_eff at theta = 0.02 is
+    wrong at 40 digits and correct to 2e-13 at 50). The root finders stay different from the reference
+    (grid scan plus Illinois regula falsi on d ln D / di, Illinois in 1 / theta, safeguarded Newton on
+    ln V). noise_temperature now applies the endpoint rule with its own mean_voltage, as the prompt now
+    states. Step 6: the Kramers hierarchy in a real (1, cos p x, sin p x) Fourier basis with Hermite
+    functions centred at the overdamped velocity (N = 130, |p| <= 64), evaluated at the complex bias
+    i + 1e-20 j, so that dv/di = Im / 1e-20 without difference error (complex-step differentiation).
+  - Limitation (for the project lead): for step 6 the reference, the target and the second solution are all
+    Hermite-Fourier matrix continued fractions (different basis centres, truncations, Fourier
+    representations and derivative methods). No method outside this family that reaches the stated
+    1e-7 |v| + 1e-12 at voltages of order 1e-9 was found (a sparse direct solve of the hierarchy and a
+    continued fraction over the Fourier index were tried in version 5 and rejected; no Langevin or
+    velocity-grid solver was run: a Langevin estimate cannot reach a relative 1e-7 in reasonable time,
+    and a double-precision grid solver gives v only with an absolute error, which would have to stay
+    below about 1e-12 at that voltage).
+    The checks of step 6 outside this family are the beta_c = 0 limit (overdamped continued fraction and,
+    in general case 1, mean_voltage), v = 0 at i = 0, and the noiseless and ohmic bounds at i = 2.5.
+  - Regression test: on the step 1 and step 2 test points the new second solution reproduces the
+    continued-fraction v, dv/di and D_eff to the last double-precision bit (closed forms at i = 0 to
+    2.3e-15); it agrees with the reference to 4e-15 in i_peak and about 1e-13 in every other step 3 to 5
+    output, and with the reference rcsj_voltage to 5.4e-9 relative in dv/di and 3.3e-5 of the v tolerance
+    on 13 RCSJ points. crown_check SECOND passes every case (results below).
+- Step 6 target dv/di at the smallest tested voltage (tests/step_6.py, tests/general.py, helper
+  _t_kramers).
+  - Finding: at (i, theta, beta_c) = (0.05, 0.1, 2) the target dv/di was accurate only to a few 1e-6
+    relative (the reference deviated from it by 0.27 of the 1e-5 tolerance), so a candidate inside the
+    specification but erring in the same direction as the target could fail.
+  - Cause: in the shifted basis (centre v0 = 0.6 i = 0.03) the voltage v = 4.6e-9 results from a
+    cancellation of about 7 digits, which leaves a rounding error of about 2.5e-17 in v; the central
+    difference with h = 1e-4 amplifies it to about 2e-6 relative, and its own truncation error there is
+    about 1.4e-6 (the voltage varies on the scale theta / pi).
+  - Change: dv/di of the target is now the fourth-order five-point central difference
+    [8 (f(i+h) - f(i-h)) - (f(i+2h) - f(i-2h))] / (12 h) with h = 1e-3 (at that point its truncation
+    error is 2.6e-7 relative, measured with the unshifted expansion of the reference, and the rounding of
+    the shifted basis is of the same order), and the truncation is N = 120, |p| <= 60 instead of N = 150,
+    |p| <= 72 (against N = 220, |p| <= 110 with the same stencil on all 13 tested points: dv/di within
+    1e-12 relative except 1.7e-7 at that point, v within 5e-5 of its tolerance; still larger than the
+    reference's N = 110, |p| <= 56). This also answers the verifier's runtime advisory: one check now costs
+    five solves of about 0.2 to 0.3 s instead of three of about 0.5 s with single-threaded BLAS (measured
+    here), i.e. somewhat less than before. Thread oversubscription of a multi-threaded BLAS on a loaded
+    machine can still make the step 6 and general cases slow; no timing code is used in the tests.
+    No tolerance was changed.
+  - Regression test: deviation of the reference (analytic dv/di) from the target, in units of the 1e-5
+    tolerance, at (0.05, 0.1, 2): 0.27 before, 0.025 now; at the other 12 RCSJ test points at most 9e-5 now
+    (at most 0.042 before). The new second solution (complex-step dv/di) deviates from the target by the
+    same amounts, and its v by at most 2.3e-5 of the v tolerance.
+- Untested promised ValueErrors (tests/step_1.py case 4, tests/step_5.py case 5, tests/step_6.py case 3).
+  - Finding: step 5 promised ValueError for v_crit not in (0, 0.5 sum(c_k r_k)], which includes NaN, and for
+    every non-finite entry, but only v_crit = 0 and 0.51, a NaN critical current and a zero resistance were
+    tested; step 6 promised ValueError for any beta_c that is neither 0 nor in [0.1, 2], but no negative
+    beta_c was tested. The same audit found theta = NaN untested in step 1, where a check written as
+    "theta < 0.02 or theta > 50" lets NaN through.
+  - Cause: the error lists of the prompts had more clauses than the error cases had entries.
+  - Change: entries added to the existing error cases (no new case, n_test_cases unchanged): step 1
+    (0.5, nan); step 5 rs = [1, inf], ics = [-1, 1] and v_crit = nan; step 6 beta_c = -1 and nan,
+    i = inf and theta = inf.
+  - Regression test: the reference and the second solution raise ValueError for every entry; the all-None
+    and all-zero controls fail these cases.
+- Step 2 dependency (problem.yaml step 2) and earlier functions named in the prompts.
+  - Finding: step 2 listed step_dependencies [1], although neither the reference nor the second solution
+    calls mean_voltage; the prompt named mean_voltage only to identify the model.
+  - Cause: the dependency recorded the shared model, not a function the step uses.
+  - Change: step_dependencies [] and the prompt says "the same overdamped junction as in step 1". The step 3
+    prompt now says to use effective_diffusion (step 2) for D_eff and the step 6 prompt says to use
+    mean_voltage (step 1) for beta_c = 0, matching their step_dependencies [2] and [1] and the reference.
+  - Regression test: crown_check REF (each step run with the earlier reference steps only) passes; the
+    prompts and contracts were compared by hand for every step.
+- Step 4 endpoint rule needed accuracy beyond the stated tolerances (problem.yaml step 4 prompt, contract
+  and function header; steps/step_4.py; solution/step_4.py and solution.py docstring and comment; the step 4
+  and whole-task mutants' identical docstring and comment; tests/step_4.py case 3).
+  - Finding: the rule was relative to the exact voltage at theta = 0.02 and 50, and the test separates
+    excesses of 0.9e-11 and 1.1e-11; a candidate computing the endpoint voltage itself within the 1e-9
+    stated for mean_voltage could misclassify both probes.
+  - Cause: the rule referred to a quantity (the exact endpoint voltage) that the specification only asks
+    to be computed to 1e-9.
+  - Change: the rule is now defined with the endpoint voltages of step 1, v_lo = mean_voltage(i, 0.02)[0]
+    and v_hi = mean_voltage(i, 50)[0]: a v in [v_lo (1 - 1e-11), v_lo] returns theta = 0.02, a v in
+    [v_hi, v_hi (1 + 1e-11)] returns theta = 50, and a v outside [v_lo (1 - 1e-11), v_hi (1 + 1e-11)]
+    raises ValueError. The test builds its probes (0.9e-11 and 1.1e-11, unchanged) from mean_voltage, after
+    checking it against the continued fraction to the stated 1e-9, and still checks theta and kappa against
+    the independent targets. The reference already used mean_voltage for the rule.
+  - Regression test: step 4 case 3 passes for the reference, the second solution and the +-1e-12 shift;
+    the step 4 mutants still fail their cases.
+- Test-namespace names (tests/step_1.py cases 0-3, tests/step_2.py cases 0-3).
+  - Finding: the unprefixed module-level names out and D could rebind a candidate's global of the same name.
+  - Cause: these two names were not given the _t_ prefix used by every other test name.
+  - Change: renamed to _t_out and _t_res (a pure rename, no check changed).
+  - Regression test: REF, SECOND and SHIFT pass steps 1 and 2.
+- Whole-task test linked with step 1 (tests/general.py case 1).
+  - Finding: the general cases checked rcsj_voltage only against the RCSJ target, never against an earlier
+    step of the same candidate.
+  - Change: general case 1 also requires rcsj_voltage(-0.6, 0.4, 0) to reproduce mean_voltage(-0.6, 0.4)
+    within twice the step 6 tolerances (2e-7 |v| + 2e-12 for v, 2e-5 relative for r_d), as the step 6
+    prompt says for beta_c = 0.
+  - Regression test: REF, SECOND and the shift of every evaluated function pass general case 1; the
+    whole-task mutant still fails both general cases.
+- Wording and records (problem.yaml, source.md).
+  - Finding: difficulty_explanation said the solver "has to use" the integral representations or continued
+    fractions; verification_explanation said "a 60-digit central difference" (the code uses
+    60 + 1.8 / theta digits) and did not say that the old second solution shared the targets' recurrence;
+    source.md had no version 10 note and several version 11 entries gave only the change.
+  - Change: difficulty_explanation says "for example"; verification_explanation describes the current
+    targets, their error budget, the new second solution, the step 6 limitation and this pass's crown_check
+    results; the source.md target table and second-solution description are updated, a version 10 note is
+    added and the version 11 entries are completed (marked "added in version 12").
+  - Regression test: documentation only; every number quoted was rechecked against a run in this pass.
+
+- Checked without change: no prompt, problem_io or function header contains the coordinates of a test
+  point (searched for every step 6 and general test point; the only hits were the definition
+  "beta_c = 2 e I_c R**2 C / hbar" and domain bounds), and the magnitude statements ("about 1e-17",
+  "of order 1e-9 and below") hold over the stated domain; every mutant differs from the current reference
+  by its one marked change only (the step 4 and whole-task mutants received the same docstring and comment
+  edits as the reference); both general cases call rcsj_voltage; relevant_experience is still the author
+  placeholder; solution.py and second_solution.py were each run twice in clean processes on 13 calls
+  covering all six functions with identical outputs, and solution.py agrees bitwise with the concatenated
+  solution/step_*.py.
+
+Rerun (version 12): tools/crown_check.py, all modes, every case alone in a fresh process, single-threaded
+BLAS (OMP_NUM_THREADS = OPENBLAS_NUM_THREADS = MKL_NUM_THREADS = 1), -j 2:
+- FORMAT OK (no problem reported; repeated after the last documentation edits, which changed no test or
+  solution file, again OK).
+- REF: step 1 5/5, step 2 5/5, step 3 4/4, step 4 5/5, step 5 6/6, step 6 4/4, general 2/2 (solution.py
+  also passes every step file).
+- SECOND: 5/5, 5/5, 4/4, 5/5, 6/6, 4/4, general 2/2.
+- Mutants: forward_slips_only fails 4/5 (cases 0-3), kramers_rate 4/5 (0-3), einstein_relation 3/5 (1-3),
+  einstein_peak 3/4 (0-2), kramers_inversion 3/5 (0-2), inverted_sensitivity 4/5 (0-3),
+  arrhenius_sensitivity 4/5 (0-3), squared_voltage_scale 4/6 (1-4), no_inertia 3/4 (0-2),
+  velocity_noise_not_scaled 3/4 (0-2), missing_thermal_velocity 3/4 (0-2), whole-task
+  velocity_noise_not_scaled 2/2 general cases.
+- SHIFT +-1e-12: every step case passes, and both general cases pass with every evaluated function shifted.
+- Controls: all-None and all-zero stubs pass 0 cases in every step and in general.
+- SUMMARY ALL OK.

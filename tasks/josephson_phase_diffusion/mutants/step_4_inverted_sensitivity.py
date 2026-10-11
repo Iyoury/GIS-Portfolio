@@ -57,9 +57,10 @@ def noise_temperature(i, v):
 
     Raises:
       ValueError if i or v is not finite, if i is not in (0, 10], if v is not strictly
-      between sqrt(max(i**2 - 1, 0)) and i, or if v lies outside the voltages reached for
-      theta in [0.02, 50] by more than a relative 1e-11. A v within a relative 1e-11 beyond
-      the voltage at theta = 0.02 or theta = 50 returns that endpoint.
+      between sqrt(max(i**2 - 1, 0)) and i, or if v < v_lo * (1 - 1e-11) or
+      v > v_hi * (1 + 1e-11), with the endpoint voltages v_lo = mean_voltage(i, 0.02)[0] and
+      v_hi = mean_voltage(i, 50)[0] of step 1. A v in [v_lo * (1 - 1e-11), v_lo] returns
+      theta = 0.02 and a v in [v_hi, v_hi * (1 + 1e-11)] returns theta = 50.
     '''
     i = float(i)
     v = float(v)
@@ -77,8 +78,8 @@ def noise_temperature(i, v):
         return np.log(mean_voltage(i, np.exp(s))[0]) - lv
 
     lo, hi = np.log(0.02), np.log(50.0)
-    # stated endpoint tolerance: a v beyond the voltage at an endpoint by at most a relative
-    # 1e-11 of that voltage returns the endpoint; farther out there is no solution
+    # stated endpoint rule, relative to the endpoint voltages of mean_voltage (step 1): a v
+    # beyond v_lo or v_hi by at most a relative 1e-11 returns the endpoint; farther out, ValueError
     v_lo, v_hi = mean_voltage(i, 0.02)[0], mean_voltage(i, 50.0)[0]
     if v <= v_lo:
         if (v_lo - v) / v_lo > 1e-11:

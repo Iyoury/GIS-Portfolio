@@ -122,9 +122,9 @@ volumetric heat capacity rho_c, layer i has the diffusivity k_i / rho_c, and the
 departure theta obeys rho_c dtheta/dt = d/dz (k dtheta/dz) in every layer.
 Carslaw and Jaeger (1959, ch. 12) give the image series for a layer over a
 half-space; for more layers the problem is solved most directly in the Laplace
-domain, where each layer contributes exponentials in z. Paleoclimate corrections
-in layered ground differ from the half-space formula by up to tens of percent
-near strong contrasts (Beck 1977).
+domain, where each layer contributes exponentials in z. Near strong contrasts
+the paleoclimate perturbation of layered ground differs from the half-space
+formula by up to tens of percent of the surface departure.
 
 ## 6. The complete workflow
 

@@ -1,10 +1,11 @@
-# Independent targets: closed forms, the Bateman sum evaluated in 600-digit arithmetic (it only
-# cancels in floating point), and matrix exponentials by mpmath at 300 digits.
+# Independent targets: closed forms and the Bateman sum evaluated in 600-digit arithmetic (it only
+# cancels in floating point).
 
 # --- test case 0 ---
 # one nuclide: n0 exp(-lam t), down to about 1e-239, exp(-575) (about 8e-250), exp(-575.64) (1.01e-250,
 # just above 1e-250 S: relative rule) and exp(-600) (about 3e-261, below
-# 1e-250 S, so within 1e-250 S of the exact value); a stable nuclide stays
+# 1e-250 S, so within 1e-250 S of the exact value); a stable nuclide stays; and a tiny inventory, where the
+# threshold F = max(1e-250 S, 1e-300) is set by 1e-300
 import numpy as np
 
 def _t_rel(a, b):
@@ -14,7 +15,7 @@ def _t_check(x, target, scale):
     x = np.asarray(x)
     assert x.shape == (len(target),), x.shape
     for a, b in zip(x, target):
-        if b > 0.0 and b >= 1e-250 * scale:
+        if b >= max(1e-250 * scale, 1e-300):
             assert _t_rel(a, b) < 1e-10, (a, b)
         else:
             assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)
@@ -22,6 +23,11 @@ def _t_check(x, target, scale):
 for _t_lam, _t_t in ((0.3, 2.0), (1e-9, 1e3), (5.0, 100.0), (1.0, 550.0), (1.0, 575.0), (1.0, 575.6363229176583), (1.0, 600.0), (0.0, 1e20)):
     x = chain_inventory(np.array([_t_lam]), np.array([2.5]), _t_t)
     _t_check(x, [2.5 * np.exp(-_t_lam * _t_t)], 2.5)
+# S = 1e-70, F = 1e-300: exp(-500) S, about 7e-288, is under the relative rule; exp(-570) S, about 3e-318
+# (a subnormal double, above 1e-250 S but below F), is under the absolute rule
+for _t_t in (500.0, 570.0):
+    x = chain_inventory(np.array([1.0]), np.array([1e-70]), _t_t)
+    _t_check(x, [1e-70 * np.exp(-_t_t)], 1e-70)
 
 # --- test case 1 ---
 # equal decay constants (the Bateman formula is undefined): from member 0 alone,
@@ -35,7 +41,7 @@ def _t_check(x, target, scale):
     x = np.asarray(x)
     assert x.shape == (len(target),), x.shape
     for a, b in zip(x, target):
-        if b > 0.0 and b >= 1e-250 * scale:
+        if b >= max(1e-250 * scale, 1e-300):
             assert _t_rel(a, b) < 1e-10, (a, b)
         else:
             assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)
@@ -77,7 +83,7 @@ def _t_check(x, target, scale):
     x = np.asarray(x)
     assert x.shape == (len(target),), x.shape
     for a, b in zip(x, target):
-        if b > 0.0 and b >= 1e-250 * scale:
+        if b >= max(1e-250 * scale, 1e-300):
             assert _t_rel(a, b) < 1e-10, (a, b)
         else:
             assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)
@@ -118,7 +124,7 @@ def _t_check(x, target, scale):
     x = np.asarray(x)
     assert x.shape == (len(target),), x.shape
     for a, b in zip(x, target):
-        if b > 0.0 and b >= 1e-250 * scale:
+        if b >= max(1e-250 * scale, 1e-300):
             assert _t_rel(a, b) < 1e-10, (a, b)
         else:
             assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)
@@ -169,7 +175,7 @@ def _t_check(x, target, scale):
     x = np.asarray(x)
     assert x.shape == (len(target),), x.shape
     for a, b in zip(x, target):
-        if b > 0.0 and b >= 1e-250 * scale:
+        if b >= max(1e-250 * scale, 1e-300):
             assert _t_rel(a, b) < 1e-10, (a, b)
         else:
             assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)
@@ -210,7 +216,7 @@ def _t_check(x, target, scale):
     x = np.asarray(x)
     assert x.shape == (len(target),), x.shape
     for a, b in zip(x, target):
-        if b > 0.0 and b >= 1e-250 * scale:
+        if b >= max(1e-250 * scale, 1e-300):
             assert _t_rel(a, b) < 1e-10, (a, b)
         else:
             assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)

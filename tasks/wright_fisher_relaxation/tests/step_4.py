@@ -86,7 +86,8 @@ for N, s, u, v in ((20, 0.3, 1e-9, 1e-6), (20, -0.5, 1e-12, 1e-12), (16, 0.5, 1e
 
 # --- test case 3 ---
 # relabeling the alleles (s' = -s / (1 + s), u and v exchanged) leaves the spectrum
-# unchanged; at N = 400 the gap is set by mutation rates of 1e-12
+# unchanged; at N = 400 the gap is set by mutation rates of 1e-12 and by selection (about 7e-10 here, against
+# u + v = 4e-12 without selection), also checked against an independent target
 import numpy as np
 
 def _t_rel(a, b):
@@ -100,6 +101,10 @@ for N, s, s2, u, v, top in ((400, 0.5, -1.0 / 3.0, 1e-12, 3e-12, 1e-8), (300, 0.
     a, b = relaxation_rate(N, s, u, v), relaxation_rate(N, s2, v, u)
     assert a < top, a
     _t_check(a, b, tol=2.1e-8)            # two computed outputs, each within 1e-8: 2.1e-8
+# N = 400, s = 0.5, u = 1e-12, v = 3e-12: independent target from inverse iteration on I - P + 1 pi^T (pi from a
+# plain LU solve of the normalized system pi (I - P) = 0) with one plain LU factorization (scaled partial
+# pivoting) in mpmath at 400 digits, the matrix built from mpmath binomials; run once (converged to 60 digits)
+_t_check(relaxation_rate(400, 0.5, 1e-12, 3e-12), float("6.99071848429455715699225366235e-10"))
 
 # --- test case 4 ---
 # N not an integer in [1, 400], or s, u, v not finite or out of range (u, v >= 1e-12)

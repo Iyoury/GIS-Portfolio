@@ -240,3 +240,18 @@ for case in ["k0", "knan", "tops", "tops_nan", "first", "neg", "znan", "len", "t
         pass
     else:
         raise AssertionError("layer_integrals must raise ValueError" + _t_msg)
+
+# --- test case 11 ---
+# shallow depths under a deep layer stack
+import numpy as np
+# in the first layer R = z / k1 and S = z^2 / (2 k1) exactly, whatever the layers below: the layers that
+# z does not reach contribute nothing (no rounding residue of the squares of their tops), and
+# R = S = 0 at the surface
+tops, k = [0.0, 120.0, 995.3, 1358.1, 1946.2], [2.0, 3.0, 2.5, 3.1, 2.7]
+z = np.array([0.0, 0.01, 0.5, 2.0, 37.0])
+R, S = (np.asarray(v, float) for v in layer_integrals(tops, k, z))
+assert abs(R[0]) <= 1e-12 and abs(S[0]) <= 1e-12
+assert np.all(np.abs(R[1:] - z[1:] / 2.0) <= 1e-9 * z[1:] / 2.0)
+assert np.all(np.abs(S[1:] - z[1:] ** 2 / 4.0) <= 1e-9 * z[1:] ** 2 / 4.0)
+R0, S0 = layer_integrals(tops, k, 0.0)
+assert abs(R0) <= 1e-12 and abs(S0) <= 1e-12

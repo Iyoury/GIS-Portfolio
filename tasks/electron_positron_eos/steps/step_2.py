@@ -1,7 +1,6 @@
 import numpy as np
 import math
-import warnings
-from scipy.integrate import quad, IntegrationWarning
+from scipy.integrate import quad
 from scipy.optimize import brentq
 
 
@@ -10,7 +9,7 @@ def pair_thermodynamics(T, psi):
 
     Inputs:
       T: float, temperature in K, 1e7 <= T <= 1e11.
-      psi: float, (mu + m_e c^2) / (k T), 0 < psi <= 1e6 (as in pair_densities).
+      psi: float, (mu + m_e c^2) / (k T) as in the conventions, 0 < psi <= 1e6.
 
     Output:
       (P, u, s): Python floats. P the pressure (erg cm^-3); u the energy density (erg cm^-3): kinetic

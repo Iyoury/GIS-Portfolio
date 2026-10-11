@@ -19,67 +19,80 @@ author: "Ayoub Bousfiha"
 affiliation: "Independent Researcher"
 
 difficulty_explanation: >-
-  The closed forms of the prism potential, attraction and gradient tensor (Nagy, Papp and Benedek 2000)
-  are exact, but their corner terms grow like the square of the distance while the field decays, so
-  evaluated as written they lose about (distance / size)^2 of their digits far away (5e-9 relative at 100
-  diagonals of the test prism, a wrong sign at a million) and, for a rod or a plate, already within two
-  diagonals (1e-8 for a 2 m x 2 m x 2 km rod), while the stated accuracy must hold up to a million
-  diagonals and for aspect ratios up to 1000; the solver has to switch to quadrature far away and cut
-  elongated prisms into compact pieces near them. Near and on the prism it must take the right limits of
-  0 ln 0 and atan(0/0) on faces, edges and corners, rewrite ln(a + r) for a < 0 to avoid cancellation, and
-  refuse the gradient tensor on the surface where it jumps or diverges. A column whose density contrast
-  decays as drho0 exp(-lam z) has no closed-form attraction; its lamina term varies on the scale of the
-  station's distance to the column edges (one 64-point Gauss-Legendre rule over depth is off by 4e-5
-  relative 1 mm from an edge) and its four arctangents cancel far from the column (1e-7 relative lost 1e4
-  widths away, every digit 1e7 widths away), while 1e-10 is required from 1e-6 m to 1e7 m. The last
-  step inverts the anomaly of up to 100 such columns, up to three cell widths deep, for their depths to
-  1e-8 relative: the depths amplify relative data errors by up to about 1e6, so the forward model must be
-  accurate to about 1e-14, and Newton's method with step halving stalls on rough basins (shallow columns
-  beside deep ones), so the iteration needs a trust region or another globalization.
+  The closed forms of the prism potential, attraction and gradient tensor (Nagy, Papp and Benedek 2000) are
+  exact, but their corner terms grow like the square of the distance while the field decays, so evaluated as
+  written they lose about (distance / size)^2 of their digits far away (for a 100 m x 200 m x 250 m prism, U
+  is off by a median 6.5e-9 relative at 100 diagonals, 9e-6 at 1000 and 1e-2 at 1e4, and has the wrong sign
+  in most directions at a million; a thin plate is a hundred to a thousand times worse) and, for a rod or a
+  plate, already within two diagonals (about 1e-8 for aspect ratio 1000), while the stated accuracy must
+  hold up to a million diagonals and for aspect ratios up to 1000; the solver has to change method far away
+  and handle elongated prisms near them. Near and on the prism it must take the right limits of 0 ln 0 and
+  atan(0/0) on faces, edges and corners, rewrite ln(a + r) for a < 0 to avoid cancellation, and refuse the
+  gradient tensor on the surface where it jumps or diverges. A column whose density contrast decays as drho0
+  exp(-lam z) has no closed-form attraction; its lamina term varies on the scale of the station's distance
+  to the column edges (one 64-point Gauss-Legendre rule over the depth of a 3 km column is off by up to 1e-3
+  relative for a station a metre from an edge, and 1024 points still by 6e-6 a millimetre from one) and its
+  four arctangents cancel far from the column (about 1e-7 relative lost 5000 widths away, every digit 2e5
+  widths away), while 1e-10 is required at every distance up to 1e7 m. The last step inverts the anomaly of
+  up to 100 such columns, up to three cell widths deep, for their depths to 1e-8 relative: the depths
+  amplify relative data errors by up to about 1e6, so the forward model must be accurate to about 1e-14, and
+  Newton's method with step halving stalls on rough basins (shallow columns beside deep ones), so the
+  iteration needs a trust region, a damping strategy or another globalization.
 
 solution_explanation: >-
-  prism_gravity and prism_gradients evaluate the corner sums of Nagy et al. (terms such as x y ln(z + r)
-  and z^2 atan(x y / (z r)) and their derivatives), vectorised over the points, within two diagonals of
-  the prism centre, with ln(a + r) computed as ln((b^2 + c^2) / (r - a)) for a < 0, the ln(b^2 + c^2)
-  part dropped on the line of an edge where it cancels between the two corners, 0 ln 0 = 0 and
-  atan(n / 0) = sign(n) pi / 2; beyond two diagonals both use a 16^3-point Gauss-Legendre volume rule of
-  1/r and its derivatives, and prism_gradients rejects points on the closed surface. A prism whose
-  diag^3 / volume exceeds 200 (a rod or a plate) is cut into equal pieces below that ratio, each taken by
-  its corner sums within two of its own diagonals and by a Gauss-Legendre rule of distance-dependent order
-  beyond, the cuts being shifted by half a piece for points close to one. column_gz integrates
-  G drho0 exp(-lam z) Omega(z) over depth, Omega the solid angle of a horizontal lamina, with 20-point
-  Gauss-Legendre panels on a geometric grid from the top (ratio 2, down to 2^-60 of the depth); Omega is
-  the corner sum of atan2(x y, Z r) near the column and, beyond a horizontal distance of the larger
-  width, the Van Oosterom-Strackee formula for the two triangles of the lamina, which does not cancel.
-  invert_basin_depths validates the data, starts from the infinite-slab thickness under each station
-  (-ln(1 - lam d) / lam with d = gz / (2 pi G drho0), or d for lam = 0), runs scipy's trust-region
-  reflective least squares on the depths (bounded by 1.5 times the largest depth of the stated domain)
-  with the analytic Jacobian dg_i / dh_j = G drho0 exp(-lam h_j) Omega_ij(h_j), and finishes with
-  Newton's method until the relative depth update is below 1e-13; its depth panels grow geometrically from
-  a sixty-fourth of the smallest cell width.
+  prism_gravity and prism_gradients evaluate the corner sums of Nagy et al. (terms such as x y ln(z + r) and
+  z^2 atan(x y / (z r)) and their derivatives), vectorised over the points, within two diagonals of the
+  prism centre, with ln(a + r) computed as ln((b^2 + c^2) / (r - a)) for a < 0, the ln(b^2 + c^2) part
+  dropped on the line of an edge where it cancels between the two corners, 0 ln 0 = 0 and atan(n / 0) =
+  sign(n) pi / 2; beyond two diagonals both use a 16^3-point Gauss-Legendre volume rule of 1/r and its
+  derivatives, and prism_gradients rejects points on the closed surface. A prism whose diag^3 / volume
+  exceeds 200 (a rod or a plate) is cut into equal pieces below that ratio, each taken by its corner sums
+  within two of its own diagonals and by a Gauss-Legendre rule of distance-dependent order beyond, the cuts
+  being shifted by half a piece for points close to one. column_gz integrates G drho0 exp(-lam z) Omega(z)
+  over depth, Omega the solid angle of a horizontal lamina, with 20-point Gauss-Legendre panels on a
+  geometric grid from the top (ratio 2, down to 2^-60 of the depth); Omega is the corner sum of atan2(x y, Z
+  r) near the column and, beyond a horizontal distance of the larger width, the Van Oosterom-Strackee
+  formula for the two triangles of the lamina, which does not cancel. invert_basin_depths validates the
+  data, starts from the infinite-slab thickness under each station (-ln(1 - lam d) / lam with d = gz / (2 pi
+  G drho0), or d for lam = 0), runs scipy's trust-region reflective least squares on the depths (bounded by
+  1.5 times the largest depth of the stated domain) with the analytic Jacobian dg_i / dh_j = G drho0
+  exp(-lam h_j) Omega_ij(h_j), and finishes with Newton's method until the relative depth update is below
+  1e-13; its forward model sums, for every column, 20-point Gauss-Legendre panels over depth that start at a
+  sixty-fourth of the smallest cell width and double.
 
 verification_explanation: >-
-  The prism targets of steps 1 and 2 are the closed forms evaluated with mpmath at 60 digits (90 digits
-  for the rod and the plate of aspect ratio 1000), with the same limit conventions; the column targets of
-  step 3 are 30- to 70-digit mpmath tanh-sinh quadratures of the lamina term over depth, or the 60- and
-  90-digit prism closed forms for lam = 0, from 1e-6 m to 1e7 m from the column; the basin anomalies of
-  step 4 and tests/general.py are 25- and 30-digit quadratures of every station-column pair or, for the
-  100-cell basin with lam = 0, sums of 60-digit prism closed forms. Analytic checks (trace -4 pi G rho
-  inside and zero outside) complement them. second_solution.py uses different numerics (pointwise corner
-  sums with math.fsum, recursive bisection of elongated prisms and a 24^3-point rule beyond three
-  diagonals; adaptive QUADPACK over depth with a 24 x 24 Gauss-Legendre rule over the lamina far from the
-  column; trust-region least squares in the slab-equivalent thicknesses and least-squares Newton steps on
-  a forward model with other depth panels) and passes every case. Each step has named scientific mutants
-  (corner sums at every distance or for elongated prisms, ln(x + r) evaluated directly, one 64-point depth
-  rule, the density decay ignored, the lamina corner sum far away, infinite-slab thicknesses returned as
-  depths, Newton with step halving only) and a whole-task mutant with the z axis taken upward; each fails
-  at least one case of its target tests. tools/crown_check.py ran every test case alone in a fresh
+  The prism targets of steps 1 and 2 are the closed forms evaluated with mpmath at 60 digits (90 digits for
+  the rod and the plate of aspect ratio 1000), with the same limit conventions; the column targets of step 3
+  are 30- to 70-digit mpmath tanh-sinh quadratures of the lamina term over depth, or the 60- and 90-digit
+  prism closed forms for lam = 0, from 1e-6 m to 1e7 m from the column; the basin anomalies of step 4 and
+  tests/general.py are 25- and 30-digit quadratures of every station-column pair or, for the 100-cell basin
+  with lam = 0, sums of 60-digit prism closed forms, and the one-cell basin of general case 1 uses the
+  60-digit closed form of its prism, confirmed to 30 digits by a 50-digit quadrature over depth; the depths
+  are the known inputs. Analytic checks (trace -4 pi G rho inside and zero outside, a column with lam = 0
+  equal to the prism) complement them. second_solution.py uses different methods in every step: for the
+  prism, beyond three diagonals, the multipole (Cartesian Taylor) expansion of 1/r with the exact moments of
+  the box and, closer, a reduction to one dimension (the two-dimensional closed forms of the laminae along
+  one axis, or a Gauss-Legendre rule for laminae far from the point, integrated along the axis on
+  Gauss-Legendre panels that shrink geometrically toward the plane of the point, T_ww from Poisson's
+  equation); adaptive QUADPACK over depth for the column; for the basin, a tanh-sinh rule over depth in the
+  forward model and Levenberg-Marquardt iterations on the depths, projected on the admissible box (or
+  reflected at its bounds if that stalls), run to convergence. It passes every case. Each step has named
+  scientific mutants (corner sums as written at every point, ln(x + r) evaluated directly, no cutting of
+  elongated prisms, one 64-point depth rule, the density decay ignored, the lamina corner sum far away,
+  infinite-slab thicknesses returned as depths, Newton with step halving only) and a whole-task mutant that
+  handles the attraction in mGal throughout (its inverted depths are at least 1e5 times too small); each
+  fails at least one case of its target tests. tools/crown_check.py ran every test case alone in a fresh
   process (step k with the reference steps 1..k-1 as context, general cases with solution.py) for the
-  reference, the second solution and the mutants, checked that perturbing every reference output by a
-  relative +-1e-12 still passes every case and that all-None and all-zero controls pass no case; the
-  reference was also run against 90-digit closed forms for random prisms of aspect ratio up to 1000 and
-  on 200 random basins of the stated domain (smooth, random and rough depths; the second solution on 100
-  of them), and both solutions were run twice in clean processes with identical outputs.
+  reference, the second solution and the mutants, checked that every general case calls invert_basin_depths,
+  that perturbing every reference output by a relative +-1e-12 (in the general cases, every evaluated
+  function shifted) still passes every case, and that all-None and all-zero controls pass no case. Outside
+  the tests: both solutions against 90-digit closed forms (g and T by mpmath differentiation) on 28 random
+  prisms of aspect ratio up to 1000 at points inside, on the surface, near and up to a million diagonals
+  away (worst error 4.3e-3 of a tolerance for the reference, 9.2e-4 for the second solution); 240 random
+  basins of the stated domain (smooth, random, bimodal and rough depths, up to 100 cells), each inverted by
+  the reference from data of the second solution's forward model and by the second solution from data of the
+  reference's (no failure, worst depth error 1.5e-11); both solutions were run twice in clean processes and
+  with one and two BLAS threads, with identical outputs.
 
 # On a new version of an uploaded task only, what kind of edit it is.
 edit_label: grading_fix
@@ -131,9 +144,9 @@ general_tests: tests/general.py
 second_solution: second_solution.py
 
 mutants:
-  - name: whole_task_upward_z
-    description: "Takes the z axis upward for the attraction, so every vertical component has the wrong sign."
-    file: mutants/whole_task_upward_z.py
+  - name: whole_task_mgal
+    description: "Handles the attraction in mGal (1e-5 m s^-2, the unit in which gravity anomalies are reported) instead of m s^-2: prism_gravity and column_gz return it in mGal and invert_basin_depths reads gz_obs as mGal, so the inverted basin is at least 1e5 times too shallow."
+    file: mutants/whole_task_mgal.py
 
 sub_steps:
 
@@ -198,7 +211,7 @@ sub_steps:
       step_dependencies: []
     mutants:
       - name: closed_form_everywhere
-        description: "Uses the corner sums at every distance; far from the prism they cancel and lose all accuracy."
+        description: "Evaluates the corner sums of the whole prism as written at every point (no far-field quadrature, no cutting of elongated prisms); far from the prism they cancel (relative error of U about 1e-8 at 100 diagonals, 1e-5 at 1000, wrong sign at a million) and near a rod they lose about 1e-8."
         file: mutants/step_1_closed_form_everywhere.py
       - name: direct_log
         description: "Evaluates ln(x + r) directly also for x < 0, where it cancels."
@@ -261,7 +274,7 @@ sub_steps:
       step_dependencies: [1]
     mutants:
       - name: closed_form_everywhere
-        description: "Uses the corner sums of the gradients at every distance."
+        description: "Evaluates the corner sums of the gradients of the whole prism as written at every point (no far-field quadrature, no cutting of elongated prisms)."
         file: mutants/step_2_closed_form_everywhere.py
       - name: no_subdivision
         description: "Uses the corner sums of the whole prism within two diagonals whatever its shape; near a rod of aspect ratio 1000 the gradients are off by several times the tolerance."
@@ -278,10 +291,9 @@ sub_steps:
       component of its attraction (m s^-2, positive downward for drho0 > 0; see the conventions) at stations
       at or above the surface (z <= 0).
 
-      Accuracy: a relative error below 1e-10 at every station with z <= 0 up to 1e7 m from the column: above
-      the column or beside it, near or far (a station a million column widths away included), on the surface
-      directly above an edge or a corner of the column, and at any horizontal distance from its edges,
-      however small (a station on the surface 1e-6 m from an edge included).
+      Accuracy: a relative error below 1e-10 at every station with z <= 0 up to 1e7 m from the column,
+      whatever the column's width: above the column or beside it, on the surface directly above an edge or
+      a corner of the column, and at any horizontal distance from its edges, however small.
       Inputs: stations, a float array of shape (3,) or (n, 3) with z <= 0, up to 1000 stations per call;
       x1 < x2, y1 < y2 (floats); depth (float, 0 < depth <= 5e4); drho0 (float); lam (float,
       0 <= lam <= 1e-2 per m).
@@ -343,8 +355,9 @@ sub_steps:
       Depths of a sedimentary basin from its gravity anomaly. The basin is a grid of nx x ny columns: column
       (i, j) occupies x_edges[i] <= x <= x_edges[i + 1], y_edges[j] <= y <= y_edges[j + 1] and
       0 <= z <= depth[i, j], all with the density contrast drho0 exp(-lam z) of column_gz (step 3). The
-      anomaly gz_obs[i, j] is the total vertical attraction of all columns at the station at the centre of
-      cell (i, j) on the surface, ((x_edges[i] + x_edges[i + 1]) / 2, (y_edges[j] + y_edges[j + 1]) / 2, 0).
+      anomaly gz_obs[i, j] is the total vertical attraction of all columns (the sum of their column_gz values)
+      at the station at the centre of cell (i, j) on the surface,
+      ((x_edges[i] + x_edges[i + 1]) / 2, (y_edges[j] + y_edges[j + 1]) / 2, 0).
       The anomaly is that of such a basin whose every depth satisfies 0 < depth <= 3 w_min, depth <= 5e4
       and lam depth <= 2 (all inclusive), where w_min is the smallest cell width in x or in y; the depths are
       then determined by the anomaly to well within the required accuracy. No smoothness of the basin is

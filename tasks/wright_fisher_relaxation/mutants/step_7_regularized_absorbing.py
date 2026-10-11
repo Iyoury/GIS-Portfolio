@@ -10,7 +10,7 @@ def fastest_mode(N, s, u, v):
     Inputs:
       N: int, population size, 1 <= N <= 400.
       s: float, selection coefficient of A, -0.5 <= s <= 0.5.
-      u, v: float, mutation probabilities A -> a and a -> A per generation, 0 <= u, v <= 0.1
+      u, v: float, mutation probabilities A -> a and a -> A per generation, each either 0 or in [1e-12, 0.1]
             (v = 0 makes i = 0 absorbing, u = 0 makes i = N absorbing).
 
     Output:
@@ -23,7 +23,8 @@ def fastest_mode(N, s, u, v):
 
     Raises:
       ValueError if N is not an integer in [1, 400] (bool and float are not accepted), if s, u or v
-      is not finite or is outside its range, or if N = 1 and u = v = 0.
+      is not finite or is outside its range (0 < u < 1e-12 and 0 < v < 1e-12 included), or if N = 1
+      and u = v = 0.
     '''
     if isinstance(N, (bool, np.bool_)) or not isinstance(N, (int, np.integer)):
         raise ValueError("N must be an integer")
@@ -35,6 +36,8 @@ def fastest_mode(N, s, u, v):
         raise ValueError("s, u and v must be finite")
     if not (-0.5 <= s <= 0.5 and 0.0 <= u <= 0.1 and 0.0 <= v <= 0.1):
         raise ValueError("need -0.5 <= s <= 0.5 and 0 <= u, v <= 0.1")
+    if 0.0 < u < 1e-12 or 0.0 < v < 1e-12:
+        raise ValueError("a positive mutation rate must be at least 1e-12")
     if N == 1 and u == 0.0 and v == 0.0:
         raise ValueError("with N = 1 and u = v = 0 both states are absorbing")
     # absorbing states avoided by replacing a zero mutation rate with a tiny one (1e-15), as if a
@@ -47,6 +50,13 @@ def fastest_mode(N, s, u, v):
     qsel = (1.0 - p) / den
     pm = (1.0 - u) * psel + v * qsel
     qm = u * psel + (1.0 - v) * qsel
+    if N == 1 and u > 0.0 and v > 0.0:
+        # one individual with mutation both ways: P = [[q_0, p_0], [q_1, p_1]] (p_0 = v, q_1 = u) has the
+        # eigenvalues 1 and p_1 - p_0 = 1 - u - v, with the right eigenvector (p_0, -q_1) for the latter. The
+        # power method below would contract only like the ratio 1 - u - v of these two eigenvalues.
+        mode = np.array([pm[0], -qm[1]]) / max(pm[0], qm[1])
+        lam_min = float(pm[1] - pm[0])
+        return lam_min, mode
     # P[i, j] = C(N, j) p_i**j q_i**(N - j) = q_i**N x_i**j C(N, j) with x_i = p_i / q_i increasing in i, so
     # P = diag(q**N) V diag(C) with V the Vandermonde matrix of the nodes x_i. An absorbing state (i = 0 when
     # v = 0, i = N when u = 0) has the row e_i: it contributes the eigenvalue 1, and every right eigenvector
@@ -102,8 +112,8 @@ def fastest_mode(N, s, u, v):
             break
     lam_min = float(np.exp(-r))
     mode = np.zeros(N + 1)
+    # checkerboard signs with + on the first transient state I[0]: this is the stated normalisation (the first
+    # entry not on an absorbing state is positive), set by position and not read from the computed entries
     sign = np.where(np.arange(m) % 2 == 0, 1.0, -1.0)
     mode[I] = sign * np.exp(y - y.max())
-    first = mode[np.nonzero(mode)[0][0]]
-    mode = mode / np.sign(first)
     return lam_min, mode

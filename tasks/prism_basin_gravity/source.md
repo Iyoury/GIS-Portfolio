@@ -17,8 +17,15 @@
   - 0 ln 0 is taken as 0, and atan(n/0) as sign(n) pi/2. These are the limits used where the sums are
     continuous.
 - **Prism, beyond two diagonals.** A 16^3-point Gauss-Legendre volume rule of 1/r and its derivatives.
-  It is exact to rounding that far. The corner sums lose about (distance/size)^2 of their digits:
-  1e-8 relative at 100 diagonals, 4e-5 at 1000, and nothing correct at 1e4.
+  It is exact to rounding that far. The corner sums lose about (distance/size)^2 of their digits. Measured
+  in version 4 (mutants/step_1_closed_form_everywhere.py against my own 60-digit mpmath closed form, 50
+  random directions): for the 100 m x 200 m x 250 m prism of the tests, U is off by a median 6.5e-9
+  (max 5.1e-8) relative at 100 diagonals, 9.1e-6 (4.0e-5) at 1000, 9.7e-3 (4.6e-2) at 1e4, and at 1e6
+  diagonals by a factor up to 5e4 with the wrong sign in 36 of the 50 directions; for the
+  1000 m x 1000 m x 2 m plate, 2.0e-6 (5.8e-6) at 100 diagonals, 1.5e-3 (8.4e-3) at 1000, and the wrong
+  sign in about half the directions from 1e4 diagonals on. (Earlier versions of this file quoted
+  "1e-8 at 100 diagonals, 4e-5 at 1000, nothing correct at 1e4", and difficulty_explanation "5e-9 at 100
+  diagonals"; these were rounded single figures, replaced by the measured medians and maxima.)
 - **Elongated prisms (version 3).** Within two diagonals the corner sums lose about 1e-16 times the shape
   factor diag^3 / volume (5.2 for a cube, about aspect^2 for a rod, 2.8 aspect for a plate): 1e-8 for a
   1 x 1 x 1000 rod. A prism whose shape factor exceeds 200 is cut into equal pieces with shape factor at
@@ -30,8 +37,9 @@
 - **Columns.** g_z = G drho0 int_0^h e^{-lam z} Omega(z) dz, with Omega the solid angle of the
   horizontal lamina. It is evaluated with geometric panels from the top (ratio 2, down to 2^-60 h),
   20-point Gauss-Legendre each. This resolves the lamina term near the top for a station at any distance
-  from an edge. A single 64-point rule gives 4e-5 relative error 1 mm from an edge, and 6e-6 even with
-  1024 nodes. Near the column Omega is the corner sum of atan2(x y, Z r); at a horizontal distance of at
+  from an edge. A single 64-point rule over the 3 km column of the tests gives 4.1e-5 relative error 1 mm
+  from an edge and 1.0e-3 for a station 1 m from two edges, and a 1024-point rule still 6.0e-6 1 mm from
+  an edge (rechecked in version 4). Near the column Omega is the corner sum of atan2(x y, Z r); at a horizontal distance of at
   least the larger width (version 3) it is the Van Oosterom-Strackee formula for the two triangles of the
   rectangle, tan(Omega_t / 2) = Z wx wy / (|a||b||c| + (a.b)|c| + (a.c)|b| + (b.c)|a|), whose terms are all
   positive there.
@@ -41,17 +49,40 @@
   then Newton's method with step halving until the relative update is below 1e-13 or the residual is at
   its rounding level. The depth panels start at a sixty-fourth of the smallest cell width and double.
 
-## Second solution
-- The corner sums evaluated point by point, with math.fsum of all the terms.
-- A 24^3-point rule beyond three diagonals.
-- Elongated prisms (diag^3 / volume > 100) bisected recursively along the longest edge, the cut moved to
-  3/8 or 5/8 of the edge when the point is within 1/8 of its middle (version 3).
-- The columns by adaptive QUADPACK with geometric breakpoints; beyond two lamina diagonals the lamina term
-  by a 24 x 24 Gauss-Legendre rule of Z / r^3 over the lamina (version 3).
-- The basin by scipy's trust-region reflective least squares in the slab-equivalent thicknesses
-  u = (1 - e^{-lam h}) / lam, then Newton iterations with least-squares steps (numpy.linalg.lstsq) and
-  step halving, on a forward model with 16-point Gauss-Legendre panels at h 2^-k (k = 24 .. 0) and the
-  analytic Jacobian (version 3; before, undamped Newton with least-squares steps).
+## Second solution (version 4)
+Methods different from the reference's in every step (the version-3 second solution, which used the
+reference's strategies with other parameters, is described under Version 4 below):
+- **Prism, beyond three diagonals of its centre: multipole expansion.** 1/|R - s| is expanded in a
+  Cartesian Taylor series in the source offset s about the centre of the prism; the coefficients
+  a_k = d^k(1/|R|)/k! come from the recurrence
+  |k| |R|^2 a_k + (2|k| - 1) sum_i R_i a_{k-e_i} + (|k| - 1) sum_i a_{k-2e_i} = 0, and the moments of the
+  box are exact, int s^k dV = prod_i 2 h_i^(k_i+1) / (k_i+1) for even k_i (0 otherwise). U, g and T are
+  the sums over k of the moments times a_k and its derivatives ((k_i + 1) a_{k+e_i}, ...). In units of
+  the half-diagonal the order-n terms decrease like |R|^-n, so the order is ceil(19 / log10 |R|), at most
+  26 (|R| >= 6 half-diagonals).
+- **Prism, within three diagonals: reduction to one dimension.** Along the axis w whose cross-section is
+  closest to a square, the prism is a stack of rectangular laminae. Over a lamina, 1/r, the attraction and
+  the gradients have two-dimensional closed forms (corner sums of x ln(y + r) + y ln(x + r)
+  - Z atan(x y / (Z r)), -ln(y + r), -ln(x + r), atan(x y / (Z r)), x / (r (y + r)), y / (r (x + r)),
+  1 / r, Z / (r (y + r)), Z / (r (x + r)), with ln(y + r) and 1 / (y + r) rewritten for y < 0); a lamina
+  whose centre is more than four lamina diagonals from the point is integrated by a 10 x 10
+  Gauss-Legendre rule instead. The laminae are integrated over w with 12-point Gauss-Legendre panels
+  whose ends are at +-L 2^-k (k = -2 .. 60) from the plane of the point, so the panels shrink toward
+  the plane where the lamina integrals vary on the scale of the point's distance to the lamina edges,
+  jump (inside the prism) or have integrable logarithmic singularities (on the surface). T_ww follows
+  from Poisson's equation, T_ww = -4 pi G rho [inside] - T_uu - T_vv. Elongated prisms need no special
+  treatment: the cross-section of the chosen axis has an aspect ratio of at most sqrt(1000).
+- **Columns.** Adaptive QUADPACK (scipy.integrate.quad) over depth with geometric breakpoints, of the
+  corner sum of the lamina term near the column and of a 24 x 24 Gauss-Legendre rule of Z / r^3 over the
+  lamina beyond two lamina diagonals (unchanged since version 3).
+- **Basin depths.** Forward model: for every column a tanh-sinh (double-exponential) rule over [0, h_j]
+  (97 nodes, step 1/12) of e^{-lam z} times the corner sum of the lamina term; Jacobian
+  dg_i/dh_j = G drho0 e^{-lam h_j} Omega_ij(h_j). Inversion: Levenberg-Marquardt iterations from the
+  infinite-slab thicknesses (Marquardt scaling by diag(J^T J), Nielsen's update of the damping, each
+  step the least-squares solution of [J; sqrt(mu D)] p = [-r; 0]), run until the step is below 1e-14
+  relative (the Gauss-Newton limit), the iterates projected on [1e-6 w_min, 1.5 min(5e4, 3 w_min, 2/lam)];
+  if that stalls away from the data (a column held at a bound), the same iteration again with the steps
+  reflected at the bounds; ValueError if neither reaches a residual of 1e-10 max |g_obs|.
 
 ## Targets
 - **Prism (steps 1 and 2).** The closed forms evaluated with mpmath at 60 digits, which have no
@@ -66,11 +97,18 @@
   quadrature of every pair (a 6 x 4 basin with lam depth up to 2, a 5 x 4 basin of 80 m cells with
   lam = 1e-2, a rough 6 x 6 basin with 30 m columns beside 1500 m ones), and a 10 x 10 basin with lam = 0
   whose anomaly is the sum of the 60-digit closed forms of its 100 prisms at each station.
+- **One-cell basin (tests/general.py case 1, version 4).** The vertical attraction at the centre of the
+  top of the uniform prism 0..100 x 0..200 x 0..300 m (rho = -400) by my own 60-digit closed form,
+  -1.1106331967251501474213766859e-5 m s^-2, confirmed to 30 digits by a 50-digit mpmath quadrature over
+  depth of the solid angle of the centred laminae, 4 atan(a b / (z sqrt(a^2 + b^2 + z^2))). The depth
+  (300 m) is the known input.
 - No HDF5 file: every target is stored inline in the test case that uses it, so there is no
   target_evidence record.
 
-The reference agrees with all targets within the stated tolerances: U to 1e-12, g to 0.09 of its
-tolerance, T to 1e-4 of its tolerance, columns to 1.5e-13, depths to 1e-12.
+Agreement with all stored targets (rechecked in version 4): the reference within 1.1e-3 of the U
+tolerance, 0.09 of the g tolerance and 1.7e-4 of the T tolerance, columns to 4.4e-16 relative, depths to
+8.9e-13; the second solution within 6.7e-5 (U), 8.9e-5 (g) and 8.0e-7 (T) of the tolerances, columns to
+3.3e-16, depths to 1.8e-12. (The figure "columns to 1.5e-13" of earlier versions predates version 3.)
 
 ## Version 2 (grading_fix: authoring-guide conformance)
 
@@ -109,14 +147,22 @@ tolerance, T to 1e-4 of its tolerance, columns to 1.5e-13, depths to 1e-12.
 4. **Ambiguous far-field range.**
    - Finding: the prompts promised accuracy "up to a million times the size of the prism"; the farthest
      test points are 1e6 diagonals from the centre, i.e. 1.34e6 and 1.41e6 times the longest edge.
+   - Cause (added in version 4): "size" was never defined, while the far test points were placed in
+     units of the diagonal.
    - Change: "a million times the diagonal of the prism" in the prompts and docstrings of steps 1 and 2,
      and in their contracts.
+   - Regression test (added in version 4): case 0 of tests/step_1.py and tests/step_2.py (points from
+     2.5 to 1e6 diagonals) pass for the reference and the second solution; crown_check format OK.
 5. **Stated error rules without a test.**
    - Finding: several ValueError rules of the visible specification were never exercised.
+   - Cause (added in version 4): the invalid-input cases were written for the first error rules and not
+     extended when the specification listed more.
    - Change: entries added to the existing invalid-input cases: step 1, x1 = x2; step 2, a non-finite
      point and an empty (0, 3) array (rules "as in prism_gravity"); step 3, non-finite x2, depth and lam
      and y1 = y2; step 4, a 2-D edge array, an edge array with one entry, an infinite edge, a NaN
      observation and drho0 = -inf. The reference and the second solution raise for all of them.
+   - Regression test (added in version 4): case 3 of tests/step_1.py, step_2.py and step_3.py and case 1
+     of tests/step_4.py, which pass for the reference and the second solution in every crown_check run.
 6. **Undeclared and unused imports in second_solution.py.**
    - Finding: it imported `warnings`, `scipy.integrate.quad`, `IntegrationWarning` and
      `scipy.optimize.root` (never used), none declared in required_dependencies, and changed the global
@@ -132,9 +178,17 @@ tolerance, T to 1e-4 of its tolerance, columns to 1.5e-13, depths to 1e-12.
    reference does not call one: now []. Its assumptions are spelled out instead of "As in step 1", and
    the valid_input_ranges of all steps now match the prompts (distance range, points per call, parameter
    rules).
+   - Cause (added in version 4): the step-3 contract referred to step 1 for the shared conventions ("As in
+     step 1") and listed it as a dependency for that reason; the ranges were written before the prompts
+     stated the distance range and the number of points per call.
+   - Regression test (added in version 4): crown_check format checks the contract keys (OK); by reading,
+     solution/step_3.py and the column_gz of second_solution.py call no step-1 function.
 8. **Metadata.** Added subfield, tags, expert_time_estimate_hours, the relevant_experience placeholder
    (for the author to fill), difficulty_explanation, solution_explanation, verification_explanation,
    author, affiliation and edit_label: grading_fix.
+   - Cause (added in version 4): version 1 had none of these fields.
+   - Regression test (added in version 4): crown_check format checks that the metadata keys are present
+     (OK); the explanations were reread against the code (they are revised again in version 4).
 9. **Spot checks of the stored targets (new in this version, independent of the task code).** My own
    mpmath implementation of the prism potential (60 digits, attraction by mpmath differentiation) at four
    points (two near the first prism, one at 100 diagonals of each prism) matches the stored U and g to
@@ -155,6 +209,8 @@ SHIFT +-1e-12 all pass; all-None and all-zero controls pass 0 cases in every ste
 Not changed: the science, the reference algorithms, the stored targets and every stated tolerance. The
 size "up to 1000 stations per call" of step 3 is stated but exercised with at most 5 stations, because a
 QUADPACK implementation such as second_solution.py needs about 0.14 s per station (about 145 s for 1000).
+[Historical, corrected in version 4: that runtime figure was wrong (the second solution takes 3 to 11 ms
+per stored station), and step 3 case 2 now makes a 1000-station call.]
 
 ## Version 3 (grading_fix: authoring-guide conformance)
 
@@ -274,3 +330,147 @@ inputs (all four functions, including the rod, a far column and the rough basin)
 
 Not changed: the physics, the stored targets of version 2, and every stated tolerance (U 1e-10,
 g 1e-10 |g| + 1e-14 G |rho| L, T 1e-9 ||T||, columns 1e-10, depths 1e-8).
+
+## Version 4 (grading_fix: authoring-guide conformance, pass 2)
+
+The findings of the round-1 independent verification that version 3 had left open, and the pass-2 rules
+(every general case calls the final function, no prompt text pointing at hidden tests, a second solution
+by a genuinely different method, mutants built on the current reference, truthful metadata), handled as
+follows. The four blocking round-1 findings (step-4 domain and solver, step-4 coverage, far columns,
+elongated prisms) were fixed in version 3 and were rechecked, not changed.
+
+1. **General case 1 never called invert_basin_depths.**
+   - Finding: tests/general.py case 1 checked only column_gz against prism_gravity and the trace of
+     prism_gradients; crown_check format reported "general case 1 never calls the final function". Its
+     comment also called the bound 2.1e-10 |g| + 2e-14 G |rho| L "the sum of the two stated tolerances",
+     which it is not (the sum is 2e-10 |g| + 1e-14 G |rho| L).
+   - Cause: the case was written as a cross-step consistency check before the rule that every whole-task
+     case must use the final function.
+   - Change: the case now also inverts the one-cell basin made of its column (100 m x 200 m, 300 m deep,
+     i.e. 3 w_min, the inclusive limit of the stated domain, lam = 0, drho0 = -400): from the independent
+     value at the centre of the top (60-digit closed form, confirmed by a 50-digit quadrature; see
+     Targets) the depth must be 300 m within the stated 1e-8, and from column_gz's own value there within
+     2e-8 (about twice the single-output tolerance; the depth amplifies relative data errors by 6.7 here,
+     so column_gz's 1e-10 adds at most 7e-10). The comment now says "about twice the step-1 tolerance".
+   - Regression test: general case 1 passes for the reference (depth error 1.6e-15) and the second
+     solution (2.2e-16); the whole-task mutant fails it (its depth is 6.6e-4 m instead of 300 m);
+     crown_check format reports no problem.
+2. **Step 3: "up to 1000 stations per call" was stated but never exercised.**
+   - Finding: at most 5 stations were tested per call; version 2 justified this by a runtime of 0.14 s
+     per station of the second solution, which was wrong.
+   - Cause: a runtime estimate that was not measured.
+   - Change: case 2 of tests/step_3.py now also calls column_gz once with 1000 stations (the 10 near and
+     4 far stored stations of the first column, repeated) and checks every value at 1e-10 against the
+     stored targets (the 4 far targets are copied from case 4 so that the case stays self-contained).
+     Measured: the second solution takes 3 to 11 ms per stored station (about 7 s for the 1000), the
+     reference about 0.1 s for the call. The Version 2 note is labelled as historical.
+   - Regression test: step 3 case 2 passes for the reference and the second solution; the mutants
+     uniform_gauss_legendre and uniform_density still fail it.
+3. **The whole-task mutant left invert_basin_depths unchanged.**
+   - Finding: whole_task_upward_z flipped g_z in prism_gravity and column_gz only, so the integrated
+     result was the reference's and the mutant failed only through the column_gz assertions; its
+     description ("every vertical component has the wrong sign") was inaccurate.
+   - Cause: the sign was changed only where g_z is returned (prism_gravity, column_gz); invert_basin_depths
+     has had its own forward model (_basin_forward) since version 1, so the mistake never reached the
+     integrated result.
+   - Change: it is replaced by whole_task_mgal, the current reference with one mistake carried through
+     the whole task: the attraction is handled in mGal (1 mGal = 1e-5 m s^-2, the unit in which gravity
+     anomalies are reported) instead of m s^-2, so prism_gravity and column_gz return it 1e5 times too
+     large and invert_basin_depths reads gz_obs as mGal and returns a basin at least 1e5 times too shallow
+     (a column needs at least the depth of the infinite slab of the same attraction).
+     mutants/whole_task_upward_z.py is deleted.
+   - Regression test: crown_check mut, whole_task_mgal fails general cases 0, 1 and 2 (in case 1 at the
+     new inversion of the one-cell basin, since its column_gz and prism_gravity agree with each other).
+4. **The second solution used the reference's strategies with other parameters (steps 1, 2 and 4).**
+   - Finding: for the prism it used corner sums near the prism and a tensor Gauss-Legendre rule far away
+     (three instead of two diagonals, 24^3 instead of 16^3 points) and cut elongated prisms (bisection
+     instead of equal pieces); for the basin, trust-region reflective least squares (scipy's
+     least_squares, as the reference) then Newton steps on a composite Gauss-Legendre forward model.
+   - Cause: the second solution was derived from the reference by changing parameters rather than
+     methods.
+   - Change: new methods, described under "Second solution (version 4)" above: for the prism, the
+     multipole (Cartesian Taylor) expansion with exact box moments beyond three diagonals, and within
+     three diagonals a reduction to one dimension (two-dimensional closed forms of the laminae, or a
+     10 x 10 Gauss-Legendre rule for laminae more than four lamina diagonals away, integrated along the
+     axis with the most compact cross-section on 12-point Gauss-Legendre panels that shrink
+     geometrically toward the plane of the point; T_ww from Poisson's equation), with no special
+     treatment of elongated prisms; for the basin, a tanh-sinh rule over depth in the forward model and
+     Levenberg-Marquardt iterations (projected on the admissible box, or reflected at its bounds if that
+     stalls) run to convergence instead of trust-region reflective least squares plus Newton. The column
+     (step 3, adaptive QUADPACK) was already a different method and is unchanged. second_solution.py no
+     longer imports scipy.optimize. Prototypes tried on random basins and rejected: continuation in the
+     data from the slab thicknesses (the path leaves the positive depths on rough basins, whose depths
+     move by up to 1e6 times any relative change of the data), Powell's dogleg with projection (1 failure
+     in 50 rough 50- to 100-cell basins) or in log-depth (depths running off to large values),
+     Levenberg-Marquardt with projection only (1 failure in 50) or with reflection only (2 in 100); the
+     projected and reflected variants fail on different basins, and their combination, as now in
+     second_solution.py, failed on none of 200 such basins in the prototype.
+   - Regression test: the second solution passes every case. Against the stored targets it is within
+     6.7e-5 (U), 8.9e-5 (g) and 8.0e-7 (T) of the step-1 and step-2 tolerances, columns 3.3e-16, depths
+     1.8e-12. Against my own 90-digit closed form of U (g and T by mpmath differentiation) on 28 random
+     prisms (aspect ratio up to 1000, 8 of them at exactly 1000; 10 points each: inside, on a face, an
+     edge and a corner, near, at 2 to 3.5 diagonals and up to 1e6 diagonals): within 9.2e-4 (U), 3.6e-4
+     (g) and 4.4e-5 (T) of the tolerances (the reference on the same points: 3.2e-3, 4.3e-3, 2.3e-4).
+     240 random basins of the stated domain (120 of 1 to 100 cells with constant, random, bimodal,
+     bowl-shaped and rough depths; 120 of 50 to 100 cells with mostly rough and bimodal depths; lam from 0
+     to the limit lam depth = 2; both signs of drho0): the reference inverts data computed with the second
+     solution's forward model and the second solution data computed with the reference's (they agree to
+     about 1e-15): no failure, worst depth error 9.6e-12 (reference) and 1.5e-11 (second), at most 12 s
+     and 4.5 s per basin. Runtime of the new prism code for 1000 points within two diagonals: 3 to 4.5 s
+     near a 1 x 1 x 1000 rod, 0.6 to 1.5 s near a plate or a cube. No warnings in the step cases and
+     general cases 1 and 2 (run with -W error), and identical outputs (SHA-256 of the outputs of all four
+     functions, the rod, a far column and the rough basin included) in two clean runs and with one and
+     two BLAS threads, for the reference as well.
+5. **Prompt text pointing at hidden test inputs.**
+   - Finding: the step-3 prompt said "(a station a million column widths away included)" and "(a
+     station on the surface 1e-6 m from an edge included)", remarks pointing at stored test stations;
+     difficulty_explanation named the test rod (2 m x 2 m x 2 km).
+   - Cause: the remarks were added to make the stated range concrete.
+   - Change: the step-3 accuracy sentence states the regime only ("up to 1e7 m from the column, whatever
+     the column's width ... at any horizontal distance from its edges, however small"); the metadata give
+     measured figures for generic prisms and columns. Every magnitude in the prompts was rechecked over
+     the whole stated domain (for example |g| < 1e-12 G |rho| L at a million diagonals holds for every
+     box, since volume / diag^2 <= L / 3).
+   - Regression test: crown_check format OK; the step-3 cases are unchanged apart from case 2.
+6. **Inconsistent figures in source.md and the metadata.**
+   - Finding: the round-1 report noted that source.md described the basin depth panels as starting at a
+     quarter of the smallest cell width (the code starts at w_min / 64), and that the cancellation figures
+     of the corner sums differed between source.md and difficulty_explanation; stale agreement figures
+     ("columns to 1.5e-13") remained.
+   - Cause: text not updated with the code, and rounded figures quoted from different measurements.
+   - Change: the panel description had been corrected in version 3 (source.md, solution_explanation and
+     the code comment all say a sixty-fourth); the cancellation figures were measured again
+     (mutants/step_1_closed_form_everywhere.py against my own 60-digit closed form over 50 random
+     directions, both test prisms) and the same medians and maxima are now quoted in source.md and
+     difficulty_explanation; the step-3 figures (a 64-point rule 4.1e-5 1 mm from an edge and 1.0e-3 1 m
+     from a corner, 1024 points 6.0e-6; the lamina corner sum 9e-8 at 5000 widths, of order one at 1.7e5
+     and 1e7 widths) were remeasured against the stored targets; the agreement figures are recomputed.
+   - Regression test: rereading of source.md, problem.yaml and the code; the figures come from the
+     scripts named above.
+7. **Version 2 items without cause or regression test.** Items 4, 5, 7 and 8 of Version 2 now carry
+   Cause and Regression test lines (marked "added in version 4"); its wrong runtime claim is labelled.
+8. **Mutants and dependencies.** Every step mutant was rechecked by diff to be the current reference with
+   one change (closed_form_everywhere switches off both the far-field rule and the cutting of elongated
+   prisms, i.e. evaluates the closed form as written; its description now says so, with measured
+   figures). The step-4 prompt now says that the anomaly is the sum of the column_gz values of the
+   columns, the use that its step_dependencies [3] records; step 2 keeps [1] because its prompt defines
+   the tensor and its error rules through prism_gravity.
+9. **Not changed, with reasons.** The g tolerance of step 1 (1e-10 |g| + 1e-14 G |rho| L) is dominated by
+   its absolute term a million diagonals away, where |g| is about 1e-13 G |rho| L; this was a design
+   choice, unchanged so as not to change tolerances. The per-step solution files repeat the same private
+   helpers (identical code; only the evaluated functions are graded). relevant_experience is still the
+   placeholder for the author.
+
+Rerun: `OMP_NUM_THREADS=1 python3 tools/crown_check.py tasks/prism_basin_gravity -j 2` (all modes, with the
+version-4 checker, whose format mode also reports general cases that never call the final function and
+whose shift mode also shifts every evaluated function in the general cases): FORMAT OK (no problem); REF
+steps 1-4 5/5, 5/5, 5/5, 6/6 and general 3/3; SECOND the same; mutants: closed_form_everywhere (step 1)
+fails cases 0, 2, 4, direct_log 1, 2, no_subdivision (step 1) 4, closed_form_everywhere (step 2) 0, 2, 4,
+no_subdivision (step 2) 4, uniform_gauss_legendre 0, 2, uniform_density 0, 2, 4, corner_sum_far 2, 4
+(case 2 now has far stations), slab_thickness 0, 2, 3, 4, 5, newton_step_halving 5, whole_task_mgal
+general 0, 1, 2; SHIFT +-1e-12 all pass (steps and general); all-None and all-zero controls pass 0 cases
+in every step and in general; SUMMARY ALL OK.
+
+Not changed: the physics, the reference solution (solution.py and solution/), every stored target of
+earlier versions, and every stated tolerance (U 1e-10, g 1e-10 |g| + 1e-14 G |rho| L, T 1e-9 ||T||,
+columns 1e-10, depths 1e-8); relevant_experience stays the placeholder for the author.

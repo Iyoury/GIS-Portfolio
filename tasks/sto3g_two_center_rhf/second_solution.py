@@ -1,7 +1,6 @@
 import numpy as np
 from scipy.special import erf
 from scipy.optimize import minimize_scalar
-from scipy.integrate import quad
 from scipy.integrate import solve_ivp
 
 
@@ -38,6 +37,71 @@ def boys_function(n_max, t):
     return F.reshape(t_arr.shape + (int(n_max) + 1,))
 
 
+# Second solution, steps 2-3 (and the one-centre integrals of step 5): momentum space instead of the
+# closed-form Gaussian integrals of the reference and the real-space shell-theorem quadrature of the
+# tests. With g~(k) = (pi / a)**1.5 exp(-k**2 / 4a) exp(-i k.A) the Fourier transform of exp(-a |r - A|**2),
+# Parseval's theorem, the Coulomb kernel 4 pi / k**2 and the angular average j0(k d) = sin(k d) / (k d)
+# of exp(i k.d), every integral becomes a radial integral over |k| done by quadrature (no error function,
+# no Boys function):
+#   <a|b>                = N_a N_b (pi**2 / ab)**1.5 / (2 pi**2) int k**2 exp(-k**2 (a + b) / 4ab) j0(k |A - B|) dk
+#   <a|-Laplacian / 2|b> = the same with k**4 / 2 in place of k**2
+#   <a|1 / |r - C||b>    = N_a N_b K_ab (pi / p)**1.5 (2 / pi) int exp(-k**2 / 4p) j0(k |P - C|) dk
+#   (ab|cd)              = N_a N_b N_c N_d K_ab K_cd (pi**2 / pq)**1.5 (2 / pi)
+#                          int exp(-k**2 (1 / 4p + 1 / 4q)) j0(k |P - Q|) dk
+# (K_ab, p and P of the Gaussian product of a and b; only the charge clouds use the product theorem).
+
+# 16-point Gauss-Legendre rule on [0, 1], the panel rule of the momentum-space radial integrals
+_K_X, _K_W = np.polynomial.legendre.leggauss(16)
+_K_X, _K_W = 0.5 * (_K_X + 1.0), 0.5 * _K_W
+_K_TOP = np.sqrt(60.0)        # x**4 exp(-x**2) is below 1e-23 of its maximum beyond x = sqrt(60)
+
+
+def _k_radial(power, gamma, d):
+    # J = int_0^infinity k**power exp(-gamma k**2) j0(k d) dk for arrays gamma > 0 and d >= 0 of the same
+    # shape. With k = x / sqrt(gamma), J = gamma**(-(power + 1) / 2) int_0^sqrt(60) x**power exp(-x**2)
+    # j0(x delta) dx, delta = d / sqrt(gamma), done with composite 16-point Gauss-Legendre on panels no
+    # wider than 0.5 and than half an oscillation period pi / delta.
+    gamma = np.asarray(gamma, float).ravel()
+    d = np.asarray(d, float).ravel()
+    delta = d / np.sqrt(gamma)
+    n_pan = np.maximum(16, np.ceil(_K_TOP * delta / np.pi)).astype(int)
+    out = np.empty(gamma.size)
+    for n in np.unique(n_pan):
+        sel = np.where(n_pan == n)[0]
+        x = ((np.arange(n)[:, None] + _K_X[None, :]) / n).ravel() * _K_TOP
+        w = np.tile(_K_W, n) * (_K_TOP / n)
+        out[sel] = np.sinc(np.outer(delta[sel], x) / np.pi) @ (w * x ** power * np.exp(-x * x))
+    return out * gamma ** (-0.5 * (power + 1))
+
+
+def _k_basis(zeta):
+    # exponents and normalized contraction coefficients of the STO-3G 1s function
+    a = np.array([0.109818, 0.405771, 2.22766]) * zeta ** 2
+    return a, np.array([0.444635, 0.535328, 0.154329]) * (2.0 * a / np.pi) ** 0.75
+
+
+def _k_atom(Z, zeta):
+    # one-centre norm <phi|phi>, core energy <phi|-Laplacian/2 - Z/r|phi> and (phi phi|phi phi) of the
+    # STO-3G 1s function on a nucleus Z, from the same momentum-space radial integrals at zero separation
+    a, cf = _k_basis(zeta)
+    A = a[:, None] * np.ones(3)[None, :]
+    B = a[None, :] * np.ones(3)[:, None]
+    w = cf[:, None] * cf[None, :]
+    zero = np.zeros((3, 3))
+    beta = (A + B) / (4.0 * A * B)
+    pre = (np.pi ** 2 / (A * B)) ** 1.5 / (2.0 * np.pi ** 2)
+    s = np.sum(w * pre * _k_radial(2, beta, zero).reshape(3, 3))
+    p = A + B
+    h = np.sum(w * (0.5 * pre * _k_radial(4, beta, zero).reshape(3, 3)
+                    - Z * (np.pi / p) ** 1.5 * (2.0 / np.pi) * _k_radial(0, 1.0 / (4.0 * p), zero).reshape(3, 3)))
+    P = p.ravel()[:, None] * np.ones(9)[None, :]
+    Q = p.ravel()[None, :] * np.ones(9)[:, None]
+    ww = w.ravel()[:, None] * w.ravel()[None, :]
+    j = np.sum(ww * (np.pi ** 2 / (P * Q)) ** 1.5 * (2.0 / np.pi)
+               * _k_radial(0, 0.25 / P + 0.25 / Q, np.zeros((9, 9))).reshape(9, 9))
+    return s, h, j
+
+
 def sto3g_one_electron(ZA, ZB, zetaA, zetaB, R):
     '''Overlap and core-Hamiltonian matrices for two atoms with one STO-3G 1s function each.
 
@@ -56,68 +120,33 @@ def sto3g_one_electron(ZA, ZB, zetaA, zetaB, R):
     Raises:
       ValueError if R, ZA, ZB, zetaA or zetaB is not positive.
     '''
-    # Other method: no closed-form Gaussian integrals. Every integral is reduced to a
-    # one-dimensional radial integral with the shell theorem (angular averages over
-    # spheres) and done with composite Gauss-Legendre quadrature.
+    # Other method: momentum space (see _k_radial above), no closed-form Gaussian integrals and no
+    # real-space quadrature.
     if not (R > 0 and ZA > 0 and ZB > 0 and zetaA > 0 and zetaB > 0):
         raise ValueError("R, the nuclear charges and the Slater exponents must be positive")
-    alpha_one = np.array([0.109818, 0.405771, 2.22766])
-    coef = np.array([0.444635, 0.535328, 0.154329])
     centers = np.array([0.0, float(R)])
     charges = np.array([float(ZA), float(ZB)])
-    expo = [alpha_one * zetaA ** 2, alpha_one * zetaB ** 2]
-    x16, w16 = np.polynomial.legendre.leggauss(16)
-    t_nodes, t_wts = np.polynomial.legendre.leggauss(80)
-    t_nodes = 0.5 * (t_nodes + 1.0)
-    t_wts = 0.5 * t_wts
-
-    def radial_grid(s_max, width):
-        n_pan = int(np.ceil(s_max / width))
-        edges = np.linspace(0.0, s_max, n_pan + 1)
-        half = 0.5 * (edges[1:] - edges[:-1])
-        mid = 0.5 * (edges[1:] + edges[:-1])
-        s = (mid[:, None] + half[:, None] * x16[None, :]).ravel()
-        ws = (half[:, None] * w16[None, :]).ravel()
-        return s, ws
-
-    def sphere_avg(beta, s, dist):
-        # average of exp(-beta |r - X|^2) over a sphere of radius s whose centre is at distance dist from X
-        if dist < 1e-12:
-            return np.exp(-beta * s * s)
-        return -np.exp(-beta * (s - dist) ** 2) * np.expm1(-4.0 * beta * s * dist) / (4.0 * beta * s * dist)
-
+    ex, cf = zip(_k_basis(zetaA), _k_basis(zetaB))
     S = np.zeros((2, 2))
     H = np.zeros((2, 2))
     for m in range(2):
         for n in range(2):
-            a = np.repeat(expo[m], 3)[:, None]
-            b = np.tile(expo[n], 3)[:, None]
-            w = (np.repeat(coef, 3) * np.tile(coef, 3)) * (2.0 * a[:, 0] / np.pi) ** 0.75 * (2.0 * b[:, 0] / np.pi) ** 0.75
-            dist = abs(centers[n] - centers[m])
-            s, ws = radial_grid(dist + 10.0 / np.sqrt(np.min(a + b)), min(0.5, 0.5 / np.sqrt(np.max(a + b))))
-            s = s[None, :]
-            over = np.sum(4.0 * np.pi * s * s * np.exp(-a * s * s) * sphere_avg(b, s, dist) * ws, axis=1)
-            kin = np.sum(4.0 * np.pi * s * s * (3.0 * b - 2.0 * b * b * s * s) * np.exp(-b * s * s)
-                         * sphere_avg(a, s, dist) * ws, axis=1)
-            a = a[:, 0]
-            b = b[:, 0]
+            a = ex[m][:, None] * np.ones(3)[None, :]
+            b = ex[n][None, :] * np.ones(3)[:, None]
+            w = cf[m][:, None] * cf[n][None, :]
+            dist = abs(centers[m] - centers[n]) * np.ones((3, 3))
+            beta = (a + b) / (4.0 * a * b)
+            pre = (np.pi ** 2 / (a * b)) ** 1.5 / (2.0 * np.pi ** 2)
+            ovl = pre * _k_radial(2, beta, dist).reshape(3, 3)
+            kin = 0.5 * pre * _k_radial(4, beta, dist).reshape(3, 3)
             p = a + b
-            k_ab = np.exp(-a * b / p * dist ** 2)
-            center_p = (a * centers[m] + b * centers[n]) / p
-            pot = np.zeros(9)
+            P = (a * centers[m] + b * centers[n]) / p
+            att = np.zeros((3, 3))
             for C in range(2):
-                e_dist = np.abs(center_p - centers[C])
-                # integral over space of exp(-p |r-P|^2) / |r - C|: inside the sphere through C the
-                # shell average of 1/|r - C| is 1/e_dist, outside it is 1/s (that part is exact)
-                # (1/e) int_0^e s^2 exp(-p s^2) ds over [0, min(e, 9 / sqrt(p))]: beyond that the integrand is
-                # negligible, and a fixed rule on all of [0, e] misses the narrow peak of a tight function
-                top = np.minimum(e_dist, 9.0 / np.sqrt(p))
-                inner = np.sum(t_wts[None, :] * t_nodes[None, :] ** 2
-                               * np.exp(-p[:, None] * (top[:, None] * t_nodes[None, :]) ** 2), axis=1) \
-                    * top ** 3 / np.where(e_dist > 0, e_dist, 1.0)
-                pot -= charges[C] * 4.0 * np.pi * (inner + np.exp(-p * e_dist ** 2) / (2.0 * p))
-            S[m, n] = np.sum(w * over)
-            H[m, n] = np.sum(w * (kin + k_ab * pot))
+                att -= charges[C] * _k_radial(0, 1.0 / (4.0 * p), np.abs(P - centers[C])).reshape(3, 3)
+            att *= np.exp(-a * b / p * dist ** 2) * (np.pi / p) ** 1.5 * (2.0 / np.pi)
+            S[m, n] = np.sum(w * ovl)
+            H[m, n] = np.sum(w * (kin + att))
     return S, H
 
 
@@ -136,55 +165,11 @@ def sto3g_two_electron(zetaA, zetaB, R):
     Raises:
       ValueError if R, zetaA or zetaB is not positive.
     '''
-    # Other method: the potential of the charge cloud phi_i phi_j is averaged over spheres
-    # around the centre of the cloud phi_k phi_l (shell theorem), then a 1D radial
-    # integral is done with composite Gauss-Legendre quadrature. Only the 6 distinct
-    # integrals are computed.
+    # Other method: momentum space (see _k_radial above). Only the 6 distinct integrals are computed.
     if not (R > 0 and zetaA > 0 and zetaB > 0):
         raise ValueError("R and the Slater exponents must be positive")
-    alpha_one = np.array([0.109818, 0.405771, 2.22766])
-    coef = np.array([0.444635, 0.535328, 0.154329])
     centers = np.array([0.0, float(R)])
-    expo = [alpha_one * zetaA ** 2, alpha_one * zetaB ** 2]
-    idx = np.array(np.meshgrid(np.arange(3), np.arange(3), np.arange(3), np.arange(3), indexing='ij')).reshape(4, -1)
-    x16, w16 = np.polynomial.legendre.leggauss(16)
-
-    def one_integral(i, j, k, l):
-        a = expo[i][idx[0]][:, None]
-        b = expo[j][idx[1]][:, None]
-        c = expo[k][idx[2]][:, None]
-        d = expo[l][idx[3]][:, None]
-        w = (coef[idx[0]] * coef[idx[1]] * coef[idx[2]] * coef[idx[3]])[:, None]
-        norm = (2.0 * a / np.pi * 2.0 * b / np.pi * 2.0 * c / np.pi * 2.0 * d / np.pi) ** 0.75
-        p = a + b
-        q = c + d
-        center_p = (a * centers[i] + b * centers[j]) / p
-        center_q = (c * centers[k] + d * centers[l]) / q
-        k_ab = np.exp(-a * b / p * (centers[i] - centers[j]) ** 2)
-        k_cd = np.exp(-c * d / q * (centers[k] - centers[l]) ** 2)
-        e_dist = np.abs(center_p - center_q)
-        s_max = float(np.max(e_dist)) + 10.0 / np.sqrt(np.min(q))
-        width = min(1.0, 1.2 / np.sqrt(max(np.max(p), np.max(q))))
-        n_pan = int(np.ceil(s_max / width))
-        edges = np.linspace(0.0, s_max, n_pan + 1)
-        half = 0.5 * (edges[1:] - edges[:-1])
-        mid = 0.5 * (edges[1:] + edges[:-1])
-        s = (mid[:, None] + half[:, None] * x16[None, :]).ravel()[None, :]
-        ws = (half[:, None] * w16[None, :]).ravel()[None, :]
-        sp = np.sqrt(p)
-        tiny = e_dist < 1e-6
-        e_safe = np.where(tiny, 1.0, e_dist)
-
-        def G(u):
-            return u * erf(sp * u) + np.exp(-p * u * u) / np.sqrt(np.pi * p)
-
-        far = (G(s + e_safe) - G(s - e_safe)) / (2.0 * s * e_safe)
-        near = erf(sp * s) / s
-        avg = np.where(tiny, near, far)
-        radial = np.sum(4.0 * np.pi * s * s * np.exp(-q * s * s) * avg * ws, axis=1)[:, None]
-        vals = norm * k_ab * k_cd * (np.pi / p) ** 1.5 * radial
-        return float(np.sum(w * vals))
-
+    ex, cf = zip(_k_basis(zetaA), _k_basis(zetaB))
     eri = np.zeros((2, 2, 2, 2))
     done = {}
     for i in range(2):
@@ -193,58 +178,88 @@ def sto3g_two_electron(zetaA, zetaB, R):
                 for l in range(2):
                     key = tuple(sorted([tuple(sorted((i, j))), tuple(sorted((k, l)))]))
                     if key not in done:
-                        done[key] = one_integral(i, j, k, l)
+                        a = ex[i][:, None, None, None]
+                        b = ex[j][None, :, None, None]
+                        c = ex[k][None, None, :, None]
+                        d = ex[l][None, None, None, :]
+                        w = (cf[i][:, None, None, None] * cf[j][None, :, None, None]
+                             * cf[k][None, None, :, None] * cf[l][None, None, None, :])
+                        p = a + b
+                        q = c + d
+                        P = (a * centers[i] + b * centers[j]) / p
+                        Q = (c * centers[k] + d * centers[l]) / q
+                        kk = (np.exp(-a * b / p * (centers[i] - centers[j]) ** 2)
+                              * np.exp(-c * d / q * (centers[k] - centers[l]) ** 2))
+                        shape = (3, 3, 3, 3)
+                        rad = _k_radial(0, np.broadcast_to(0.25 / p + 0.25 / q, shape),
+                                        np.broadcast_to(np.abs(P - Q), shape)).reshape(shape)
+                        done[key] = float(np.sum(w * kk * (np.pi ** 2 / (p * q)) ** 1.5 * (2.0 / np.pi) * rad))
                     eri[i, j, k, l] = done[key]
     return eri
 
 
 def fci_energy(ZA, ZB, zetaA, zetaB, R):
     '''Singlet ground-state full-CI and closed-shell RHF energies of a two-electron diatomic in STO-3G.'''
-    # Other methods: RHF by direct minimisation over the single orbital-mixing angle (no Fock
-    # matrix, no SCF loop); full CI in the Loewdin-orthogonalized atomic orbitals instead of
-    # the RHF molecular orbitals.
+    # Other methods. RHF without a scan or an iteration: every normalized orbital is X (cos theta,
+    # sin theta) with X = S^(-1/2), and E(theta) = 2 c.H.c + (cc|cc) is then a trigonometric polynomial
+    # with harmonics 0, 2 and 4 only: E = a0 + a1 cos phi + b1 sin phi + a2 cos 2 phi + b2 sin 2 phi in
+    # phi = 2 theta. Its coefficients follow exactly from 8 samples (discrete Fourier transform), and its
+    # stationary points are the arguments of the roots of the quartic polynomial 2 z**2 dE/dphi in
+    # z = exp(i phi); the global minimum is the lowest value of E at these points (each polished by Newton
+    # steps on dE/dphi). Full CI: the whole 4-dimensional two-electron product space of the RHF orbitals
+    # (singlets and the triplet) with a spin penalty instead of a restriction to singlet functions.
     S, H = sto3g_one_electron(ZA, ZB, zetaA, zetaB, R)
     eri = sto3g_two_electron(zetaA, zetaB, R)
+    s_val, s_vec = np.linalg.eigh(S)
+    X = s_vec @ np.diag(s_val ** -0.5) @ s_vec.T
+
+    def orbital(theta):
+        return X @ np.array([np.cos(theta), np.sin(theta)])
 
     def energy(theta):
-        v = np.array([np.cos(theta), np.sin(theta)])
-        c = v / np.sqrt(v @ S @ v)
-        return 2.0 * (c @ H @ c) + np.einsum('i,j,k,l,ijkl->', c, c, c, c, eri)
+        c = orbital(theta)
+        return float(2.0 * (c @ H @ c) + np.einsum('i,j,k,l,ijkl->', c, c, c, c, eri))
 
-    # several local minima are possible (one closed-shell branch per atom): refine every local minimum
-    # of a fine periodic scan and keep the lowest
-    grid = np.linspace(-0.5 * np.pi, 0.5 * np.pi, 1441)[:-1]
-    vals = np.array([energy(t) for t in grid])
-    step = grid[1] - grid[0]
-    best = np.inf
-    for i in np.where((vals <= np.roll(vals, 1)) & (vals <= np.roll(vals, -1)))[0]:
-        res = minimize_scalar(energy, bounds=(grid[i] - step, grid[i] + step), method='bounded',
-                              options={'xatol': 1e-13})
-        best = min(best, float(res.fun))
-    E_rhf = float(best + ZA * ZB / R)
-    s_val, s_vec = np.linalg.eigh(S)
-    X = s_vec @ np.diag(s_val ** -0.5) @ s_vec.T          # Loewdin orbitals, still localized
-    h = X.T @ H @ X
-    g = np.einsum('pi,qj,rk,sl,pqrs->ijkl', X, X, X, X, eri)
-    # spatial two-electron functions symmetric in the electrons: chi_a chi_a, chi_b chi_b and
-    # (chi_a chi_b + chi_b chi_a) / sqrt(2); matrix elements from the product-basis Hamiltonian
-    # <ij|H|kl> = h_ik d_jl + d_ik h_jl + (ik|jl)
+    phis = 2.0 * np.pi * np.arange(8) / 8.0
+    samp = np.array([energy(0.5 * f) for f in phis])
+    a1, b1 = 2.0 * np.mean(samp * np.cos(phis)), 2.0 * np.mean(samp * np.sin(phis))
+    a2, b2 = 2.0 * np.mean(samp * np.cos(2.0 * phis)), 2.0 * np.mean(samp * np.sin(2.0 * phis))
+    poly = np.array([2.0 * b2 + 2.0j * a2, b1 + 1.0j * a1, 0.0, b1 - 1.0j * a1, 2.0 * b2 - 2.0j * a2])
+    cands = list(phis)
+    if np.max(np.abs(poly)) > 0.0:
+        cands += list(np.angle(np.roots(poly)))
+    best_e, best_t = np.inf, 0.0
+    for f in cands:
+        for _ in range(3):
+            d1 = -a1 * np.sin(f) + b1 * np.cos(f) - 2.0 * a2 * np.sin(2.0 * f) + 2.0 * b2 * np.cos(2.0 * f)
+            d2 = -a1 * np.cos(f) - b1 * np.sin(f) - 4.0 * a2 * np.cos(2.0 * f) - 4.0 * b2 * np.sin(2.0 * f)
+            if d2 <= 0.0:
+                break
+            f = f - d1 / d2
+        e = energy(0.5 * f)
+        if e < best_e:
+            best_e, best_t = e, 0.5 * f
+    E_rhf = float(best_e + ZA * ZB / R)
+    # full CI: product functions chi_i(1) chi_j(2) of the RHF orbital and its S-orthogonal partner, with
+    # <ij|H|kl> = h_ik d_jl + d_ik h_jl + (ik|jl); the penalty lambda (1 - P12) / 2, P12 the exchange of the
+    # two electrons, lifts the spatially antisymmetric (triplet) state by lambda = 20 hartree, so the lowest
+    # eigenvalue is the lowest singlet
+    C = np.column_stack([orbital(best_t), orbital(best_t + 0.5 * np.pi)])
+    h = C.T @ H @ C
+    g = np.einsum('pi,qj,rk,sl,pqrs->ijkl', C, C, C, C, eri)
     I2 = np.eye(2)
     Hp = (np.einsum('ik,jl->ijkl', h, I2) + np.einsum('ik,jl->ijkl', I2, h)
           + np.einsum('ikjl->ijkl', g)).reshape(4, 4)
-    B = np.zeros((4, 3))
-    B[0, 0] = 1.0
-    B[3, 1] = 1.0
-    B[1, 2] = B[2, 2] = np.sqrt(0.5)
-    E_fci = float(np.linalg.eigvalsh(B.T @ Hp @ B)[0] + ZA * ZB / R)
+    P12 = np.einsum('il,jk->ijkl', I2, I2).reshape(4, 4)
+    E_fci = float(np.linalg.eigvalsh(Hp + 10.0 * (np.eye(4) - P12))[0] + ZA * ZB / R)
     result = (E_fci, E_rhf)
     return result
 
 
 def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
     '''Lowest five vibrational levels (J = 0) on the full-CI potential curve, from the dissociation limit.'''
-    # Other methods: the dissociation limit from one-centre integrals evaluated primitive pair
-    # by primitive pair, V(R) sampled on Chebyshev nodes in ln R and interpolated up to the distance
+    # Other methods: the dissociation limit from one-centre integrals in momentum space (_k_atom),
+    # V(R) sampled on Chebyshev nodes in ln R and interpolated up to the distance
     # where the cross integrals have died out, the exact Coulomb tail of the separated fragments
     # beyond it, and the radial equation by the sinc DVR on uniform grids whose length is doubled and
     # whose step is refined until the five levels stop changing (no shooting, no fixed outer wall).
@@ -254,27 +269,8 @@ def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
     for m in (massA, massB):
         if not (np.isfinite(m) and 1.0 <= m <= 10.0):
             raise ValueError("nuclear masses must be finite and between 1 and 10 u")
-    alpha = np.array([0.109818, 0.405771, 2.22766])
-    coef = np.array([0.444635, 0.535328, 0.154329])
-
-    def atom(Z, zeta):
-        a = alpha * zeta ** 2
-        nrm = coef * (2.0 * a / np.pi) ** 0.75
-        s = h = j = 0.0
-        for i in range(3):
-            for k in range(3):
-                p = a[i] + a[k]
-                w = nrm[i] * nrm[k]
-                s += w * (np.pi / p) ** 1.5
-                h += w * (3.0 * a[i] * a[k] / p * (np.pi / p) ** 1.5 - 2.0 * np.pi * Z / p)
-                for l in range(3):
-                    for n in range(3):
-                        q = a[l] + a[n]
-                        j += w * nrm[l] * nrm[n] * 2.0 * np.pi ** 2.5 / (p * q * np.sqrt(p + q))
-        return s, h, j
-
-    sA, hA, jA = atom(ZA, zetaA)
-    sB, hB, jB = atom(ZB, zetaB)
+    sA, hA, jA = _k_atom(ZA, zetaA)
+    sB, hB, jB = _k_atom(ZB, zetaB)
     # both electrons on A, both on B, or one on each: energies E_j + c_j / R at large R
     arr = [((2.0 * hA * sA + jA) / sA ** 2, (ZA - 2.0) * ZB), ((2.0 * hB * sB + jB) / sB ** 2, (ZB - 2.0) * ZA),
            (hA / sA + hB / sB, (ZA - 1.0) * (ZB - 1.0))]
@@ -342,211 +338,152 @@ def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
     return levels
 
 
-# Second solution, step 6: Obara-Saika recursions instead of McMurchie-Davidson Hermite
-# expansions; kinetic energy as (1/2) sum_i <d_i a | d_i b>.
+# Second solution, step 6: Gaussian-transform (Rys-type) integrals evaluated by quadrature, no Boys
+# function, no Hermite expansion and no recursion. 1 / r = (2 / sqrt(pi)) int_0^inf exp(-s**2 r**2) ds
+# makes every Coulomb integral over Cartesian Gaussians a product of x, y and z factors under one
+# integral over s; with u**2 = s**2 / (rho + s**2) that integral runs over u in [0, 1]:
+#   attraction  <a|1/|r - C||b> = (2 pi / p) K_ab int_0^1 exp(-p |PC|**2 u**2) prod_x E_u[(x - Ax)^la (x - Bx)^lb] du
+#   repulsion   (ab|cd) = 2 pi**2.5 / (p q sqrt(p + q)) K_ab K_cd int_0^1 exp(-rho |PQ|**2 u**2)
+#                         prod_x E_u[(x1 - Ax)^la (x1 - Bx)^lb (x2 - Cx)^lc (x2 - Dx)^ld] du,
+# where E_u is the mean under a Gaussian (one-dimensional for the attraction, mean Px - u**2 (Px - Cx),
+# variance (1 - u**2) / 2p; two-dimensional for the repulsion, means Px - u**2 q (Px - Qx) / (p + q) and
+# Qx + u**2 p (Px - Qx) / (p + q), covariance [[q (1 - u**2) + rho u**2, rho u**2], [rho u**2,
+# p (1 - u**2) + rho u**2]] / 2pq). These means of polynomials of degree <= 4 are exact with the 3-point
+# Gauss-Hermite rule in each direction, and the u integral is done with Gauss-Legendre on
+# [0, min(1, sqrt(46 / T))], T the exponent factor (the integrand is a polynomial times exp(-T u**2)).
+# Overlap and kinetic integrals are one-dimensional Gauss-Hermite quadratures of the same kind.
+
+_Q_Z, _Q_W = np.polynomial.hermite_e.hermegauss(3)
+_Q_W = _Q_W / np.sqrt(2.0 * np.pi)                     # probabilists' rule, weights summing to 1
+_Q_U, _Q_UW = np.polynomial.legendre.leggauss(40)
+_Q_U, _Q_UW = 0.5 * (_Q_U + 1.0), 0.5 * _Q_UW
 
 
-def _g6_memo(f):
-    # memoization of the recursive integral functions (keyed by their positional arguments)
-    cache = {}
-
-    def wrapped(*args):
-        if args not in cache:
-            cache[args] = f(*args)
-        return cache[args]
-    return wrapped
-
-
-_T_AL = np.array([0.109818, 0.405771, 2.22766])
-_T_DC = np.array([0.444635, 0.535328, 0.154329])
-
-
-def _g6_F(m, T):
-    return float(boys_function(m, T)[m])
-
-
-def _g6_basis(zA, zB, aA, aB, R):
-    out = []
-    for cen, z, ap in ((np.zeros(3), zA, aA), (np.array([0.0, 0.0, R]), zB, aB)):
-        e = _T_AL * z * z
-        out.append([(ee, cc, (0, 0, 0), cen) for ee, cc in zip(e, _T_DC * (2 * e / np.pi) ** 0.75)])
-        for ang in ((1, 0, 0), (0, 1, 0), (0, 0, 1)):
-            out.append([(ap, (2 * ap / np.pi) ** 0.75 * 2 * np.sqrt(ap), ang, cen)])
-    return out
+def _q_prims(zA, zB, aA, aB, R):
+    # primitive Cartesian Gaussians: exponent, coefficient (contraction times normalization), angular
+    # exponents (lx, ly, lz), centre, index of the basis function they belong to
+    al = np.array([0.109818, 0.405771, 2.22766])
+    dc = np.array([0.444635, 0.535328, 0.154329])
+    ex, cf, ang, cen, fun = [], [], [], [], []
+    f = 0
+    for c, z, ap in ((np.zeros(3), zA, aA), (np.array([0.0, 0.0, R]), zB, aB)):
+        e = al * z * z
+        for ee, cc in zip(e, dc * (2.0 * e / np.pi) ** 0.75):
+            ex.append(ee); cf.append(cc); ang.append((0, 0, 0)); cen.append(c); fun.append(f)
+        f += 1
+        for l in ((1, 0, 0), (0, 1, 0), (0, 0, 1)):
+            ex.append(ap); cf.append((2.0 * ap / np.pi) ** 0.75 * 2.0 * np.sqrt(ap)); ang.append(l)
+            cen.append(c); fun.append(f)
+            f += 1
+    return (np.array(ex), np.array(cf), np.array(ang), np.array(cen), np.array(fun), f)
 
 
-def _g6_ovl1d(a, la, Ax, b, lb, Bx):
-    # 1-D Obara-Saika overlap of x^la e^{-a x^2} (centred Ax) and x^lb e^{-b x^2} (centred Bx), without (pi/p)^1/2
+def _q_mean1(m, var, A, la, B, lb):
+    # E[(x - A)^la (x - B)^lb] for x ~ N(m, var), 3-point Gauss-Hermite (exact up to degree 5);
+    # arrays broadcast, the quadrature node on the last axis
+    x = m[..., None] + np.sqrt(var)[..., None] * _Q_Z
+    return np.sum(_Q_W * (x - A[..., None]) ** la[..., None] * (x - B[..., None]) ** lb[..., None], axis=-1)
+
+
+def _q_integrals(ZA, ZB, zA, zB, aA, aB, R):
+    ex, cf, ang, cen, fun, nb = _q_prims(zA, zB, aA, aB, R)
+    n = ex.size
+    i, j = np.meshgrid(np.arange(n), np.arange(n), indexing='ij')
+    i, j = i.ravel(), j.ravel()                       # all ordered primitive pairs
+    a, b = ex[i], ex[j]
+    A, B = cen[i], cen[j]
+    la, lb = ang[i], ang[j]
     p = a + b
-    P = (a * Ax + b * Bx) / p
-
-    @_g6_memo
-    def S(i, j):
-        if i < 0 or j < 0:
-            return 0.0
-        if i == 0 and j == 0:
-            return np.exp(-a * b / p * (Ax - Bx) ** 2)
-        if i > 0:
-            return (P - Ax) * S(i - 1, j) + ((i - 1) * S(i - 2, j) + j * S(i - 1, j - 1)) / (2 * p)
-        return (P - Bx) * S(i, j - 1) + (i * S(i - 1, j - 1) + (j - 1) * S(i, j - 2)) / (2 * p)
-    return S(la, lb) * np.sqrt(np.pi / p)
-
-
-def _g6_S(a, la, A, b, lb, B):
-    return np.prod([_g6_ovl1d(a, la[k], A[k], b, lb[k], B[k]) for k in range(3)])
-
-
-def _g6_T(a, la, A, b, lb, B):
-    # (1/2) sum_i <d_i a | d_i b>, d/dx x^l e^{-a x^2} = l x^(l-1) - 2 a x^(l+1)
-    tot = 0.0
-    for k in range(3):
-        da = [(la[k], -2 * a, 1)] + ([(la[k], la[k], -1)] if la[k] > 0 else [])
-        db = [(lb[k], -2 * b, 1)] + ([(lb[k], lb[k], -1)] if lb[k] > 0 else [])
-        for _, ca, sa in da:
-            for _, cb, sb in db:
-                l1 = list(la); l1[k] += sa
-                l2 = list(lb); l2[k] += sb
-                tot += 0.5 * ca * cb * _g6_S(a, l1, A, b, l2, B)
-    return tot
-
-
-def _g6_V(a, la, A, b, lb, B, C):
-    p = a + b
-    P = (a * A + b * B) / p
-    K = np.exp(-a * b / p * np.sum((A - B) ** 2))
-    T = p * np.sum((P - C) ** 2)
-
-    @_g6_memo
-    def V(l1, l2, m):
-        if min(l1) < 0 or min(l2) < 0:
-            return 0.0
-        if sum(l1) == 0 and sum(l2) == 0:
-            return 2 * np.pi / p * K * _g6_F(m, T)
-        if sum(l1) > 0:
-            i = next(k for k in range(3) if l1[k] > 0)
-            d1 = tuple(x - (k == i) for k, x in enumerate(l1))
-            d11 = tuple(x - (k == i) for k, x in enumerate(d1))
-            d2 = tuple(x - (k == i) for k, x in enumerate(l2))
-            r = (P[i] - A[i]) * V(d1, l2, m) - (P[i] - C[i]) * V(d1, l2, m + 1)
-            r += d1[i] / (2 * p) * (V(d11, l2, m) - V(d11, l2, m + 1))
-            r += l2[i] / (2 * p) * (V(d1, d2, m) - V(d1, d2, m + 1))
-            return r
-        i = next(k for k in range(3) if l2[k] > 0)
-        d2 = tuple(x - (k == i) for k, x in enumerate(l2))
-        d22 = tuple(x - (k == i) for k, x in enumerate(d2))
-        d1 = tuple(x - (k == i) for k, x in enumerate(l1))
-        r = (P[i] - B[i]) * V(l1, d2, m) - (P[i] - C[i]) * V(l1, d2, m + 1)
-        r += d2[i] / (2 * p) * (V(l1, d22, m) - V(l1, d22, m + 1))
-        r += l1[i] / (2 * p) * (V(d1, d2, m) - V(d1, d2, m + 1))
-        return r
-    return V(tuple(la), tuple(lb), 0)
-
-
-def _g6_ERI(a, la, A, b, lb, B, c, lc, C, d, ld, D):
-    z, e = a + b, c + d
-    P = (a * A + b * B) / z
-    Q = (c * C + d * D) / e
-    W = (z * P + e * Q) / (z + e)
-    rho = z * e / (z + e)
-    K = np.exp(-a * b / z * np.sum((A - B) ** 2) - c * d / e * np.sum((C - D) ** 2))
-    T = rho * np.sum((P - Q) ** 2)
-    pre = 2 * np.pi ** 2.5 / (z * e * np.sqrt(z + e)) * K
-    cen = (A, B, C, D)
-
-    def dec(l, i):
-        return tuple(x - (k == i) for k, x in enumerate(l))
-
-    @_g6_memo
-    def I(l1, l2, l3, l4, m):
-        ls = (l1, l2, l3, l4)
-        if any(min(l) < 0 for l in ls):
-            return 0.0
-        if all(sum(l) == 0 for l in ls):
-            return pre * _g6_F(m, T)
-        pos = next(q for q in range(4) if sum(ls[q]) > 0)
-        i = next(k for k in range(3) if ls[pos][k] > 0)
-        L = list(ls)
-        L[pos] = dec(ls[pos], i)
-        if pos < 2:      # electron 1, exponent z, centre P
-            Xi, Ce, own, oth = z, P, pos, 1 - pos
-            r = (P[i] - cen[pos][i]) * I(*L, m) + (W[i] - P[i]) * I(*L, m + 1)
-            for q in (0, 1):
-                n = L[q][i]
-                if n > 0:
-                    M = list(L); M[q] = dec(L[q], i)
-                    r += n / (2 * z) * (I(*M, m) - rho / z * I(*M, m + 1))
-            for q in (2, 3):
-                n = L[q][i]
-                if n > 0:
-                    M = list(L); M[q] = dec(L[q], i)
-                    r += n / (2 * (z + e)) * I(*M, m + 1)
-        else:            # electron 2, exponent e, centre Q
-            r = (Q[i] - cen[pos][i]) * I(*L, m) + (W[i] - Q[i]) * I(*L, m + 1)
-            for q in (2, 3):
-                n = L[q][i]
-                if n > 0:
-                    M = list(L); M[q] = dec(L[q], i)
-                    r += n / (2 * e) * (I(*M, m) - rho / e * I(*M, m + 1))
-            for q in (0, 1):
-                n = L[q][i]
-                if n > 0:
-                    M = list(L); M[q] = dec(L[q], i)
-                    r += n / (2 * (z + e)) * I(*M, m + 1)
-        return r
-    return I(tuple(la), tuple(lb), tuple(lc), tuple(ld), 0)
-
-
-def _g6_integrals(ZA, ZB, zA, zB, aA, aB, R):
-    bs = _g6_basis(zA, zB, aA, aB, R)
-    n = len(bs)
-    nuc = ((ZA, np.zeros(3)), (ZB, np.array([0.0, 0.0, R])))
-    S = np.zeros((n, n)); H = np.zeros((n, n)); G = np.zeros((n,) * 4)
-    for i in range(n):
-        for j in range(n):
-            for (a, ca, la, A) in bs[i]:
-                for (b, cb, lb, B) in bs[j]:
-                    S[i, j] += ca * cb * _g6_S(a, la, A, b, lb, B)
-                    H[i, j] += ca * cb * (_g6_T(a, la, A, b, lb, B) - sum(Z * _g6_V(a, la, A, b, lb, B, C) for Z, C in nuc))
-    done = {}
-    for i in range(n):
-        for j in range(n):
-            for k in range(n):
-                for l in range(n):
-                    key = tuple(sorted([tuple(sorted((i, j))), tuple(sorted((k, l)))]))
-                    if key not in done:
-                        done[key] = sum(ca * cb * cc * cd * _g6_ERI(a, la, A, b, lb, B, c, lc, C, d, ld, D)
-                                        for (a, ca, la, A) in bs[i] for (b, cb, lb, B) in bs[j]
-                                        for (c, cc, lc, C) in bs[k] for (d, cd, ld, D) in bs[l])
-                    G[i, j, k, l] = done[key]
+    P = (a[:, None] * A + b[:, None] * B) / p[:, None]
+    Kx = np.exp(-(a * b / p)[:, None] * (A - B) ** 2)          # per direction
+    K = np.prod(Kx, axis=1)
+    # map from primitive pairs to basis-function pairs (mu nb + nu) with the coefficients
+    M = np.zeros((nb * nb, n * n))
+    M[fun[i] * nb + fun[j], np.arange(n * n)] = cf[i] * cf[j]
+    # overlap and kinetic: one-dimensional means under N(Px, 1 / 2p)
+    var = 1.0 / (2.0 * p)
+    s1 = np.empty((n * n, 3))
+    t1 = np.empty((n * n, 3))
+    for x in range(3):
+        m = P[:, x]
+        s1[:, x] = Kx[:, x] * np.sqrt(np.pi / p) * _q_mean1(m, var, A[:, x], la[:, x], B[:, x], lb[:, x])
+        # <d/dx a | d/dx b> with d/dx (x - A)^l e^{-a (x - A)^2} = l (x - A)^(l - 1) - 2a (x - A)^(l + 1)
+        xx = m[:, None] + np.sqrt(var)[:, None] * _Q_Z
+        ya = xx - A[:, x, None]
+        yb = xx - B[:, x, None]
+        da = la[:, x, None] * ya ** np.maximum(la[:, x, None] - 1, 0) - 2.0 * a[:, None] * ya ** (la[:, x, None] + 1)
+        db = lb[:, x, None] * yb ** np.maximum(lb[:, x, None] - 1, 0) - 2.0 * b[:, None] * yb ** (lb[:, x, None] + 1)
+        t1[:, x] = Kx[:, x] * np.sqrt(np.pi / p) * np.sum(_Q_W * da * db, axis=1)
+    ovl = np.prod(s1, axis=1)
+    kin = 0.5 * (t1[:, 0] * s1[:, 1] * s1[:, 2] + s1[:, 0] * t1[:, 1] * s1[:, 2] + s1[:, 0] * s1[:, 1] * t1[:, 2])
+    # nuclear attraction
+    att = np.zeros(n * n)
+    for Z, C in ((ZA, np.zeros(3)), (ZB, np.array([0.0, 0.0, R]))):
+        T = p * np.sum((P - C) ** 2, axis=1)
+        top = np.minimum(1.0, np.sqrt(46.0 / np.maximum(T, 1e-300)))
+        u = top[:, None] * _Q_U[None, :]
+        wu = top[:, None] * _Q_UW[None, :]
+        u2 = u * u
+        prod = np.exp(-T[:, None] * u2)
+        varu = (1.0 - u2) / (2.0 * p[:, None])
+        for x in range(3):
+            mu = P[:, x, None] - u2 * (P[:, x] - C[x])[:, None]
+            prod = prod * _q_mean1(mu, varu, A[:, x, None] * np.ones_like(u), la[:, x, None] * np.ones_like(u, int),
+                                   B[:, x, None] * np.ones_like(u), lb[:, x, None] * np.ones_like(u, int))
+        att -= Z * 2.0 * np.pi / p * K * np.sum(wu * prod, axis=1)
+    S = (M @ ovl).reshape(nb, nb)
+    H = (M @ (kin + att)).reshape(nb, nb)
+    # electron repulsion over all primitive quartets (pair 1, pair 2), in blocks of pair 1
+    V = np.empty((n * n, n * n))
+    zz1 = np.repeat(_Q_Z, 3)
+    zz2 = np.tile(_Q_Z, 3)
+    ww = np.repeat(_Q_W, 3) * np.tile(_Q_W, 3)
+    for lo in range(0, n * n, 12):
+        s = slice(lo, min(lo + 12, n * n))
+        p1, q1 = p[s, None], p[None, :]
+        rho = p1 * q1 / (p1 + q1)
+        PQ = P[s, None, :] - P[None, :, :]
+        T = rho * np.sum(PQ ** 2, axis=2)
+        top = np.minimum(1.0, np.sqrt(46.0 / np.maximum(T, 1e-300)))
+        u = top[..., None] * _Q_U
+        wu = top[..., None] * _Q_UW
+        u2 = u * u
+        prod = np.exp(-T[..., None] * u2)
+        p3, q3, r3 = p1[..., None], q1[..., None], rho[..., None]
+        c11 = (q3 * (1.0 - u2) + r3 * u2) / (2.0 * p3 * q3)
+        c12 = r3 * u2 / (2.0 * p3 * q3)
+        c22 = (p3 * (1.0 - u2) + r3 * u2) / (2.0 * p3 * q3)
+        L11 = np.sqrt(c11)
+        L21 = c12 / L11
+        L22 = np.sqrt(np.maximum(c22 - L21 * L21, 0.0))
+        for x in range(3):
+            d = PQ[..., x][..., None]
+            m1 = P[s, None, x][..., None] - u2 * q3 / (p3 + q3) * d
+            m2 = P[None, :, x][..., None] + u2 * p3 / (p3 + q3) * d
+            x1 = m1[..., None] + L11[..., None] * zz1
+            x2 = m2[..., None] + L21[..., None] * zz1 + L22[..., None] * zz2
+            f1 = ((x1 - A[s, None, x, None, None]) ** la[s, None, x, None, None]
+                  * (x1 - B[s, None, x, None, None]) ** lb[s, None, x, None, None])
+            f2 = ((x2 - A[None, :, x, None, None]) ** la[None, :, x, None, None]
+                  * (x2 - B[None, :, x, None, None]) ** lb[None, :, x, None, None])
+            prod = prod * np.sum(ww * f1 * f2, axis=-1)
+        V[s] = (2.0 * np.pi ** 2.5 / (p1 * q1 * np.sqrt(p1 + q1)) * K[s, None] * K[None, :]
+                * np.sum(wu * prod, axis=-1))
+    G = (M @ V @ M.T).reshape(nb, nb, nb, nb)
     return S, H, G
 
 
 def polarized_energies(ZA, ZB, zetaA, zetaB, alphaA, alphaB, R):
     '''Full-CI and RHF energies of a two-electron diatomic in the STO-3G 1s + p-shell basis.'''
-    # Other routes: full CI in the singlet configuration functions (i <= j) of Loewdin
-    # orbitals; RHF by steepest descent along great circles with an exact line search.
-    S, H, G = _g6_integrals(ZA, ZB, zetaA, zetaB, alphaA, alphaB, R)
+    # Other routes: RHF by steepest descent along great circles with an exact line search from many
+    # starting orbitals; full CI in the whole 64-dimensional product space of the RHF orbitals with a
+    # spin penalty on the spatially antisymmetric (triplet) states.
+    S, H, G = _q_integrals(ZA, ZB, zetaA, zetaB, alphaA, alphaB, R)
     n = S.shape[0]
     w, U = np.linalg.eigh(S)
     X = U @ np.diag(w ** -0.5) @ U.T
     h = X.T @ H @ X
     g = np.einsum("pi,qj,rk,sl,pqrs->ijkl", X, X, X, X, G)
-    pairs = [(i, j) for i in range(n) for j in range(i, n)]
-
-    def norm(i, j):
-        return 0.5 if i == j else np.sqrt(0.5)
-
-    M = np.zeros((len(pairs), len(pairs)))
-    I = np.eye(n)
-    for a, (i, j) in enumerate(pairs):
-        for b, (k, l) in enumerate(pairs):
-            # singlet |ij> = N (chi_i chi_j + chi_j chi_i); matrix element from the product basis
-            val = 0.0
-            for (p, q) in ((i, j), (j, i)):
-                for (r, s) in ((k, l), (l, k)):
-                    val += h[p, r] * I[q, s] + I[p, r] * h[q, s] + g[p, r, q, s]
-            M[a, b] = norm(i, j) * norm(k, l) * val
-    E_fci = float(np.linalg.eigvalsh(M)[0]) + ZA * ZB / R
 
     def energy(x):
         return float(2.0 * (x @ h @ x) + np.einsum("i,j,k,l,ijkl->", x, x, x, x, g))
@@ -556,7 +493,7 @@ def polarized_energies(ZA, ZB, zetaA, zetaB, alphaA, alphaB, R):
         return r - (r @ x) * x
 
     rng = np.random.default_rng(77)
-    best = np.inf
+    best, best_x = np.inf, None
     for x in list(np.linalg.eigh(h)[1].T) + list(rng.normal(size=(40, n))):
         x = x / np.linalg.norm(x)
         for _ in range(3000):
@@ -572,7 +509,20 @@ def polarized_energies(ZA, ZB, zetaA, zetaB, alphaA, alphaB, R):
             if energy(y) >= energy(x):
                 break
             x = y / np.linalg.norm(y)
-        best = min(best, energy(x))
+        if energy(x) < best:
+            best, best_x = energy(x), x
     E_rhf = best + ZA * ZB / R
+    # full CI: orthonormal orbitals = the RHF orbital and an orthonormal complement (QR), product
+    # functions chi_i(1) chi_j(2) with <ij|H|kl> = h_ik d_jl + d_ik h_jl + (ik|jl), and the penalty
+    # lambda (1 - P12) / 2 (P12 exchanges the electrons, lambda = 20 hartree) that lifts every triplet
+    # above the singlets, so the lowest eigenvalue is the lowest singlet
+    Q = np.linalg.qr(np.column_stack([best_x, np.eye(n)]))[0][:, :n]
+    hm = Q.T @ h @ Q
+    gm = np.einsum("pi,qj,rk,sl,pqrs->ijkl", Q, Q, Q, Q, g)
+    I = np.eye(n)
+    Hp = (np.einsum("ik,jl->ijkl", hm, I) + np.einsum("ik,jl->ijkl", I, hm)
+          + np.einsum("ikjl->ijkl", gm)).reshape(n * n, n * n)
+    P12 = np.einsum("il,jk->ijkl", I, I).reshape(n * n, n * n)
+    E_fci = float(np.linalg.eigvalsh(Hp + 10.0 * (np.eye(n * n) - P12))[0]) + ZA * ZB / R
     result = (float(E_fci), float(E_rhf))
     return result

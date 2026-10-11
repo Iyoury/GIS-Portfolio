@@ -66,6 +66,7 @@ def _t_check(out, args):
     assert isinstance(out, tuple) and len(out) == 2
     S, H = out
     assert isinstance(S, np.ndarray) and isinstance(H, np.ndarray)
+    assert np.issubdtype(S.dtype, np.floating) and np.issubdtype(H.dtype, np.floating), (S.dtype, H.dtype)
     assert S.shape == (2, 2) and H.shape == (2, 2)
     S_t, H_t = _t_one(*args)
     assert np.max(np.abs(np.asarray(S) - np.asarray(S_t))) <= 1e-10, (S, S_t)
@@ -140,6 +141,7 @@ def _t_check(out, args):
     assert isinstance(out, tuple) and len(out) == 2
     S, H = out
     assert isinstance(S, np.ndarray) and isinstance(H, np.ndarray)
+    assert np.issubdtype(S.dtype, np.floating) and np.issubdtype(H.dtype, np.floating), (S.dtype, H.dtype)
     assert S.shape == (2, 2) and H.shape == (2, 2)
     S_t, H_t = _t_one(*args)
     assert np.max(np.abs(np.asarray(S) - np.asarray(S_t))) <= 1e-10, (S, S_t)
@@ -215,6 +217,7 @@ def _t_check(out, args):
     assert isinstance(out, tuple) and len(out) == 2
     S, H = out
     assert isinstance(S, np.ndarray) and isinstance(H, np.ndarray)
+    assert np.issubdtype(S.dtype, np.floating) and np.issubdtype(H.dtype, np.floating), (S.dtype, H.dtype)
     assert S.shape == (2, 2) and H.shape == (2, 2)
     S_t, H_t = _t_one(*args)
     assert np.max(np.abs(np.asarray(S) - np.asarray(S_t))) <= 1e-10, (S, S_t)
@@ -288,6 +291,7 @@ def _t_check(out, args):
     assert isinstance(out, tuple) and len(out) == 2
     S, H = out
     assert isinstance(S, np.ndarray) and isinstance(H, np.ndarray)
+    assert np.issubdtype(S.dtype, np.floating) and np.issubdtype(H.dtype, np.floating), (S.dtype, H.dtype)
     assert S.shape == (2, 2) and H.shape == (2, 2)
     S_t, H_t = _t_one(*args)
     assert np.max(np.abs(np.asarray(S) - np.asarray(S_t))) <= 1e-10, (S, S_t)
@@ -376,6 +380,7 @@ def _t_check(out, args):
     assert isinstance(out, tuple) and len(out) == 2
     S, H = out
     assert isinstance(S, np.ndarray) and isinstance(H, np.ndarray)
+    assert np.issubdtype(S.dtype, np.floating) and np.issubdtype(H.dtype, np.floating), (S.dtype, H.dtype)
     assert S.shape == (2, 2) and H.shape == (2, 2)
     S_t, H_t = _t_one(*args)
     assert np.max(np.abs(np.asarray(S) - np.asarray(S_t))) <= 1e-10, (S, S_t)

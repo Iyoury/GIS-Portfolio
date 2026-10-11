@@ -1,14 +1,18 @@
 # --- test case 0 ---
 import numpy as np
 
+# targets: the estimators of the prompt evaluated in extended precision (mpmath) from independent inputs:
+# f_W, xi_spin and xi_energy from Kaufman's exact strip spectrum; m_W, chi_W and H_edge(W) from the
+# zero-momentum block of the transfer matrix (50-digit diagonalization, 90-digit second difference in h,
+# 40-digit root of the leading-pair discriminant)
 out = critical_exponents(4)
 expected = {
-    "x_sigma": 0.12892232785193444,
+    "x_sigma": 0.12892232785193442,
     "x_energy": 0.952153234423053,
-    "beta_over_nu": 0.1192889730965362,
-    "gamma_over_nu": 1.8112793749049496,
-    "y_h": 1.9318245860885825,
-    "c": 0.4950743416965247,
+    "beta_over_nu": 0.11928897309653642,
+    "gamma_over_nu": 1.8112793749049443,
+    "y_h": 1.931824586088568,
+    "c": 0.4950743416963288,
 }
 assert isinstance(out, dict) and set(out) == set(expected)
 assert all(isinstance(v, float) for v in out.values())
@@ -18,14 +22,18 @@ for key, value in expected.items():
 # --- test case 1 ---
 import numpy as np
 
+# targets: the estimators of the prompt evaluated in extended precision (mpmath) from independent inputs:
+# f_W, xi_spin and xi_energy from Kaufman's exact strip spectrum; m_W, chi_W and H_edge(W) from the
+# zero-momentum block of the transfer matrix (50-digit diagonalization, 90-digit second difference in h,
+# 40-digit root of the leading-pair discriminant)
 out = critical_exponents(6)
 expected = {
-    "x_sigma": 0.12656074717880184,
-    "x_energy": 0.9778985038020392,
-    "beta_over_nu": 0.12244327675045068,
-    "gamma_over_nu": 1.7759995588747937,
-    "y_h": 1.8986874467776071,
-    "c": 0.49823978745756425,
+    "x_sigma": 0.12656074717880197,
+    "x_energy": 0.9778985038020386,
+    "beta_over_nu": 0.1224432767504538,
+    "gamma_over_nu": 1.7759995588747775,
+    "y_h": 1.8986874467775703,
+    "c": 0.4982397874572249,
 }
 assert isinstance(out, dict) and set(out) == set(expected)
 assert all(isinstance(v, float) for v in out.values())
@@ -35,11 +43,13 @@ for key, value in expected.items():
 # --- test case 2 ---
 import numpy as np
 
-# width endpoints L = 3 and L = 7 (values cross-checked by the two solutions, 1e-12)
-for L, expected in ((3, {"x_sigma": 0.1322568028591277, "x_energy": 0.9190468875900993, "beta_over_nu": 0.11479064707719389,
-                         "gamma_over_nu": 1.8496126199116005, "y_h": 1.9673692810059342, "c": 0.4987546714035908}),
-                    (7, {"x_sigma": 0.12611511593158228, "x_energy": 0.9836222211786327, "beta_over_nu": 0.12310599848615947,
-                         "gamma_over_nu": 1.768763273117929, "y_h": 1.8919597616888932, "c": 0.49906830035366995})):
+# targets: the estimators of the prompt evaluated in extended precision (mpmath) from independent inputs:
+# f_W, xi_spin and xi_energy from Kaufman's exact strip spectrum; m_W, chi_W and H_edge(W) from the
+# zero-momentum block of the transfer matrix (50-digit diagonalization, 90-digit second difference in h,
+# 40-digit root of the leading-pair discriminant)
+# width endpoints L = 3 and L = 7
+for L, expected in ((3, {"x_sigma": 0.13225680285912744, "x_energy": 0.9190468875900993, "beta_over_nu": 0.11479064707719534, "gamma_over_nu": 1.849612619911595, "y_h": 1.967369281005889, "c": 0.4987546714036298}),
+                    (7, {"x_sigma": 0.12611511593158242, "x_energy": 0.983622221178631, "beta_over_nu": 0.12310599848616365, "gamma_over_nu": 1.7687632731179646, "y_h": 1.8919597616887955, "c": 0.49906830035341704})):
     out = critical_exponents(L)
     assert isinstance(out, dict) and set(out) == set(expected)
     assert all(isinstance(v, float) for v in out.values())

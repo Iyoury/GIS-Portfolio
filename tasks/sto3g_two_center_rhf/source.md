@@ -31,8 +31,9 @@ The combination of steps, the treatment of the dissociation limit and the parame
 Checks for steps 4 and 5: the reference full CI (configuration state functions in the RHF orbitals) is
 the lowest singlet. It agrees to about 1e-14 hartree with the lowest eigenvalue of the non-orthogonal
 product-basis Hamiltonian restricted to the three symmetric (singlet) product functions, and with the
-second solution (Loewdin orbitals). It is not always the lowest eigenvalue of the full 4 x 4 product
-space: for diffuse exponents at stretched R the triplet lies below the singlet in this basis (by
+second solution (version 15: the full product space of its RHF orbitals with a spin penalty on the
+triplet, within 9.1e-13 on 540 points; version 14: Loewdin orbitals). It is not always the lowest
+eigenvalue of the full 4 x 4 product space: for diffuse exponents at stretched R the triplet lies below the singlet in this basis (by
 6.3e-3 hartree at ZA = ZB = 2, zeta = 0.8, R = 4 bohr; see version 14). The analytic limit reproduces
 He = -2.643876 and H = -0.466582 hartree in this basis, and E_fci(R) - E_inf times R tends to the
 fragment-charge product (for example -1 for the ion pair).
@@ -50,23 +51,33 @@ analytic tail integrated outward with solve_ivp, with Sturm node counting and bi
 starts polished by a maximum-overlap SCF, and full CI in the symmetric product functions of Loewdin
 orbitals.
 
-The second solution uses other methods where practical: composite Gauss-Legendre quadrature of the
-defining integral for F_n (since version 13); shell-theorem radial quadrature instead of closed-form
-Gaussian integrals for steps 2 and 3 (the formulation of the test oracles, so there it is a second
-implementation of the oracle method rather than a third method); for step 4 RHF by direct
-minimization over the angle of the normalized coefficient vector (1440-point scan, every local minimum
-refined) and full CI in Loewdin orbitals; for step 5 its own fci_energy sampled on 200 Chebyshev nodes
-in ln R on [0.3 bohr, r_c] and interpolated, the exact separated-fragment tail beyond r_c, and a
-Colbert-Miller sinc DVR whose length is doubled and whose step is refined until the five levels change
-by less than 1e-4 cm^-1 (since version 12); for step 6 Obara-Saika integrals, full CI in singlet
-configuration functions and RHF by steepest descent along great circles with Brent line searches.
+The second solution (version 15) uses a third method wherever the reference and the test oracles
+differ: composite Gauss-Legendre quadrature of the defining integral for F_n (since version 13);
+momentum-space (Fourier) radial integrals for steps 2 and 3 (overlap and kinetic energy from the
+Fourier transforms of the two primitives and Parseval's theorem, attraction and repulsion from the
+Fourier transform of the Gaussian charge cloud and the Coulomb kernel 4 pi / k^2, the angular average
+giving j0(k d), the k integral by composite Gauss-Legendre; no erf, no Boys function); for step 4 RHF
+from the exact trigonometric-polynomial form of E(theta) (harmonics 0, 2, 4, coefficients from 8
+samples) and the roots of its derivative (a quartic in exp(2 i theta)), and full CI in the whole
+4-dimensional product space of the RHF orbitals with a spin penalty 20 (1 - P12) / 2 hartree on the
+triplet; for step 5 the one-centre integrals of the limit from the same momentum-space integrals, its
+own fci_energy sampled on 200 Chebyshev nodes in ln R on [0.3 bohr, r_c] and interpolated, the exact
+separated-fragment tail beyond r_c, and a Colbert-Miller sinc DVR whose length is doubled and whose step
+is refined until the five levels change by less than 1e-4 cm^-1 (since version 12); for step 6
+Gaussian-transform (Rys-type) integrals, 1/r = (2/sqrt(pi)) int exp(-s^2 r^2) ds with the x, y, z
+factors done exactly by 3-point Gauss-Hermite rules and the transform variable by Gauss-Legendre, RHF
+by steepest descent along great circles with Brent line searches, and full CI in the 64-dimensional
+product space of the RHF orbitals with the same spin penalty.
 
-Superseded descriptions, kept for the record (earlier versions of this file): the step 5 reference
-was a sinc DVR on a widening fixed domain until version 11; the second solution then used Chebyshev
-spectral collocation for the levels, and direct orbital minimization against the self-consistent field
-that the step 4 reference used until version 9; the step 1 target was a 400-point Gauss-Legendre
-quadrature of F0 until version 6, and the levels target was renormalized Numerov shooting until
-version 7. None of these is used now.
+Superseded descriptions, kept for the record (earlier versions of this file): until version 14 the
+second solution reused the test-oracle code for the integrals of steps 2-3 (shell-theorem quadrature)
+and step 6 (Obara-Saika), found the step 4 RHF with the scan-and-refine formulation of the step 4 oracle
+and did both full CIs in Loewdin orbitals restricted to singlet functions (as the step 6 reference);
+the step 5 reference was a sinc DVR on a widening fixed domain until version 11; the second solution
+then used Chebyshev spectral collocation for the levels, and direct orbital minimization against the
+self-consistent field that the step 4 reference used until version 9; the step 1 target was a
+400-point Gauss-Legendre quadrature of F0 until version 6, and the levels target was renormalized
+Numerov shooting until version 7. None of these is used now.
 
 ## How the test targets are obtained
 
@@ -82,7 +93,8 @@ No target is copied from the reference solution. Every test computes its own tar
 | dissociation limit (step 5) | one-centre norm, core energy and (aa\|aa) by adaptive radial quadrature (scipy quad, the Coulomb term through the radial potential of the charge cloud); lowest of the three fragment arrangements | about 1e-12 hartree |
 | vibrational levels (step 5) | full-CI curve from test-side closed-form s-Gaussian integrals vectorized over R (F0 from erf with its small-argument series) and the singlet generalized eigenproblem; second-order finite differences with Dirichlet walls on steps 0.004, 0.002 and 0.001 bohr over [0.25, 22] bohr, extrapolated twice by Richardson (tridiagonal eigenproblems); for the near-threshold case 6 the exact separated-fragment tail beyond 30 bohr (asserted equal to the curve there to 1e-12 hartree) and outer walls at 150 and 250 bohr, which agree to 1e-3 cm^-1 | below 1e-3 cm^-1; test tolerance 0.01 cm^-1 |
 | E_fci, E_rhf with p shells (step 6, general) | Obara-Saika overlap, nuclear-attraction and repulsion integrals, kinetic energy as (1/2) sum_i <d_i a\|d_i b>, F_m from Kummer's function 1F1 (scipy hyp1f1); full CI as the generalized eigenproblem in the non-orthogonal symmetric product functions; RHF by BFGS from 40 random starts with the fixed seed 2024 | integrals agreed with the reference to 5e-15 and energies to 2e-14 on 16 random points (version 7); test tolerance 1e-9 absolute |
-| sanity bands | Szabo and Ostlund values: S01, H00, H01, (00\|00), (00\|11), (01\|01), (00\|01) for H2; S01, H00, H01, H11 for HeH+; E_rhf = -1.1167 (H2) and -2.8607 (HeH+), E_fci = -1.1373 (H2), also as the 1s-only upper bounds in step 6 case 0; stretched H2 full CI near 2 x -0.466582 | bands of 1e-4 to 2e-3 only |
+| 1s-only bounds (step 6 case 0) | the step 6 oracle restricted to the two 1s functions (generalized-eigenproblem full CI, BFGS RHF); the candidate must lie below it by more than 1e-3 (full CI) and 1e-4 (RHF), the actual lowerings being 0.0130 and 0.0036 hartree | variational principle |
+| sanity bands | Szabo and Ostlund values: S01, H00, H01, (00\|00), (00\|11), (01\|01), (00\|01) for H2; S01, H00, H01, H11 for HeH+; E_rhf = -1.1167 (H2) and -2.8607 (HeH+), E_fci = -1.1373 (H2), also checked against the 1s-only oracle values of step 6 case 0; stretched H2 full CI near 2 x -0.466582 | bands of 1e-4 to 2e-3 only |
 
 ## Version 2 changes
 
@@ -376,3 +388,133 @@ the regression test and what was rerun.
   - Repeat runs in clean processes (boundary inputs of steps 2-4 included): solution.py gives bitwise
     identical outputs in two runs and with one BLAS/OpenMP thread. second_solution.py is identical in two
     runs; with one thread only its vibrational levels move, by 4e-10 cm^-1.
+
+## Version 15 (grading_fix: authoring-guide conformance, pass 2)
+
+Fixes for the remaining findings of the round-1 independent verification and for the pass-2 rules. No
+reference algorithm, target, stated tolerance or input domain was changed. Each item gives the finding,
+its cause, the change, the regression test and what was rerun. The round-1 findings on the step 4
+singlet, the step 2-4 input ranges, the undeclared step 5 dependencies and the superseded method
+descriptions were already fixed in version 14 (see above) and were rechecked here.
+
+- Second solution copied the test oracles (rule D).
+  - Finding: in second_solution.py, sto3g_one_electron and sto3g_two_electron were the shell-theorem
+    quadrature of the step 2-4 test oracles and the step 6 integrals (_g6_*) the Obara-Saika code of
+    the step 6 / general oracle, line for line apart from names; the step 4 RHF used the oracle's
+    formulation (v / sqrt(v S v), periodic scan, every local minimum refined by Brent), and the step 6
+    full CI was the reference's construction (Loewdin orbitals restricted to symmetric product
+    functions). Passing those tests added no independent evidence there.
+  - Cause: the second solution of versions 7 and 10 was written from the oracle code.
+  - Change: new methods, different from both the reference and the oracles.
+    - Steps 2-3 (and the one-centre integrals of the step 5 limit): momentum space. Overlap and kinetic
+      energy from the Fourier transforms of the two primitives and Parseval's theorem; attraction and
+      repulsion from the Fourier transform of the Gaussian charge cloud and the Coulomb kernel
+      4 pi / k^2; the angular average gives j0(k d), and the radial k integral is done by composite
+      16-point Gauss-Legendre on panels no wider than half an oscillation period (no erf, no F0).
+    - Step 4 RHF: E(theta) = 2 c.H.c + (cc|cc) with c = S^(-1/2) (cos theta, sin theta) is a
+      trigonometric polynomial with harmonics 0, 2 and 4; its five coefficients come exactly from 8
+      samples, its stationary points are the arguments of the roots of a quartic in exp(2 i theta)
+      (numpy roots, then Newton steps), and the lowest value is kept. No scan, no Brent search.
+    - Step 4 and step 6 full CI: the whole product space of the RHF orbitals (occupied orbital plus its
+      orthogonal complement; 4 and 64 functions) with the spin penalty 20 (1 - P12) / 2 hartree, P12 the
+      exchange of the electrons, which lifts every spatially antisymmetric (triplet) state, instead of
+      a restriction to singlet functions. A first version in Loewdin orbitals erred by 1.3e-10 hartree
+      at R = 0.1 bohr, zeta = 0.5 (rounding amplified by the nearly singular overlap), so the RHF-orbital
+      basis is used.
+    - Step 6 integrals: Gaussian transform 1/r = (2 / sqrt(pi)) int exp(-s^2 r^2) ds (Rys-type). With
+      u^2 = s^2 / (rho + s^2) every attraction and repulsion integral is an integral over u in [0, 1] of
+      exp(-T u^2) times a product of x, y and z factors, each the mean of a polynomial under a one- or
+      two-dimensional Gaussian; the means are exact with 3-point Gauss-Hermite rules and the u integral
+      uses 40-point Gauss-Legendre on [0, min(1, sqrt(46 / T))]. Overlap and kinetic integrals are
+      one-dimensional Gauss-Hermite quadratures. No Boys function, no Hermite expansion, no recursion.
+    - Unchanged: Gauss-Legendre quadrature of the Boys integral (step 1), the Chebyshev interpolant
+      in ln R and sinc DVR of step 5, and RHF by great-circle steepest descent in step 6.
+  - Regression tests and checks (single-threaded BLAS):
+    - Integrals of steps 2-3 against the reference on 288 points (Z = (1,1), (3,3), (1,3), (2,1);
+      zetaA = 0.5, 1.24, 3; zetaB = 0.5, 2, 3; R = 0.02 to 100 bohr): within 7.1e-15 (one-electron), and
+      within 4.4e-16 for the repulsion integrals on the 72 of them with Z = (1, 1) (they do not depend
+      on Z). Against a 50-digit mpmath evaluation of the closed forms (written for this
+      check) at R = 0.02, 7 and 100 bohr with zeta = 0.5 and 3: within 3.6e-15.
+    - fci_energy against the reference on 540 points (ZA = 1, 2, 3; ZB = 1, 3; zeta = 0.5, 1.2, 3;
+      R = 0.1 to 100 bohr): within 9.1e-13 (full CI) and 7.1e-14 (RHF). Against the 50-digit evaluation
+      (singlet full CI by Cholesky-reduced generalized eigenproblem, RHF by scan and root of dE/dtheta)
+      at (3, 3, 0.5, 0.5, 0.1), (1, 3, 3, 0.5, 0.1), (1, 1, 0.5, 0.5, 0.1), (3, 1, 3, 0.5, 100),
+      (2, 2, 0.8, 0.8, 4), (1, 1, 1.24, 1.24, 1.4) and (3, 3, 3, 3, 0.1): within 3.5e-13 (full CI) and
+      5.1e-14 (RHF); the reference is within 5.6e-13 and 3.7e-14 there.
+    - Step 6 integrals against the reference McMurchie-Davidson integrals at four inputs, including the
+      range ends (3, 1, 3, 0.5, 5, 0.1, 0.3) and (1, 3, 0.5, 3, 0.1, 5, 10): within 2.4e-15 (S),
+      1.6e-14 (H) and 3.1e-15 (repulsion). polarized_energies against the reference on all ten step 6
+      and general test inputs: within 1.7e-14 hartree.
+    - vibrational_levels against the reference on all ten step 5 test inputs: within 1.5e-6 cm^-1.
+    - crown_check SECOND: all cases of steps 1-6 and general pass (results below).
+    - Runtime per call (one thread): step 4 below 0.05 s, step 5 about 2 s (10 s for the near-threshold
+      case), step 6 4.5-27 s (the great-circle RHF from 48 starts dominates).
+- Step 5 mutants built on a superseded solver (rule E).
+  - Finding: step_5_total_mass, step_5_harmonic_levels, step_5_limit_at_finite_distance and the
+    vibrational_levels of whole_task_missing_hermite_sign were the version-11 sinc-DVR solver (h = 0.03,
+    walls up to 36 bohr, fci_energy calls), which is itself wrong for test case 6, so each carried two
+    deviations; limit_at_finite_distance failed case 6 because of its wall, not its limit.
+  - Cause: the mutants were not rebuilt when the step 5 reference was rewritten in version 12.
+  - Change: each is now the current solution/step_5.py with one change: total_mass uses
+    mu = (massA + massB) u; limit_at_finite_distance measures the levels from E_fci(60 bohr) instead of
+    the exact limit (levels shifted by E_inf - E_fci(60) = -q_A q_B / 60 hartree); harmonic_levels
+    replaces the radial solver by harmonic-oscillator levels V(R_e) + omega (v + 1/2) from the curvature
+    at the minimum of the same curve. The whole-task mutant is now the current solution.py with only the
+    sign (-1)^(tau + nu + phi) dropped.
+  - Regression test: crown_check MUT. limit_at_finite_distance now fails exactly the two charged-fragment
+    cases 2 and 3 (and passes the neutral-fragment case 6), as its description says.
+- Step 6 prompt did not name boys_function (rule F).
+  - Change: "the Coulomb integrals need the Boys functions F_0 .. F_4: use boys_function (step 1)".
+    step_dependencies stays [1] (the step 6 reference calls only boys_function).
+- Step 6 case 0 bound and slack (rule G, task note).
+  - Finding: the case bounded the result by the 4-digit Szabo-Ostlund 1s-only values (version 14; it
+    had used fci_energy from the evaluation context before) and required E_fci < E_rhf strictly.
+  - Change: the 1s-only bound now comes from the case's own Obara-Saika oracle restricted to the two 1s
+    functions (the Szabo-Ostlund values check that restricted oracle with 2e-4 bands); margins 1e-3 and
+    1e-4 as before (actual lowerings 0.0130 and 0.0036 hartree); the ordering is E_fci <= E_rhf + 2e-9
+    (two outputs, each within 1e-9), as in step 4.
+  - Regression test: step 6 case 0 with the reference, the second solution and the ±1e-12 shift.
+- General tests (rule A): every case already called polarized_energies against the independent
+  oracle. Case 0 now also checks the integrated link with step 4: the 8-function basis contains the two
+  1s functions, so polarized_energies <= fci_energy (both energies) at the same geometry, slack 2e-9
+  (actual lowerings 0.0034 and 0.0037 hartree), and E_fci <= E_rhf + 2e-9.
+- Hidden test inputs in visible text (rule B).
+  - Finding: the step 4 step_background quoted the literature energies for H2 at R = 1.4 bohr with
+    zeta = 1.24, which is a step 4 test input; the step 5 step_background named He2 2+, the system of the
+    step 5 error case.
+  - Change: the step 4 background states only the size of the correlation energy, the step 5 background
+    says that a well above the limit gives no bound levels. The step 5 prompt sentence on the reach of
+    near-threshold levels now says "with 1 u nuclei" (the reach shrinks for heavier nuclei, so the
+    unqualified sentence was not accurate over the whole mass range). background.md still describes the
+    Szabo-Ostlund textbook examples (H2 at 1.4 bohr, HeH+ at 1.4632 bohr) as literature context; they
+    are not prompt or docstring text, and their 4-5 digit values are far from the 1e-9 grading
+    tolerance.
+- Stated behaviour not tested (rule F): the prompts say "float numpy array" for steps 1, 2, 3 and 5;
+  the tests now assert a floating dtype. The step 5 levels oracle helper is renamed _t_fd_levels (it is
+  finite differences with Richardson extrapolation, not Numerov).
+- Unused dependency: "from scipy.integrate import quad" is removed from required_dependencies and from
+  the scaffold, solution, second-solution and mutant headers (no solution used it). The step 5 tests
+  import quad themselves for their one-centre oracle.
+- Step 4 contract: the error figures for short R (1.4e-10 at 0.1 bohr, ...) are labelled as the version-14
+  measurements of the formulations checked then.
+- Step 5 runtime (round-1 advisory). Measured here with one BLAS thread, each case alone in a fresh
+  process with the reference: cases 0-7 take 8.5, 16.7, 9.3, 9.1, 16.2, 35.6, 14.4 and 1.0 s (the oracle
+  included). Single reference calls at the corners named by the verifier, (2, 1, 3, 3, 10, 10),
+  (2, 1, 3, 1.24, 10, 10) and (1, 1, 3, 0.8, 10, 1), take 9.9, 11.9 and 7.5 s; the 33-53 s seen in round
+  1 were under heavier CPU load. No case was split.
+- Rerun after all changes: tools/crown_check.py, all modes, every case alone in a fresh process, one
+  BLAS/OpenMP thread, -j 2.
+  - FORMAT OK (no problems; every general case calls polarized_energies).
+  - REF: steps 1-6 pass 5/5, 6/6, 5/5, 8/8, 8/8 and 4/4; general 3/3; solution.py also passes every
+    step file.
+  - SECOND: all cases of steps 1-6 and general pass.
+  - Mutants: upward_recursion fails 3/5 (cases 0, 1, 3); zeta_not_squared 4/6 (0, 1, 3, 5);
+    wrong_boys_argument 4/5 (0, 1, 2, 4); full_exchange 8/8; orthonormal_atomic_basis 8/8;
+    single_start_scf 1/8 (5); lowest_product_eigenvalue 1/8 (6); limit_at_finite_distance 2/8 (2, 3);
+    total_mass 7/8 (0-6); harmonic_levels 7/8 (0-6); kinetic_without_angular_momentum 4/4;
+    sigma_p_only 4/4; aufbau_scf 1/4 (2); whole_task_missing_hermite_sign 3/3 general cases.
+  - SHIFT ±1e-12: every step case passes, and every general case with all six functions shifted.
+  - All-None and all-zero controls pass 0 cases in every step and in general.
+  - Repeat runs: second_solution.py gives bitwise identical outputs of all six functions (range-end
+    inputs of steps 2-4 and 6, one step 5 input) in two clean processes with one thread. Runs with more
+    threads were not made here (shared CPU).

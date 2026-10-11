@@ -7,7 +7,8 @@
 
 # --- test case 0 ---
 # classical gas without pairs: n_net = n_- = theta K2(1/theta) e^psi / (pi^2 lambda^3)
-# (positrons below 1e-30 of the electrons, Fermi corrections below 1e-11), so psi follows in closed form
+# (positrons below 2e-19 of the electrons, shifting psi by less than 1e-20 relative; Fermi corrections
+# below 1e-11), so psi follows in closed form
 import numpy as np
 import mpmath as _t_mp
 

@@ -378,7 +378,7 @@ def substitution_times(N, s, u, v):
       u: float, mutation probability A -> a per generation, 1e-12 <= u <= 0.1.
       v: float, mutation probability a -> A per generation, 1e-12 <= v <= 0.1.
       Inputs for which t_up or t_down would exceed 1e300 generations are outside the domain (within these
-      ranges only t_up can be that large, near N = 400, s = -0.5, u = 0.1, v = 1e-12).
+      ranges only t_up can be that large, and only if N >= 370, s <= -0.46, u >= 0.06 and v <= 3e-3).
 
     Output:
       (t_up, t_down): tuple of two Python floats.
@@ -386,8 +386,8 @@ def substitution_times(N, s, u, v):
               for the first time.
         t_down: mean number of generations for a population fixed for A (i = N) to reach i = 0 for
                 the first time.
-        Each with a relative error below 1e-8, however large (t_down is about 1e150 at
-        N = 400, s = 0.5, u = v = 1e-12).
+        Each with a relative error below 1e-8, however large (above 1e248 generations for some
+        inputs at N = 400).
 
     Raises:
       ValueError if N is not an integer in [1, 400], or if s, u or v is not finite or is outside its
@@ -484,11 +484,36 @@ def quasi_stationary(N, s, v):
 
 
 def fastest_mode(N, s, u, v):
-    '''Smallest eigenvalue of the Wright-Fisher transition matrix and its right eigenvector.'''
-    # Other methods: the elementary symmetric functions of the nodes without x_a are the convolution of
-    # the coefficients of prod_{k<a} (1 + x_k t) and prod_{k>a} (1 + x_k t) (prefix and suffix products);
-    # the Perron pair of |P_II^-1| comes from a dense eigensolver after a diagonal similarity that balances
-    # its rows and columns, and the eigenvector is then polished by fixed-point sweeps in logarithms.
+    '''Smallest eigenvalue of the Wright-Fisher transition matrix and its right eigenvector.
+
+    Inputs:
+      N: int, population size, 1 <= N <= 400.
+      s: float, selection coefficient of A, -0.5 <= s <= 0.5.
+      u, v: float, mutation probabilities A -> a and a -> A per generation, each either 0 or in [1e-12, 0.1]
+            (v = 0 makes i = 0 absorbing, u = 0 makes i = N absorbing).
+
+    Output:
+      lam_min: Python float, the smallest eigenvalue of the transition matrix P of step 1
+               (wf_transition_matrix), with a relative error below 1e-8.
+      mode: numpy float array of shape (N + 1,), the right eigenvector (P mode = lam_min mode), scaled so
+            that max_i |mode[i]| = 1 and its first entry that is not on an absorbing state is positive;
+            every entry with an error below 1e-8 times its absolute value, except on the absorbing states,
+            where the exact entries are zero and the returned entries must be below 1e-250 in absolute value.
+
+    Raises:
+      ValueError if N is not an integer in [1, 400] (bool and float are not accepted), if s, u or v
+      is not finite or is outside its range (0 < u < 1e-12 and 0 < v < 1e-12 included), or if N = 1
+      and u = v = 0.
+    '''
+    # Other method: inverse iteration, P_T y = r, on the transient block T, where every solve goes through the
+    # factorization P_T = diag(q^N x^lo) V(x) diag(C(N, j)) and the Vandermonde factor is solved by the
+    # Bjorck-Pereyra algorithm (Newton divided differences, then conversion of the Newton form to monomial
+    # coefficients); no inverse matrix and no elementary symmetric functions are formed. With positive
+    # increasing nodes x and a right-hand side of alternating sign, every update of Bjorck-Pereyra combines two
+    # numbers of the same sign (a divided difference of alternating values, or f_i - x_k f_(i+1) with f_i and
+    # f_(i+1) of opposite signs), so it runs without cancellation in (log magnitude, known sign) arithmetic; the
+    # iterate keeps the alternating sign, and inverse iteration converges to the eigenvector of the smallest
+    # eigenvalue (the ratio lam_min / next eigenvalue is about 1/N).
     if isinstance(N, (bool, np.bool_)) or not isinstance(N, (int, np.integer)):
         raise ValueError("N must be an integer")
     N = int(N)
@@ -499,83 +524,75 @@ def fastest_mode(N, s, u, v):
         raise ValueError("s, u and v must be finite")
     if not (-0.5 <= s <= 0.5 and 0.0 <= u <= 0.1 and 0.0 <= v <= 0.1):
         raise ValueError("need -0.5 <= s <= 0.5 and 0 <= u, v <= 0.1")
+    if 0.0 < u < 1e-12 or 0.0 < v < 1e-12:
+        raise ValueError("a positive mutation rate must be at least 1e-12")
     if N == 1 and u == 0.0 and v == 0.0:
         raise ValueError("N = 1 without mutation: no transient state")
     lo = 0 if v > 0.0 else 1                         # state 0 absorbs when v = 0
     hi = N if u > 0.0 else N - 1                     # state N absorbs when u = 0
     k = np.arange(lo, hi + 1)
     n = k.size
+    mode = np.zeros(N + 1)
+    if n == 1:
+        # a single transient state: its diagonal entry q^N x^lo C(N, lo) is the eigenvalue
+        f = k / N
+        w = 1.0 + s * f
+        a_sel, b_sel = (1.0 + s) * f / w, (1.0 - f) / w
+        lp = np.log(v * b_sel + (1.0 - u) * a_sel)[0]
+        lq = np.log((1.0 - v) * b_sel + u * a_sel)[0]
+        lam_min = float(np.exp(gammaln(N + 1) - gammaln(lo + 1) - gammaln(N - lo + 1) + lo * lp + (N - lo) * lq))
+        mode[lo] = 1.0
+        return lam_min, mode
+    if N == 1:
+        # two states with u, v > 0: P = [[1 - v, v], [u, 1 - u]] has the eigenvalues 1 and 1 - u - v (trace minus
+        # 1), with the right eigenvector (v, -u) for 1 - u - v; inverse iteration would contract only like
+        # 1 - u - v here (the ratio of the two eigenvalues)
+        lam_min = float((1.0 - u) - v)
+        mode[:] = np.array([v, -u]) / max(u, v)
+        return lam_min, mode
     f = k / N
     w = 1.0 + s * f
     a_sel = (1.0 + s) * f / w
     b_sel = (1.0 - f) / w
     lp = np.log(v * b_sel + (1.0 - u) * a_sel)
     lq = np.log((1.0 - v) * b_sel + u * a_sel)
-    lx = lp - lq
-    gap = np.abs(k[:, None] - k[None, :]).astype(float)
-    np.fill_diagonal(gap, 1.0)
-    L = np.log((1.0 - u - v) * (1.0 + s) * gap / N) - np.log(w)[:, None] - np.log(w)[None, :]
-    L = L - lq[:, None] - lq[None, :]
-    np.fill_diagonal(L, 0.0)
-    lden = L.sum(axis=1)
+    lx = lp - lq                                     # log nodes, increasing
+    # log |x_a - x_b| = log(|p_a - p_b| / (q_a q_b)) with p_a - p_b = (1 - u - v)(1 + s)(a - b) / (N w_a w_b)
+    dist = np.abs(k[:, None] - k[None, :]).astype(float)
+    np.fill_diagonal(dist, 1.0)
+    LD = (np.log1p(-(u + v)) + np.log1p(s) + np.log(dist / N) - np.log(w)[:, None] - np.log(w)[None, :]
+          - lq[:, None] - lq[None, :])
+    lrow = N * lq + lo * lx                          # log of the row factor q_a^N x_a^lo
+    lcol = gammaln(N + 1) - gammaln(k + 1) - gammaln(N - k + 1)   # log C(N, j)
+    idx = np.arange(n)
 
-    def lse(t, axis):
-        m = np.max(t, axis=axis, keepdims=True)
-        m = np.where(np.isfinite(m), m, 0.0)
-        return np.squeeze(m, axis=axis) + np.log(np.sum(np.exp(t - m), axis=axis))
+    def solve(lr):
+        # P_T y = r for r_a = (-1)^a exp(lr_a): returns log |y| (y_b has the sign (-1)^b)
+        lf = lr - lrow
+        for st in range(n - 1):                      # divided differences of order st + 1
+            ii = idx[st + 1:]
+            lf[ii] = np.logaddexp(lf[ii], lf[ii - 1]) - LD[ii, ii - st - 1]
+        for st in range(n - 2, -1, -1):              # Newton form -> monomial coefficients
+            ii = idx[st:n - 1]
+            lf[ii] = np.logaddexp(lf[ii], lf[ii + 1] + lx[st])
+        return lf - lcol
 
-    def times_linear(c, lxk):
-        out = np.full(c.size + 1, -np.inf)
-        out[:-1] = c
-        out[1:] = np.logaddexp(out[1:], c + lxk)
-        return out
-
-    pre = [np.zeros(1)]
-    for a in range(n - 1):
-        pre.append(times_linear(pre[-1], lx[a]))
-    suf = [np.zeros(1)]
-    for a in range(n - 1, 0, -1):
-        suf.append(times_linear(suf[-1], lx[a]))
-    suf = suf[::-1]
-    LE = np.empty((n, n))
-    for a in range(n):
-        A, B = pre[a], suf[a]
-        T = np.full((A.size, A.size + B.size - 1), -np.inf)
-        rows = np.arange(A.size)[:, None]
-        T[rows, rows + np.arange(B.size)[None, :]] = A[:, None] + B[None, :]
-        LE[a] = lse(T, 0)
-    lC = gammaln(N + 1) - gammaln(k + 1) - gammaln(N - k + 1)
-    # P_II = diag(q^N x^lo) V(x) diag(C): log |P_II^-1|
-    LM = LE[:, ::-1].T - lC[:, None] - (lden + N * lq + lo * lx)[None, :]
-    d = np.zeros(n)
-    for sweep in range(200):
-        T = LM + d[None, :] - d[:, None]
-        rs, cs = lse(T, 1), lse(T, 0)
-        step = 0.5 * (rs - cs)
-        d = d + step
-        if np.max(np.abs(step)) < 1e-3:
+    lr = np.zeros(n)
+    lam_old = None
+    for it in range(500):
+        ly = solve(lr)
+        top = ly.max()
+        lam_min = float(np.exp(-top))                # r is scaled to max |r| = 1, so y = r / lam at convergence
+        lr_new = ly - top
+        change = np.max(np.abs(lr_new - lr))
+        lr = lr_new
+        # the log magnitudes reach a few thousand, so their rounding noise is up to about 1e-12: stop when the log
+        # magnitudes and lam_min change by less than 1e-11 (the contraction factor lam_min / next eigenvalue is at
+        # most about 1/2, so the remaining error is below the last change)
+        if lam_old is not None and change <= 1e-11 and abs(lam_min - lam_old) <= 1e-11 * lam_min:
             break
-    T = LM + d[None, :] - d[:, None]
-    shift = T.max()
-    ev, W = np.linalg.eig(np.exp(T - shift))
-    j = int(np.argmax(ev.real))
-    lrho = np.log(ev[j].real) + shift
-    wv = np.abs(W[:, j].real)
-    y = np.log(np.maximum(wv, 1e-300)) + d          # B = D^-1 M D: Perron vector of M is D w
-    # polish: y <- log(M e^y) - log rho, which contracts like (rho_2 / rho)
-    for sweep in range(5000):
-        z = lse(LM + y[None, :], 1)
-        lrho = np.max(z - y)
-        ynew = z - z.max()
-        dy = np.max(np.abs(ynew - (y - y.max())))
-        y = ynew
-        if dy < 1e-12:
-            break
-    z = lse(LM + y[None, :], 1)
-    lrho = float(np.log(np.sum(np.exp(z - z.max()))) + z.max() - np.log(np.sum(np.exp(y - y.max()))) - y.max())
-    lam_min = float(np.exp(-lrho))
-    mode = np.zeros(N + 1)
-    mode[k] = np.where((k - lo) % 2 == 0, 1.0, -1.0) * np.exp(y - y.max())
-    if mode[lo] < 0:
-        mode = -mode
+        lam_old = lam_min
+    else:
+        raise RuntimeError("inverse iteration did not converge")
+    mode[k] = np.where(idx % 2 == 0, 1.0, -1.0) * np.exp(lr)
     return lam_min, mode

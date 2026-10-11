@@ -247,8 +247,10 @@ _t_check_temp(0.7, 50.0, _t_cf(0.7, 50.0, want_D=False)[0])
 _t_check_temp(0.4, 0.06, _t_v_bessel(0.4, 0.06))
 
 # --- test case 3 ---
-# the stated endpoint tolerance, a relative 1e-11 of the endpoint voltage: an
-# excess of 0.9e-11 returns the endpoint, an excess of 1.1e-11 raises ValueError
+# the stated endpoint rule, a relative 1e-11 of the endpoint voltages v_lo = mean_voltage(i, 0.02)[0]
+# and v_hi = mean_voltage(i, 50)[0] of step 1, which the rule is defined with: an excess of 0.9e-11
+# returns the endpoint (with the independent kappa of the endpoint), an excess of 1.1e-11 raises
+# ValueError
 import numpy as np
 import mpmath as _t_mp
 
@@ -309,11 +311,13 @@ def _t_kappa(i, theta):
         dlv = (_t_mp.log(v(th + h)) - _t_mp.log(v(th - h))) / (_t_mp.log(th + h) - _t_mp.log(th - h))
         return float(1 / dlv)
 
-_t_v02 = _t_cf(0.9, 0.02, want_D=False)[0]
+_t_v02 = mean_voltage(0.9, 0.02)[0]
+assert _t_rel(_t_v02, _t_cf(0.9, 0.02, want_D=False)[0]) < 1e-9     # the voltage of step 1 at theta = 0.02
 _t_o = noise_temperature(0.9, _t_v02 * (1.0 - 0.9e-11))
 assert _t_rel(_t_o[0], 0.02) < 1e-7, _t_o
 assert _t_rel(_t_o[1], _t_kappa(0.9, 0.02)) < 1e-6, _t_o      # with the kappa of the endpoint
-_t_v50 = _t_cf(0.7, 50.0, want_D=False)[0]
+_t_v50 = mean_voltage(0.7, 50.0)[0]
+assert _t_rel(_t_v50, _t_cf(0.7, 50.0, want_D=False)[0]) < 1e-9     # the voltage of step 1 at theta = 50
 _t_o = noise_temperature(0.7, _t_v50 * (1.0 + 0.9e-11))
 assert _t_rel(_t_o[0], 50.0) < 1e-7, _t_o
 assert _t_rel(_t_o[1], _t_kappa(0.7, 50.0)) < 1e-6, _t_o

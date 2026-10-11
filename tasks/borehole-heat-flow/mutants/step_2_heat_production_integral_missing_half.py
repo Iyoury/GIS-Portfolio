@@ -26,7 +26,7 @@ def layer_integrals(layer_top_tvd, layer_k, z):
         a = top
         b = top + lo
         R += (b - a) / kk
-        S += (b**2 - a**2) / kk            # MUTANT: factor 1/2 missing
+        S += (b - a) * (b + a) / kk              # MUTANT: factor 1/2 missing
     if z_in.ndim == 0:
         return float(R[0]), float(S[0])
     return R.reshape(z_in.shape), S.reshape(z_in.shape)

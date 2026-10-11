@@ -371,12 +371,15 @@ for _t_bad in ((np.array([1.0, 2.0]), np.array([1.0]), 0.1, 0.1),
                (np.array([]), np.array([]), 0.1, 0.1),
                (np.array([1.0, np.nan]), np.array([1.0, 1.0]), 0.1, 0.1),
                (np.array([1.0, 1.0]), np.array([1.0, 0.0]), 0.1, 0.1),
+               (np.array([1.0, 1.0]), np.array([1.0, np.inf]), 0.1, 0.1),
+               (np.array([-1.0, 1.0]), np.array([1.0, 1.0]), 0.1, 0.1),
                (np.array([1.0, 6.0]), np.array([1.0, 1.0]), 0.2, 0.1),
                (np.array([1.0, 2.0]), np.array([1.0, 1.0]), 0.03, 0.1),
                (np.array([1.0]), np.array([1.0]), 51.0, 0.1),
                (np.array([1.0]), np.array([1.0]), float("nan"), 0.1),
                (np.array([1.0]), np.array([1.0]), 0.1, 0.0),
-               (np.array([1.0]), np.array([1.0]), 0.1, 0.51)):
+               (np.array([1.0]), np.array([1.0]), 0.1, 0.51),
+               (np.array([1.0]), np.array([1.0]), 0.1, float("nan"))):
     try:
         array_criterion(*_t_bad)
     except ValueError:

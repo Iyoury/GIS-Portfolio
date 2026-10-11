@@ -18,10 +18,10 @@ def _t_rel(x, y):
     return abs(x - y) / abs(y)
 
 for _t_th in (0.02, 0.05, 0.3, 2.0, 50.0):
-    D = effective_diffusion(0.0, _t_th)
-    assert isinstance(D, float), D
+    _t_res = effective_diffusion(0.0, _t_th)
+    assert isinstance(_t_res, float), _t_res
     _t_lj = _t_th / float(_t_mp.besseli(0, 1.0 / _t_th)) ** 2
-    assert _t_rel(D, _t_lj) < 1e-9, (_t_th, D, _t_lj)
+    assert _t_rel(_t_res, _t_lj) < 1e-9, (_t_th, _t_res, _t_lj)
 
 # --- test case 1 ---
 # giant diffusion near the critical tilt (D far above theta)
@@ -67,10 +67,10 @@ def _t_rel(x, y):
     return abs(x - y) / abs(y)
 
 for _t_i, _t_th in ((1.0, 0.03), (0.99, 0.05), (1.02, 0.1), (1.15, 0.5)):
-    D = effective_diffusion(_t_i, _t_th)
+    _t_res = effective_diffusion(_t_i, _t_th)
     _t_D = _t_cf(_t_i, _t_th)[2]
     assert _t_D > 1.5 * _t_th
-    assert _t_rel(D, _t_D) < 1e-9, (_t_i, _t_th, D, _t_D)
+    assert _t_rel(_t_res, _t_D) < 1e-9, (_t_i, _t_th, _t_res, _t_D)
 
 # --- test case 2 ---
 # tilted states away from equilibrium (Einstein relation D = theta dv/di fails)
@@ -116,9 +116,9 @@ def _t_rel(x, y):
     return abs(x - y) / abs(y)
 
 for _t_i, _t_th in ((0.5, 0.05), (0.3, 0.2), (0.8, 0.02), (2.0, 0.3), (6.0, 0.05), (9.0, 30.0), (10.0, 0.02), (10.0, 50.0)):
-    D = effective_diffusion(_t_i, _t_th)
+    _t_res = effective_diffusion(_t_i, _t_th)
     _t_D = _t_cf(_t_i, _t_th)[2]
-    assert _t_rel(D, _t_D) < 1e-9, (_t_i, _t_th, D, _t_D)
+    assert _t_rel(_t_res, _t_D) < 1e-9, (_t_i, _t_th, _t_res, _t_D)
 
 # --- test case 3 ---
 # mirror symmetry D(-i) = D(i)
@@ -164,9 +164,9 @@ def _t_rel(x, y):
     return abs(x - y) / abs(y)
 
 for _t_i, _t_th in ((-0.7, 0.1), (-1.0, 0.04), (-3.0, 2.0), (-10.0, 0.5)):
-    D = effective_diffusion(_t_i, _t_th)
+    _t_res = effective_diffusion(_t_i, _t_th)
     _t_D = _t_cf(-_t_i, _t_th)[2]
-    assert _t_rel(D, _t_D) < 1e-9, (_t_i, _t_th, D, _t_D)
+    assert _t_rel(_t_res, _t_D) < 1e-9, (_t_i, _t_th, _t_res, _t_D)
 
 # --- test case 4 ---
 # non-finite input, |i| > 10 or theta outside [0.02, 50] raises ValueError

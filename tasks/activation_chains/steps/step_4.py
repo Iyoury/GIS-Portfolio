@@ -24,16 +24,19 @@ def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activi
            caller guarantees that the activity A(flux) is strictly increasing on this interval.
 
     Output:
-      flux: Python float, the flux in neutrons / (cm^2 s) with A(flux) = activity; relative error below
-            1e-8 wherever d ln A / d ln flux >= 0.5 at the solution.
+      flux: Python float, the flux in neutrons / (cm^2 s) with A(flux) = activity, A computed with
+            activation_inventory (step 3); relative error below 1e-8 wherever d ln A / d ln flux >= 0.5
+            at the solution, for activities of any size within the domain.
 
     Raises:
       ValueError for nuclide data as in step 3, for times, k, activity or flux bounds outside these
-      ranges, if A(flux_lo) < 1e-250 * lam[k] * sum(n0) (the measured nuclide must hold at least 1e-250
-      of the initial atoms at flux_lo), or if activity lies outside [A(flux_lo), A(flux_hi)] by more
-      than a relative 1e-9.
+      ranges (NaN and infinite values included), if A(flux_lo) < lam[k] * max(1e-250 * sum(n0), 1e-300)
+      (at flux_lo the measured nuclide must hold at least 1e-250 of the initial atoms and at least 1e-300
+      atoms), or if activity lies outside [A(flux_lo), A(flux_hi)] by more than a relative 1e-9.
       An activity with |ln(activity / A(end))| <= 1e-9 for an end of the interval, on either side of
-      it, gives that end. The end values carry rounding errors, so the tolerance holds up to 1e-12 in ln:
-      for 1e-9 - 1e-12 < |ln| <= 1e-9 + 1e-12 the end, the root and (outside the interval) ValueError are all correct.
+      it, gives that end (flux_lo is checked first); the end is returned as the given bound itself, equal
+      to it to a relative 1e-11. A is known to a relative 1e-10 (the accuracy of step 3), so the
+      tolerance holds up to 1e-10 in ln: for 1e-9 - 1e-10 < |ln| <= 1e-9 + 1e-10 the end, the root and
+      (outside the interval) ValueError are all correct.
     '''
     raise NotImplementedError

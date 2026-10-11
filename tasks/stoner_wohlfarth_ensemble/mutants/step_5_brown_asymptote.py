@@ -29,11 +29,74 @@ def brown_relaxation(sigma, h):
         raise ValueError("sigma and h must be finite")
     if not (0.0 <= sigma <= 60.0) or abs(h) > 0.9:
         raise ValueError("need 0 <= sigma <= 60 and |h| <= 0.9")
-    # MUTANT: Brown's high-barrier asymptote for the rate, and tau_int taken as 1 / lam1
-    hh = abs(h)
-    lam1 = (sigma ** 1.5 / np.sqrt(np.pi) * (1.0 - hh * hh)
-            * ((1.0 + hh) * np.exp(-sigma * (1.0 + hh) ** 2) + (1.0 - hh) * np.exp(-sigma * (1.0 - hh) ** 2)))
-    lam1 = lam1 if lam1 > 0.0 else 1.0
-    tau_int = 1.0 / lam1
-    result = (float(lam1), float(tau_int))
+    # piecewise Chebyshev representation in theta (z = cos theta); every panel keeps its own
+    # relative accuracy, so the exponentially different well weights are resolved
+    C = np.polynomial.chebyshev
+    h = abs(h)                     # the problem is symmetric under z -> -z, h -> -h
+    K, d, iters = int(30 + 1.5 * sigma), 24, 300
+    edges = np.linspace(0.0, np.pi, K + 1)
+    xk = np.cos(np.pi * (np.arange(d + 1) + 0.5) / (d + 1))[::-1]      # Chebyshev points in [-1, 1]
+    a, b = edges[:-1, None], edges[1:, None]
+    TH = 0.5 * (a + b) + 0.5 * (b - a) * xk[None, :]                   # (K, d+1)
+    half = 0.5 * (b - a)[:, 0]
+    V = C.chebvander(xk, d)
+    Vinv = np.linalg.inv(V)
+    shift = sigma + 2 * sigma * abs(h)
+    Z = np.cos(TH)
+    lw = sigma * Z * Z + 2 * sigma * h * Z - shift          # log w
+    W = np.exp(lw)
+    S = np.sin(TH)
+
+    def cum_from_right(vals):
+        # int_theta^{pi} f dtheta at every node
+        coef = vals @ Vinv.T                                  # (K, d+1)
+        out = np.empty_like(vals)
+        acc = 0.0
+        for k in range(K - 1, -1, -1):
+            ci = C.chebint(coef[k], lbnd=1) * half[k]        # = -int_x^1 on the panel
+            out[k] = acc - C.chebval(xk, ci)
+            acc = acc + (-C.chebval(-1.0, ci))
+        return out, acc
+
+    def cum_from_left(vals):
+        coef = vals @ Vinv.T
+        out = np.empty_like(vals)
+        acc = 0.0
+        for k in range(K):
+            ci = C.chebint(coef[k], lbnd=-1) * half[k]
+            out[k] = acc + C.chebval(xk, ci)
+            acc = acc + C.chebval(1.0, ci)
+        return out, acc
+
+    def total(vals):
+        return cum_from_left(vals)[1]
+
+    # barrier at z = -h, theta_b = arccos(-h): the flux int_{-1}^{z} w f dz of a function f with
+    # int w f dz = 0 is taken from the nearer end on each side of the barrier (from z = -1 on the
+    # side of the shallow well, as minus the integral from z = +1 on the side of the deep one),
+    # which avoids the cancellation of the two well masses
+    shallow = TH > np.arccos(-h)
+
+    def flux(vals):
+        right, _ = cum_from_right(vals)
+        left, _ = cum_from_left(vals)
+        return np.where(shallow, right, -left)
+
+    def project(g):
+        return g - total(W * g * S) / total(W * S)
+
+    # MUTANT: lam1 is taken from Brown's high-barrier (Kramers-type) asymptote for the two wells,
+    # sigma**1.5 / sqrt(pi) (1 - h^2) [(1 + h) exp(-sigma (1 + h)^2) + (1 - h) exp(-sigma (1 - h)^2)],
+    # instead of the exact smallest nonzero eigenvalue; it is used outside its regime of validity
+    # (low barriers, strong fields) and is a few percent off even at sigma = 60, h = 0
+    lam = (sigma ** 1.5 / np.sqrt(np.pi) * (1.0 - h * h)
+           * ((1.0 + h) * np.exp(-sigma * (1.0 + h) ** 2) + (1.0 - h) * np.exp(-sigma * (1.0 - h) ** 2)))
+    # integral relaxation time (Garanin): with Q(z) = int_{-1}^{z} (z' - <z>) w dz',
+    # tau = 2 int Q^2 / ((1 - z^2) w) dz / int (z - <z>)^2 w dz
+    zbar = total(W * Z * S) / total(W * S)
+    # Q is divided by w, which is smallest at the barrier and in the shallow well: there the
+    # integral from z = -1 is a sum over the shallow side only and is accurate
+    Q, _ = cum_from_right(W * (Z - zbar) * S)
+    tau = 2.0 * total(Q * Q / (S * W)) / total(W * (Z - zbar) ** 2 * S)
+    result = (float(lam), float(tau))
     return result

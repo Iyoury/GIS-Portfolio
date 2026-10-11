@@ -280,15 +280,16 @@ def prism_gravity(points, bounds, rho):
     if np.any(near) and _elongated(b):
         U_, g_ = _split_sums(p[near], b, False)
         U[near] = G * rho * U_
-        g[near] = G * rho * g_ * np.array([1.0, 1.0, -1.0])      # z taken upward
+        g[near] = G * rho * g_
     elif np.any(near):
         U_, Fx, Fy, Fz = _corners(p[near], b, _uvw)
         U[near] = G * rho * U_
-        g[near] = -G * rho * np.stack([Fx, Fy, -Fz], axis=1)     # z taken upward
+        g[near] = -G * rho * np.stack([Fx, Fy, Fz], axis=1)
     if np.any(far):
         res = _cubature(p[far], b)
         U[far] = G * rho * np.array([r[0] for r in res])
-        g[far] = G * rho * np.array([r[1] for r in res]) * np.array([1.0, 1.0, -1.0])
+        g[far] = G * rho * np.array([r[1] for r in res])
+    g = g * 1e5                                  # attraction in mGal (1 mGal = 1e-5 m s^-2)
     result = (float(U[0]), g[0]) if single else (U, g)
     return result
 
@@ -415,7 +416,8 @@ def column_gz(stations, x1, x2, y1, y2, depth, drho0, lam):
         Y = np.array([[y1 - q[1]], [y2 - q[1]]])
         Z = (z - q[2])[:, None]
         L = _lamina(X, Y, Z, np.array([x2 - x1]), np.array([y2 - y1]))[:, 0]
-        out[i] = -G * drho0 * float(np.sum(w * np.exp(-lam * z) * L))
+        out[i] = G * drho0 * float(np.sum(w * np.exp(-lam * z) * L))
+    out = out * 1e5                              # attraction in mGal
     gz = float(out[0]) if single else out
     return gz
 
@@ -475,7 +477,7 @@ def invert_basin_depths(x_edges, y_edges, gz_obs, drho0, lam):
     """
     xe = np.asarray(x_edges, float)
     ye = np.asarray(y_edges, float)
-    go = np.asarray(gz_obs, float)
+    go = np.asarray(gz_obs, float) * 1e-5         # observations read as mGal
     if xe.ndim != 1 or ye.ndim != 1 or xe.size < 2 or ye.size < 2:
         raise ValueError("cell edges must be 1-D with at least two entries")
     if not (np.all(np.isfinite(xe)) and np.all(np.isfinite(ye))) or np.any(np.diff(xe) <= 0) or np.any(np.diff(ye) <= 0):

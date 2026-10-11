@@ -26,7 +26,7 @@ def layer_integrals(layer_top_tvd, layer_k, z):
         a = top
         b = top + lo
         R += (b - a) / np.mean(k)          # MUTANT: arithmetic mean conductivity
-        S += (b**2 - a**2) / (2 * kk)
+        S += (b - a) * (b + a) / (2 * kk)        # factored: exactly 0 in the layers below z
     if z_in.ndim == 0:
         return float(R[0]), float(S[0])
     return R.reshape(z_in.shape), S.reshape(z_in.shape)

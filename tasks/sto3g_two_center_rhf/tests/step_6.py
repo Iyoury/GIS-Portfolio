@@ -4,9 +4,11 @@
 # Every test case below is self-contained: it repeats its own imports, helpers and setup.
 
 # --- test case 0 ---
-# H2 at 1.4 bohr with p shells (alpha = 1.1): polarization lowers both energies
-# below the 1s-only (STO-3G) values, full CI -1.1373 and RHF -1.1167 hartree in Szabo and Ostlund
-# (variational principle), and full CI stays below RHF
+# H2 at 1.4 bohr with p shells (alpha = 1.1). Variational principle: adding the p shells lowers both
+# energies below the 1s-only (STO-3G) values, computed here with the same oracle restricted to the two
+# 1s functions (which reproduces the Szabo and Ostlund values, full CI -1.1373 and RHF -1.1167 hartree);
+# the actual lowerings are 0.0130 and 0.0036 hartree, the margins 1e-3 and 1e-4. Full CI lies below RHF
+# (two outputs, each within 1e-9 of its target: slack 2e-9).
 import numpy as np
 from functools import lru_cache
 from scipy.special import hyp1f1 as _t_hyp1f1
@@ -208,8 +210,34 @@ def _t_check_pol(args):
     assert abs(out[1] - t_rhf) < 1e-9, (args, out, t_rhf)
     return out
 
-_t_o = _t_check_pol((1.0, 1.0, 1.24, 1.24, 1.1, 1.1, 1.4))
-assert _t_o[0] < -1.1373 - 1e-3 and _t_o[1] < -1.1167 - 1e-4 and _t_o[0] < _t_o[1]
+def _t_energies_1s(ZA, ZB, zA, zB, aA, aB, R):
+    # the oracle of _t_energies with the basis restricted to the two 1s functions (indices 0 and 4)
+    from scipy.linalg import eigh as _t_eigh
+    from scipy.optimize import minimize as _t_minimize
+    S, H, G = _t_integrals(ZA, ZB, zA, zB, aA, aB, R)
+    k = [0, 4]
+    S, H, G = S[np.ix_(k, k)], H[np.ix_(k, k)], G[np.ix_(k, k, k, k)]
+    Hp = (np.einsum("ik,jl->ijkl", H, S) + np.einsum("ik,jl->ijkl", S, H) + np.einsum("ikjl->ijkl", G)).reshape(4, 4)
+    Sp = np.einsum("ik,jl->ijkl", S, S).reshape(4, 4)
+    B = _t_sym(2)
+    e_fci = float(_t_eigh(B.T @ Hp @ B, B.T @ Sp @ B, eigvals_only=True)[0])
+
+    def E(x):
+        c = x / np.sqrt(x @ S @ x)
+        return 2 * (c @ H @ c) + np.einsum("i,j,k,l,ijkl->", c, c, c, c, G)
+
+    rng = np.random.default_rng(2024)
+    e_rhf = min(_t_minimize(E, x0, method="BFGS", options={"gtol": 1e-13, "maxiter": 5000}).fun
+                for x0 in rng.normal(size=(40, 2)))
+    enuc = ZA * ZB / R
+    return e_fci + enuc, float(e_rhf) + enuc
+
+_t_args = (1.0, 1.0, 1.24, 1.24, 1.1, 1.1, 1.4)
+_t_o = _t_check_pol(_t_args)
+_t_1s = _t_energies_1s(*_t_args)
+assert abs(_t_1s[0] + 1.1373) < 2e-4 and abs(_t_1s[1] + 1.1167) < 2e-4, _t_1s
+assert _t_o[0] < _t_1s[0] - 1e-3 and _t_o[1] < _t_1s[1] - 1e-4, (_t_o, _t_1s)
+assert _t_o[0] <= _t_o[1] + 2e-9, _t_o
 
 # --- test case 1 ---
 # HeH+ near its minimum, different p exponents on the two atoms

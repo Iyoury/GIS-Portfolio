@@ -112,8 +112,9 @@ with _t_mp.workdps(60):
             M[a - 1, b - 1] = (1 if a == b else 0) - P[a, b]
     p1 = float(_t_mp.lu_solve(M, rhs)[0])
 out = substitution_times(20, 0.3, 1e-12, 1e-12)
-# (1e-8 allowed for t_up plus the 2e-10 by which the origin-fixation form differs: 2.1e-8)
-assert _t_rel(out[0], 1.0 / (20 * 1e-12 * p1)) < 2.1e-8, (out, 1.0 / (20 * 1e-12 * p1))
+# one computed output (1e-8 allowed for t_up) against an extended-precision value, plus the about 2e-10 by which
+# the origin-fixation form differs here: 1e-8 + 2e-10 = 1.02e-8, used as 1.05e-8
+assert _t_rel(out[0], 1.0 / (20 * 1e-12 * p1)) < 1.05e-8, (out, 1.0 / (20 * 1e-12 * p1))
 
 # --- test case 4 ---
 # N not an integer in [1, 400], or s, u, v not finite or out of range (u, v >= 1e-12)

@@ -17,8 +17,22 @@ def strip_lengths(L, T):
         Both lengths with relative accuracy 1e-6.
     '''
     M = transfer_matrix(L, T)
-    w = np.linalg.eigvalsh(M)
-    f = float(-T * np.log(w[-1]) / L)
-    xi_spin = float(1.0 / np.log(w[-1] / w[-2]))
-    xi_energy = float(1.0 / np.log(w[-1] / w[-3]))     # third eigenvalue of the whole matrix
+    n = 2 ** L
+    labels = np.arange(n)
+    partner = labels ^ (n - 1)              # the same row with every spin flipped
+    rep = labels[labels < partner]
+    # M commutes with the global spin flip. In the basis (|a> +- |flip a>) / sqrt(2) it splits
+    # into an even block M[a, b] + M[a, flip b] and an odd block M[a, b] - M[a, flip b].
+    near = M[np.ix_(rep, rep)]
+    far = M[np.ix_(rep, partner[rep])]
+    even = np.linalg.eigvalsh(near + far)
+    odd = np.linalg.eigvalsh(near - far)
+    lam0 = even[-1]
+    # s_0 is odd under the flip, so it joins the top state to the odd sector; e = s_0 s_1 is even,
+    # so its connected correlation decays through the second state of the even sector.
+    f = float(-T * np.log(lam0) / L)
+    xi_spin = float(1.0 / np.log(lam0 / odd[-1]))
+    # MUTANT: xi_energy from the third-largest eigenvalue of the whole matrix (both sectors pooled)
+    # instead of the second state of the even sector
+    xi_energy = float(1.0 / np.log(lam0 / np.sort(np.concatenate([even, odd]))[-3]))
     return f, xi_spin, xi_energy

@@ -34,16 +34,16 @@ difficulty_explanation: >-
   surface departure, for up to 50 layers, strong conductivity contrasts and histories from centuries to more
   than 100 kyr, needs an exact Laplace-domain solution of the layered diffusion problem written without
   overflow or cancellation and an accurate numerical inverse Laplace transform. Gaver-Stehfest inversion in
-  double precision (errors of about 3e-6 K per K) and erfc responses with a mean or local diffusivity (0.04 to
-  0.2 K per K in the test columns) miss that requirement by orders of magnitude.
+  double precision (errors of 2e-6 to 7e-6 K per K in the test columns) and erfc responses with a mean or local
+  diffusivity (0.04 to 0.3 K per K in the test columns) miss that requirement by orders of magnitude.
 
 solution_explanation: >-
   Step 1 accumulates the closed-form minimum-curvature increments 0.5 dMD (cos I1 + cos I2) RF(beta), with the
   dogleg from atan2(|t1 x t2|, t1 . t2) and the ratio factor tan(beta/2)/(beta/2) from its Taylor series for
   small half-angles; a point inside a segment uses the great-circle tangent written with sinc functions and
   the ratio factor of the partial arc. Step 2 sums the exact layer contributions (b - a)/k and
-  (b^2 - a^2)/(2k). Step 3 superposes differences of erfc step responses with times converted with the Julian
-  year. Step 4 checks resolvability with the singular values of the column-normalized design [1, R, P], solves
+  (b - a)(b + a)/(2k), factored so that the layers below z add exactly zero. Step 3 superposes differences of
+  erfc step responses with times converted with the Julian year. Step 4 checks resolvability with the singular values of the column-normalized design [1, R, P], solves
   the normal equations for y = T + A S and takes the covariance s^2 (G^T G)^-1 with s^2 = RSS/(n - 3). Step 5
   Laplace-transforms the layered problem: in each layer the transform is a e^{-qz} + b e^{qz} with
   q = sqrt(s/kappa_i), the admittance k F'/F is carried up from the bottom half-space with a tanh recursion,
@@ -53,26 +53,36 @@ solution_explanation: >-
 
 verification_explanation: >-
   Independent targets come from closed forms (straight and constant-build holes, a constant-azimuth segment
-  with inclination linear in MD, hand-computed layer sums, erfc forms evaluated with math.erfc, the
+  with inclination linear in MD, hand-computed layer sums, R = z/k1 and S = z^2/(2 k1) at shallow depths under a
+  deep layer stack, erfc forms evaluated with math.erfc, including depths of a few centimetres to metres, the
   Carslaw-Jaeger image series for a layer over a half-space), from independent computations inside the tests
   (adaptive quadrature of the arc tangent and of 1/k and z/k with scipy.integrate.quad, numpy.linalg.lstsq
-  with the OLS covariance), from 90-digit mpmath values for two multilayer columns stored inline
-  (transfer-matrix transform and mpmath's Talbot inversion; five of them were recomputed in the latest
-  revision by a forward transfer-matrix propagation at 40 digits and agree to 5e-17 K), and, for the whole
-  task, from synthetic
-  boreholes regenerated in each case forward from known q0, T0 and g (Gauss-Legendre TVD, exact layer sums,
-  math.erfc, seeded noise), with the noisy-hole targets recomputed by least squares on the generator's own
-  model terms. The second solution uses different methods (Gauss-Legendre integration of the arc tangent,
-  adaptive quadrature for R and S, Duhamel convolution in log-time for the half-space perturbation, QR least
-  squares, and one global linear system per Laplace node with the Weideman-Trefethen hyperbolic contour for
-  the layered column) and passes every test case. Each step has named scientific mutants (linear TVD
-  interpolation, balanced tangential, arithmetic-mean conductivity, missing 1/2 in S, years not converted,
-  missing factor 2, reversed interval sign, wrong heat-production sign, RSS/n, erfc with a mean or local
-  diffusivity, Gaver-Stehfest in double precision, MD used as depth, no paleoclimate term, one mean
-  conductivity, z_min cut on MD) and four whole-task mutants, and each fails at least one case of its target
-  tests. Every case was run alone in a fresh process with tools/crown_check.py for the per-step references,
-  solution.py, the second solution, the mutants, the all-None and all-zero controls (which pass no case) and
-  with every reference output scaled by 1 +- 1e-12 (all cases still pass).
+  with the pseudo-inverse covariance), from mpmath values stored inline for three multilayer columns (two
+  columns at 90 digits by transfer-matrix transform and mpmath's Talbot inversion, five of them recomputed in
+  version 10 by forward transfer-matrix propagation at 40 digits, agreement 5e-17 K; six depths of the
+  50-layer column computed in version 11 by forward transfer-matrix propagation at 270 to 390 digits with
+  fixed-Talbot inversion of degree 60 and 90, identical to 30 digits, and Gaver-Stehfest inversion with 60
+  terms, agreement 2e-16 K), and, for the whole task, from synthetic boreholes regenerated in each case
+  forward from known q0, T0 and g (Gauss-Legendre TVD, exact layer sums, math.erfc, seeded noise), with the
+  noisy-hole targets recomputed by least squares on the generator's own model terms, the residual rms
+  compared with the known logging noise, and vertical holes whose collar reading sits exactly at z_min = 0
+  or whose cut leaves exactly 4 (valid) or 3 (ValueError) readings. The second solution uses different
+  methods (circular-arc geometry of each segment for the TVD; R as a sum of ramps c_i (z - t_i)_+ from the
+  contrasts c_i of 1/k at the layer tops and S by integration by parts, S = z R minus the integral of the
+  piecewise-linear R by the trapezoid rule on the tops; Duhamel convolution of the impulse response
+  integrated from tau = 0 by adaptive quadrature in the similarity variable for the half-space
+  perturbation; QR least squares; and one global linear system per Laplace node with the
+  Weideman-Trefethen hyperbolic contour for the layered column), copies no test oracle and passes every
+  test case. R and S are elementary integrals, so any exact route gives the reference values up to
+  rounding; their independent evidence is the hand-computed closed forms and the quadrature of step 2.
+  Each step has named scientific mutants (linear TVD interpolation, balanced tangential, arithmetic-mean
+  conductivity, missing 1/2 in S, years not converted, missing factor 2, reversed interval sign, wrong
+  heat-production sign, RSS/n, erfc with a mean or local diffusivity, Gaver-Stehfest in double precision, MD
+  used as depth, no paleoclimate term, one mean conductivity, z_min cut on MD, strict z_min cut) and four
+  whole-task mutants, and each fails at least one case of its target tests. Every case was run alone in a fresh process with tools/crown_check.py for the
+  per-step references, solution.py, the second solution, the mutants, the all-None and all-zero controls
+  (which pass no case) and with every reference output scaled by 1 +- 1e-12 (every evaluated function at
+  once in the whole-task cases; all cases still pass).
 
 required_dependencies: |-
   import numpy as np
@@ -151,7 +161,10 @@ problem_io: |-
       rms_residual below 1e-6 K; for noisy temperatures, T0, q0 and g within
       5e-4 K, 2e-6 W m^-2 and 2e-3 K of the exact least-squares solution, the
       three standard errors within 2 % and rms_residual within 1 % (relative);
-      n_used exact.
+      n_used exact. The noise-free limits presume P accurate to 1e-8 K per
+      kelvin of the largest |hist_dT_shape| or better (an error at the 1e-6 K
+      per K limit of step 3 can move q0 by a few 1e-7 W m^-2); the accuracies
+      of steps 1, 2 and 4 propagate within these limits.
 
       Raises
       ------
@@ -314,7 +327,7 @@ sub_steps:
       the thickness-weighted harmonic mean; an arithmetic mean or a single average conductivity biases both
       q0 and the curvature of the profile. Without heat production and transients the Bullard plot is a
       straight line.
-    n_test_cases: 11
+    n_test_cases: 12
     contract:
       quantity: "Thermal resistance R(z) = integral of 1/k and heat-production depth function S(z) = integral of z'/k from 0 to z in a layered column."
       assumptions: "Horizontal layers of constant conductivity, the last layer extending to infinite depth; steady one-dimensional conduction with uniform heat production, T = T0 + q0 R - A S."
@@ -360,7 +373,8 @@ sub_steps:
           surface temperature by dT[i] (K). Before t_years[-1] the surface stayed
           at the reference temperature long enough for the ground to be in steady
           state. The subsurface is a homogeneous conductive half-space with thermal
-          diffusivity kappa. Times in years are converted with SECONDS_PER_YEAR.
+          diffusivity kappa. Times in years are converted with 1 year = 365.25 x
+          86400 s.
 
           Parameters
           ----------
@@ -389,7 +403,7 @@ sub_steps:
       responses (Birch 1948; Beck 1977). On the Canadian Shield the last glaciation still leaves the upper
       1-2 km several kelvin out of equilibrium; the shape of the history comes from paleoclimate proxies,
       while its amplitude is poorly known and is estimated from the borehole itself.
-    n_test_cases: 11
+    n_test_cases: 12
     contract:
       quantity: "Present-day temperature departure from the steady state caused by a piecewise-constant ground-surface temperature history in a homogeneous half-space."
       assumptions: "Homogeneous conducting half-space with diffusivity kappa and no internal sources; surface departure dT[i] during interval i and zero before t_years[-1]; superposition of erfc step responses; 1 year = 365.25 x 86400 s."
@@ -549,8 +563,8 @@ sub_steps:
       metasediments with conductivities from about 2 to 5 W m^-1 K^-1, and the glacial signal is refracted at
       each contrast: the diffusion is faster in conductive layers, and the heat flux, not the temperature
       gradient, is continuous across an interface (Carslaw and Jaeger 1959, ch. 12, give the image series for
-      a layer over a half-space). Paleoclimate corrections in layered ground therefore differ from the
-      half-space formula by up to tens of percent near strong contrasts (Beck 1977; Clauser 1984).
+      a layer over a half-space). Near strong contrasts the paleoclimate perturbation of layered ground
+      therefore differs from the half-space formula by up to tens of percent of the surface departure.
     n_test_cases: 8
     contract:
       quantity: "Present-day temperature departure from the steady state in a horizontally layered conductivity column for a piecewise-constant ground-surface temperature history."
@@ -602,7 +616,10 @@ sub_steps:
       Accuracy: for temperatures that follow the model exactly (no noise), T0, q0 and g within 1e-5 K,
       1e-8 W m^-2 and 1e-4 K of the generating values and rms_residual below 1e-6 K; for noisy temperatures,
       T0, q0 and g within 5e-4 K, 2e-6 W m^-2 and 2e-3 K of the exact least-squares solution of the model,
-      the three standard errors within 2 % and rms_residual within 1 % (relative); n_used exact.
+      the three standard errors within 2 % and rms_residual within 1 % (relative); n_used exact. The
+      noise-free limits presume P accurate to 1e-8 K per kelvin of the largest |hist_dT_shape| or better (an
+      error at the 1e-6 K per K limit of step 3 can move q0 by a few 1e-7 W m^-2); the accuracies of steps 1,
+      2 and 4 propagate within these limits.
       Errors: ValueError if log_md and log_temp are not 1-D arrays of equal length, if any earlier step raises
       (invalid survey, layer tops or log depths beyond the last survey station, invalid conductivities,
       invalid history or kappa, heat_production negative or non-finite), if fewer than 4 readings remain after
@@ -651,7 +668,10 @@ sub_steps:
           rms_residual below 1e-6 K; for noisy temperatures, T0, q0 and g within
           5e-4 K, 2e-6 W m^-2 and 2e-3 K of the exact least-squares solution, the
           three standard errors within 2 % and rms_residual within 1 % (relative);
-          n_used exact.
+          n_used exact. The noise-free limits presume P accurate to 1e-8 K per
+          kelvin of the largest |hist_dT_shape| or better (an error at the 1e-6 K
+          per K limit of step 3 can move q0 by a few 1e-7 W m^-2); the accuracies
+          of steps 1, 2 and 4 propagate within these limits.
 
           Raises
           ------
@@ -674,7 +694,7 @@ sub_steps:
     n_test_cases: 7
     contract:
       quantity: "Paleoclimate-corrected steady surface heat flow q0, reference surface temperature T0 and glacial amplitude g of an inclined borehole, with their 1-sigma standard errors, the rms residual and the number of readings used."
-      assumptions: "Minimum-curvature trajectory; horizontal layers logged in MD; one-dimensional conduction with uniform heat production; half-space paleoclimate perturbation with diffusivity kappa; ordinary least squares with noise variance RSS/(n_used - 3) on the readings with TVD >= z_min."
+      assumptions: "Minimum-curvature trajectory; horizontal layers logged in MD; one-dimensional conduction with uniform heat production; half-space paleoclimate perturbation with diffusivity kappa; ordinary least squares with noise variance RSS/(n_used - 3) on the readings with TVD >= z_min; the noise-free accuracy presumes P evaluated to 1e-8 K per K or better (steps 1, 2 and 4 at their stated accuracies propagate within it)."
       result_kind: exact
       valid_input_ranges: "Survey, layers and history as in steps 1-3 with layer tops and log depths within the survey; heat_production finite and >= 0; at least 4 readings with TVD >= z_min and a resolvable design; holes up to a few km with inclinations below 90 degrees."
       units: "T0 in deg C, q0 in W m^-2, g in K, standard errors in the same units, rms_residual in K, n_used dimensionless."
@@ -693,3 +713,6 @@ sub_steps:
       - name: z_min_on_measured_depth
         description: "Shallow-reading cut applied to measured depth instead of true vertical depth."
         file: mutants/step_6_z_min_on_measured_depth.py
+      - name: z_min_cut_strict
+        description: "Shallow-reading cut applied as TVD > z_min, so that a reading exactly at z_min is dropped."
+        file: mutants/step_6_z_min_cut_strict.py

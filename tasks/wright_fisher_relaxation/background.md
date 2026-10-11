@@ -22,7 +22,7 @@ h = P h with h_0 = 0 and h_N = 1. The mean times conditional on fixation or loss
 chain conditioned on its fate (the Doob h-transform), t_i = (G h)_i / h_i, where G is the
 fundamental matrix of the transient states. Kimura's diffusion result
 (1 - exp(-2 N s p)) / (1 - exp(-2 N s)) shows how fast the fixation probability falls for
-deleterious alleles: for N s = -200 it is far below 1e-100.
+deleterious alleles: for N s = -100 it is already below 1e-80.
 
 ## Stationary distribution and relaxation
 

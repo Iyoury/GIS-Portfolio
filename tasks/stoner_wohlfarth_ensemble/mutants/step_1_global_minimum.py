@@ -26,14 +26,35 @@ def branch_magnetization(h, psi):
     psi = float(psi)
     if not np.isfinite(h) or not (0.0 <= psi <= 0.5 * np.pi):
         raise ValueError("h must be finite and psi must be between 0 and pi/2")
-    # Deliberate error: takes the global energy minimum instead of following the local
-    # minimum of the descending branch (no hysteresis at all).
-    grid = np.linspace(-np.pi, np.pi, 20001)
-    energy = 0.5 * np.sin(grid) ** 2 - h * np.cos(grid - psi)
-    theta = grid[int(np.argmin(energy))]
-    for _ in range(30):
-        d1 = 0.5 * np.sin(2.0 * theta) + h * np.sin(theta - psi)
-        d2 = np.cos(2.0 * theta) + h * np.cos(theta - psi)
-        theta -= d1 / d2
+    # Switching field: e' = 0 and e'' = 0 together give the astroid
+    # h_sw = (cos(psi)**(2/3) + sin(psi)**(2/3))**(-3/2).
+    # cos(pi/2) is 6e-17 in floating point, which alone would put h_sw 2e-11 below 1
+    h_sw = 1.0 if psi == 0.5 * np.pi else (np.cos(psi) ** (2.0 / 3.0) + np.sin(psi) ** (2.0 / 3.0)) ** -1.5
+    # MUTANT: the particle is put in the global energy minimum instead of the local minimum it
+    # follows. For h < 0 the global minimum is the other one (theta -> theta + pi maps the energy
+    # at field h onto the energy at -h, where the followed minimum is the deeper one), so the
+    # particle switches at h = 0 instead of h = -h_sw (no hysteresis).
+    if h < 0.0:
+        m = -branch_magnetization(-h, psi)
+        return m
+    if psi == 0.0:
+        theta = 0.0
+    else:
+        # The minimum followed from theta = psi lies between psi and the fold angle where
+        # it disappears at h = -h_sw (tan(theta)**3 = -tan(psi); -pi/2 for psi = pi/2).
+        if psi == 0.5 * np.pi:
+            theta_fold = -0.5 * np.pi
+        else:
+            theta_fold = -np.arctan(np.tan(psi) ** (1.0 / 3.0))
+        # start a hair inside the fold, where the slope e'(theta) is reliably negative
+        lo = theta_fold + 1e-13
+
+        def slope(t):
+            return 0.5 * np.sin(2.0 * t) + h * np.sin(t - psi)
+
+        if slope(lo) >= 0.0:
+            theta = lo
+        else:
+            theta = brentq(slope, lo, psi, xtol=1e-15, rtol=1e-15)
     m = float(np.cos(theta - psi))
     return m

@@ -95,7 +95,7 @@ assert np.max(np.abs(np.asarray(out, float) - np.asarray((np.sin(math.radians(10
 import math
 import numpy as np
 
-def _mp_build_tvd(inc1_deg, dinc_rad, seg_len, m):
+def _exact_build_tvd(inc1_deg, dinc_rad, seg_len, m):
     """Exact TVD on a constant-azimuth segment whose inclination changes by dinc_rad over seg_len
     (inclination linear in MD): (sin(I1 + k m) - sin(I1)) / k written without cancellation as
     m cos(I1 + k m / 2) sinc(k m / 2)."""
@@ -105,13 +105,13 @@ def _mp_build_tvd(inc1_deg, dinc_rad, seg_len, m):
     return m * math.cos(math.radians(inc1_deg) + h) * sinc
 
 dinc_rad = 8e-10
-# a dogleg of 8e-10 rad over 20 km already bends the path by ~4e-6 m of TVD:
-# treating a small non-zero dogleg as straight fails the 1e-6 m accuracy
+# a dogleg of 8e-10 rad over 20 km bends the path by about sin(30 deg) dinc L / 2 = 4e-6 m of TVD at the
+# end of the segment: treating a small non-zero dogleg as straight fails the 1e-6 m accuracy
 L, inc1 = 20000.0, 30.0
 inc2 = inc1 + math.degrees(dinc_rad)
 q = np.array([5000.0, 13000.0, 20000.0])
 got = np.asarray(true_vertical_depth([0.0, L], [inc1, inc2], [75.0, 75.0], q))
-ref = np.array([_mp_build_tvd(inc1, dinc_rad, L, m) for m in q])
+ref = np.array([_exact_build_tvd(inc1, dinc_rad, L, m) for m in q])
 assert np.max(np.abs(np.asarray(got, float) - np.asarray(ref, float))) <= 1e-6
 
 # --- test case 10 ---
@@ -119,7 +119,7 @@ assert np.max(np.abs(np.asarray(got, float) - np.asarray(ref, float))) <= 1e-6
 import math
 import numpy as np
 
-def _mp_build_tvd(inc1_deg, dinc_rad, seg_len, m):
+def _exact_build_tvd(inc1_deg, dinc_rad, seg_len, m):
     """Exact TVD on a constant-azimuth segment whose inclination changes by dinc_rad over seg_len
     (inclination linear in MD): (sin(I1 + k m) - sin(I1)) / k written without cancellation as
     m cos(I1 + k m / 2) sinc(k m / 2)."""
@@ -129,13 +129,13 @@ def _mp_build_tvd(inc1_deg, dinc_rad, seg_len, m):
     return m * math.cos(math.radians(inc1_deg) + h) * sinc
 
 dinc_rad = 3e-8
-# a dogleg of 8e-10 rad over 20 km already bends the path by ~4e-6 m of TVD:
-# treating a small non-zero dogleg as straight fails the 1e-6 m accuracy
+# a dogleg of 3e-8 rad over 20 km bends the path by about sin(30 deg) dinc L / 2 = 1.5e-4 m of TVD at the
+# end of the segment: treating a small non-zero dogleg as straight fails the 1e-6 m accuracy
 L, inc1 = 20000.0, 30.0
 inc2 = inc1 + math.degrees(dinc_rad)
 q = np.array([5000.0, 13000.0, 20000.0])
 got = np.asarray(true_vertical_depth([0.0, L], [inc1, inc2], [75.0, 75.0], q))
-ref = np.array([_mp_build_tvd(inc1, dinc_rad, L, m) for m in q])
+ref = np.array([_exact_build_tvd(inc1, dinc_rad, L, m) for m in q])
 assert np.max(np.abs(np.asarray(got, float) - np.asarray(ref, float))) <= 1e-6
 
 # --- test case 11 ---
@@ -143,7 +143,7 @@ assert np.max(np.abs(np.asarray(got, float) - np.asarray(ref, float))) <= 1e-6
 import math
 import numpy as np
 
-def _mp_build_tvd(inc1_deg, dinc_rad, seg_len, m):
+def _exact_build_tvd(inc1_deg, dinc_rad, seg_len, m):
     """Exact TVD on a constant-azimuth segment whose inclination changes by dinc_rad over seg_len
     (inclination linear in MD): (sin(I1 + k m) - sin(I1)) / k written without cancellation as
     m cos(I1 + k m / 2) sinc(k m / 2)."""
@@ -153,13 +153,13 @@ def _mp_build_tvd(inc1_deg, dinc_rad, seg_len, m):
     return m * math.cos(math.radians(inc1_deg) + h) * sinc
 
 dinc_rad = 2e-6
-# a dogleg of 8e-10 rad over 20 km already bends the path by ~4e-6 m of TVD:
-# treating a small non-zero dogleg as straight fails the 1e-6 m accuracy
+# a dogleg of 2e-6 rad over 20 km bends the path by about sin(30 deg) dinc L / 2 = 1e-2 m of TVD at the
+# end of the segment: treating a small non-zero dogleg as straight fails the 1e-6 m accuracy
 L, inc1 = 20000.0, 30.0
 inc2 = inc1 + math.degrees(dinc_rad)
 q = np.array([5000.0, 13000.0, 20000.0])
 got = np.asarray(true_vertical_depth([0.0, L], [inc1, inc2], [75.0, 75.0], q))
-ref = np.array([_mp_build_tvd(inc1, dinc_rad, L, m) for m in q])
+ref = np.array([_exact_build_tvd(inc1, dinc_rad, L, m) for m in q])
 assert np.max(np.abs(np.asarray(got, float) - np.asarray(ref, float))) <= 1e-6
 
 # --- test case 12 ---

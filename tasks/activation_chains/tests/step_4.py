@@ -1,5 +1,6 @@
-# Independent targets: closed forms, the Bateman sum evaluated in 600-digit arithmetic (it only
-# cancels in floating point), and matrix exponentials by mpmath at 300 digits.
+# Independent targets: the activity from mpmath's matrix exponential of every period at 300 digits (the
+# flux is the input of the round trip), the end tolerance located with 60-digit logarithms, and closed forms
+# for the domain rule.
 
 # --- test case 0 ---
 # gold monitor, activity of 198Au after 5 days of irradiation and 1 day of cooling,
@@ -58,7 +59,8 @@ for _t_flux in (1e8, 3.3e12, 5e13):
 
 # --- test case 1 ---
 # the two-capture product 199Au at low flux: its activity grows like flux**2 and is
-# about 2e-11 Bq at flux 1e4
+# about 2e-11 Bq at flux 1e4; a two-capture product whose activity is near the bottom of the double range;
+# and a tiny inventory whose product stays above the floor of 1e-300 atoms of the domain
 import numpy as np
 import mpmath as _t_mp
 
@@ -110,6 +112,16 @@ def _t_roundtrip(k, flux, t_irr, t_cool, lo, hi, data):
 
 for _t_flux in (1e4, 7.7e9):
     _t_roundtrip(2, _t_flux, 5 * _T_DAY, _T_DAY, 1e-2, 1e15, _T_DATA)
+# a far smaller activity: a two-capture product with lam[k] = 1e-295 per s, about 5e-302 Bq at the root;
+# at flux_lo its activity (about 5e-330 Bq) is below the smallest positive double, while it holds 5e-35
+# of the target atoms (inside the domain)
+_t_tiny = (np.array([0.0, 0.0, 1e-295]), np.zeros((3, 3)), np.array([1e7, 1e7, 0.0]), np.array([1, 2, -1]),
+           np.array([1.0, 0.0, 0.0]))
+_t_roundtrip(2, 1e12, 100.0, 10.0, 1e-2, 1e15, _t_tiny)
+# 1e-70 target atoms irradiated for 1e-200 s: at flux_lo = 1 the product holds about 1e-294 atoms (above
+# max(1e-250 sum(n0), 1e-300) = 1e-300: inside the domain), about 1e-295 Bq at the root
+_t_small = (np.array([0.0, 1e-3]), np.zeros((2, 2)), np.array([1.0, 0.0]), np.array([1, -1]), np.array([1e-70, 0.0]))
+_t_roundtrip(1, 100.0, 1e-200, 10.0, 1.0, 1e4, _t_small)
 
 # --- test case 2 ---
 # burnup of 198Au (25100 b) bends the activity over (maximum near 1.6e15): at 1e14 the
@@ -238,24 +250,26 @@ _t_faint = (np.array([0.0, 1e-3]), np.zeros((2, 2)), np.array([1e-6, 0.0]), np.a
 _t_roundtrip(1, 1e12, 1e3, 10.0, 1e6, 1e18, _t_faint)
 # the interval is closed with a two-sided tolerance: activities equal to A(flux_lo) or A(flux_hi), or
 # 5e-10 inside them (whose exact roots are about 5e-10 away from the ends), or 5e-10 outside them, give
-# back those ends
+# back those ends: the given bound itself, to the stated relative 1e-11
 for _t_end, _t_in in ((1e8, 1.0 + 5e-10), (1e13, 1.0 - 5e-10)):
     for _t_f in (1.0, _t_in, 2.0 - _t_in):
         act = _t_f * _t_activity(1, _t_end, 5 * _T_DAY, _T_DAY, *_T_DATA)
         got = monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, act, 1e8, 1e13)
         assert _t_rel(got, _t_end) < 1e-11, (got, _t_end, _t_f)
-    # the tolerance 1e-9 holds up to the rounding of the end values (1e-12 in ln): at both ends and on both
-    # sides, the representable activity closest to |ln(activity / A(end))| = 1e-9 - 1e-12 from inside gives
-    # the end; outside the interval the representable activity closest to |ln| = 1e-9 + 1e-12 from beyond
-    # raises ValueError, and inside the interval it gives a flux within 1e-8 of the end (the exact root is
-    # about 2e-9 away). A(end) is the extended-precision target; the logarithms are taken in mpmath.
+    # the tolerance 1e-9 holds up to the accuracy of the end values, which activation_inventory gives to a
+    # relative 1e-10 (so 1e-10 in ln): at both ends and on both sides, the representable activity closest to
+    # |ln(activity / A(end))| = 1e-9 - 1e-10 from inside gives the end; outside the interval the
+    # representable activity closest to |ln| = 1e-9 + 1e-10 from beyond raises ValueError, and inside the
+    # interval it gives a flux within 1e-8 of the end (the exact root is about 1.1e-9 away, the slope
+    # d ln A / d ln flux being 1.00 at 1e8 and 0.96 at 1e13). A(end) is the extended-precision target; the
+    # logarithms are taken in mpmath.
     _t_a = _t_activity(1, _t_end, 5 * _T_DAY, _T_DAY, *_T_DATA)
     for _t_sgn in (1, -1):
         _t_outside = (_t_sgn < 0) == (_t_end == 1e8)
         with _t_mp.workdps(60):
             _t_A = _t_mp.mpf(_t_a)
             _t_lr = lambda x: abs(_t_mp.log(_t_mp.mpf(x) / _t_A))
-            _t_lo_b, _t_hi_b = _t_mp.mpf("1e-9") - _t_mp.mpf("1e-12"), _t_mp.mpf("1e-9") + _t_mp.mpf("1e-12")
+            _t_lo_b, _t_hi_b = _t_mp.mpf("1e-9") - _t_mp.mpf("1e-10"), _t_mp.mpf("1e-9") + _t_mp.mpf("1e-10")
             _t_in = float(_t_A * _t_mp.exp(_t_sgn * _t_lo_b))
             while _t_lr(_t_in) > _t_lo_b:
                 _t_in = float(np.nextafter(_t_in, _t_a))
@@ -274,7 +288,7 @@ for _t_end, _t_in in ((1e8, 1.0 + 5e-10), (1e13, 1.0 - 5e-10)):
                 monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, _t_beyond, 1e8, 1e13)
             except ValueError:
                 _t_raised = True
-            assert _t_raised, ("activity just beyond 1e-9 + 1e-12 outside the end at %g must raise ValueError" % _t_end)
+            assert _t_raised, ("activity just beyond 1e-9 + 1e-10 outside the end at %g must raise ValueError" % _t_end)
         else:
             got = monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, _t_beyond, 1e8, 1e13)
             assert _t_rel(got, _t_end) < 1e-8, (got, _t_end, _t_sgn)
@@ -338,7 +352,8 @@ for _t_act in (_t_activity(1, 1e7, 5 * _T_DAY, _T_DAY, *_T_DATA), _t_activity(1,
         raise AssertionError("monitor_flux must raise ValueError for activity %r" % _t_act)
 
 # --- test case 5 ---
-# bad times, nuclide index, activity or flux bounds raise ValueError
+# bad times, nuclide index, activity or flux bounds (NaN and infinite values included) raise ValueError, and
+# so does a measured nuclide below the domain floor at flux_lo (1e-250 of the initial atoms, or 1e-300 atoms)
 import numpy as np
 import mpmath as _t_mp
 
@@ -390,7 +405,9 @@ for _t_args in ((0.0, _T_DAY, 1, _t_act, 1e8, 1e13), (5 * _T_DAY, -1.0, 1, _t_ac
                 (5 * _T_DAY, 2e9, 1, _t_act, 1e8, 1e13), (5 * _T_DAY, _T_DAY, -1, _t_act, 1e8, 1e13),
                 (5 * _T_DAY, _T_DAY, 3, _t_act, 1e8, 1e13), (5 * _T_DAY, _T_DAY, 1, float("nan"), 1e8, 1e13),
                 (5 * _T_DAY, _T_DAY, 1, _t_act, 1e8, 2e18), (5 * _T_DAY, _T_DAY, 1, 0.0, 1e8, 1e13),
-                (5 * _T_DAY, _T_DAY, 1, _t_act, 1e10, 1e10), (5 * _T_DAY, _T_DAY, 1, _t_act, float("nan"), 1e13)):
+                (5 * _T_DAY, _T_DAY, 1, _t_act, 1e10, 1e10), (5 * _T_DAY, _T_DAY, 1, _t_act, float("nan"), 1e13),
+                (5 * _T_DAY, _T_DAY, 1, float("inf"), 1e8, 1e13), (5 * _T_DAY, _T_DAY, 1, _t_act, 1e8, float("inf")),
+                (float("inf"), _T_DAY, 1, _t_act, 1e8, 1e13)):
     try:
         monitor_flux(*_T_DATA, *_t_args)
     except ValueError:
@@ -398,7 +415,8 @@ for _t_args in ((0.0, _T_DAY, 1, _t_act, 1e8, 1e13), (5 * _T_DAY, -1.0, 1, _t_ac
     else:
         raise AssertionError("monitor_flux must raise ValueError for %r" % (_t_args,))
 # precedence of the ends: with bounds 1e-10 apart both end activities lie within the tolerance of
-# A(flux_lo); flux_lo is checked first and returned
+# A(flux_lo); flux_lo is checked first and returned (to the stated relative 1e-11, which separates it from
+# flux_hi)
 _t_lo = 1e10
 _t_hi = 1e10 * (1.0 + 1e-10)
 got = monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, _t_activity(1, _t_lo, 5 * _T_DAY, _T_DAY, *_T_DATA), _t_lo, _t_hi)
@@ -422,6 +440,17 @@ try:
 except ValueError:
     _t_raised = True
 assert _t_raised, "A(flux_lo) below 1e-250 lam[k] sum(n0) with a tiny lam[k] must raise ValueError"
+# outside the domain through the floor of 1e-300 atoms: 1e-70 target atoms irradiated for 1e-225 s leave about
+# 1e-319 atoms of product at flux_lo = 1, 1e-249 of the initial atoms but fewer than 1e-300 atoms, so
+# A(flux_lo) < lam[k] max(1e-250 sum(n0), 1e-300); the activity 1e-320 Bq lies between A(flux_lo) (about 1e-322)
+# and A(flux_hi) (about 1e-318)
+_t_raised = False
+try:
+    monitor_flux(np.array([0.0, 1e-3]), np.zeros((2, 2)), np.array([1.0, 0.0]), np.array([1, -1]),
+                 np.array([1e-70, 0.0]), 1e-225, 0.0, 1, 1e-320, 1.0, 1e4)
+except ValueError:
+    _t_raised = True
+assert _t_raised, "fewer than 1e-300 atoms of the measured nuclide at flux_lo must raise ValueError"
 # nuclide data rejected by step 3: a positive cross section below 1e-6 b (its rate would underflow)
 _t_raised = False
 try:

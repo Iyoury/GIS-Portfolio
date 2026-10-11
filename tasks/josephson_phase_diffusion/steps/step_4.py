@@ -21,8 +21,9 @@ def noise_temperature(i, v):
 
     Raises:
       ValueError if i or v is not finite, if i is not in (0, 10], if v is not strictly
-      between sqrt(max(i**2 - 1, 0)) and i, or if v lies outside the voltages reached for
-      theta in [0.02, 50] by more than a relative 1e-11. A v within a relative 1e-11 beyond
-      the voltage at theta = 0.02 or theta = 50 returns that endpoint.
+      between sqrt(max(i**2 - 1, 0)) and i, or if v < v_lo * (1 - 1e-11) or
+      v > v_hi * (1 + 1e-11), with the endpoint voltages v_lo = mean_voltage(i, 0.02)[0] and
+      v_hi = mean_voltage(i, 50)[0] of step 1. A v in [v_lo * (1 - 1e-11), v_lo] returns
+      theta = 0.02 and a v in [v_hi, v_hi * (1 + 1e-11)] returns theta = 50.
     '''
     raise NotImplementedError

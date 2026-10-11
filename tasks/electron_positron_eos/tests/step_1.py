@@ -94,7 +94,9 @@ for (_t_T, _t_psi), _t_v in _T_TP.items():
 
 # --- test case 2 ---
 # the hot end of the domain, T = 1e11 K: the net density of a pair plasma
-# grows in proportion to psi (n_net(2 psi) / n_net(psi) = 2 to the accuracy of the two values)
+# grows in proportion to psi (n_net(2 psi) / n_net(psi) = 2 up to a relative 1e-40, so the ratio of two
+# values each within relative 1e-10 is within 4e-10 of 2), while n_minus changes by a relative 1e-20 only
+# (two values each within relative 1e-10 agree within 2e-10) and exceeds n_net by more than 15 decades
 import numpy as np
 
 def _t_rel(a, b):
@@ -103,7 +105,7 @@ def _t_rel(a, b):
 _t_a = pair_densities(1e11, 1e-20)
 _t_b = pair_densities(1e11, 2e-20)
 assert abs(_t_b[2] / _t_a[2] - 2.0) < 4e-10, (_t_a, _t_b)
-assert _t_rel(_t_b[0], _t_a[0]) < 1e-9 and _t_a[2] < 1e-15 * _t_a[0], (_t_a, _t_b)
+assert _t_rel(_t_b[0], _t_a[0]) < 2e-10 and _t_a[2] < 1e-15 * _t_a[0], (_t_a, _t_b)
 
 # --- test case 3 ---
 # T or psi not finite or outside its range

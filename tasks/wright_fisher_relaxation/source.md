@@ -30,9 +30,12 @@ Checks used while building the task:
 - Reference: subtraction-free elimination (state reduction) for the absorption probabilities and
   times, the stationary distribution, the relaxation rate (inverse iteration on a GTH-factored
   I - P, eliminating towards the most probable state) and the passage times. Second solution
-  (versions 1-12; replaced for steps 2-6 in version 13, see there): the same linear systems solved
-  by plain LU in mpmath, with the precision doubled until two runs agree to 1e-13. The two agree to
-  about 1e-14 relative on all tested cases.
+  (versions 1-12; replaced for steps 2-6 in version 13 and for step 7 in version 14, see there): the
+  same linear systems solved by plain LU in mpmath, with the precision doubled until two runs agree to
+  1e-13. The two agree to about 1e-14 relative on all tested cases.
+
+The version sections below describe the task as it was at that version; numbers and methods in an
+older section are historical when a later section replaces them.
 - Analytic checks:
   - neutral fixation probability i0 / N;
   - exact neutral first two stationary moments;
@@ -320,6 +323,9 @@ whose result is not representable.
      1e-6, 1e-3, 0.01, 0.1} and the swapped (u, v) found t_up >= 1e300 only for N >= 380, s <= -0.48,
      u >= 0.07, v <= 1e-3, and every other value below 9.2e299 (t_down never above 1e290). No test uses these
      inputs (the largest tested time is 4.4e248), so no test changed.
+     (Superseded by version 14, item 10: the visible text no longer names the corner, which is a step-7 test
+     input, and finer scans place the region at N >= 376, s <= -0.467, u >= 0.068, v <= 2.54e-3; the v bound of
+     this coarse grid, 1e-3, was too small.)
    - Regression test: crown_check format and ref (unchanged results).
 3. Metadata: verification_explanation describes the new second solution and that it passes every case;
    edit_label stays grading_fix.
@@ -339,4 +345,237 @@ crown_check results:
   [1, 2, 3]; step 7: [1, 2, 3, 4], [1, 2, 3, 4], [0, 1, 2, 3, 4] and [0, 1, 2, 3, 4]); the whole-task
   mutant fails general [0, 1, 2, 3, 4].
 - shift: every reference output scaled by 1 + 1e-12 and by 1 - 1e-12: every step case passes.
+- controls: all-None and all-zero stubs pass no case of any step or of the general tests.
+
+## Version 14 (grading_fix: authoring-guide conformance, pass 2)
+
+Each item lists the finding, its cause, the change and the regression test; what was rerun follows at the end.
+No tolerance was loosened.
+
+1. Whole-task tests that never called the final function.
+   - Finding: tests/general.py cases 0-3 tested steps 1-6 only; fastest_mode appeared only in case 4, whose mode
+     check was a residual at 2.1e-8 max(|P| |mode|). With lambda_min (1.3e-8) below that bound, a mode
+     contaminated by 0.1 %, 1 % or 5 % of the next eigenvector passed it (checked with the eigenvectors of the
+     matrix in 100-digit mpmath).
+   - Cause: the general cases were written before step 7 existed (versions 3-9) and were not extended when step 7
+     became the integrated result.
+   - Change: every general case now calls fastest_mode and asserts a scientific property of its result.
+     Case 0 (N = 20, s = 0.3, u = v = 1e-12): lambda_min and every entry of the mode against mpmath eig plus shifted
+     inverse iteration with plain LU at 80 digits (1e-8), 0 < lambda_min < 1 - gap (step 4), and the stationary
+     distribution of step 3 orthogonal to the mode. Case 1 (N = 18, s = -0.4, u = 1e-12, v = 1e-8):
+     0 < lambda_min < 1 and the same orthogonality with pi. Case 2 (N = 16, s = 0.2, u = v = 0, the chain of
+     fixation_statistics): lambda_min and the mode against the 80-digit eigenpair, the mode within 1e-250 of zero on
+     both absorbing states. Case 3 (N = 20, s = -0.5, u = 0, v = 1e-12): the quasi-stationary distribution of step 6
+     orthogonal to the mode on the transient states, |mode[N]| <= 1e-250, 0 < lambda_min < 1 - rate; the stale
+     comment "rate about 1e-28" now gives the actual 6e-23. Case 4: every entry of the mode against the 100-digit
+     eigenvector at 1e-8 (the residual check stays as an extra check).
+     The orthogonality identities are exact: pi P = pi (or q Q = rho q) and P x = lambda_min x with
+     lambda_min != 1 (!= rho) give sum_i pi_i x_i = 0. With every entry of pi or q of at least 1e-250 within 1e-8
+     relative (smaller entries within 1e-250) and every entry of the mode within 1e-8 relative, the computed sum
+     lies within (2e-8 + rounding) sum_i pi_i |x_i| + 1e-250 sum_i |x_i| of zero; the tests use 2.1e-8, as for two
+     computed outputs. The reference meets them to 1.3e-15, 6.4e-16 and 1.7e-16 (cases 0, 1, 3).
+   - Regression test: crown_check format reports no general case without a call of fastest_mode; the contaminated
+     modes above now fail case 4.
+2. Prompts that named hidden test inputs, and inaccurate magnitude statements.
+   - Finding: the prompts quoted exact test tuples: step 2 (N = 400, s = -1/3, i0 = 1 and N = 400, s = 0.5,
+     i0 = N - 1), step 4 (u = v = 1e-12 without selection), step 5 (N = 400, s = 0.5, u = v = 1e-12, also in the
+     function_header and every docstring of substitution_times), step 6 (N = 400, s = -0.5, v = 1e-9 and N = 400,
+     s = 0.5, v = 0.1 with qsd[0]), step 7 (N = 400, s = 0, u = v = 0.1). Several magnitudes were inaccurate: step 4
+     said the gap goes down to about 1e-12 (it is 2e-12), step 6 said 1e-246 for a rate of 2.3e-246, step 7 said
+     about 1e-173 for N!/N^N = 9.6e-173 and "of similar size with selection" although lambda_min reaches 1.4e-225,
+     and difficulty_explanation gave lambda_min between 2e-211 and 1e-172 and passage times "up to about 4e248"
+     (the domain reaches 1e300).
+   - Cause: the sentences were added in versions 4-11 to make the accuracy requirement concrete, using the cases
+     at hand.
+   - Change: the prompts now state regimes and domain-wide magnitudes only: step 2 "with strong selection at
+     N = 400 the smaller of the two probabilities can be far below 1e-100 (p_fix comes down to about 6e-240 within
+     the stated ranges)"; step 4 "with rare mutation in both directions the gap ... comes down to about 2e-12";
+     step 5 (prompt, function_header and the docstrings of steps/, solution/, solution.py, second_solution.py and
+     the two mutants that carry it) "above 1e248 generations for some inputs at N = 400"; step 6 "comes down to
+     about 2e-249 within the stated ranges" and "at N = 400 the distribution can span more than 200 decades";
+     step 7 "at N = 400 it lies between about 1e-225 and 1e-172 over the stated ranges of s, u and v ... the entries
+     of the mode span up to about 175 decades", and "(as stated in step 4)" instead of "(step 4)" so that it does
+     not read as a dependency. background.md: the Kimura example uses N s = -100 (below 1e-80) instead of the
+     tested corner N s = -200. difficulty_explanation corrected accordingly.
+   - Evidence for the new numbers: lambda_min and the span of the mode over s in 41 values of [-0.5, 0.5] and
+     u, v in {0, 1e-12, 1e-9, 1e-6, 1e-3, 0.01, 0.03, 0.06, 0.08, 0.1} at N = 300, 350, 380, 400 with the
+     second solution: at N = 400 the smallest lambda_min is 1.357e-225 (s = -0.5, u = v = 0.1) and the largest span
+     175.5 decades (s = -0.5, u = 0.1, v = 1e-12); the reference on 11 values of s and u, v in
+     {0, 1e-12, 1e-6, 1e-3, 0.03, 0.1} at N = 400 gives the same extremes and the largest lambda_min, 9.603e-173 =
+     N!/N^N (s = 0, u = v = 0); the minimum gap over N in {1, 2, 3, 5, 10, 40, 150, 400}, 11 values of s and
+     u, v in {1e-12, 2e-12} is about 2.0e-12 (1.99999999999947e-12, neutral); the step-6 rate at s = -0.5,
+     v = 1e-12 is 2.1e-237, 9.1e-249 and 2.28e-249 for N = 380, 399, 400; p_fix = 5.7e-240, t_up = 4.4e248 and the
+     221-decade quasi-stationary distribution are the stored 400-digit targets.
+     (Later correction, item 9: this scan had no positive u or v below 1e-12, which the step-7 domain then still
+     allowed and where the span statement was false; item 9 restricts the domain and repeats the scan.)
+   - Regression test: crown_check format; an AST comparison of every docstring in steps/, solution/, solution.py,
+     second_solution.py and mutants/ with the function_header docstrings (31 files, no mismatch; problem_io equals
+     the step-7 header).
+3. Reference defect in fastest_mode at N = 1 with small u + v.
+   - Finding: comparing the reference with mpmath eig plus inverse iteration for N = 1..8 showed wrong results at
+     N = 1 when u + v is small, inside the domain: (u, v) = (1e-6, 1e-12) gave the mode (0.693, -1) instead of
+     (1e-6, -1) and lambda_min with a relative error of 1.7e-6; (1e-12, 3e-12) gave (1, -1) instead of (1, -1/3);
+     the v13 second solution also failed there (mode entry 1.000033e-6 instead of 1e-6).
+   - Cause: the power method on |P_II^-1| contracts like the ratio of the two eigenvalues, 1 - u - v, and its
+     stopping rule (vector change below 1e-11 per iteration) is met long before convergence when the contraction
+     is that slow; for N >= 2 the ratio is at most about 1/2.
+   - Change: for N = 1 with u, v > 0 the reference returns the exact 2 x 2 eigenpair, lambda_min = p_1 - p_0 =
+     1 - u - v with the right eigenvector (p_0, -q_1) = (v, -u), in solution/step_7.py, solution.py, the two step-7
+     mutants built from the reference (largest_entry_positive, regularized_absorbing) and the whole-task mutant
+     (there with its own mutation-before-selection frequencies).
+   - Regression test: tests/step_7.py case 0 adds N = 1 with (s, u, v) = (0.2, 1e-6, 1e-12) and
+     (-0.4, 2e-12, 5e-12) against the exact eigenpair; the v13 reference and the v13 second solution fail it, the new
+     reference passes. After the fix the reference agrees with the 60-digit mpmath eigenpair to 1e-11 or better for
+     N = 1..8, s in {-0.5, -0.1, 0, 0.3, 0.5}, u, v in {0, 1e-12, 1e-6, 0.1}, except N = 1 with u = v = 1e-12 where the
+     60-digit oracle itself is wrong (eigenvalues 1 and 1 - 2e-12); at 100 digits it gives (1, -1), as the reference.
+4. Second solution of step 7.
+   - Finding (round-1 verification, advisory): the step-7 second solution used the reference's reduction (the
+     Perron root of |P_II^-1| built from elementary symmetric functions and node differences) and differed only in
+     how the e_k were accumulated and in the eigen-solve; its docstring was a one-line summary.
+   - Change: new method. Inverse iteration P_T y = r on the transient block, every solve through
+     P_T = diag(q^N x^lo) V(x) diag(C(N, j)) with the Vandermonde factor solved by the Bjorck-Pereyra algorithm
+     (Newton divided differences, then conversion to monomial coefficients). With positive increasing nodes and an
+     alternating right-hand side every update combines two numbers of the same sign, so the solve runs in
+     log-magnitude arithmetic with known signs and no cancellation; no inverse matrix and no elementary symmetric
+     function is formed. A single transient state is its diagonal entry, and N = 1 with u, v > 0 uses the 2 x 2
+     eigenpair (inverse iteration would contract only like 1 - u - v there). The function carries the full step-7
+     docstring. What it still shares with the reference is the factorization into diagonal and Vandermonde factors
+     and the cancellation-free node differences, i.e. the structure of the model; verification_explanation says so.
+   - Regression test: crown_check second (all cases pass). Against the stored 400-digit targets of tests/step_7.py
+     case 3 the new second solution is within 1.0e-12 (lambda_min) and 1.0e-12 (entries), the reference within
+     2.6e-13 and 7.9e-13. Grid and random comparison with the reference: N in {1, 2, 3, 5, 20, 60, 150, 400},
+     s in {-0.5, -0.2, 0, 0.2, 0.5}, u, v in {0, 1e-12, 1e-6, 1e-3, 0.1}: largest relative difference 8.5e-12 (at
+     N = 2, where both iterations stop at changes of about 1e-11 and contract by about 1/2); 120 random sets (N
+     uniform in [1, 400], s uniform, u and v log-uniform in [1e-12, 0.1], each set to 0 with probability 0.2):
+     1.4e-12; both solutions return exact zeros on the absorbing states. At N = 400 it takes about 0.1 s per call
+     (reference about 1.5 s).
+5. Step 7, test case 3 (compacted N = 400 eigenvectors).
+   - Finding (advisory): the version-12 compaction kept i = 0, 8, 16, ..., 400, so for the two vectors without
+     absorbing states only even indices remained, all of the same sign in a checkerboard mode; the sign alternation
+     and the odd entries at N = 400 were no longer checked.
+   - Change: the stored entries are now i = 0, 5, 10, ..., 400 (both parities, 40-42 odd indices per vector) plus
+     the entries next to an absorbing state, taken from the full version-11 400-digit vectors (git history) and
+     checked string by string against the entries kept in version 12. tests/step_7.py is 23.7 KB.
+   - Regression test: case 3 passes for the reference, the second solution and the shift check; the dense,
+     numerical-inverse, regularized and largest-entry mutants fail it.
+6. Step 4: the neutral_gap mutant was rejected by one case only.
+   - Finding (advisory): gap = u + v for every s failed only case 2; the relabeling check of case 3 cannot see it and
+     no N = 400 gap with selection was compared with an independent value.
+   - Change: case 3 adds relaxation_rate(400, 0.5, 1e-12, 3e-12) against an independent target,
+     6.99071848429455715699225366235e-10: the matrix from mpmath binomials at 400 digits, pi from a plain LU solve of
+     the normalized system, inverse iteration on I - P + 1 pi^T with one plain LU factorization (scaled partial
+     pivoting), converged to 60 digits (run once, 534 s). The reference agrees to 8.3e-15, the second solution to
+     1.9e-13. The same script at N = 30 (80 digits) agrees with the reference to 6e-15.
+   - Regression test: crown_check mut: neutral_gap now fails cases [2, 3].
+7. Step 5, test case 3 tolerance.
+   - Finding (advisory): the case compares one computed output (t_up) with an extended-precision value
+     1 / (N v p_fix) and used 2.1e-8, justified by a comment with an arithmetic slip (1e-8 + 2e-10 is 1.02e-8, not
+     2.1e-8); 2.1e-8 is the tolerance for two computed outputs.
+   - Change: 1.05e-8 (1e-8 for t_up plus the origin-fixation discrepancy, measured 1.73e-10 here), comment
+     corrected. This is a consistency fix of the error budget, not a tuning change: the reference is at 1.7e-10.
+   - Regression test: crown_check ref/second/shift on tests/step_5.py.
+8. Metadata and truthfulness.
+   - difficulty_explanation (magnitudes of item 2, about 4 minutes per 400-digit factorization as measured for item
+     6), solution_explanation (the N = 1 eigenpair of item 3) and verification_explanation (the whole-task identities
+     of item 1, the new step-7 second solution and what it shares with the reference, the step-4 target, the shift
+     check now covering the whole-task tests with every evaluated function scaled) were rewritten to match the code
+     and tests; the unmeasured "about 40 s" timing claim was removed. The top of this file marks the version sections
+     as historical where later versions replace them. relevant_experience stays the placeholder for the author;
+     edit_label stays grading_fix.
+   - Not changed, raised for the lead: removing the per-call time budget in version 12 makes plain arbitrary-precision
+     linear algebra a valid but slow route (several minutes per factorization at N = 400); this is a design risk for
+     the rollouts' overall time limit, not a rule violation. expert_time_estimate_hours = 14 is an estimate for the
+     author to confirm.
+
+9. Step 7: positive mutation rates below 1e-12, and the sign rule of the reference (independent verification of
+   pass 2, blocking).
+   - Finding: step 7 promised every u, v in [0, 0.1], hence any tiny positive rate. The entry of the mode at the end
+     fed by a tiny rate scales like that rate: at N = 400, s = -0.5, u = 0.1 the reference gives mode[0] = 3.27e-176,
+     3.27e-177, 3.27e-264 and 3.27e-314 (subnormal) for v = 1e-12, 1e-13, 1e-100 and 1e-150. So (a) the span of the
+     mode is 176.5 decades already at v = 1e-13 and 263.5 at v = 1e-100, not "up to about 175"; (b) entries below
+     the normal double range cannot carry the stated 1e-8 relative accuracy; (c) at v = 1e-200 and 1e-300 mode[0]
+     underflows, the rule "divide by the sign of the first nonzero entry" then read mode[1] (negative) and the
+     reference returned every entry with the wrong sign (mode[0] = -0.0, mode[1] = +8.164e-167, mode[400] = -0.90895
+     instead of +3e-364, -8.164e-167, +0.90895; relative error 2). The second solution, which sets the signs by
+     position, kept them right (mode[0] = 0.0). The item-2 scan used u, v in {0, 1e-12, 1e-9, ...} only, and no test
+     had 0 < u or v < 1e-12, so this part of the domain had never been checked.
+   - Cause: the domain of version 11 extended the lower bound 1e-12 of steps 3-6 down to 0 in order to include the
+     absorbing cases, which also admitted arbitrarily small positive rates; and the reference read the sign from the
+     computed entries (np.nonzero(mode)[0][0]) instead of from the position of the first transient state.
+   - Change: (a) u and v are each either 0 or in [1e-12, 0.1], the lower bound of steps 3-6 and of
+     problem_description_main ("down to 1e-12"); ValueError for 0 < u < 1e-12 and for 0 < v < 1e-12. This is stated
+     in the step-7 prompt (domain sentence, Inputs and Errors), the function_header and problem_io, the contract
+     (assumptions and valid_input_ranges) and the docstrings of steps/step_7.py, solution/step_7.py, solution.py,
+     second_solution.py, the four step-7 mutants and the whole-task mutant, and the check is added to the validation
+     of the eight implementations. (b) solution/step_7.py and solution.py no longer divide by the sign of the first
+     nonzero entry: the checkerboard sign array is + on the first transient state I[0] by construction, which is the
+     stated normalisation, so the sign is set by position. Mutants rebuilt from the current reference:
+     regularized_absorbing and the whole-task mutant carry the same change; largest_entry_positive keeps its single
+     mistake (flip so that the largest entry is positive, now marked as such); dense_eigenvalues and numerical_inverse
+     now normalise by the sign of the first entry off the absorbing states, as stated, instead of the first nonzero
+     entry, so that their only mistake is the dense eigen-solve. solution_explanation says how the sign is set.
+   - Re-scan on the restricted domain: second solution on N in {200, 300, 350, 380, 400}, 11 values of s in
+     [-0.5, 0.5] and u, v in {0, 1e-12, 2e-12, 1e-11, 1e-9, 1e-6, 1e-3, 0.03, 0.1} (4455 inputs), reference on
+     N = 400, s in {-0.5, -0.25, 0, 0.25, 0.5}, u, v in {0, 1e-12, 1e-6, 0.1}: lambda_min at N = 400 between
+     1.357e-225 (s = -0.5, u = v = 0.1) and 9.603e-173 (s = 0, u = v = 0), largest span 175.49 decades and smallest
+     entry off the absorbing states 3.27e-176 (both at s = -0.5, u = 0.1, v = 1e-12, the lower bound of v, since the
+     end entry is proportional to the rate), every mode with max |entry| = 1, + on the first transient state,
+     strictly alternating signs and |entry| <= 1e-250 on the absorbing states. The prompt's "between about 1e-225
+     and 1e-172" and "up to about 175 decades" stay true; the 1e-250 bound on the absorbing states stays about 74 decades
+     below the smallest true entry.
+   - Regression test: tests/step_7.py case 5 adds (10, 0.1, 1e-13, 0.01), (10, 0.1, 0.01, 5e-13),
+     (10, 0.1, 0, 1e-300), (400, -0.5, 0.1, 1e-200) and (3, 0.2, 9.9e-13, 0), each required to raise ValueError; the
+     previous reference fails case 5 (no error at (10, 0.1, 1e-13, 0.01)), the new reference and the second solution
+     pass. Inside the domain the new reference is bit-identical to the previous one (lam_min, mode and the signs of
+     zeros on 46 inputs: 40 random ones with N = 1 to 119 and rates 0 or 1e-12 to 0.1, and six fixed ones from N = 1
+     to 400); with its
+     validation removed it returns mode[1] = -8.164e-167 and mode[400] = +0.90895 at v = 1e-200 and 1e-300, i.e. the
+     correct signs, where the previous rule flipped them. crown_check (below).
+10. Step 5: the visible text named a hidden test input (independent verification of pass 2, blocking, rule B).
+   - Finding: the step-5 prompt, function_header, contract and the six docstring copies of substitution_times said
+     that t_up can exceed 1e300 only "near (the corner) N = 400, s = -0.5, u = 0.1, v = 1e-12"; the same tuple is a
+     hidden input of tests/step_7.py case 3 (fastest_mode(400, -0.5, 0.1, 1e-12), target 5.87144975069e-197), the
+     input with the largest span of the mode.
+   - Cause: version 13 described the excluded region by its extreme corner.
+   - Change: every copy now gives the region in general terms by necessary bounds: "only t_up can be that large, and
+     only if N >= 370, s <= -0.46, u >= 0.06 and v <= 3e-3" (the prompt adds "for large N with A strongly
+     deleterious, frequent mutation A -> a and rare mutation a -> A ... all hold"; the contract says the same). Files:
+     problem.yaml (prompt, function_header, contract), steps/step_5.py, solution/step_5.py, solution.py,
+     second_solution.py, mutants/step_5_dense_solve.py, mutants/whole_task_mutation_before_selection.py.
+   - Evidence for the bounds (second solution; the reference agrees with it to 5e-13 at four inputs near the
+     boundary, while at the corner itself, outside the domain, the reference returns nan and the second solution
+     inf): along the four lines through the corner, t_up is monotone (increasing in N and u,
+     decreasing in s and v) and reaches 1e300 at N = 376 (7.4e299 at N = 375, 4.4e300 at N = 376), s = -0.46704,
+     u = 0.067998 and v = 2.538e-3 (bisection); on 1200 random inputs with N in [350, 400], s in [-0.5, -0.43],
+     u in [0.055, 0.1] and v log-uniform in [1e-12, 10^-1.5] the 16 inputs with t_up > 1e300 all lie in the box
+     N >= 376, s <= -0.467, u >= 0.068, v <= 2.54e-3, the largest t_up outside it is 2.2e292, and no t_down exceeds
+     1e300 (the largest t_down over N in {300, 350, 400}, s in {-0.5, -0.3, 0, 0.3, 0.5}, u, v in {1e-12, 1e-6, 0.1}
+     is 1.2e233). The stated bounds are these thresholds rounded outwards. They replace the coarse-grid region of
+     version 13, item 2, whose v bound (1e-3) was too small (t_up = 1.2e300 at v = 2.5e-3).
+   - Regression test: the AST comparison of item 2 repeated (31 files, 49 docstrings of the seven step functions,
+     no mismatch; problem_io equals the step-7 function_header); a search of problem_description_main, every
+     step_description_prompt, function_header and problem_io for parameter assignments finds no tested tuple (only
+     N = 400 as a size, N = 1 with u = v = 0 as the stated error case, and u = 0 / v = 0 as the absorbing cases);
+     crown_check format. No test changed for this item.
+   - verification_explanation now cites the scans of items 9 and 10.
+
+Rerun (after items 9 and 10, the last change to code, tests and problem.yaml): tools/crown_check.py on the whole
+folder, all modes, every case alone in a fresh process (-j 2, one BLAS thread); solution.py on every case of
+tests/step_1..7.py, each alone in a fresh process (all pass); fastest_mode of solution.py and second_solution.py
+(six inputs from N = 1 to 400) run twice in clean processes with one BLAS thread and once with two: bit-identical
+outputs in all three runs (second_solution.substitution_times differs by 3e-16 relative with two BLAS threads,
+as noted in version 13). The results below are those of this final run; they are the same as before items 9
+and 10 (the new entries of step-7 case 5 raise ValueError in the reference, the second solution and every
+step-7 mutant, so the failing-case lists of the mutants are unchanged).
+
+crown_check results:
+- format: OK (no general case without a call of fastest_mode; relevant_experience is the placeholder for the author).
+- ref: every step 5/5, 4/4, 5/5, 5/5, 5/5, 5/5, 6/6 and general 5/5 pass; solution.py also passes every step file.
+- second: every step 5/5, 4/4, 5/5, 5/5, 5/5, 5/5, 6/6 and general 5/5 pass.
+- mut: step 1: [0, 2, 3] and [0, 1, 2, 3]; step 2: [1, 2] and [1, 2]; step 3: [0, 2, 3]; step 4: dense_eigenvalues
+  [1, 2, 3], neutral_gap [2, 3] (was [2]); step 5: [0, 1, 2, 3]; step 6: [1, 2, 3] and [1, 2, 3]; step 7:
+  dense_eigenvalues [0, 1, 2, 3, 4], numerical_inverse [0, 1, 2, 3, 4], regularized_absorbing [0, 1, 2, 3, 4],
+  largest_entry_positive [1, 2, 3, 4]; the whole-task mutant fails general [0, 1, 2, 3, 4].
+- shift: every step output scaled by 1 + 1e-12 and by 1 - 1e-12, and the whole-task tests with every evaluated
+  function so scaled: every case passes.
 - controls: all-None and all-zero stubs pass no case of any step or of the general tests.

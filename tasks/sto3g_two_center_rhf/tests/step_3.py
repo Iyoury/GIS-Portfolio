@@ -64,7 +64,7 @@ def _t_eri(za, zb, R):
     return out
 
 def _t_check(eri, args):
-    assert isinstance(eri, np.ndarray) and eri.shape == (2, 2, 2, 2)
+    assert isinstance(eri, np.ndarray) and np.issubdtype(eri.dtype, np.floating) and eri.shape == (2, 2, 2, 2)
     target = _t_eri(*args)
     assert np.max(np.abs(np.asarray(eri) - np.asarray(target))) <= 1e-10, (eri, target)
     # permutation symmetry: comparisons between two computed entries, each within 1e-10 of the target
@@ -137,7 +137,7 @@ def _t_eri(za, zb, R):
     return out
 
 def _t_check(eri, args):
-    assert isinstance(eri, np.ndarray) and eri.shape == (2, 2, 2, 2)
+    assert isinstance(eri, np.ndarray) and np.issubdtype(eri.dtype, np.floating) and eri.shape == (2, 2, 2, 2)
     target = _t_eri(*args)
     assert np.max(np.abs(np.asarray(eri) - np.asarray(target))) <= 1e-10, (eri, target)
     # permutation symmetry: comparisons between two computed entries, each within 1e-10 of the target
@@ -208,7 +208,7 @@ def _t_eri(za, zb, R):
     return out
 
 def _t_check(eri, args):
-    assert isinstance(eri, np.ndarray) and eri.shape == (2, 2, 2, 2)
+    assert isinstance(eri, np.ndarray) and np.issubdtype(eri.dtype, np.floating) and eri.shape == (2, 2, 2, 2)
     target = _t_eri(*args)
     assert np.max(np.abs(np.asarray(eri) - np.asarray(target))) <= 1e-10, (eri, target)
     # permutation symmetry: comparisons between two computed entries, each within 1e-10 of the target
@@ -292,7 +292,7 @@ def _t_eri(za, zb, R):
     return out
 
 def _t_check(eri, args):
-    assert isinstance(eri, np.ndarray) and eri.shape == (2, 2, 2, 2)
+    assert isinstance(eri, np.ndarray) and np.issubdtype(eri.dtype, np.floating) and eri.shape == (2, 2, 2, 2)
     target = _t_eri(*args)
     assert np.max(np.abs(np.asarray(eri) - np.asarray(target))) <= 1e-10, (eri, target)
     # permutation symmetry: comparisons between two computed entries, each within 1e-10 of the target

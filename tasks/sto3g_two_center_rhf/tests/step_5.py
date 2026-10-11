@@ -130,7 +130,7 @@ def _t_arrangements(ZA, ZB, za, zb):
     return [((2 * hA * sA + jA) / sA ** 2, (ZA - 2) * ZB), ((2 * hB * sB + jB) / sB ** 2, (ZB - 2) * ZA),
             (hA / sA + hB / sB, (ZA - 1) * (ZB - 1))]
 
-def _t_numerov_levels(ZA, ZB, za, zb, mA, mB, nlev=5, h=0.004, r0=0.25, r1=22.0, rc=None):
+def _t_fd_levels(ZA, ZB, za, zb, mA, mB, nlev=5, h=0.004, r0=0.25, r1=22.0, rc=None):
     # second-order finite differences of the radial equation on steps h, h/2 and h/4
     # (tridiagonal eigenproblems, Dirichlet walls), extrapolated twice by Richardson (error O(h**6));
     # beyond rc (where all cross integrals have vanished) the curve is the exact separated-fragment
@@ -161,8 +161,8 @@ _T_MH, _T_MD, _T_MHE = 1.00782503207, 2.01410177812, 4.00260325413
 
 def _t_check_levels(args):
     lev = vibrational_levels(*args)
-    assert isinstance(lev, np.ndarray) and lev.shape == (5,), lev
-    target = _t_numerov_levels(*args)
+    assert isinstance(lev, np.ndarray) and np.issubdtype(lev.dtype, np.floating) and lev.shape == (5,), lev
+    target = _t_fd_levels(*args)
     err = np.abs(lev - target)
     assert np.all(err < 0.01), (args, lev, target)
     return lev
@@ -291,7 +291,7 @@ def _t_arrangements(ZA, ZB, za, zb):
     return [((2 * hA * sA + jA) / sA ** 2, (ZA - 2) * ZB), ((2 * hB * sB + jB) / sB ** 2, (ZB - 2) * ZA),
             (hA / sA + hB / sB, (ZA - 1) * (ZB - 1))]
 
-def _t_numerov_levels(ZA, ZB, za, zb, mA, mB, nlev=5, h=0.004, r0=0.25, r1=22.0, rc=None):
+def _t_fd_levels(ZA, ZB, za, zb, mA, mB, nlev=5, h=0.004, r0=0.25, r1=22.0, rc=None):
     # second-order finite differences of the radial equation on steps h, h/2 and h/4
     # (tridiagonal eigenproblems, Dirichlet walls), extrapolated twice by Richardson (error O(h**6));
     # beyond rc (where all cross integrals have vanished) the curve is the exact separated-fragment
@@ -322,8 +322,8 @@ _T_MH, _T_MD, _T_MHE = 1.00782503207, 2.01410177812, 4.00260325413
 
 def _t_check_levels(args):
     lev = vibrational_levels(*args)
-    assert isinstance(lev, np.ndarray) and lev.shape == (5,), lev
-    target = _t_numerov_levels(*args)
+    assert isinstance(lev, np.ndarray) and np.issubdtype(lev.dtype, np.floating) and lev.shape == (5,), lev
+    target = _t_fd_levels(*args)
     err = np.abs(lev - target)
     assert np.all(err < 0.01), (args, lev, target)
     return lev
@@ -454,7 +454,7 @@ def _t_arrangements(ZA, ZB, za, zb):
     return [((2 * hA * sA + jA) / sA ** 2, (ZA - 2) * ZB), ((2 * hB * sB + jB) / sB ** 2, (ZB - 2) * ZA),
             (hA / sA + hB / sB, (ZA - 1) * (ZB - 1))]
 
-def _t_numerov_levels(ZA, ZB, za, zb, mA, mB, nlev=5, h=0.004, r0=0.25, r1=22.0, rc=None):
+def _t_fd_levels(ZA, ZB, za, zb, mA, mB, nlev=5, h=0.004, r0=0.25, r1=22.0, rc=None):
     # second-order finite differences of the radial equation on steps h, h/2 and h/4
     # (tridiagonal eigenproblems, Dirichlet walls), extrapolated twice by Richardson (error O(h**6));
     # beyond rc (where all cross integrals have vanished) the curve is the exact separated-fragment
@@ -485,8 +485,8 @@ _T_MH, _T_MD, _T_MHE = 1.00782503207, 2.01410177812, 4.00260325413
 
 def _t_check_levels(args):
     lev = vibrational_levels(*args)
-    assert isinstance(lev, np.ndarray) and lev.shape == (5,), lev
-    target = _t_numerov_levels(*args)
+    assert isinstance(lev, np.ndarray) and np.issubdtype(lev.dtype, np.floating) and lev.shape == (5,), lev
+    target = _t_fd_levels(*args)
     err = np.abs(lev - target)
     assert np.all(err < 0.01), (args, lev, target)
     return lev
@@ -614,7 +614,7 @@ def _t_arrangements(ZA, ZB, za, zb):
     return [((2 * hA * sA + jA) / sA ** 2, (ZA - 2) * ZB), ((2 * hB * sB + jB) / sB ** 2, (ZB - 2) * ZA),
             (hA / sA + hB / sB, (ZA - 1) * (ZB - 1))]
 
-def _t_numerov_levels(ZA, ZB, za, zb, mA, mB, nlev=5, h=0.004, r0=0.25, r1=22.0, rc=None):
+def _t_fd_levels(ZA, ZB, za, zb, mA, mB, nlev=5, h=0.004, r0=0.25, r1=22.0, rc=None):
     # second-order finite differences of the radial equation on steps h, h/2 and h/4
     # (tridiagonal eigenproblems, Dirichlet walls), extrapolated twice by Richardson (error O(h**6));
     # beyond rc (where all cross integrals have vanished) the curve is the exact separated-fragment
@@ -643,8 +643,8 @@ def _t_numerov_levels(ZA, ZB, za, zb, mA, mB, nlev=5, h=0.004, r0=0.25, r1=22.0,
 
 def _t_check_levels(args):
     lev = vibrational_levels(*args)
-    assert isinstance(lev, np.ndarray) and lev.shape == (5,), lev
-    target = _t_numerov_levels(*args)
+    assert isinstance(lev, np.ndarray) and np.issubdtype(lev.dtype, np.floating) and lev.shape == (5,), lev
+    target = _t_fd_levels(*args)
     err = np.abs(lev - target)
     assert np.all(err < 0.01), (args, lev, target)
     return lev
@@ -772,7 +772,7 @@ def _t_arrangements(ZA, ZB, za, zb):
     return [((2 * hA * sA + jA) / sA ** 2, (ZA - 2) * ZB), ((2 * hB * sB + jB) / sB ** 2, (ZB - 2) * ZA),
             (hA / sA + hB / sB, (ZA - 1) * (ZB - 1))]
 
-def _t_numerov_levels(ZA, ZB, za, zb, mA, mB, nlev=5, h=0.004, r0=0.25, r1=22.0, rc=None):
+def _t_fd_levels(ZA, ZB, za, zb, mA, mB, nlev=5, h=0.004, r0=0.25, r1=22.0, rc=None):
     # second-order finite differences of the radial equation on steps h, h/2 and h/4
     # (tridiagonal eigenproblems, Dirichlet walls), extrapolated twice by Richardson (error O(h**6));
     # beyond rc (where all cross integrals have vanished) the curve is the exact separated-fragment
@@ -803,8 +803,8 @@ _T_MH, _T_MD, _T_MHE = 1.00782503207, 2.01410177812, 4.00260325413
 
 def _t_check_levels(args):
     lev = vibrational_levels(*args)
-    assert isinstance(lev, np.ndarray) and lev.shape == (5,), lev
-    target = _t_numerov_levels(*args)
+    assert isinstance(lev, np.ndarray) and np.issubdtype(lev.dtype, np.floating) and lev.shape == (5,), lev
+    target = _t_fd_levels(*args)
     err = np.abs(lev - target)
     assert np.all(err < 0.01), (args, lev, target)
     return lev
@@ -935,7 +935,7 @@ def _t_arrangements(ZA, ZB, za, zb):
     return [((2 * hA * sA + jA) / sA ** 2, (ZA - 2) * ZB), ((2 * hB * sB + jB) / sB ** 2, (ZB - 2) * ZA),
             (hA / sA + hB / sB, (ZA - 1) * (ZB - 1))]
 
-def _t_numerov_levels(ZA, ZB, za, zb, mA, mB, nlev=5, h=0.004, r0=0.25, r1=22.0, rc=None):
+def _t_fd_levels(ZA, ZB, za, zb, mA, mB, nlev=5, h=0.004, r0=0.25, r1=22.0, rc=None):
     # second-order finite differences of the radial equation on steps h, h/2 and h/4
     # (tridiagonal eigenproblems, Dirichlet walls), extrapolated twice by Richardson (error O(h**6));
     # beyond rc (where all cross integrals have vanished) the curve is the exact separated-fragment
@@ -964,8 +964,8 @@ def _t_numerov_levels(ZA, ZB, za, zb, mA, mB, nlev=5, h=0.004, r0=0.25, r1=22.0,
 
 def _t_check_levels(args):
     lev = vibrational_levels(*args)
-    assert isinstance(lev, np.ndarray) and lev.shape == (5,), lev
-    target = _t_numerov_levels(*args)
+    assert isinstance(lev, np.ndarray) and np.issubdtype(lev.dtype, np.floating) and lev.shape == (5,), lev
+    target = _t_fd_levels(*args)
     err = np.abs(lev - target)
     assert np.all(err < 0.01), (args, lev, target)
     return lev
@@ -1098,7 +1098,7 @@ def _t_arrangements(ZA, ZB, za, zb):
     return [((2 * hA * sA + jA) / sA ** 2, (ZA - 2) * ZB), ((2 * hB * sB + jB) / sB ** 2, (ZB - 2) * ZA),
             (hA / sA + hB / sB, (ZA - 1) * (ZB - 1))]
 
-def _t_numerov_levels(ZA, ZB, za, zb, mA, mB, nlev=5, h=0.004, r0=0.25, r1=22.0, rc=None):
+def _t_fd_levels(ZA, ZB, za, zb, mA, mB, nlev=5, h=0.004, r0=0.25, r1=22.0, rc=None):
     # second-order finite differences of the radial equation on steps h, h/2 and h/4
     # (tridiagonal eigenproblems, Dirichlet walls), extrapolated twice by Richardson (error O(h**6));
     # beyond rc (where all cross integrals have vanished) the curve is the exact separated-fragment
@@ -1129,12 +1129,12 @@ _t_args = (1.0, 2.0, 1.24, 1.592, 1.0, 1.0)
 _t_e = _t_limit(*_t_args[:4])[0]
 _t_tail30 = min(e - _t_e + c / 30.0 for e, c in _t_arrangements(*_t_args[:4]))
 assert abs(_t_curve(*_t_args[:4], np.array([30.0]))[0] - _t_e - _t_tail30) < 1e-12
-_t_far = _t_numerov_levels(*_t_args, nlev=6, r1=150.0, rc=30.0)
-_t_farther = _t_numerov_levels(*_t_args, nlev=6, r1=250.0, rc=30.0)
+_t_far = _t_fd_levels(*_t_args, nlev=6, r1=150.0, rc=30.0)
+_t_farther = _t_fd_levels(*_t_args, nlev=6, r1=250.0, rc=30.0)
 assert np.max(np.abs(_t_far[:5] - _t_farther[:5])) < 1e-3, (_t_far, _t_farther)
 assert -1.0 < _t_farther[4] < 0.0 < _t_farther[5], _t_farther
 lev = vibrational_levels(*_t_args)
-assert isinstance(lev, np.ndarray) and lev.shape == (5,), lev
+assert isinstance(lev, np.ndarray) and np.issubdtype(lev.dtype, np.floating) and lev.shape == (5,), lev
 assert np.all(np.abs(lev - _t_farther[:5]) < 0.01), (lev, _t_farther)
 
 # --- test case 7 ---

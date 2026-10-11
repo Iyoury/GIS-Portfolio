@@ -1,14 +1,29 @@
 """Independent second solution for borehole-heat-flow.
 
 Differences from solution.py (method, not formatting):
-  * TVD: numerical Gauss-Legendre integration of the vertical component of
-    the unit tangent along the minimum-curvature arc (solution.py uses the
-    closed-form ratio-factor formula).
-  * R and S: adaptive quadrature (scipy.integrate.quad) of the piecewise
-    conductivity profile (solution.py sums exact layer contributions).
+  * TVD: circular-arc geometry. On each segment the path is a circle of radius
+    L / beta in the plane of the first tangent t1 and the unit vector
+    w = (t2 - t1 cos beta) / sin beta, so the displacement after an arc length s
+    is (L / beta) [sin(phi) t1 + (1 - cos(phi)) w], phi = beta s / L, written
+    with sinc functions (exact for beta = 0) (solution.py uses the ratio-factor
+    formula 0.5 dMD (t1 + t2) tan(beta/2) / (beta/2) and the great-circle
+    tangent of the partial arc).
+  * R: superposition of the conductivity contrasts at the layer tops,
+    1/k(z') = sum_i c_i H(z' - t_i) with c_0 = 1/k_0 and c_i = 1/k_i - 1/k_{i-1},
+    so R(z) = sum_i c_i (z - t_i)_+ (a sum of ramps; solution.py clips every
+    depth into every layer and sums (b - a)/k layer by layer).
+  * S: integration by parts, S(z) = z R(z) - int_0^z R(z') dz', with the
+    integral of the continuous, piecewise-linear R by the trapezoid rule on the
+    layer tops and z, which is exact (solution.py sums (b - a)(b + a)/(2k)
+    layer by layer). Both are exact for these elementary integrals, so they
+    give the same values as the reference up to rounding; the independent
+    evidence for step 2 is the hand-computed closed forms and the quadrature
+    of the step 2 tests.
   * Paleoclimate: Duhamel convolution of the surface history with the
     half-space impulse response z/(2 sqrt(pi kappa tau^3)) exp(-z^2/4 kappa tau),
-    integrated numerically (solution.py uses differences of erfc).
+    integrated over each history interval from tau = 0 by adaptive quadrature
+    in the similarity variable eta = z/(2 sqrt(kappa tau)) (solution.py uses
+    differences of erfc).
   * Fit: QR-based least squares with covariance from the inverse of the
     triangular factor (solution.py solves the normal equations).
   * Layered paleoclimate perturbation (step 5): one global linear system per
@@ -16,15 +31,19 @@ Differences from solution.py (method, not formatting):
     Weideman and Trefethen (2007) (solution.py carries the admittance with a
     tanh recursion and inverts on the fixed Talbot contour).
 """
+import math
 import numpy as np
 from scipy.integrate import quad
 
 YEAR = 365.25 * 86400.0
-_X, _W = np.polynomial.legendre.leggauss(48)
 
 
 def _t(i, a):
     return np.array([np.sin(i) * np.cos(a), np.sin(i) * np.sin(a), np.cos(i)])
+
+
+def _sc(x):
+    return float(np.sinc(x / np.pi))          # sin(x) / x, exactly 1 at x = 0
 
 
 def true_vertical_depth(survey_md, inc_deg, azi_deg, md_query):
@@ -41,30 +60,26 @@ def true_vertical_depth(survey_md, inc_deg, azi_deg, md_query):
         raise ValueError("bad survey")
     if np.any(~np.isfinite(q)) or np.any(q < 0) or np.any(q > md[-1]):
         raise ValueError("query outside survey")
-
-    def seg_tvd(i, b):
-        a = md[i]
-        if b <= a:
-            return 0.0
-        t1, t2 = _t(inc[i], azi[i]), _t(inc[i + 1], azi[i + 1])
-        beta = np.arctan2(np.linalg.norm(np.cross(t1, t2)), t1 @ t2)
-        L = md[i + 1] - md[i]
-        s = 0.5 * (b - a) * _X + 0.5 * (b + a)
-        f = (s - a) / L
-        # slerp written with sinc so that it stays exact for any dogleg, including 0
-        sc = lambda x: np.sinc(x / np.pi)
-        tz = ((1 - f) * sc((1 - f) * beta) * t1[2] + f * sc(f * beta) * t2[2]) / sc(beta)
-        return 0.5 * (b - a) * np.sum(_W * tz)
-
+    segs = []
     for i in range(md.size - 1):
-        if _t(inc[i], azi[i]) @ _t(inc[i + 1], azi[i + 1]) <= np.cos(np.pi - 1e-6):
+        t1, t2 = _t(inc[i], azi[i]), _t(inc[i + 1], azi[i + 1])
+        if t1 @ t2 <= np.cos(np.pi - 1e-6):
             raise ValueError("180 degree dogleg")
-    full = np.concatenate(([0.0], np.cumsum([seg_tvd(i, md[i + 1]) for i in range(md.size - 1)])))
-    out = []
-    for m in q:
-        i = min(np.searchsorted(md, m, side="right") - 1, md.size - 2)
-        out.append(full[i] + seg_tvd(i, m))
-    out = np.array(out)
+        beta = math.atan2(float(np.linalg.norm(np.cross(t1, t2))), float(t1 @ t2))
+        # circle of radius L / beta in the plane of t1 and w = (t2 - t1 cos beta) / sin beta:
+        # r(s) = (L / beta) [sin(phi) t1 + (1 - cos(phi)) w], phi = beta s / L, written with sinc
+        segs.append((md[i + 1] - md[i], beta, t1[2], (t2[2] - t1[2] * math.cos(beta)) / _sc(beta)))
+
+    def rise(i, s):
+        L, beta, t1z, wz = segs[i]
+        phi = beta * s / L
+        return s * (_sc(phi) * t1z + 0.5 * (s / L) * _sc(0.5 * phi) ** 2 * wz)
+
+    full = np.concatenate(([0.0], np.cumsum([rise(i, segs[i][0]) for i in range(len(segs))])))
+    out = np.empty(q.size)
+    for j, m in enumerate(q):
+        i = min(int(np.searchsorted(md, m, side="right")) - 1, md.size - 2)
+        out[j] = full[i] + rise(i, m - md[i])
     return float(out[0]) if q_in.ndim == 0 else out.reshape(q_in.shape)
 
 
@@ -73,18 +88,28 @@ def layer_integrals(layer_top_tvd, layer_k, z):
     k = np.asarray(layer_k, float)
     z_in = np.asarray(z, float)
     zz = np.atleast_1d(z_in).ravel()
-    if tops.ndim != 1 or tops.shape != k.shape or not np.all(np.isfinite(tops)) or tops[0] != 0 or np.any(np.diff(tops) <= 0):
+    if tops.ndim != 1 or tops.shape != k.shape or tops.size < 1 or not np.all(np.isfinite(tops)) \
+            or tops[0] != 0 or np.any(np.diff(tops) <= 0):
         raise ValueError("bad layers")
     if np.any(~np.isfinite(k)) or np.any(k <= 0) or np.any(~np.isfinite(zz)) or np.any(zz < 0):
         raise ValueError("bad input")
-    from scipy.integrate import quad  # local import: harness may strip top-level imports
-    kf = lambda x: k[np.searchsorted(tops, x, side="right") - 1]
-    R, S = [], []
-    for zi in zz:
-        pts = [t for t in tops if 0 < t < zi] or None
-        R.append(quad(lambda x: 1 / kf(x), 0, zi, points=pts, limit=200, epsabs=1e-13)[0] if zi > 0 else 0.0)
-        S.append(quad(lambda x: x / kf(x), 0, zi, points=pts, limit=200, epsabs=1e-13)[0] if zi > 0 else 0.0)
-    R, S = np.array(R), np.array(S)
+    # R: the resistivity profile 1/k(z') is a superposition of steps c_i H(z' - t_i) at the layer tops
+    # (c_0 = 1/k_0, c_i = 1/k_i - 1/k_{i-1}), so R(z) = sum_i c_i (z - t_i)_+ (sum of ramps; no per-layer
+    # partition and no layer thickness)
+    c = np.diff(np.concatenate(([0.0], 1.0 / k)))
+
+    def ramp_sum(x):
+        return np.maximum(x[:, None] - tops[None, :], 0.0) @ c
+
+    R = ramp_sum(zz)
+    # S by integration by parts: S(z) = int_0^z z' dR(z') = z R(z) - int_0^z R(z') dz'. R is continuous and
+    # linear between the tops, so the trapezoid rule on the nodes (tops above z, then z) is exact for the
+    # integral of R; no z'/k integrand is formed
+    R_top = ramp_sum(tops)
+    I_top = np.concatenate(([0.0], np.cumsum(np.diff(tops) * 0.5 * (R_top[:-1] + R_top[1:]))))
+    j = np.searchsorted(tops, zz, side="right") - 1
+    I = I_top[j] + (zz - tops[j]) * 0.5 * (R_top[j] + R)
+    S = zz * R - I
     if z_in.ndim == 0:
         return float(R[0]), float(S[0])
     return R.reshape(z_in.shape), S.reshape(z_in.shape)
@@ -101,19 +126,22 @@ def paleoclimate_perturbation(z, t_years, dT, kappa):
         raise ValueError("bad input")
     from scipy.integrate import quad  # local import: harness may strip top-level imports
     edges = np.concatenate(([0.0], t * YEAR))
+    # Duhamel: theta(z) = sum_i dT_i int_{edges[i]}^{edges[i+1]} g(z, tau) dtau with the half-space impulse
+    # response g = z / (2 sqrt(pi kappa tau^3)) exp(-z^2 / (4 kappa tau)); with eta = z / (2 sqrt(kappa tau)),
+    # g dtau = (2 / sqrt(pi)) exp(-eta^2) deta, and tau in [0, edges[1]] maps to eta in [eta(edges[1]), inf)
+    kern = lambda e: 2.0 / math.sqrt(math.pi) * math.exp(-e * e)
+    ETA_MAX = 40.0                               # exp(-1600): nothing beyond
     out = np.zeros(zz.size)
     for j, zj in enumerate(zz):
         if zj == 0:
             out[j] = d[0]
             continue
-        g = lambda tau: zj / (2 * np.sqrt(np.pi * kappa * tau**3)) * np.exp(-zj**2 / (4 * kappa * tau))
         tot = 0.0
         for i in range(t.size):
-            lo, hi = edges[i], edges[i + 1]
-            # integrate in log-time for accuracy over many decades
-            f = lambda u: g(np.exp(u)) * np.exp(u)
-            lo_u = np.log(max(lo, 1e-3 * YEAR))
-            tot += d[i] * quad(f, lo_u, np.log(hi), limit=400, epsabs=1e-14, epsrel=1e-12)[0]
+            a = zj / (2.0 * math.sqrt(kappa * edges[i + 1]))
+            b = ETA_MAX if edges[i] == 0.0 else min(ETA_MAX, zj / (2.0 * math.sqrt(kappa * edges[i])))
+            if a < b:
+                tot += d[i] * quad(kern, a, b, epsabs=1e-15, epsrel=1e-13, limit=200)[0]
         out[j] = tot
     return float(out[0]) if z_in.ndim == 0 else out.reshape(z_in.shape)
 

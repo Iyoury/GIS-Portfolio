@@ -32,11 +32,18 @@ assert np.max(np.abs(_t_back / _t_h - 1.0)) < 1e-8
 
 # --- test case 1 ---
 # a uniform column (lam = 0) is a prism: column_gz and the z component of prism_gravity agree
-# within the sum of their two stated tolerances (1e-10 |g_z| <= 1e-10 |g| for column_gz,
-# 1e-10 |g| + 1e-14 G |rho| L for prism_gravity), and its gradients satisfy Laplace outside
+# within about twice the step-1 tolerance (2.1e-10 |g| + 2e-14 G |rho| L; column_gz's own 1e-10 |g_z|
+# is at most 1e-10 |g|), and its gradients satisfy Laplace outside (trace within the sum of the three
+# diagonal tolerances). The one-cell basin made of this column, 3 w_min deep (the stated limit), gives
+# its depth back from the attraction at the centre of its top: from the independent value (60-digit
+# closed form of the prism, confirmed to 30 digits by a 50-digit quadrature over depth of the solid angle
+# of its laminae) within the stated 1e-8, and from column_gz's own value within 2e-8 (the depth
+# amplifies relative data errors by 6.7 here, so column_gz's 1e-10 adds at most 7e-10)
 import numpy as np
 
 _T_G = 6.6743e-11
+
+_T_GC = -0.0000111063319672515014742137668593
 
 _t_st = np.array([[30.0, 40.0, -20.0], [0.0, 0.0, 0.0], [-500.0, 900.0, -3.0]])
 _t_a = column_gz(_t_st, 0.0, 100.0, 0.0, 200.0, 300.0, -400.0, 0.0)
@@ -46,6 +53,12 @@ assert np.all(np.abs(_t_a - _t_gv[:, 2]) <= _t_tol), (_t_a, _t_gv)
 _t_T = prism_gradients(_t_st[[0, 2]], (0.0, 100.0, 0.0, 200.0, 0.0, 300.0), -400.0)
 for _t_k in range(2):
     assert abs(np.trace(_t_T[_t_k])) <= 3e-9 * np.linalg.norm(_t_T[_t_k])
+_t_h = invert_basin_depths(np.array([0.0, 100.0]), np.array([0.0, 200.0]), np.array([[_T_GC]]), -400.0, 0.0)
+assert isinstance(_t_h, np.ndarray) and _t_h.shape == (1, 1), _t_h
+assert abs(_t_h[0, 0] / 300.0 - 1.0) < 1e-8, _t_h
+_t_gc = column_gz(np.array([50.0, 100.0, 0.0]), 0.0, 100.0, 0.0, 200.0, 300.0, -400.0, 0.0)
+_t_h2 = invert_basin_depths(np.array([0.0, 100.0]), np.array([0.0, 200.0]), np.array([[_t_gc]]), -400.0, 0.0)
+assert abs(_t_h2[0, 0] / 300.0 - 1.0) < 2e-8, (_t_h2, _t_gc, _T_GC)
 
 # --- test case 2 ---
 # a uniform-density basin (lam = 0, +300 kg m^-3) of 10 x 10 cells is a sum of prisms: prism_gravity

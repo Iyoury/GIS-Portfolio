@@ -50,20 +50,44 @@ def strip_lengths(L, T):
         xi_energy: decay length of the connected correlation of e = s_0 s_1 along the strip.
         Both lengths with relative accuracy 1e-6.
     '''
-    # Exact free-fermion (Kaufman) spectrum of the periodic strip; no matrix at all.
-    K = 1.0 / T
-    K_dual = -0.5 * np.log(np.tanh(K))
-    q = np.arange(2 * L)
-    ch = (np.cosh(2 * K) * np.cosh(2 * K_dual)
-          - np.sinh(2 * K) * np.sinh(2 * K_dual) * np.cos(np.pi * q / L))
-    gam = np.arccosh(np.maximum(ch, 1.0))
-    gam[0] = 2.0 * (K - K_dual)
-    log_lam0 = 0.5 * L * np.log(2.0 * np.sinh(2.0 * K)) + 0.5 * np.sum(gam[1::2])
-    f = float(-T * log_lam0 / L)
-    # top odd state: modes of even q; the gap is half the alternating sum of the mode energies
-    xi_spin = float(1.0 / (0.5 * np.sum(gam[1::2] - gam[0::2])))
-    # second even state: the two lowest modes q = 1 and q = 2L - 1 are flipped together
-    xi_energy = float(1.0 / (2.0 * gam[1]))
+    # Full symmetry reduction instead of the flip blocks alone: M commutes with the cyclic shift of
+    # a row (lattice momentum k = 2 pi j / L) and with the global spin flip (parity p = +-1), so it
+    # is block diagonal in the (k, p) sectors. Each block is written in a basis of projected orbit
+    # states and diagonalized; the levels of all momenta are then pooled by parity.
+    M = transfer_matrix(L, T)
+    n = 2 ** L
+    labels = np.arange(n)
+    shift = (labels >> 1) | ((labels & 1) << (L - 1))
+    flip = labels ^ (n - 1)
+    images = [labels]                       # images[j][a]: row a shifted j times
+    for _ in range(L - 1):
+        images.append(shift[images[-1]])
+    images = np.array(images)
+    group = np.concatenate([images, flip[images]])          # the 2L symmetry images of every row
+    reps = np.unique(np.min(group, axis=0))                   # one row per orbit of the group
+    levels = {1: [], -1: []}
+    for j in range(L // 2 + 1):             # the block of momentum -k is the complex conjugate of k
+        phase = np.exp(-2j * np.pi * j * np.arange(L) / L)
+        for p in (1, -1):
+            weights = np.concatenate([phase, p * phase])
+            cols = []
+            for a in reps:
+                v = np.zeros(n, dtype=complex)
+                np.add.at(v, group[:, a], weights)
+                norm = np.linalg.norm(v)
+                if norm > 1e-8:             # the projection of an orbit can vanish in a sector
+                    cols.append(v / norm)
+            if cols:
+                V = np.array(cols).T
+                levels[p].extend(np.linalg.eigvalsh(V.conj().T @ (M @ V)))
+    even = np.sort(levels[1])
+    odd = np.sort(levels[-1])
+    lam0 = even[-1]
+    f = float(-T * np.log(lam0) / L)
+    # s_0 is flip-odd: slowest term from the largest odd level of any momentum; e = s_0 s_1 is
+    # flip-even: its connected correlation decays through the second even level of any momentum
+    xi_spin = float(1.0 / np.log(lam0 / odd[-1]))
+    xi_energy = float(1.0 / np.log(lam0 / even[-2]))
     return f, xi_spin, xi_energy
 
 
@@ -271,7 +295,20 @@ def _v7_vumps(T, h, chi=16, start=None):
 
 
 def bulk_thermodynamics(T, h):
-    '''Free energy, magnetization, susceptibility and specific heat per spin of the infinite lattice in a field.'''
+    '''Free energy, magnetization, susceptibility and specific heat per spin of the infinite lattice in a field.
+
+    Inputs:
+      T: float, temperature, 2 <= T <= 3 (J = 1, k_B = 1).
+      h: float, uniform field, 0.005 <= h <= 0.2; the energy is E = - sum_<ij> s_i s_j - h sum_i s_i.
+
+    Output:
+      (f, m, chi, c): tuple of four Python floats for the infinite square lattice (the limit of
+      the strip quantities as the width goes to infinity):
+        f: free energy per spin, f = -T lim ln(Z) / N (units of J), absolute accuracy 1e-10;
+        m: magnetization per spin <s_i> = -df/dh, absolute accuracy 1e-9;
+        chi: susceptibility per spin, chi = dm/dh at fixed T (units 1/J), relative accuracy 1e-5;
+        c: specific heat per spin at fixed h, c = -T d2f/dT2 (units k_B), relative accuracy 1e-5.
+    '''
     # Other route: VUMPS instead of corner transfer matrices, the free energy from the per-site
     # eigenvalue of the row transfer matrix, and both response functions as second derivatives
     # of f (fourth-order five-point stencils), chi = -d2f/dh2 instead of dm/dh.
@@ -279,9 +316,6 @@ def bulk_thermodynamics(T, h):
 
     def f_at(TT, hh):
         return _v7_vumps(TT, hh, start=st)[0]
-
-    def second(g, x, d):
-        return (-g(x + 2 * d) + 16.0 * g(x + d) - 30.0 * g(x) + 16.0 * g(x - d) - g(x - 2 * d)) / (12.0 * d * d)
 
     vals_h = {0: f0}
     vals_T = {0: f0}

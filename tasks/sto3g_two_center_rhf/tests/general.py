@@ -4,7 +4,10 @@
 # Every test case below is self-contained: it repeats its own imports, helpers and setup.
 
 # --- test case 0 ---
-# stretched H2 with polarization functions on both atoms
+# stretched H2 with polarization functions on both atoms; integrated link with step 4: the 8-function
+# basis contains the two 1s functions of steps 2-4, so by the variational principle both energies lie at
+# or below those of fci_energy at the same geometry (two computed outputs, each within 1e-9: slack 2e-9),
+# and full CI lies at or below RHF
 import numpy as np
 from functools import lru_cache
 from scipy.special import hyp1f1 as _t_hyp1f1
@@ -206,7 +209,11 @@ def _t_check_pol(args):
     assert abs(out[1] - t_rhf) < 1e-9, (args, out, t_rhf)
     return out
 
-assert _t_check_pol((1.0, 1.0, 1.24, 1.24, 1.0, 1.0, 3.0)) is not None
+_t_o = _t_check_pol((1.0, 1.0, 1.24, 1.24, 1.0, 1.0, 3.0))
+_t_e4 = fci_energy(1.0, 1.0, 1.24, 1.24, 3.0)
+assert isinstance(_t_e4, tuple) and len(_t_e4) == 2, _t_e4
+assert _t_o[0] <= _t_e4[0] + 2e-9 and _t_o[1] <= _t_e4[1] + 2e-9, (_t_o, _t_e4)
+assert _t_o[0] <= _t_o[1] + 2e-9, _t_o
 
 # --- test case 1 ---
 # HeH+ with a tight p shell on He and a diffuse one on H

@@ -91,7 +91,7 @@ def _t_rel(x, y):
 
 def _t_check_brown(sigma, h):
     out = brown_relaxation(sigma, h)
-    assert isinstance(out, tuple) and len(out) == 2 and all(type(x) is float for x in out), out
+    assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(x, float) for x in out), out
     lam, tau = (float(x) for x in _t_brown(sigma, h))
     assert _t_rel(out[0], lam) < 1e-5, (sigma, h, out, lam)
     assert _t_rel(out[1], tau) < 1e-5, (sigma, h, out, tau)
@@ -196,7 +196,7 @@ def _t_rel(x, y):
 
 def _t_check_brown(sigma, h):
     out = brown_relaxation(sigma, h)
-    assert isinstance(out, tuple) and len(out) == 2 and all(type(x) is float for x in out), out
+    assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(x, float) for x in out), out
     lam, tau = (float(x) for x in _t_brown(sigma, h))
     assert _t_rel(out[0], lam) < 1e-5, (sigma, h, out, lam)
     assert _t_rel(out[1], tau) < 1e-5, (sigma, h, out, tau)
@@ -300,7 +300,7 @@ def _t_rel(x, y):
 
 def _t_check_brown(sigma, h):
     out = brown_relaxation(sigma, h)
-    assert isinstance(out, tuple) and len(out) == 2 and all(type(x) is float for x in out), out
+    assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(x, float) for x in out), out
     lam, tau = (float(x) for x in _t_brown(sigma, h))
     assert _t_rel(out[0], lam) < 1e-5, (sigma, h, out, lam)
     assert _t_rel(out[1], tau) < 1e-5, (sigma, h, out, tau)
@@ -403,7 +403,7 @@ def _t_rel(x, y):
 
 def _t_check_brown(sigma, h):
     out = brown_relaxation(sigma, h)
-    assert isinstance(out, tuple) and len(out) == 2 and all(type(x) is float for x in out), out
+    assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(x, float) for x in out), out
     lam, tau = (float(x) for x in _t_brown(sigma, h))
     assert _t_rel(out[0], lam) < 1e-5, (sigma, h, out, lam)
     assert _t_rel(out[1], tau) < 1e-5, (sigma, h, out, tau)
@@ -511,7 +511,7 @@ def _t_rel(x, y):
 
 def _t_check_brown(sigma, h):
     out = brown_relaxation(sigma, h)
-    assert isinstance(out, tuple) and len(out) == 2 and all(type(x) is float for x in out), out
+    assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(x, float) for x in out), out
     lam, tau = (float(x) for x in _t_brown(sigma, h))
     assert _t_rel(out[0], lam) < 1e-5, (sigma, h, out, lam)
     assert _t_rel(out[1], tau) < 1e-5, (sigma, h, out, tau)

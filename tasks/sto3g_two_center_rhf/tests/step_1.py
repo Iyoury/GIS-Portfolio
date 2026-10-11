@@ -18,7 +18,7 @@ def _t_F(n, t):
 
 def _t_check(n_max, t):
     F = boys_function(n_max, t)
-    assert isinstance(F, np.ndarray) and F.shape == np.shape(t) + (n_max + 1,), (n_max, t, getattr(F, "shape", None))
+    assert isinstance(F, np.ndarray) and np.issubdtype(F.dtype, np.floating) and F.shape == np.shape(t) + (n_max + 1,), (n_max, t, getattr(F, "shape", None))
     tt = np.asarray(t, dtype=float)
     for idx in np.ndindex(tt.shape):
         for n in range(n_max + 1):
@@ -46,7 +46,7 @@ def _t_F(n, t):
 
 def _t_check(n_max, t):
     F = boys_function(n_max, t)
-    assert isinstance(F, np.ndarray) and F.shape == np.shape(t) + (n_max + 1,), (n_max, t, getattr(F, "shape", None))
+    assert isinstance(F, np.ndarray) and np.issubdtype(F.dtype, np.floating) and F.shape == np.shape(t) + (n_max + 1,), (n_max, t, getattr(F, "shape", None))
     tt = np.asarray(t, dtype=float)
     for idx in np.ndindex(tt.shape):
         for n in range(n_max + 1):
@@ -72,7 +72,7 @@ def _t_F(n, t):
 
 def _t_check(n_max, t):
     F = boys_function(n_max, t)
-    assert isinstance(F, np.ndarray) and F.shape == np.shape(t) + (n_max + 1,), (n_max, t, getattr(F, "shape", None))
+    assert isinstance(F, np.ndarray) and np.issubdtype(F.dtype, np.floating) and F.shape == np.shape(t) + (n_max + 1,), (n_max, t, getattr(F, "shape", None))
     tt = np.asarray(t, dtype=float)
     for idx in np.ndindex(tt.shape):
         for n in range(n_max + 1):
@@ -98,7 +98,7 @@ def _t_F(n, t):
 
 def _t_check(n_max, t):
     F = boys_function(n_max, t)
-    assert isinstance(F, np.ndarray) and F.shape == np.shape(t) + (n_max + 1,), (n_max, t, getattr(F, "shape", None))
+    assert isinstance(F, np.ndarray) and np.issubdtype(F.dtype, np.floating) and F.shape == np.shape(t) + (n_max + 1,), (n_max, t, getattr(F, "shape", None))
     tt = np.asarray(t, dtype=float)
     for idx in np.ndindex(tt.shape):
         for n in range(n_max + 1):

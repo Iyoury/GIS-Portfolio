@@ -10,7 +10,7 @@ def fastest_mode(N, s, u, v):
     Inputs:
       N: int, population size, 1 <= N <= 400.
       s: float, selection coefficient of A, -0.5 <= s <= 0.5.
-      u, v: float, mutation probabilities A -> a and a -> A per generation, 0 <= u, v <= 0.1
+      u, v: float, mutation probabilities A -> a and a -> A per generation, each either 0 or in [1e-12, 0.1]
             (v = 0 makes i = 0 absorbing, u = 0 makes i = N absorbing).
 
     Output:
@@ -23,6 +23,7 @@ def fastest_mode(N, s, u, v):
 
     Raises:
       ValueError if N is not an integer in [1, 400] (bool and float are not accepted), if s, u or v
-      is not finite or is outside its range, or if N = 1 and u = v = 0.
+      is not finite or is outside its range (0 < u < 1e-12 and 0 < v < 1e-12 included), or if N = 1
+      and u = v = 0.
     '''
     raise NotImplementedError

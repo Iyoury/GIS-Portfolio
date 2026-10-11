@@ -104,9 +104,9 @@ for N, s, v, dps in ((20, -0.5, 1e-12, 200), (25, 0.3, 1e-3, 120), (16, 0.5, 0.1
 # lower ends v = 1e-12 and s = -0.5, and 1e-68) and the complete quasi-stationary distribution, every entry, against
 # independent targets: Gaussian elimination with partial pivoting in mpmath at 400 digits on (I - Q)^T, inverse
 # iteration until every entry changed by less than 1e-60 relative, run once. For N = 400, s = 0.5, v = 0.1 the
-# distribution spans 221 decades (qsd[0] about 4.36e-221, as stated in the prompt). Two exact identities with the
-# matrix in double precision (only sums of nonnegative terms) are checked as well, on every entry whose target is
-# at least 1e-240: (q Q)_j = (1 - rate) q_j and rate = sum_i q_i P[i, N]
+# distribution spans 221 decades (qsd[0] about 4.36e-221; the prompt states spans of more than 200 decades at
+# N = 400). Two exact identities with the matrix in double precision (only sums of nonnegative terms) are checked
+# as well, on every entry whose target is at least 1e-240: (q Q)_j = (1 - rate) q_j and rate = sum_i q_i P[i, N]
 import numpy as np
 
 def _t_rel(a, b):

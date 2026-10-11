@@ -23,15 +23,45 @@ values (k, N_A).
   - same-species pairs give two-pass centred second moments;
   - electron-positron pairs give (e_i + e_j)^2 > 0.
 
-  There is no cancellation. The Schur form loses (kT/E_F)^2, which is 2.8e-6 relative at
-  rho_Ye = 1e13, T = 1e7 K.
+  There is no cancellation. The Schur form <dE^2> - <dE dN>^2/<dN^2>, evaluated directly, loses about
+  (kT/E_F)^2 relative to its terms: the shipped schur_complement mutant is off by 1.9e-7 at
+  rho_Ye = 1e13, T = 1e7 K (measured in version 4; versions 1-3 quoted 2.8e-6, which is not reproduced).
+- **Helper names** (version 4). The module-level helpers and constants of the per-step files and of
+  solution.py are named _epeos_* and _EPEOS_*, so that a helper with a generic name (_nodes, _log_net,
+  PREF, ...) defined by a candidate in a later step cannot replace them in the shared namespace.
 
-## Second solution
-- Adaptive QUADPACK (scipy.integrate.quad) in E, split at the edge window, instead of fixed panels.
-- Brent's method for psi.
-- Centred moments for c_V, by the same adaptive quadrature.
-- Agrees with the reference to 1e-11 or better (version 2 rerun: worst 9.8e-12, n_minus at T = 2e7 K,
-  psi = 1e6, where the reference is within 7e-16 of the 40-digit target; all others below 5e-12).
+## Second solution (version 4)
+- **Quadrature.** Adaptive QUADPACK (scipy.integrate.quad, epsrel 1e-13) instead of fixed panels: in the
+  momentum p itself below the Fermi window (and for a non-degenerate gas), and in y = (E - E_F)/kT over
+  the window E_F +- 40 kT. quad is called with full_output=1, so QUADPACK's round-off notices are returned
+  instead of raised as warnings; no warning filter is set.
+- **Net electron density.** For psi >= 1 the plain difference n_minus - n_plus (n_plus/n_minus <= e^{-2 psi},
+  so the difference loses at most a factor 1.3). For psi < 1 the charge-susceptibility integral
+  n_net(psi) = int_0^psi chi(psi') dpsi', chi = d n_net/d psi = PREF int p^2 [f_-(1-f_-) + f_+(1-f_+)] dp > 0
+  (n_net(0) = 0 by charge-conjugation symmetry), with 16-point Gauss-Legendre in psi'; chi is analytic
+  for |Im psi'| < pi, so on [0, 1] the rule is converged to rounding (8 nodes already agree with 24
+  within 1e-14). This replaces the sinh identity of the reference.
+- **Pressure.** From the grand potential, P = kT PREF int p^2 [ln(1 + e^{-x_-}) + ln(1 + e^{-x_+})] dp, not
+  from the p^4/eps moment.
+- **psi.** Brent's method on ln n_net(ln psi).
+- **Specific heat.** The thermodynamic Jacobian in (T, mu): c_V = u_T - u_mu n_T / n_mu, with u_T, n_T at
+  fixed mu and u_mu, n_mu at fixed T integrated from the analytic derivatives of the occupation numbers
+  (df/dT at fixed mu = f(1-f) x/T, df_-+/dpsi = +- f(1-f)). The integrands are written with the occupation
+  arguments x (eps = theta (x_- + psi) = theta (x_+ - psi)), so that u_T = k (A + psi B),
+  u_psi = kT (B + psi W), n_T = B/T, n_psi = W with A, B, W the moments x^2, n x and 1 of the weights
+  f(1-f): the mu n_T term is carried by the same integral B in u_T and in u_mu n_T/n_mu. This replaces
+  the pairwise determinant of the reference.
+- **Entropy.** The same stable form of the defining integrand as the reference (log1p(e^{-|x|}) +
+  |x|/(e^{|x|}+1)), integrated with the quadrature above.
+- **Accuracy (measured in version 4).** Every stored target to 1.1e-13 or better (the largest,
+  1.0e-13, is n_plus at (rho, T, Ye) = (1e8, 3e8, 0.43), where d ln n_plus/d ln psi = -72.6). On a
+  240-state (rho_Ye, T) grid with Ye = 1 the complete equations of state of the two solutions agree to
+  2.7e-12; on a 190-point (T, psi) grid (ten temperatures from 1e7 to 1e11 K, psi from 1e-30 to 1e6,
+  including 0.999999, 1 and 1.000001 around the switch of the n_net route) pair_densities and
+  pair_thermodynamics agree to 3.2e-12 (P at T = 2.2e8 K, psi = 1e4, where 30-digit mpmath quadrature
+  puts the reference within 6e-16 and the second solution within 3.2e-12).
+- Versions 1-3 used QUADPACK in E, the sinh identity for n_net, the p^4/eps form of P and the same
+  pairwise determinant for c_V as the reference; it agreed with the reference to 9.8e-12.
 
 ## Targets (all independent of the solution code)
 - **Classical gas.** The Maxwell-Juettner closed forms with modified Bessel functions, in mpmath:
@@ -53,16 +83,28 @@ values (k, N_A).
 - **Two corner states of the complete equation of state** (version 3): (rho, T, Ye) = (2e13, 1e7, 0.5)
   and (2e-10, 1e11, 0.5); psi and c_V are the stored (rho_Ye, T) targets, P, u, s and the densities come
   from 40-digit mpmath quadrature at that psi (see Version 3).
+- **General case 1** (version 4) has no stored target. At (rho, T, Ye) = (1e6, 3e9, 0.5) it checks
+  identities of the returned equation of state (charge neutrality, the Euler relation, c_V = du/dT =
+  T ds/dT at constant rho Ye), each within its first-order error budget (see Version 4).
 
-The reference agrees with all targets to 1.4e-13 or better (remeasured in version 3): up to about 1e-13
-for c_V and for the densities of the cool classical gas at T = 1e7 K with tiny psi (n_minus about
-4.5e-232 cm^-3, n_net 9.0e-250 cm^-3), up to 5e-14 for the other low-temperature classical states (values
-down to 1e-109), and below 2e-14 for the rest.
+The reference agrees with all targets to 1.4e-13 or better (remeasured in version 4, same values as in
+version 3): 1.4e-13 for n_net = 9.0e-250 cm^-3 of the cool classical gas at T = 1e7 K, psi = 1e-18 (and
+6.7e-14 for its n_minus, n_plus of 4.5e-232 cm^-3); up to 1.05e-13 for c_V (at rho_Ye = 1e-10, T = 1e7 K,
+where d ln c_V/d ln psi = 564, and 9.4e-14 at 1e13, 1e7 K); up to 4.8e-14 for the other low-temperature
+classical states (values down to 1e-109); and below 2.7e-14 for every other value (the largest is n_plus
+at (rho, T, Ye) = (1e8, 3e8, 0.43)). These deviations come mostly from the rounding of theta and of
+exponents near 1/theta = 593 at T = 1e7 K (condition number about 600).
 
 ## Why the naive formulas fail the stated accuracy
-- n_minus - n_plus: 100 % error in the pair plasma (rho_Ye = 1e-10, T = 1e11 K).
-- (u_tot + P - mu n)/T for the entropy: 1.6e-5 at psi = 1.3e5, T = 1e7 K (required 1e-10).
-- The Schur form of c_V: 2.8e-6 at rho_Ye = 1e13, T = 1e7 K, and 4.5e-8 at 1e11 (required 1e-8).
+Measured with the shipped mutants in version 4 (versions 1-3 quoted 1.6e-5 for the entropy at
+psi = 1.3e5 and 2.8e-6 for the Schur form at rho_Ye = 1e13; neither is reproduced by the shipped mutants).
+- n_minus - n_plus: 100 % error in the pair plasma at T = 1e11 K, psi = 2.2e-21, 76 % at T = 3e9 K,
+  psi = 1.37e-16 (net_by_subtraction).
+- (u_tot + P - mu n)/T for the entropy: 7.5e-7 at psi = 1.3e5, T = 1e7 K, 4.5e-8 at psi = 2.8e4,
+  T = 1e7 K, 3.2e-5 at psi = 1e6, T = 2e7 K and 2.7e-6 at psi = 1e6, T = 1e11 K (required 1e-10;
+  entropy_from_euler).
+- The Schur form of c_V: 1.9e-7 at rho_Ye = 1e13, T = 1e7 K, and 4.5e-8 at 1e11 g cm^-3, T = 1e7 K
+  (required 1e-8; schur_complement).
 
 ## Version 2 (grading_fix: authoring-guide conformance)
 
@@ -107,6 +149,8 @@ its cause, the change, the regression test and what was rerun.
   - Regression test: general case 1 with solution.py and second_solution.py.
 - Stated but untested endpoint.
   - Finding: the step 5 domain includes Ye = 1 (0 < Ye <= 1), but no test used it.
+  - Cause (added in version 4): the version 1 tests were chosen by physical regime (white dwarf, pair
+    plasma, helium burning, degenerate core) and never by the stated domain boundaries.
   - Change: step 5 case 2 evaluates (rho, T, Ye) = (1e6, 1e9, 1.0), which has rho Ye = 1e6 g cm^-3 exactly
     like the stored state (2e6, 1e9, 0.5), against the same 40-digit targets (the equation of state depends
     on rho and Ye only through rho Ye, as the prompt defines). n_test_cases of step 5 is now 3.
@@ -116,18 +160,28 @@ its cause, the change, the regression test and what was rerun.
   - Finding: the step 1 tests require a tuple of Python floats, while the step 1 prompt said only "return
     n_minus, n_plus and n_net"; the step 4 contract lists step 1 as a dependency, but the step 4 prompt
     did not name pair_densities.
+  - Cause (added in version 4): the type contract and the dependency were written only in the
+    function_header docstring and in the contract, not in the step prompt.
   - Change: the step 1 prompt now says "return the tuple (n_minus, n_plus, n_net) of Python floats"; the
     step 4 prompt says "the net electron density n_net of pair_densities (step 1)". No new requirement.
   - Regression test: crown_check ref and second on steps 1 and 4.
 - Undeclared imports.
   - Finding: second_solution.py imports warnings, scipy.integrate.quad and IntegrationWarning, and
     scipy.optimize.brentq, which were not in required_dependencies.
+  - Cause (added in version 4): required_dependencies listed only the imports of the reference.
   - Change: declared in required_dependencies; the scaffolds start with the same import lines.
   - Regression test: crown_check second (all cases).
-- Metadata: subfield, tags, expert_time_estimate_hours, relevant_experience (placeholder for the author),
-  author, affiliation, difficulty_explanation, solution_explanation, verification_explanation and
-  edit_label grading_fix added. The second-solution agreement stated above was corrected from "about
-  1e-13" to the measured 1e-11 (see Second solution).
+- Metadata.
+  - Finding: the version 1 problem.yaml had no subfield, tags, expert_time_estimate_hours,
+    relevant_experience, author, affiliation, difficulty_explanation, solution_explanation,
+    verification_explanation or edit_label, and source.md stated a second-solution agreement of "about
+    1e-13".
+  - Cause (added in version 4): version 1 predates the current skeleton's metadata fields; the
+    agreement figure was not remeasured after the second solution was written.
+  - Change: the fields were added (relevant_experience as the placeholder for the author, edit_label
+    grading_fix) and the agreement was corrected to the measured 1e-11.
+  - Regression test: crown_check format (metadata keys present); the corrected agreement is the version 2
+    rerun (worst 9.8e-12, n_minus at T = 2e7 K, psi = 1e6).
 - Floating-point comparisons: no exact float equality and no zero tolerance were present (all checks are
   relative errors with stated bounds or the stated absolute 1e-250 for tiny n_plus); nothing changed.
 - Independent re-check of stored targets: n_minus, n_net, P, u and s at (T, psi) = (1e7 K, 2.8e4),
@@ -279,3 +333,183 @@ Each item gives the finding, its cause, the change, the regression test and what
     outputs were bitwise identical; the methods use no random numbers.
   - On a 240-state grid (rho_Ye = 1e-10 ... 1e13 g cm^-3 by decades, ten temperatures from 1e7 to
     1e11 K, Ye = 1), the complete equations of state of the two solutions agree to 4.6e-12.
+
+## Version 4 (grading_fix: authoring-guide conformance, pass 2)
+
+No stored target, input domain, tolerance of a stored-target check or reference algorithm was changed.
+The findings come from the round-1 independent verifier and from the pass-2 rules (every general case
+calls the final function, no hidden test inputs in the visible text, truthful explanations, a genuinely
+different second solution, mutants built on the current reference). Each item gives the finding, its
+cause, the change, the regression test and what was rerun.
+
+- 1. General case 1 never called electron_positron_eos.
+  - Finding: general case 1 called degeneracy_parameter, pair_densities and pair_thermodynamics only
+    (crown_check format: "general case 1 never calls the final function"). Its Euler-relation tolerance
+    of 1e-8 was also about 30 times its own error budget (3.4e-10).
+  - Cause: the case was written as a cross-step consistency test of steps 1-3 before the final function
+    was required in every general case.
+  - Change: case 1 now tests the complete equation of state at (rho, T, Ye) = (1e6 g cm^-3, 3e9 K, 0.5),
+    where psi = 0.65 and n_plus/n_minus = 0.29, so the positrons enter every quantity. It needs no stored
+    target. It checks three identities of the returned dict:
+    - charge neutrality n_minus - n_plus = rho Ye N_A;
+    - the Euler relation u + n_net m_e c^2 + P - T s = psi k T n_net, with n_net = rho Ye N_A;
+    - c_V = du/dT and c_V = T ds/dT at constant rho Ye, by the five-point centred difference of the
+      returned u and s at T +- h, T +- 2h with h = 5e-3 T.
+
+    Each tolerance is the first-order error budget when every returned quantity has its stated accuracy,
+    computed in the test from the returned values: 1e-10 (n_minus + n_plus)/(rho Ye N_A) = 1.8e-10 for
+    neutrality; 1e-10 (|u| + |P| + T|s| + |psi k T n_net|)/|psi k T n_net| = 2.6e-9 for the Euler relation;
+    for c_V, 1e-8 (c_V itself) + the propagated 1e-10 of the four u or s values (6.5e-9 and 1.0e-8) +
+    1.2e-8 for the h^4 truncation of the stencil. The truncation is a property of the exact u(T) and s(T):
+    the five-point difference of the reference deviates from c_V by 4.8e-9 (u) and 6.0e-9 (s) at
+    h = 5e-3 T and by 7.7e-8 and 9.7e-8 at h = 1e-2 T (ratio 16, so the h^4 term dominates); the
+    allowance is about twice the larger value. The old cross-step checks are covered by the new case: the
+    neutrality check tests degeneracy_parameter with pair_densities end to end, the Euler relation links
+    psi with P, u and s.
+  - Regression test: crown_check format no longer reports the case. Reference and second solution pass
+    with deviations 0 and 1.0e-14 (neutrality), 3.9e-15 and 2.5e-14 (Euler), 4.8e-9 and 6.0e-9 (both,
+    c_V from u and s; the truncation). Each of six whole solutions with one plausible error fails case 1:
+    psi from n_minus = rho Ye N_A (positrons ignored), s without positrons, P without positrons, u without
+    the positron rest energy, c_V without positron fluctuations, c_V as du/dT at constant psi. The shift
+    mode (all five functions scaled by 1 +- 1e-12 at once) passes.
+- 2. Exact key set of the step 5 dict.
+  - Finding: tests/step_5.py requires set(out) == the seven keys, but the prompt and docstrings said only
+    "a dict with the keys ..."; a dict with an extra key such as "n_net" fails every value case.
+  - Cause: the wording described the required keys, not the exclusion of others.
+  - Change: the step 5 prompt says "a dict with exactly the seven keys ...", and the step 5
+    function_header, problem_io, steps/step_5.py, solution/step_5.py, solution.py and the two mutants that
+    define electron_positron_eos say "dict with exactly the seven keys ..., whose values are Python floats".
+    The tests are unchanged.
+  - Regression test: all docstrings of the five functions in steps/, solution/, solution.py and mutants/
+    were compared with function_header (and problem_io) by a script; all are identical.
+- 3. Hidden test inputs in the prompts of steps 1-4.
+  - Finding: the step prompts named exact test states with their approximate outputs: step 1 (T = 1e11 K,
+    psi = 2.2e-21), step 2 (psi = 1.3e5, T = 1e7 K), step 3 (rho_Ye = 1e13, T = 1e7 K and rho_Ye = 1e-10,
+    T = 1e11 K) and step 4 (rho_Ye = 1e13, T = 1e7 K). The step 1 prompt also called the Fermi edge "many
+    hundreds of k T wide", which contradicts itself (the edge is a few k T wide; the Fermi sea is up to
+    1e6 k T deep).
+  - Cause: the regimes were illustrated with the corner states that the tests also use.
+  - Change: the prompts state regimes and magnitudes that hold over the domain:
+    - step 1: for psi up to 1e6 the Fermi energy reaches about 1e6 k T with an edge a few k T wide; in a
+      pair plasma n_net/n_minus is of order psi for small psi;
+    - step 2: the entropy of a degenerate gas is about 1e-11 of (u + P)/T for psi near 1e6 (measured
+      9.9e-12 at T = 2e7 K and at 1e11 K);
+    - step 3: psi ranges from above 1e5 in the densest, coolest gases to about 2e-21 in the most dilute,
+      hottest pair plasmas (1.289e5 and 2.17e-21 at the corners);
+    - step 4: c_V T/u falls below 1e-9 in the densest, coolest gases (7.97e-10 at the corner).
+
+    The only numbers left in the agent-visible text are constants, tolerances, domain bounds and these
+    magnitudes (checked by a script listing every number in problem_description_main, the prompts, the
+    function headers, problem_io and required_dependencies).
+  - Regression test: crown_check ref and second (no test changed by this item).
+- 4. step_dependencies of step 2 and the wording of step 4.
+  - Finding: step 2 listed step 1 as a dependency although pair_thermodynamics does not use
+    pair_densities; its prompt said "occupation numbers ... as in pair_densities, step 1".
+  - Cause: the shared conventions were referred to through the step 1 function.
+  - Change: step 2 step_dependencies is [] and its prompt and docstring refer to the conventions of
+    problem_description_main. The step 4 prompt now says to use degeneracy_parameter (step 3) for psi; it
+    keeps [1, 2, 3] because c_V is defined as the temperature derivative of the energy density of
+    pair_thermodynamics along the path on which n_net of pair_densities is fixed (stated in its contract
+    assumptions).
+  - Regression test: crown_check ref, second and mut for steps 2 and 4.
+- 5. Test comments.
+  - Finding: step 3 case 0 said "positrons below 1e-30 of the electrons"; 40-digit values are e^{-2 psi}
+    = 1.4e-19 at (1e-8, 1.2e8) and 2.1e-24 at (1e-10, 1e8).
+  - Cause: the bound was not recomputed when the states were chosen.
+  - Change: "positrons below 2e-19 of the electrons, shifting psi by less than 1e-20 relative" (6.6e-21);
+    the target is unchanged. The other numbers quoted in test comments were remeasured with the reference
+    (step 3 case 1 and step 4 case 0: E_F/kT = 61.8 and 121.6, d ln n_net/d ln psi = 16.7 and 8.4,
+    d ln c_V/d ln psi = 6.6 and 3.8; step 1 cases 0 and 4: smallest occupation exponents 39.3 and 593.1).
+  - Regression test: crown_check ref (comments only).
+- 6. Comparison tolerance in step 1 case 2.
+  - Finding: n_minus(1e11 K, 2e-20) and n_minus(1e11 K, 1e-20), two computed values that differ by a
+    relative 1e-20, were compared within 1e-9, five times the convention for two outputs each within
+    1e-10.
+  - Cause: the bound was set loosely in version 1.
+  - Change: 2e-10 (twice the single-output tolerance), with the reason in the comment; the ratio check
+    n_net(2 psi)/n_net(psi) = 2 within 4e-10 was already at that convention.
+  - Regression test: reference, solution.py and second solution pass (deviation below 1e-15); shift
+    +-1e-12 passes; net_by_subtraction still fails case 2.
+- 7. Explanation numbers that were not reproduced.
+  - Finding: the entropy from the Euler relation was said to be wrong by 1.6e-5 at psi = 1.3e5, T = 1e7 K
+    and the Schur-form c_V by 2.8e-6 at rho_Ye = 1e13, T = 1e7 K; the shipped mutants give 7.5e-7 and
+    1.9e-7. The verification text said the 1 +- 1e-12 scaling passed "every case", while crown_check then
+    shifted only the step cases.
+  - Cause: the numbers came from earlier, differently summed versions of the naive formulas; the shift
+    claim predated the checker's general-case shift.
+  - Change: difficulty_explanation, the Reference solution paragraph and "Why the naive formulas fail"
+    give the values measured with the shipped mutants (entropy 7.5e-7 at psi = 1.3e5, T = 1e7 K and 3.2e-5
+    at psi = 1e6, T = 2e7 K; Schur form 1.9e-7 at 1e13 and 4.5e-8 at 1e11 g cm^-3, T = 1e7 K), labelling
+    the old figures as versions 1-3. The reference-agreement paragraph gives the remeasured values per
+    category (largest 1.4e-13, c_V up to 1.05e-13, everything except the low-temperature classical states
+    and c_V below 2.7e-14). verification_explanation now describes what crown_check runs today (step
+    cases shifted one function at a time, general cases with all five functions shifted at once), the
+    new second solution, general case 1 and the remeasured grid agreement.
+  - Regression test: every quoted number was remeasured in this version with the scripts kept outside the
+    task folder (mutant errors, reference and second solution against all stored targets, grids).
+- 8. Second solution.
+  - Finding: second_solution.py reused the reference's reformulations (the sinh identity for n_net, the
+    same pairwise determinant for c_V) with only QUADPACK and Brent's method differing, and called
+    warnings.simplefilter("ignore", IntegrationWarning) at module level, which changes process-wide state
+    and was the only reason for "import warnings" and IntegrationWarning in the visible
+    required_dependencies.
+  - Cause: the version 1 second solution was written as a check of the numerics, not of the
+    reformulations.
+  - Change: second_solution.py was rewritten (see Second solution above): n_net from n_minus - n_plus for
+    psi >= 1 and from the integral of the charge susceptibility over psi for psi < 1; P from the grand
+    potential; c_V from the Jacobian of (u_tot, n_net) in (T, mu) with analytic derivative integrands;
+    quadrature in the momentum below the Fermi window (which also removed its earlier 1e-11 error at
+    psi = 1e6). quad is called with full_output=1, which returns QUADPACK's round-off notices instead of
+    issuing warnings, so no filter and no catch_warnings block is needed; "import warnings" and
+    IntegrationWarning were removed from required_dependencies and from the five scaffolds. The entropy
+    still uses the stable form of the defining integrand; it is the definition itself, and the
+    alternative routes (the Euler relation, d P/d T at fixed mu) cancel in a degenerate gas.
+  - Regression test: crown_check second passes every case of every step and of general; against every
+    stored target the second solution is within 1.1e-13 (before: 9.8e-12); on the 240-state (rho_Ye, T)
+    grid the two complete equations of state agree to 2.7e-12, and on a 190-point (T, psi) grid around
+    the psi = 1 switch the densities, P, u and s agree to 3.2e-12 (30-digit mpmath quadrature confirms the
+    reference at the worst point). A call of electron_positron_eos takes at most 0.06 s.
+- 9. Generic helper names in the shared evaluation namespace.
+  - Finding: the reference functions of steps 1-3 looked up module-level helpers and constants with
+    generic names (_nodes, _occ, _xp, _log_net, _net, _check_T_psi, _sigma, PREF, KB, MEC2, NA, ...) at
+    call time. A candidate's later step defining a helper with the same name and another meaning replaced
+    them: reference steps 1-3 plus the reference step 4 plus "def _log_net(...): return 0.0" failed step 4
+    case 0 with "OverflowError: math range error" inside degeneracy_parameter (reproduced with the
+    version 3 files).
+  - Cause: the per-step reference files were written as stand-alone modules.
+  - Change: the helpers and constants of solution/step_1..4.py, solution.py and the six mutants built on
+    them were renamed with the prefixes _epeos_ and _EPEOS_ (no other change).
+  - Regression test: the same construction, with a candidate step 4 that also redefines _nodes, _occ,
+    PREF, KB, MEC2 and NA, now passes both cases of step 4; crown_check ref, mut, shift and controls pass.
+- 10. Whole-task mutant.
+  - Finding: whole_task_classical_occupation replaced only the occupation function by e^{-x}. It kept
+    the Fermi-Dirac net density (so psi was Fermi-Dirac), the Fermi-Dirac entropy integrand, and used the
+    fluctuation weight e^{-x}(1 - e^{-x}), which is negative for x < 0: not one coherent mistake.
+  - Cause: the mutant was made by editing a single helper.
+  - Change: the mutant is the current reference with classical (Maxwell-Boltzmann) statistics throughout:
+    occupation e^{-x} without Pauli blocking (weight f instead of f(1 - f)), the classical net-density
+    integrand e^{psi - b}(1 - e^{-2 psi}) and the classical entropy per state (x + 1) e^{-x}.
+  - Regression test: it fails general case 0 (psi off by 10 % at (2e6, 1e9, 0.5)); as expected for a
+    thermodynamically consistent classical gas, it passes the identities of general case 1.
+- 11. Version 2 notes without a Cause line.
+  - Finding: the Version 2 items "Stated but untested endpoint", "Visible specification", "Undeclared
+    imports" and "Metadata" had no Cause line, and the metadata item had no finding/change/regression
+    structure.
+  - Change: the Cause lines were added there, marked "(added in version 4)", and the metadata item was
+    given the same structure; the content of the changes is as recorded in version 2.
+- Rerun after all changes:
+  - tools/crown_check.py, all modes, every case alone in a fresh process, one BLAS/OpenMP thread, -j 2:
+    - FORMAT OK (no problem reported).
+    - REF: steps 1-5 pass 5/5, 3/3, 3/3, 2/2 and 4/4, general passes 2/2; solution.py passes every step
+      file.
+    - SECOND: steps 1-5 and general all pass.
+    - Mutants: net_by_subtraction fails 3/5 (cases 1, 2, 4), entropy_from_euler 1/3 (case 1),
+      positrons_ignored 1/3 (case 1), schur_complement 1/2 (case 0), positron_fluctuations_ignored 1/2
+      (case 0), cv_at_fixed_psi 3/4 (cases 0, 2, 3) and whole_task_classical_occupation 1/2 general
+      (case 0).
+    - SHIFT +-1e-12: every step case and every general case (all five functions shifted) pass.
+    - Controls: all-None and all-zero pass 0 cases of every step and of general.
+    - SUMMARY ALL OK.
+  - Repeat runs: solution.py and second_solution.py were each run three times in clean processes (once
+    with one BLAS/OpenMP thread) on 62 calls covering all five functions and every test state; the
+    outputs were bitwise identical. The methods use no random numbers.

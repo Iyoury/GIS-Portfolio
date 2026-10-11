@@ -26,13 +26,13 @@ difficulty_explanation: >-
   eigenvalues of the whole matrix belong to the odd sector above Tc; below Tc the two leading states
   are degenerate to machine precision, so the strip magnetization needs states of definite parity and
   the zero-field susceptibility cannot come from a finite difference in h. The Yang-Lee edge needs a
-  non-Hermitian eigensolver on a complex symmetric matrix, a bracket that reaches edges of order 1e-4
-  below Tc, and tracking of the leading pair only, since lower pairs leave the real axis first. Step 6
-  combines four earlier functions into finite-size exponent and central-charge estimates at the exact
-  Tc. The last step asks for f, m, chi = dm/dh and c = -T d2f/dT2 of the infinite lattice down to
-  h = 0.005 near Tc, where no diagonalizable strip is close to the bulk limit, so an infinite-lattice
-  method with a correctly normalized partition function per site and derivatives converged to 1e-5
-  relative is required.
+  non-Hermitian eigensolver on a complex symmetric matrix, a bracket that reaches edges down to about
+  5e-5 below Tc, and tracking of the leading pair only, since lower pairs leave the real axis first.
+  Step 6 combines four earlier functions into finite-size exponent and central-charge estimates at the
+  exact Tc. The last step asks for f, m, chi = dm/dh and c = -T d2f/dT2 of the infinite lattice down
+  to h = 0.005 near Tc, where no diagonalizable strip is close to the bulk limit, so an
+  infinite-lattice method with a correctly normalized partition function per site and derivatives
+  converged to 1e-5 relative is required.
 
 solution_explanation: >-
   The reference builds the symmetric transfer matrix with the in-row bonds and the field shared
@@ -46,26 +46,41 @@ solution_explanation: >-
   gamma/nu and y_h, and a 3x3 linear solve for c. Step 7 runs corner-transfer-matrix renormalization at
   bond dimension 16 on the infinite lattice, takes f from kappa = Z(3x3) Z(4 corners) / Z(corners + 2
   edges)**2 and m from the converged environment, and obtains chi and c by Richardson-extrapolated
-  central differences of m in h and of f in T around warm-started runs.
+  central differences of m in h and of f in T around one cold and eight warm-started runs.
 
 verification_explanation: >-
   Step 1 targets are brute-force sums over the energy written inside the tests (entry by entry for
-  L = 3, 4 and 6, over all pairs of rows at L = 10) plus hand-worked entries, including the ends of
-  the stated range (T = 0.5 and 10, |h| = 20, L = 10, largest entry exp(440)), and step 2 targets
-  are Kaufman's exact free-fermion spectrum of the periodic strip evaluated inside the tests without
-  any transfer matrix. The inline targets of steps 3 to 6 come
-  from the reference algorithms and agree with second_solution.py, which uses different methods
-  (rotation of the leading pair into parity states, an odd-sector linear solve, bisection on the
-  leading pair leaving the real axis, divided differences for c), to 1.1e-15 in m_L, 2.4e-9 relative in
-  chi, 1e-12 relative in H_edge and 4.3e-12 in the step 6 values; the step 7 and whole-task targets come
-  from corner-transfer-matrix renormalization at bond dimension 28 (the reference uses 16), which was
-  rerun for this version and reproduces them to 3e-15 in f, 7e-14 in m and 2e-8 relative in chi and c,
-  and the second solution reaches them with VUMPS and five-point stencils for chi = -d2f/dh2 and c.
-  tools/crown_check.py ran every test case alone in a fresh process for the reference (per-step files
-  and solution.py), the second solution, every named mutant (nine step mutants and one whole-task
-  mutant, each failing at least one case), a relative shift of every reference output by +-1e-12 (all
-  cases pass) and all-None and all-zero controls (no case passes). The reference and the second
-  solution were also run twice in clean processes and gave identical outputs.
+  L = 3, 4 and 6, over all pairs of rows at L = 10) plus hand-worked entries at the ends of the stated
+  range (T = 0.5 and 10, |h| = 20, L = 10, largest entry exp(440)); both solutions also agree with a
+  40-digit sum over the energy to 3e-14 relative at the corners of the range. Step 2 targets are
+  Kaufman's exact free-fermion spectrum of the periodic strip, evaluated inside the tests with 60-digit
+  decimal arithmetic and no transfer matrix. The inline targets of steps 3 to 6 were regenerated for
+  this version by a route that shares no code with either solution: the transfer matrix, summed from
+  the energy, is reduced exactly to its zero-momentum block (every state involved is translation
+  invariant) and diagonalized with mpmath, giving m_L at 50 digits, chi as a 90-digit second
+  difference of the top eigenvalue with a field step of 1e-25, and H_edge as a 40-digit root of the
+  leading-pair discriminant; the step 6 targets apply the stated estimators in extended precision to
+  these values and to Kaufman's f and lengths. The reference agrees with these targets to 7e-16 in
+  m_L, 1.5e-8 relative in chi, 1.1e-13 relative in H_edge and 3e-13 in the step 6 values, and
+  second_solution.py, which uses other methods (momentum and flip sectors for the lengths, rotation of
+  the leading pair into parity states, an odd-sector linear solve, bisection on the leading pair
+  leaving the real axis, divided differences for c, VUMPS), to 1.2e-15, 1.7e-8, 5.7e-12 and 4.5e-12.
+  The step 7 and whole-task targets are reference-algorithm outputs at a higher setting:
+  corner-transfer-matrix renormalization at bond dimension 28 (the reference uses 16); for the eight
+  points kept from version 9 a rerun in this version reproduces the stored values within 2.2e-15 in
+  f, 7e-14 in m, 1.7e-10 relative in chi and 1.2e-8 relative in c, and the two weak-field corner
+  points added in this version were computed the same way. They are
+  confirmed independently by VUMPS (the second solution, a different algorithm with f from the
+  per-site eigenvalue of the row transfer matrix and chi = -d2f/dh2 and c from five-point stencils),
+  which agrees within 5.2e-14 in f, 4.6e-11 in m, 5.3e-7 relative in chi and 1e-7 relative in c on
+  all ten points, and at h = 0 the same corner-transfer-matrix free energy reproduces Onsager's to
+  2e-14 at T = 2, 2.5 and 3 and the magnetization Yang's to 1e-14 at T = 2. tools/crown_check.py ran
+  every test case alone in a fresh process for the reference (per-step files and solution.py), the
+  second solution, every named mutant (each failing at least one case), a relative shift by +-1e-12
+  of every real and complex reference output in the step cases and of every evaluated function of
+  solution.py in the whole-task cases (all cases pass) and all-None and all-zero controls (no case
+  passes). All validation ran with single-threaded BLAS; both solutions were run twice in clean
+  processes on every test input and gave identical outputs.
 
 required_dependencies: |-
   import numpy as np
@@ -231,7 +246,7 @@ sub_steps:
       step_dependencies: [1]
     mutants:
       - name: third_eigenvalue
-        description: "Takes xi_energy from the third-largest eigenvalue of the whole matrix, which above Tc belongs to the odd sector."
+        description: "The reference with xi_energy taken from the third-largest eigenvalue of the whole matrix (both flip sectors pooled) instead of the second state of the even sector; above Tc that eigenvalue belongs to the odd sector."
         file: mutants/step_2_third_eigenvalue.py
 
   - step_number: 3
@@ -276,7 +291,7 @@ sub_steps:
       step_dependencies: [1]
     mutants:
       - name: correlation_one_row
-        description: "Returns the square root of the correlation one row away, G(1), instead of the amplitude of its slowest-decaying term."
+        description: "The reference returning the square root of the correlation one row away, G(1) = <0|s_0 M s_0|0> / lam_0, instead of the amplitude of its slowest-decaying term."
         file: mutants/step_3_correlation_one_row.py
 
   - step_number: 4
@@ -322,9 +337,9 @@ sub_steps:
       output_shape: "One Python float."
       step_dependencies: [1]
     mutants:
-      - name: finite_difference
-        description: "Second difference of f(h) with a fixed step h = 1e-4, far wider than the field scale of the curvature below Tc."
-        file: mutants/step_4_finite_difference.py
+      - name: one_sided_correlation_sum
+        description: "The reference with the fluctuation sum taken over r >= 0 only, so each odd state enters with lam_0 / (lam_0 - lam_k) instead of (lam_0 + lam_k) / (lam_0 - lam_k)."
+        file: mutants/step_4_one_sided_sum.py
 
   - step_number: 5
     scaffold: steps/step_5.py
@@ -363,7 +378,7 @@ sub_steps:
     n_test_cases: 6
     contract:
       quantity: "Yang-Lee edge of the strip: smallest imaginary field H at which the two leading eigenvalues of the transfer matrix meet."
-      assumptions: "Imaginary field h = i H; the leading pair stays real and distinct for 0 <= H < H_edge (checked on a fine grid over the whole input range), while lower eigenvalue pairs may leave the real axis earlier."
+      assumptions: "Imaginary field h = i H; the leading pair stays real and distinct for 0 <= H < H_edge (checked for L = 3 to 8 at ten temperatures from 1.5 to 10, on 120 fields below each edge), while lower eigenvalue pairs may leave the real axis earlier. The smallest edge of the range is about 4.8e-5, at L = 8 and T = 1.5."
       result_kind: exact
       valid_input_ranges: "Integer L from 3 to 8; 1.5 <= T <= 10."
       units: "Units of J."
@@ -371,7 +386,7 @@ sub_steps:
       step_dependencies: [1]
     mutants:
       - name: first_complex_eigenvalue
-        description: "Returns the first field at which any eigenvalue of the matrix becomes complex, not the meeting point of the two leading ones."
+        description: "The reference with the root function watching the whole spectrum instead of the leading pair, so it returns the first field at which any eigenvalue becomes complex, not the meeting point of the two leading ones."
         file: mutants/step_5_first_complex_eigenvalue.py
 
   - step_number: 6
@@ -485,7 +500,7 @@ sub_steps:
       h**(-14/15) at Tc, and c keeps the trace of the logarithmic specific-heat singularity of
       the zero-field model. At h = 0 the exact free energy is Onsager's; the quantities here are
       not known in closed form for h > 0.
-    n_test_cases: 6
+    n_test_cases: 8
     contract:
       quantity: "Free energy, magnetization, susceptibility and specific heat per spin of the infinite square-lattice Ising model in a uniform field h > 0."
       assumptions: "Single Gibbs state for h > 0; all four are infinite-width limits of the strip quantities; chi = dm/dh at fixed T, c = -T d2f/dT2 at fixed h. Strips of feasible width stay far from the limits near Tc in weak fields, so a method that works on the infinite lattice is needed."

@@ -177,3 +177,27 @@ for case in ["t0", "order", "t_nan", "dT_nan", "kappa", "kappa_nan", "len", "two
         pass
     else:
         raise AssertionError("paleoclimate_perturbation must raise ValueError" + _t_msg)
+
+# --- test case 11 ---
+# shallow depths below the surface
+import math
+import numpy as np
+
+YEAR = 365.25 * 86400.0
+
+# within a few metres of the surface the response to the latest interval changes on time scales of
+# hours to days (z^2 / kappa): a recent two-step history checked against the erfc forms (math.erfc)
+kappa, t_y, d = 1.0e-6, [2.0, 150.0], [1.2, -0.7]
+z = np.array([0.05, 0.3, 1.0, 2.5])
+edges = [0.0] + [t * YEAR for t in t_y]
+exp = []
+for v in z:
+    tot = 0.0
+    for i, di in enumerate(d):
+        e_old = math.erfc(v / (2 * math.sqrt(kappa * edges[i + 1])))
+        e_new = 0.0 if i == 0 else math.erfc(v / (2 * math.sqrt(kappa * edges[i])))
+        tot += di * (e_old - e_new)
+    exp.append(tot)
+got = np.asarray(paleoclimate_perturbation(z, t_y, d, kappa))
+assert got.shape == (4,)
+assert np.max(np.abs(np.asarray(got, float) - np.asarray(exp, float))) <= 1.2e-6   # 1e-6 K per K, largest |dT| = 1.2

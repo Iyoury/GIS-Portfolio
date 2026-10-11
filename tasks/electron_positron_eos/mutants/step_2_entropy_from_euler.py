@@ -1,16 +1,16 @@
 import numpy as np
 import math
 
-MEC2 = 8.1871057769e-7          # erg, m_e c^2
-KB = 1.380649e-16               # erg / K
-LAMBDA_C = 3.8615926796e-11     # cm, hbar / (m_e c)
-NA = 6.02214076e23              # 1 / mol
-PREF = 1.0 / (math.pi ** 2 * LAMBDA_C ** 3)
+_EPEOS_MEC2 = 8.1871057769e-7           # erg, m_e c^2
+_EPEOS_KB = 1.380649e-16                # erg / K
+_EPEOS_LAMBDA_C = 3.8615926796e-11      # cm, hbar / (m_e c)
+_EPEOS_NA = 6.02214076e23               # 1 / mol
+_EPEOS_PREF = 1.0 / (math.pi ** 2 * _EPEOS_LAMBDA_C ** 3)
 
-_GX, _GW = np.polynomial.legendre.leggauss(24)
+_EPEOS_GX, _EPEOS_GW = np.polynomial.legendre.leggauss(24)
 
 
-def _check_T_psi(T, psi):
+def _epeos_check_T_psi(T, psi):
     T, psi = float(T), float(psi)
     if not (math.isfinite(T) and math.isfinite(psi)):
         raise ValueError("T and psi must be finite")
@@ -18,10 +18,10 @@ def _check_T_psi(T, psi):
         raise ValueError("need 1e7 K <= T <= 1e11 K")
     if not 0.0 < psi <= 1e6:
         raise ValueError("need 0 < psi <= 1e6")
-    return T, psi, KB * T / MEC2
+    return T, psi, _EPEOS_KB * T / _EPEOS_MEC2
 
 
-def _nodes(theta, psi):
+def _epeos_nodes(theta, psi):
     """Quadrature nodes for int_0^inf p^2 dp (...): kinetic energies E (units m_e c^2), weights, and the
     electron occupation argument x_- = (E - E_F) / theta with E_F = psi theta - 1.
     Below the Fermi edge (and when it is close to E = 0): composite Gauss-Legendre in t = sqrt(E), smooth
@@ -42,8 +42,8 @@ def _nodes(theta, psi):
         tb.append(tlo)
         tb = np.array(tb)
         a, b = tb[:-1], tb[1:]
-        t = ((0.5 * (b - a))[:, None] * _GX[None, :] + (0.5 * (a + b))[:, None]).ravel()
-        wt = ((0.5 * (b - a))[:, None] * _GW[None, :]).ravel()
+        t = ((0.5 * (b - a))[:, None] * _EPEOS_GX[None, :] + (0.5 * (a + b))[:, None]).ravel()
+        wt = ((0.5 * (b - a))[:, None] * _EPEOS_GW[None, :]).ravel()
         E = t * t
         Es.append(E)
         ws.append(wt * 2.0 * t * t * (E + 1.0) * np.sqrt(E + 2.0))   # p^2 dp = 2 t^2 (E+1) sqrt(E+2) dt
@@ -52,8 +52,8 @@ def _nodes(theta, psi):
         nY = max(int(math.ceil(yhi - ylo)), 1)
         yb = np.linspace(ylo, yhi, nY + 1)
         a, b = yb[:-1], yb[1:]
-        y = ((0.5 * (b - a))[:, None] * _GX[None, :] + (0.5 * (a + b))[:, None]).ravel()
-        wy = ((0.5 * (b - a))[:, None] * _GW[None, :]).ravel()
+        y = ((0.5 * (b - a))[:, None] * _EPEOS_GX[None, :] + (0.5 * (a + b))[:, None]).ravel()
+        wy = ((0.5 * (b - a))[:, None] * _EPEOS_GW[None, :]).ravel()
         E = EF + theta * y
         p = np.sqrt(E * (E + 2.0))
         Es.append(E)
@@ -63,8 +63,8 @@ def _nodes(theta, psi):
         nE = max(int(math.ceil((hi - lo) / theta)), 1)
         tb = np.unique(np.concatenate([[0.0], np.sqrt(np.linspace(lo, hi, nE + 1)[1:])]))
         a, b = tb[:-1], tb[1:]
-        t = ((0.5 * (b - a))[:, None] * _GX[None, :] + (0.5 * (a + b))[:, None]).ravel()
-        wt = ((0.5 * (b - a))[:, None] * _GW[None, :]).ravel()
+        t = ((0.5 * (b - a))[:, None] * _EPEOS_GX[None, :] + (0.5 * (a + b))[:, None]).ravel()
+        wt = ((0.5 * (b - a))[:, None] * _EPEOS_GW[None, :]).ravel()
         E = t * t
         Es.append(E)
         ws.append(wt * 2.0 * t * t * (E + 1.0) * np.sqrt(E + 2.0))
@@ -72,7 +72,7 @@ def _nodes(theta, psi):
     return np.concatenate(Es), np.concatenate(ws), np.concatenate(xs)
 
 
-def _occ(x):
+def _epeos_occ(x):
     # 1 / (e^x + 1) and 1 minus it, without overflow or cancellation
     ex = np.exp(-np.abs(x))
     f = np.where(x > 0, ex / (1.0 + ex), 1.0 / (1.0 + ex))
@@ -80,12 +80,12 @@ def _occ(x):
     return f, g
 
 
-def _xp(E, theta, psi):
+def _epeos_xp(E, theta, psi):
     # positron occupation argument eps / theta + psi, eps = E + 1 (always above 1 / theta)
     return (E + 1.0) / theta + psi
 
 
-def _sigma(x):
+def _epeos_sigma(x):
     # -[f ln f + (1 - f) ln(1 - f)] for f = 1/(e^x + 1) = log1p(e^{-|x|}) + |x| / (e^{|x|} + 1) > 0
     ax = np.abs(x)
     e = np.exp(-ax)
@@ -97,7 +97,7 @@ def pair_thermodynamics(T, psi):
 
     Inputs:
       T: float, temperature in K, 1e7 <= T <= 1e11.
-      psi: float, (mu + m_e c^2) / (k T), 0 < psi <= 1e6 (as in pair_densities).
+      psi: float, (mu + m_e c^2) / (k T) as in the conventions, 0 < psi <= 1e6.
 
     Output:
       (P, u, s): Python floats. P the pressure (erg cm^-3); u the energy density (erg cm^-3): kinetic
@@ -107,16 +107,16 @@ def pair_thermodynamics(T, psi):
     Raises:
       ValueError if T or psi is not finite, if T is outside [1e7, 1e11] or psi is not in (0, 1e6].
     '''
-    T, psi, theta = _check_T_psi(T, psi)
-    E, w, xm = _nodes(theta, psi)
-    xp = _xp(E, theta, psi)
-    fm, fp = _occ(xm)[0], _occ(xp)[0]
+    T, psi, theta = _epeos_check_T_psi(T, psi)
+    E, w, xm = _epeos_nodes(theta, psi)
+    xp = _epeos_xp(E, theta, psi)
+    fm, fp = _epeos_occ(xm)[0], _epeos_occ(xp)[0]
     p2 = E * (E + 2.0)
-    P = MEC2 * PREF / 3.0 * float(np.sum(w * p2 / (E + 1.0) * (fm + fp)))
-    u = MEC2 * PREF * float(np.sum(w * (E * fm + (E + 2.0) * fp)))
-    fmn = _occ(xm)[0] - _occ(xp)[0]
-    n_net = PREF * float(np.sum(w * fmn))
+    P = _EPEOS_MEC2 * _EPEOS_PREF / 3.0 * float(np.sum(w * p2 / (E + 1.0) * (fm + fp)))
+    u = _EPEOS_MEC2 * _EPEOS_PREF * float(np.sum(w * (E * fm + (E + 2.0) * fp)))
+    fmn = _epeos_occ(xm)[0] - _epeos_occ(xp)[0]
+    n_net = _EPEOS_PREF * float(np.sum(w * fmn))
     # Euler relation u_tot + P - T s = mu_tot n_net
-    s = (u + n_net * MEC2 + P - psi * KB * T * n_net) / T
+    s = (u + n_net * _EPEOS_MEC2 + P - psi * _EPEOS_KB * T * n_net) / T
     result = (P, u, s)
     return result

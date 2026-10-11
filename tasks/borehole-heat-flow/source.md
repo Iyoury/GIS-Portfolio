@@ -8,6 +8,18 @@
 | Layered conduction, Bullard method | Bullard (1939); Carslaw & Jaeger (1959) | R(z), S(z), steady geotherm with uniform heat production |
 | Paleoclimate correction | Birch (1948); Beck (1977) | erfc step response, superposition of a piecewise history |
 | Shield workflow and magnitudes | Jessop et al. (1984); Mareschal & Jaupart (2004) | Inclined exploration holes, typical q0 of 35–55 mW m^-2, glacial correction |
+| Layer over a half-space (step 5 targets) | Carslaw & Jaeger (1959), ch. 12 | Image series of the step response, alpha = (e1 − e2)/(e1 + e2) with the effusivities e = √(k ρc) |
+| Fixed Talbot inversion (step 5 reference, mpmath targets) | Abate & Valkó (2004) | Contour s = rθ(cot θ + i), r = 2M/5t, and the trapezoid weights |
+| Hyperbolic contour (step 5 second solution) | Weideman & Trefethen (2007) | s(u) = μ(1 + sin(iu − α)) with α = 1.1721, h = 1.0818/N, μ = 4.4921 N/t |
+| Gaver–Stehfest inversion (step 5 mutant, cross-check of the 50-layer targets) | Stehfest (1970) | Weights V_k and nodes k ln 2 / t |
+
+Full references: Abate, J., Valkó, P.P. (2004) Multi-precision Laplace transform inversion. International
+Journal for Numerical Methods in Engineering 60, 979–993. Weideman, J.A.C., Trefethen, L.N. (2007) Parabolic
+and hyperbolic contours for computing the Bromwich integral. Mathematics of Computation 76, 1341–1356.
+Stehfest, H. (1970) Algorithm 368: Numerical inversion of Laplace transforms. Communications of the ACM 13,
+47–49. Carslaw, H.S., Jaeger, J.C. (1959) Conduction of Heat in Solids, 2nd ed., Oxford. The other works are
+listed in background.md. Each formula taken from these works was checked numerically against the independent
+targets of the tests (closed forms, image series, extended-precision values), not only taken on trust.
 
 Everything else is the author's own design:
 
@@ -242,7 +254,13 @@ if __name__ == "__main__":
 one checks that R gives the harmonic, not the arithmetic, effective
 conductivity. Six random layered columns (seeds 11–16) are compared with
 adaptive quadrature (`scipy.integrate.quad`) of 1/k and z/k computed inside
-each case.
+each case. Since version 11, case 11 checks shallow depths (0 to 37 m) under a
+deep layer stack against R = z/k1 and S = z²/(2k1), and R = S = 0 at the
+surface (absolute 1e-12). R and S are elementary integrals: the second
+solution (ramp superposition of the conductivity contrasts and integration by
+parts, version 11 item 14) and the reference give the same values up to
+rounding, so neither is evidence for the other; the evidence is the closed
+forms and the quadrature.
 
 **Step 3, paleoclimate_perturbation.**
 
@@ -253,6 +271,8 @@ each case.
   The two agree to 1e-9 K; the stored 8-decimal values agree with the
   convolution to 5e-9 K (their rounding).
 - Linearity in the departure and decay with depth are analytic properties.
+- Since version 11, case 11 checks depths of 0.05 to 2.5 m under a recent
+  two-step history (2 and 150 years) against the erfc forms (`math.erfc`).
 
 **Step 4, fit_heat_flow.**
 
@@ -267,26 +287,41 @@ each case.
 **Step 5, layered_paleoclimate_perturbation.** The targets and their
 provenance are listed in the Version 8 section (now `tests/step_5.py`); five
 of the stored 90-digit values were recomputed independently in version 10.
+Since version 11 the 50-layer column of case 6 (k from 1.5 to 5 W m^-1 K^-1,
+20 intervals) has independent targets at six depths (30 m to 3000 m, the last
+one in the bottom half-space); their computation is described in the version 11
+section. Before version 11 that column was only checked for self-consistency.
 
 **Step 6 and whole task (`tests/step_6.py`, `tests/general.py`).**
 
 - *noiseless*: the truth is the generator input. solution.py recovers
-  q0 = 0.041 to 4e-15 W m^-2 and second_solution.py to 3e-16 W m^-2
-  (re-measured in version 10).
+  q0 = 0.041 to 4e-15 W m^-2 and second_solution.py to 6e-17 W m^-2
+  (re-measured in version 11).
 - *noisy* and *deep*: **no value is taken from the reference solution.** The
   expected estimates are recomputed at test time inside each case of
   `tests/step_6.py` and `tests/general.py` (`_independent_fit`). They come
   from `numpy.linalg.lstsq`, with the covariance from the pseudo-inverse,
   applied to the generator's own model terms: Gauss–Legendre TVD, exact layer
   sums for R and S, and `math.erfc` for P. They agree with `solution.py` and
-  `second_solution.py` to 1e-10 W m^-2 and 1e-7 K (re-measured in version 10:
-  1e-14 W m^-2 on q0, 4e-13 K on T0, 3e-12 K on g). These values are valid
+  `second_solution.py` to 1e-10 W m^-2 and 1e-7 K (re-measured in version 11:
+  1e-14 W m^-2 on q0, 3e-13 K on T0, 3e-12 K on g, 2e-13 relative on the
+  standard errors). These values are valid
   for the stated 1-D model: conduction only, horizontal layers, uniform κ,
   and OLS with n − 3 degrees of freedom.
 - *n_used* is the count of readings whose generator TVD is ≥ z_min, by
   definition. The value 46 in step 6 case 5 / general case 5 (z_min applied
   in vertical depth) is the count of generator TVDs in [150, 350) m of the
   noisy hole (an MD cut would remove 40 readings).
+- Since version 11: step 6 case 6 puts a reading at the collar (MD 0, hence
+  TVD 0 on any trajectory) of a vertical hole and cuts at z_min = 0, so the
+  reading sits exactly at the cut and every valid TVD method computes it
+  exactly; n_used = 151 (all readings) by definition, and the noise-free
+  T0, q0, g are the generating values. Step 6 case 4 and general case 4 add a
+  vertical noise-free hole with six readings where z_min = 300 m keeps exactly
+  4 (valid, generating values recovered) and z_min = 500 m keeps 3
+  (ValueError). Step 6 case 0 and general case 0 compare the rms residual of
+  the noisy hole with its 5 mK logging noise (expected σ√((n − 3)/n), relative
+  scatter 1/√(2(n − 3)) = 4 % for n = 326; band 15 %; measured ratio 0.993).
 - The same records (target, test, method, note, validity) were listed in the
   `target_provenance` field of the old-format problem.yaml; since version 10
   they are in the header comments of `tests/step_6.py` and `tests/general.py`.
@@ -303,9 +338,11 @@ of the stored 90-digit values were recomputed independently in version 10.
 - The noisy targets are least-squares estimates, not the truth; noise moves
   them.
 
-## Tolerance rationale and rejected incorrect approaches
+## Tolerance rationale and rejected incorrect approaches (historical: v7 tests and step numbers)
 
-The table compares the reference with each mutant. Δq is in mW m^-2 and Δg
+This section and its table were measured on the v7 test files (workflow = step 5 then); the current
+per-case mutant results are in the version 11 table at the end of this file. The table compares the
+reference with each mutant. Δq is in mW m^-2 and Δg
 in K.
 
 | Mutant | noiseless | noisy | deep | Caught by |
@@ -334,7 +371,7 @@ The tolerances sit between numerical noise and the smallest mutant effects:
   0.5 % change is below the 2 % sigma tolerance of the integration tests,
   which admits any valid covariance evaluation (normal equations, QR, SVD).
 
-## Error-contract tests (v5 additions)
+## Error-contract tests (v5 additions; historical step numbers: workflow = step 5 in v5-v9)
 
 Every stated ValueError has a test built by construction (no value from the reference):
 
@@ -350,7 +387,7 @@ Every stated ValueError has a test built by construction (no value from the refe
 - step 5 (the workflow; step 6 since version 10) / whole task: a survey not starting at MD 0, a non-increasing survey, a non-increasing
   history and a NaN history time all propagate as ValueError through surface_heat_flow.
 
-## Registered mutants (problem.yaml)
+## Registered mutants (problem.yaml) (historical: v5-v7 test functions and step numbers)
 
 Every mutant below is a complete implementation that contains one deliberate
 scientific error. Each one fails the tests it targets, and the reference and
@@ -542,7 +579,7 @@ twice in clean processes (and once with one BLAS/OpenMP thread) on the three syn
 1000-depth / 50-layer / 20-interval layered case and a three-dimensional survey: identical outputs (SHA-256 of
 the results) in every run.
 
-crown_check (tools/crown_check.py, every case alone in a fresh process, -j 2), final run of this version
+crown_check (tools/crown_check.py, every case alone in a fresh process, -j 2), final run of version 10
 (rerun in all modes after item 13, summary ALL OK; the clean-process repeat runs of both solutions above were
 also repeated and gave identical SHA-256 digests):
 
@@ -578,4 +615,232 @@ also repeated and gave identical SHA-256 digests):
 | whole task | whole_task_z_min_on_measured_depth | 5 of 6 |
 
 The mutant table of "Registered mutants (problem.yaml)" above uses the v5-v7 test functions and step
-numbers (workflow = step 5 then); this table replaces it.
+numbers (workflow = step 5 then); this table replaced it in version 10 and is itself superseded by the
+version 11 table below. Every section before "Version 10" uses the old step numbering (v5-v7: workflow =
+step 5; v8-v9: workflow = step 5 and layered step = step 6); since version 10 the layered step is step 5
+and the workflow step 6.
+
+## Version 11 (grading_fix: authoring-guide conformance, pass 2)
+
+Second conformance pass on version 10 (rules on whole-task tests, hidden inputs, truthfulness, independent
+second solution, current-reference mutants, stated/tested consistency), with the findings of the independent
+verifier of version 10. Version 10 is kept (self-contained cases, no clock reads, no exact float equality,
+contracts and metadata). Each item gives the finding, its cause, the change, the regression test and what was
+rerun. Domains, tolerances and the science are unchanged; the visible text gains one accuracy statement
+(item 6) and one changed sentence (items 7 and 11).
+
+1. Second solution, half-space perturbation near the surface. Finding: second_solution.py integrated the
+   Duhamel convolution in log-time from max(lo, 1e-3 yr), so the response to the latest interval was cut off
+   for 0 < z <~ 1.5 m, inside the promised domain z >= 0 (at z = 0.05, 0.3 and 1.0 m under a 2-year interval
+   of 1.2 K the error was 1.0 K, 0.28 K and 8e-5 K against 1.2e-6 K allowed). No step 3 case had a small
+   positive depth. Cause: the lower limit of the log-time quadrature was a fixed time instead of scaling with
+   z^2/kappa. Change: each interval is integrated from its own start (tau = 0 for the first) in the similarity
+   variable eta = z/(2 sqrt(kappa tau)), in which the impulse response z/(2 sqrt(pi kappa tau^3))
+   exp(-z^2/(4 kappa tau)) dtau becomes (2/sqrt(pi)) exp(-eta^2) deta, by adaptive quadrature truncated at
+   eta = 40 (exp(-1600)). Regression: new step 3 case 11 (z = 0.05, 0.3, 1.0, 2.5 m; history 2 and 150
+   years; targets from math.erfc): the version 10 second solution fails it, the new one passes. Sweep against
+   solution.py over 200 random histories (t from 1e-3 to 1e6 years, kappa from 3e-8 to 1e-5 m^2 s^-1, z from
+   1e-300 to 3e4 m, including 0.01 to 1.5 m): largest difference 6.4e-16 K per K.
+2. Second solution copied the strategy of test oracles (rule D). Finding: its TVD integrated the great-circle
+   tangent with 48-point Gauss-Legendre quadrature, the strategy of the borehole generator embedded in
+   tests/step_6.py and tests/general.py (64 points), and its R and S called scipy.integrate.quad on 1/k and z/k
+   with the layer tops as break points, almost verbatim the step 2 oracle _quad_RS. Cause: the second solution
+   predates the embedding of these generators in the test files. Change: TVD by circular-arc geometry: on a
+   segment of length L and dogleg beta the path is a circle of radius L/beta in the plane of t1 and
+   w = (t2 - t1 cos beta)/sin beta, so the rise after an arc length s is
+   s [sinc(phi) t1z + (s/(2L)) sinc^2(phi/2) (t2z - t1z cos beta)/sinc(beta)], phi = beta s/L, a closed form
+   that is exact for beta = 0 and free of cancellation for tiny doglegs (solution.py uses the ratio-factor
+   formula; the step 1 oracle integrates the same tangent numerically). R and S by cumulative tables at the
+   layer tops completed with the midpoint rule in the layer that holds z (exact for 1/k and z/k); this R and
+   S route turned out to be the reference's own per-layer terms reorganized and was replaced in item 14.
+   Regression: crown_check second (every case of every step and of general passes); sweeps against
+   solution.py: TVD within 3.6e-12 m over 300 random surveys (segments of 1 m to 3 km, about 60 of them with
+   doglegs of order 1e-9 rad), R and S (midpoint-rule version, superseded) within a relative 6.7e-16 over
+   3000 random columns.
+3. Reference S at shallow depth (found in this pass). Finding: solution.py and solution/step_2.py added
+   (b**2 - a**2)/(2k) for every layer; for a layer below z, b = a = top, but numpy's scalar a**2 and array
+   b**2 can differ by one ulp (on this platform for tops such as 995.3, 1358.1 or 1946.2 m), which left a
+   residue of about 1e-10 m^3 K W^-1 in S: S(0) = 8.9e-11 against the stated absolute 1e-12, and a relative
+   error 3.7e-6 at z = 0.01 m against the stated 1e-9. No case had a shallow depth under such a top. Cause:
+   unfactored difference of squares. Change: (b - a)(b + a)/(2k), exactly zero for the layers below z, in
+   solution.py, solution/step_2.py and every mutant that contains the reference layer_integrals (the two step
+   2 mutants and the four whole-task mutants, so that each stays the current reference with one error).
+   Regression: new step 2 case 11 (tops 0, 120, 995.3, 1358.1, 1946.2 m; z = 0, 0.01, 0.5, 2, 37 m and a
+   scalar z = 0; R = z/k1 and S = z^2/(2 k1) to a relative 1e-9, R = S = 0 within 1e-12): the version 10
+   reference fails it, the new one passes. The workflow numbers below were re-measured after the change.
+4. Inclusive z_min boundary (task note; verifier advisory). Finding: step 6 case 6 kept a reading at TVD 200
+   m = z_min of a vertical hole; a valid TVD within the stated 1e-6 m can be one ulp below (5-node
+   Gauss-Legendre gives 199.99999999999997), so the case was a floating-point knife-edge. Cause: the case
+   relied on TVD = MD being computed exactly. Change: the collar reading (MD 0, TVD 0 on every trajectory, the
+   origin of the TVD) of a vertical noise-free hole with z_min = 0: n_used = 151 (every reading), and T0, q0,
+   g within the noise-free limits of the generating values (6.0 deg C, 0.045 W m^-2, 5.5 K). The prompt
+   statement "a reading exactly at z_min is kept" is unchanged. Regression: a step 1 written with 5-node
+   Gauss-Legendre quadrature fails the old case and passes the new one; a new step 6 mutant
+   z_min_cut_strict (TVD > z_min) fails case 6 (and only it); reference and second solution pass.
+5. Independent target for the 50-layer column (task note; verifier advisory). Finding: step 5 case 6 checked
+   the column with k rising from 1.5 to 5 W m^-1 K^-1 only by array-against-scalar self-consistency, so the
+   mean- and local-diffusivity mutants passed it. Change: six depths (z[j] for j = 10, 137, 300, 500, 700,
+   999 of the case's 1000-depth grid, 30 m to 3000 m, the last in the bottom half-space) are compared with
+   values computed once in mpmath by a method shared with neither solution: forward propagation of
+   (F, k dF/dz) from the surface with 2 x 2 transfer matrices [[cosh qh, sinh qh/(kq)], [kq sinh qh, cosh qh]],
+   the unknown surface flux fixed by the decay condition k F' = -k q F at the top of the bottom half-space,
+   and the working precision set from the growth of the exponentials (2 sum Re(q) h / ln 10 digits lost,
+   plus a margin: 267, 334 and 392 digits); inversion by the fixed Talbot contour of degree 60 and 90 (the
+   two agree to the 30 printed digits) and by Gaver-Stehfest with 60 terms (agreement 2e-16). Twenty
+   significant digits are stored inline. The self-consistency check is kept. Regression: solution.py agrees
+   with the targets to 3.0e-11 K, second_solution.py to 1.8e-10 K (tolerance 1e-8 x max|dT|, about 1e-8 K); the
+   mean- and local-diffusivity mutants now fail case 6 (5 of 8 cases each). The script (about 120 lines:
+   transform, growth estimate, Talbot and Stehfest sums, superposition of the 20 step responses) is not
+   shipped with the task; its algorithm is fully described here.
+6. Error budget of the workflow (task note; verifier advisory). Finding: the noise-free accuracy of step 6
+   (T0 1e-5 K, q0 1e-8 W m^-2, g 1e-4 K) is tested with the candidate's own steps 1-4 in the whole-task
+   cases, but step 3 promises only 1e-6 K per K. Worst-case propagation (L1 norms of the rows of the
+   pseudo-inverse of [1, R, P] times the largest per-reading temperature error) on the noise-free holes:
+
+   | Hole (readings used) | steps 1 + 2 at their limits: T0 / q0 / g | step 3 at 1e-6 K per K: T0 / q0 / g |
+   |---|---|---|
+   | general noiseless (263) | 1.8e-7 K / 2.6e-9 W m^-2 / 2.0e-6 K | 2.0e-5 K / 2.8e-7 W m^-2 / 2.2e-4 K |
+   | step 6 vertical, z_min = 0 (151) | 8.1e-8 / 8.5e-10 / 7.7e-7 | 1.1e-5 / 1.1e-7 / 1.0e-4 |
+   | step 6 vertical, 4 readings | 2.1e-7 / 7.8e-10 / 1.1e-6 | 2.9e-5 / 1.1e-7 / 1.5e-4 |
+
+   (step 1: 1e-6 m of TVD times the largest |dT/dz| plus the shift of the layer tops; step 2: a relative 1e-9
+   on q0 R and A S; step 4 adds 1e-9 K and 1e-12 W m^-2.) Steps 1, 2 and 4 stay inside the noise-free limits;
+   step 3 at its limit does not (a smooth error 1e-6 exp(-z/500) K per K still gives 3.5e-9 W m^-2). With P
+   accurate to 1e-8 K per K the step 3 column drops by 100 and every total is inside the limits with a
+   margin of at least 1.8 on q0 (the erfc closed form gives about 1e-15). The noisy-hole limits hold even
+   with step 3 at its limit (1.6e-7 W m^-2 against 2e-6). Cause: the step 3 accuracy was written for the step
+   on its own. Change (no tolerance changed, rule G): the step 6 prompt, its function_header, problem_io, the
+   scaffold docstring and the step 6 contract now state "The noise-free limits presume P accurate to 1e-8 K
+   per kelvin of the largest |hist_dT_shape| or better (an error at the 1e-6 K per K limit of step 3 can move
+   q0 by a few 1e-7 W m^-2); the accuracies of steps 1, 2 and 4 propagate within these limits." Regression:
+   crown_check format (header = scaffold = problem_io checked by a script as well).
+7. SECONDS_PER_YEAR in the step 3 header (verifier advisory). Finding: the visible function_header said
+   "Times in years are converted with SECONDS_PER_YEAR", a name defined only in the scaffold module. Change:
+   "Times in years are converted with 1 year = 365.25 x 86400 s." in the header and the scaffold docstring.
+   Regression: crown_check format; header and scaffold identical.
+8. difficulty_explanation numbers (verifier advisory). Finding: "about 3e-6 K per K" (Gaver-Stehfest) and
+   "0.04 to 0.2 K per K" (erfc with mean or local diffusivity) did not match the shipped mutants. Cause: the
+   numbers were estimated on the v8 columns before the case set was final. Change: re-measured per test
+   column as max|mutant - reference| / max|dT| (mean / local / Stehfest): layer over half-space (2, 5, 400)
+   0.097 / 0.129 / 2.1e-6; (6, 0.8, 400) 0.246 / 0.299 / 6.4e-6; (1.2, 4.4, 35) 0.071 / 0.064 / 2.6e-6;
+   Abitibi 0.038 / 0.052 / 2.9e-6; contrasted 0.178 / 0.206 / 2.2e-6; 50 layers 0.073 / 0.039 / 6.6e-6;
+   shape case 0.124 / 0.161 / 2.8e-6. The text now says "2e-6 to 7e-6 K per K" and "0.04 to 0.3 K per K".
+9. Whole-task cases (rule A). Finding: general case 4 only checked ValueError (no computed result) and
+   general case 0 only the output contract; the minimum-size boundary of the workflow was tested only with 0
+   readings left (verifier advisory). Change: general case 4 (and step 6 case 4) add a vertical noise-free
+   hole with six readings: z_min = 300 m keeps exactly 4 readings (the smallest valid fit; n_used = 4 and the
+   generating T0, q0, g within the noise-free limits) and z_min = 500 m keeps 3 (ValueError). General case 0
+   (and step 6 case 0) check that the rms residual of the noisy hole matches its 5 mK logging noise (expected
+   sigma sqrt((n - 3)/n), relative scatter 1/sqrt(2(n - 3)) = 4 % for n = 326; band 15 %; measured ratio
+   0.993). Every general case now calls surface_heat_flow and asserts a computed scientific result (crown_check
+   format reports no general case without the final function). Regression: crown_check ref/second/mut/shift
+   on general; the whole-task mutants fail 5 or 6 of the 6 general cases.
+10. Sources (verifier advisory). Finding: Clauser (1984) was cited in the step 5 step_background without being
+    checked or listed; the methods of the step 5 reference, second solution, targets and mutant were not in the
+    sources table. Change: rows and full references for Carslaw & Jaeger (1959, ch. 12, image series), Abate &
+    Valko (2004), Weideman & Trefethen (2007) and Stehfest (1970); "Clauser 1984" removed; the magnitude
+    "up to tens of percent near strong contrasts" is no longer attributed to Beck (1977) in the step 5
+    background and in background.md, and rests on the exact layered solutions of the tests (4 to 30 % of the
+    largest surface departure in the test columns, item 8).
+11. Visible text. Besides items 6 and 7, solution_explanation now gives the factored S term and
+    verification_explanation describes the current second-solution methods, the new targets and cases and the
+    strict-cut mutant. No prompt exposes a test input: the only sizes stated (1000 depths, 50 layers, 20
+    intervals per call in step 5) are the stated domain limits, and the example amplitude of step 6 (g = 4) is
+    used by no case.
+12. Step 1 comments (verifier advisory): the tiny-dogleg cases 10 and 11 repeated the 8e-10 rad comment of
+    case 9; each now states its own bend (sin(30 deg) dinc L / 2 = 4e-6, 1.5e-4 and 1e-2 m), and the helper
+    _mp_build_tvd (no mpmath) is renamed _exact_build_tvd. No assertion changed.
+13. Text of this file. The Data and evidence findings of the verifier (stored least-squares targets,
+    "computed with both solutions", the pytest name, the tests/step_6.py location of the layered targets) were
+    already corrected by item 13 of version 10; the evidence section now also lists the version 11 cases and
+    re-measured numbers. The tolerance-rationale, error-contract and registered-mutant sections are labelled as
+    historical with the versions and step numbers they used, and the version 10 crown_check table is marked as
+    the version 10 run. Completion of the version 10 notes: item 5 (dependencies), cause: quad was imported
+    by second_solution.py only and never declared; regression: crown_check second runs with exactly the
+    declared imports. Item 7 (float comparisons), cause: pytest-era assert_allclose(rtol=0) and "== 0.0"
+    shortcuts; regression: crown_check format (no exact-equality pattern) and ref/second/shift. Item 9
+    (visible specification), cause: the old schema kept inputs, ranges and errors in fields the agent does
+    not see; regression: crown_check format and the header = scaffold comparison. Item 10 (stated but
+    untested), cause: the error lists grew in v5-v9 without matching invalid inputs; regression: the merged
+    ValueError cases pass for the reference and the second solution. Item 12 (metadata), cause: the old
+    schema had no such fields; regression: crown_check format (metadata keys).
+14. Second solution R and S were the reference's arithmetic (rule D; blocking finding of the independent
+    verifier after this pass). Finding: the cumulative tables of item 2 summed h/k and
+    h (t_i + t_{i+1})/(2k) per layer and completed the layer that holds z with dz/k and
+    dz (t_j + z)/(2k); in exact arithmetic these are term by term the reference's (b - a)/k and
+    (b - a)(b + a)/(2k), so the "different method" for step 2 was the reference reorganized, and
+    verification_explanation listed it among the different methods without a caveat. Cause: item 2 removed
+    the copy of the quadrature oracle but replaced it with the reference's per-layer partition; a
+    different exact route exists and was not used. Change: second_solution.py layer_integrals now writes
+    the resistivity profile as a superposition of steps at the layer tops, 1/k(z') = sum_i c_i H(z' - t_i)
+    with c_0 = 1/k_0 and c_i = 1/k_i - 1/k_{i-1}, so R(z) = sum_i c_i (z - t_i)_+ (a sum of ramps; no layer
+    thickness and no per-layer partition), and S by integration by parts, S(z) = z R(z) - int_0^z R dz',
+    with the integral of the continuous, piecewise-linear R by the trapezoid rule on the layer tops above z
+    and on z (exact; no z'/k integrand is formed). The route shares no formula with solution.py (per-layer
+    clipped sums), with the step 2 oracle (scipy quad of 1/k and z/k) or with the borehole generators of
+    tests/step_6.py and tests/general.py (per-layer sums of (b - a)/k and (b^2 - a^2)/(2k)). Because R and
+    S are elementary integrals, any exact route gives the same values up to rounding; the independent
+    evidence for step 2 remains the hand-computed closed forms (cases 0-3 and 11) and the quadrature oracle
+    (cases 4-9), and verification_explanation now says so. The module docstring of second_solution.py
+    describes the new route. Regression: crown_check second (every case of every step and of general
+    passes, step 2 12/12, including case 11 at z = 0.01 m under the deep stack, where R = c_0 z and
+    S = z R - z R/2 exactly); a sweep over 1500 random columns (1 to 11 layers, thicknesses 1 cm to about
+    3 km, conductivities 0.1 to 32 W m^-1 K^-1, depths 0, below 1 cm, inside the column, at every top and up
+    to 3 km below the last top) against the exact rational layer sums of the float inputs (Python fractions):
+    largest relative error 6.5e-14 (R) and 1.1e-13 (S) for the second solution (3.9e-16 and 5.7e-16 for
+    solution.py), against the stated 1e-9. The whole-task numbers of the second solution were re-measured
+    (below) and the clean-process repeat runs redone.
+
+Not changed, with reasons (also reported to the lead): step 5 (layered perturbation) still does not feed
+the workflow, which keeps the half-space correction of step 3 (making the workflow layered would change the
+science and every whole-task target, so it belongs to a repair or difficulty_increase version); the noisy-hole
+standard errors keep their 2 % tolerance, so the RSS/n mutant is caught only by step 4 case 2 (a scientifically
+justified tighter tolerance is a decision for a later version); a stub that always raises ValueError passes
+the merged validation case of each step (1 case per step, inherent to merging them); relevant_experience stays
+the placeholder for the author.
+
+Clean-process repeat runs: solution.py and second_solution.py were run twice with one BLAS/OpenMP thread and
+once with two BLAS threads on the three synthetic boreholes, the 1000-depth / 50-layer / 20-interval column
+and a three-dimensional survey: identical SHA-256 digests of the outputs in all three runs. After item 14 the
+runs on the three boreholes and on 200 random layer columns (50 depths each) were repeated in the same way
+(two runs with one thread, one with two): identical digests. Re-measured numbers (after item 14): noiseless
+q0 recovered to 3.7e-15 (solution.py) and below 1e-16 W m^-2 (second_solution.py; 6.2e-17 before item 14);
+noisy and deep holes against _independent_fit (largest over both solutions): q0 1e-14 W m^-2, T0 3.2e-13 K,
+g 2.6e-12 K, standard errors 1.8e-13 relative, rms 4.6e-14 relative (1.9e-13 and 6e-14 before item 14);
+generator truth 1.10 sigma (q0) and 0.68 sigma (g) from the noisy estimate, 0.60 and 0.22 sigma for the deep
+hole; the two layered solvers agree to 4.1e-10 K over the 1000 depths of the 50-layer column.
+
+crown_check (tools/crown_check.py, every case alone in a fresh process, one BLAS/OpenMP thread, -j 2), final
+run of version 11 (after item 14), all modes, summary ALL OK:
+
+| Mode | Result |
+|---|---|
+| format | OK (no problem; every general case calls surface_heat_flow) |
+| REF steps 1-6, general (solution.py) | 22/22, 12/12, 12/12, 7/7, 8/8, 7/7, 6/6 |
+| SECOND steps 1-6, general | 22/22, 12/12, 12/12, 7/7, 8/8, 7/7, 6/6 |
+| SHIFT +-1e-12 (step outputs; every evaluated function in general) | all cases pass |
+| CONTROL None / 0.0 | 0 cases pass in every step and in general |
+
+| Where | Mutant | Cases failed |
+|---|---|---|
+| step 1 | linear_tvd_between_stations | 15 of 22 |
+| step 1 | balanced_tangential | 12 of 22 |
+| step 2 | arithmetic_conductivity | 10 of 12 |
+| step 2 | heat_production_integral_missing_half | 10 of 12 |
+| step 3 | years_not_converted | 9 of 12 |
+| step 3 | erfc_missing_factor_2 | 9 of 12 |
+| step 3 | interval_sign_reversed | 10 of 12 |
+| step 4 | heat_production_sign | 4 of 7 |
+| step 4 | dof_n | 1 of 7 (the covariance case) |
+| step 5 | mean_diffusivity_halfspace | 5 of 8 |
+| step 5 | local_diffusivity_halfspace | 5 of 8 |
+| step 5 | stehfest_double_precision | 6 of 8 |
+| step 6 | measured_depth_as_depth | 6 of 7 |
+| step 6 | no_paleoclimate_correction | 6 of 7 |
+| step 6 | single_mean_conductivity | 7 of 7 |
+| step 6 | z_min_on_measured_depth | 5 of 7 |
+| step 6 | z_min_cut_strict | 1 of 7 (case 6) |
+| whole task | whole_task_measured_depth_as_depth | 6 of 6 |
+| whole task | whole_task_no_paleoclimate_correction | 5 of 6 |
+| whole task | whole_task_single_mean_conductivity | 6 of 6 |
+| whole task | whole_task_z_min_on_measured_depth | 5 of 6 |

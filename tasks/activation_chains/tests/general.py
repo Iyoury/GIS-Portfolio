@@ -3,7 +3,12 @@
 
 # --- test case 0 ---
 # the 238U series as a linear chain and as a branching network (with 0.02 % of 214Bi
-# decaying to 210Tl, 1.30 min, which feeds 210Pb) after 3e5 years, against the Bateman sum
+# decaying to 210Tl, 1.30 min, which feeds 210Pb) after 3e5 years, against the Bateman sum (chain) and
+# mpmath's matrix exponential at 300 digits (network); then this aged ore is irradiated: 238U captures
+# neutrons (2.68 b) into 239U (23.45 min), which decays to 239Np (2.356 d) and 239Pu (2.411e4 y), and the
+# 239Np activity measured after the cooling gives back the flux (the 238U capture rate). The activity
+# target is the Bateman sum of the capture branch at 600 digits; the same activity predicted with
+# chain_inventory alone (step 1) must give back the flux as well
 import numpy as np
 import mpmath as _t_mp
 
@@ -43,7 +48,7 @@ def _t_check(x, target, scale):
     x = np.asarray(x)
     assert x.shape == (len(target),), x.shape
     for a, b in zip(x, target):
-        if b > 0.0 and b >= 1e-250 * scale:
+        if b >= max(1e-250 * scale, 1e-300):
             assert _t_rel(a, b) < 1e-10, (a, b)
         else:
             assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)
@@ -71,6 +76,52 @@ rates = B * lam2[None, :]
 target2 = [float(a) for a in _t_expm_apply(rates, lam2, np.r_[n0, 0.0], t)]
 _t_check(y, target2, 1e20)
 assert 0.0 < y[n] < 1e-3 * y[9], (y[n], y[9])
+# the aged ore (exact amounts above; 206Pb holds the rest of the atoms) irradiated for one day and cooled for
+# three days. Network: the 15 members of the series, then 239U (index 15), 239Np (16) and 239Pu (17), whose
+# decay leaves the network. Only 238U captures (into 239U); the captures of the products are left out.
+_t_l9 = [np.log(2.0) / (23.45 * _T_MIN), np.log(2.0) / (2.356 * _T_DAY), np.log(2.0) / (2.411e4 * _T_YEAR)]
+lam3 = np.r_[lam, _t_l9]
+B3 = np.zeros((18, 18))
+for i in range(14):
+    B3[i + 1, i] = 1.0
+B3[16, 15], B3[17, 16] = 1.0, 1.0
+sig3 = np.r_[2.68, np.zeros(17)]
+cap3 = np.r_[15, np.full(17, -1)]
+ore = np.r_[target, max(1e20 - float(_t_mp.fsum(target)), 0.0), np.zeros(3)]
+t_irr, t_cool = _T_DAY, 3.0 * _T_DAY
+
+def _t_np239_activity(flux):
+    # 239Np activity of the capture branch: 238U is removed at lam0 + r (decay to 234Th and capture at
+    # r = sigma 1e-24 flux) and only the captures feed 239U, so during the irradiation the branch is the
+    # linear chain (lam0 + r, l239U, l239Np, l239Pu) with its products scaled by r / (lam0 + r); the cooling
+    # is the chain (l239U, l239Np, l239Pu). Bateman sums for distinct constants at 600 digits.
+    with _t_mp.workdps(600):
+        r = _t_mp.mpf(2.68) * _t_mp.mpf("1e-24") * _t_mp.mpf(flux)
+        L = [_t_mp.mpf(float(lam[0])) + r] + [_t_mp.mpf(v) for v in _t_l9]
+        T = _t_mp.mpf(t_irr)
+        x = []
+        for k in (1, 2, 3):
+            tot = _t_mp.mpf(0)
+            for i in range(k + 1):
+                tot += _t_mp.exp(-L[i] * T) / _t_mp.fprod([L[l] - L[i] for l in range(k + 1) if l != i])
+            x.append(_t_mp.mpf(float(ore[0])) * r * _t_mp.fprod(L[1:k]) * tot)
+        a, b = L[1], L[2]
+        T = _t_mp.mpf(t_cool)
+        np239 = x[1] * _t_mp.exp(-b * T) + x[0] * a * (_t_mp.exp(-a * T) - _t_mp.exp(-b * T)) / (b - a)
+        return float(b * np239)
+
+for _t_flux in (5e11, 2e14):
+    act = _t_np239_activity(_t_flux)
+    got = monitor_flux(lam3, B3, sig3, cap3, ore, t_irr, t_cool, 16, act, 1e8, 1e16)
+    assert isinstance(got, float), type(got)
+    assert _t_rel(got, _t_flux) < 1e-8, (got, _t_flux)
+    # link with step 1: the activity predicted from two chain_inventory calls (each amount within 1e-10), so
+    # the recovered flux is compared with about twice the single-output tolerance
+    r = 2.68 * 1e-24 * _t_flux
+    xi = chain_inventory(np.array([lam[0] + r] + _t_l9), np.array([ore[0], 0.0, 0.0, 0.0]), t_irr)
+    xc = chain_inventory(np.array(_t_l9), np.asarray(xi[1:]) * (r / (lam[0] + r)), t_cool)
+    got2 = monitor_flux(lam3, B3, sig3, cap3, ore, t_irr, t_cool, 16, _t_l9[1] * float(xc[1]), 1e8, 1e16)
+    assert _t_rel(got2, _t_flux) < 2e-8, (got2, _t_flux)
 
 # --- test case 1 ---
 # flux-monitor analysis on a cobalt network irradiated for 3e6 s and cooled for 2e5 s: the 60Co
@@ -96,7 +147,7 @@ def _t_check(x, target, scale):
     x = np.asarray(x)
     assert x.shape == (len(target),), x.shape
     for a, b in zip(x, target):
-        if b > 0.0 and b >= 1e-250 * scale:
+        if b >= max(1e-250 * scale, 1e-300):
             assert _t_rel(a, b) < 1e-10, (a, b)
         else:
             assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)

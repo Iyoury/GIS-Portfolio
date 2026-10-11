@@ -28,8 +28,9 @@ def branch_magnetization(h, psi):
         raise ValueError("h must be finite and psi must be between 0 and pi/2")
     # Switching field: e' = 0 and e'' = 0 together give the astroid
     # h_sw = (cos(psi)**(2/3) + sin(psi)**(2/3))**(-3/2).
-    # Deliberate error: the outer exponent is -2/3 instead of -3/2.
-    h_sw = (np.cos(psi) ** (2.0 / 3.0) + np.sin(psi) ** (2.0 / 3.0)) ** (-2.0 / 3.0)
+    # cos(pi/2) is 6e-17 in floating point, which alone would put h_sw 2e-11 below 1
+    # MUTANT: the outer exponent of the astroid is -2/3 instead of -3/2
+    h_sw = 1.0 if psi == 0.5 * np.pi else (np.cos(psi) ** (2.0 / 3.0) + np.sin(psi) ** (2.0 / 3.0)) ** (-2.0 / 3.0)
     if h < -h_sw:
         # After the jump: theta -> theta + pi maps the energy at field h onto the
         # energy at field -h, and at -h > h_sw only one minimum is left.

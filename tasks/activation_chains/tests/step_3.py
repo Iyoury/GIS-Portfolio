@@ -1,9 +1,10 @@
-# Independent targets: closed forms, the Bateman sum evaluated in 600-digit arithmetic (it only
-# cancels in floating point), and matrix exponentials by mpmath at 300 digits.
+# Independent targets: closed forms, the Bateman sum of a capture chain evaluated in 600-digit
+# arithmetic (it only cancels in floating point), and matrix exponentials by mpmath at 300 digits.
 
 # --- test case 0 ---
 # burnup of a stable target: n0 exp(-sigma phi t), down to exp(-550), about 1e-239, exp(-575),
-# about 8e-250, exp(-575.64), 1.01e-250 just above 1e-250 S (relative rule), and exp(-600), about 3e-261 (below 1e-250 S: absolute rule)
+# about 8e-250, exp(-575.64), 1.01e-250 just above 1e-250 S (relative rule), and exp(-600), about 3e-261 (below 1e-250 S: absolute rule);
+# and a tiny inventory, where the threshold F = max(1e-250 S, 1e-300) is set by 1e-300
 import numpy as np
 import mpmath as _t_mp
 
@@ -14,7 +15,7 @@ def _t_check(x, target, scale):
     x = np.asarray(x)
     assert x.shape == (len(target),), x.shape
     for a, b in zip(x, target):
-        if b > 0.0 and b >= 1e-250 * scale:
+        if b >= max(1e-250 * scale, 1e-300):
             assert _t_rel(a, b) < 1e-10, (a, b)
         else:
             assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)
@@ -25,6 +26,14 @@ for _t_flux, _t_t in ((1e13, 1e5), (1e17, 2e7), (2e17, 1e10), (1e18, 5.5e6), (1e
     with _t_mp.workdps(40):
         target = float(3 * _t_mp.exp(-_t_mp.mpf(100) * _t_mp.mpf("1e-24") * _t_flux * _t_t))
     _t_check(x, [target], 3.0)
+# S = 1e-70, F = 1e-300: sigma phi t = 500 leaves about 7e-288 (relative rule), 570 about 3e-318 (a subnormal
+# double above 1e-250 S but below F: absolute rule)
+for _t_t in (5e6, 5.7e6):
+    x = activation_inventory(np.array([0.0]), np.zeros((1, 1)), np.array([100.0]), np.array([-1]), np.array([1e-70]),
+                             [(_t_t, 1e18)])
+    with _t_mp.workdps(40):
+        target = float(_t_mp.mpf(1e-70) * _t_mp.exp(-_t_mp.mpf(100) * _t_mp.mpf("1e-24") * _t_mp.mpf(1e18) * _t_mp.mpf(_t_t)))
+    _t_check(x, [target], 1e-70)
 
 # --- test case 1 ---
 # gold monitor through irradiation and cooling, from 1e2 to 1e17 n / (cm^2 s): 199Au is
@@ -50,7 +59,7 @@ def _t_check(x, target, scale):
     x = np.asarray(x)
     assert x.shape == (len(target),), x.shape
     for a, b in zip(x, target):
-        if b > 0.0 and b >= 1e-250 * scale:
+        if b >= max(1e-250 * scale, 1e-300):
             assert _t_rel(a, b) < 1e-10, (a, b)
         else:
             assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)
@@ -110,7 +119,7 @@ def _t_check(x, target, scale):
     x = np.asarray(x)
     assert x.shape == (len(target),), x.shape
     for a, b in zip(x, target):
-        if b > 0.0 and b >= 1e-250 * scale:
+        if b >= max(1e-250 * scale, 1e-300):
             assert _t_rel(a, b) < 1e-10, (a, b)
         else:
             assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)
@@ -153,7 +162,7 @@ def _t_check_pair(x, y, scale):
     x, y = np.asarray(x), np.asarray(y)
     assert x.shape == y.shape, (x.shape, y.shape)
     for a, b in zip(x, y):
-        if b > 0.0 and b >= 1e-250 * scale:
+        if b >= max(1e-250 * scale, 1e-300):
             assert _t_rel(a, b) < 2e-10, (a, b)
         else:
             assert abs(a - b) <= 2.0 * max(1e-250 * scale, 1e-300), (a, b)
@@ -175,7 +184,7 @@ _t_check_pair(a, b, 1e18)
 # --- test case 4 ---
 # the ends of the domain: sigma = 1e7 b, flux = 1e18 (zero cross sections), a period of
 # 1e12 s, an empty history (returns n0), an empty inventory (S = 0, all exact zeros), lam = 1e10, a combined
-# rate of exactly 1e10 per s, and 30 nuclides
+# rate of exactly 1e10 per s, and 30 nuclides (an empty history, and a chain of 29 successive captures)
 import numpy as np
 import mpmath as _t_mp
 
@@ -197,7 +206,7 @@ def _t_check(x, target, scale):
     x = np.asarray(x)
     assert x.shape == (len(target),), x.shape
     for a, b in zip(x, target):
-        if b > 0.0 and b >= 1e-250 * scale:
+        if b >= max(1e-250 * scale, 1e-300):
             assert _t_rel(a, b) < 1e-10, (a, b)
         else:
             assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)
@@ -266,11 +275,39 @@ _t_check(x, [np.exp(-1e-6), -np.expm1(-1e-6)], 1.0)
 n0 = np.linspace(1.0, 3.0, 30)
 _t_check(activation_inventory(np.full(30, 1e-3), np.diag(np.ones(29), -1), np.zeros(30), np.full(30, -1), n0, []), n0, n0.sum())
 
+def _t_capture_chain(lam, sigma, flux, n0_first, t_irr, t_cool, dps=600):
+    # nuclide i captures into i + 1 (rate c_i = sigma_i 1e-24 flux) and decays out of the network (lam_i):
+    # during the irradiation a linear chain with transfer rates c_i and removal rates r_i = lam_i + c_i,
+    # x_k = n0 prod_{i<k} c_i sum_{i<=k} exp(-r_i t) / prod_{l<=k, l!=i} (r_l - r_i) (distinct r_i); during
+    # the cooling every nuclide only decays
+    with _t_mp.workdps(dps):
+        c = [_t_mp.mpf(float(s)) * _t_mp.mpf("1e-24") * _t_mp.mpf(float(flux)) for s in sigma]
+        r = [_t_mp.mpf(float(l)) + ci for l, ci in zip(lam, c)]
+        T, Tc = _t_mp.mpf(float(t_irr)), _t_mp.mpf(float(t_cool))
+        out = []
+        for k in range(len(lam)):
+            tot = _t_mp.mpf(0)
+            for i in range(k + 1):
+                tot += _t_mp.exp(-r[i] * T) / _t_mp.fprod([r[l] - r[i] for l in range(k + 1) if l != i])
+            xk = _t_mp.mpf(float(n0_first)) * _t_mp.fprod(c[:k]) * tot
+            out.append(float(xk * _t_mp.exp(-_t_mp.mpf(float(lam[k])) * Tc)))
+        return out
+
+# 30 nuclides through an irradiation and a cooling: a stable target followed by 29 radioactive products, each
+# made by a capture on the previous one (up to 29 successive captures, amounts down to about 1e-73 of n0)
+lam = np.r_[0.0, np.geomspace(1e-6, 1e-3, 29)]
+sig = np.r_[np.geomspace(1e2, 1e4, 29), 0.0]
+cap = np.r_[np.arange(1, 30), -1]
+n0 = np.r_[1e20, np.zeros(29)]
+_t_check(activation_inventory(lam, np.zeros((30, 30)), sig, cap, n0, [(1e5, 1e15), (2e4, 0.0)]),
+         _t_capture_chain(lam, sig, 1e15, 1e20, 1e5, 2e4), 1e20)
+
 # --- test case 5 ---
 # a capture loop, capture onto itself or out of range, sigma above 1e7 b or positive below 1e-6 b, branching with a column
 # sum of 1.2 or a nonzero diagonal (even with an empty history), a malformed shape (scalar sigma, branching not n x n, n0 too long, capture_to too short), a history that is not a list or tuple (None, a set, a generator) or has a non-numeric entry,
 # a capture loop with positive cross sections (even with an empty history), sum(n0) above 1e100, lam above 1e10, 31 nuclides, a NaN cross section, a bad history entry,
-# an infinite or too long duration, a too large flux, or a too large combined rate raise ValueError
+# an infinite, negative or too long duration, a too large flux, a too large combined rate, or a negative decay constant,
+# cross section or initial amount raise ValueError
 import numpy as np
 _t_loop = np.zeros((2, 2))
 _t_loop[0, 1] = 1.0
@@ -301,7 +338,11 @@ for _t_bad in ((np.array([0.0, 1.0]), _t_loop, np.array([5.0, 0.0]), np.array([1
                (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.array([1e100, 1e99]), []),
                (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), {(1.0, 0.0), (2.0, 0.0)}),
                (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), ((1.0, 0.0) for _ in range(2))),
-               (np.array([0.0, 1.0]), np.zeros((2, 2)), np.array([5.0, 0.0]), np.array([1]), np.ones(2), [(1.0, 1e10)])):
+               (np.array([0.0, 1.0]), np.zeros((2, 2)), np.array([5.0, 0.0]), np.array([1]), np.ones(2), [(1.0, 1e10)]),
+               (np.array([-1e-3, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), [(1.0, 0.0)]),
+               (np.array([0.0, 1.0]), np.zeros((2, 2)), np.array([-5.0, 0.0]), np.array([1, -1]), np.ones(2), [(1.0, 1e10)]),
+               (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.array([1.0, -1.0]), [(1.0, 0.0)]),
+               (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), [(-1.0, 0.0)])):
     try:
         activation_inventory(*_t_bad)
     except ValueError:

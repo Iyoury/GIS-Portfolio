@@ -1,27 +1,43 @@
 # --- test case 0 ---
 import numpy as np
 
+# target: root, found with 40-digit arithmetic (mpmath), of Re((a - b)**2) for the two eigenvalues a, b of
+# largest modulus of the zero-momentum block of the transfer matrix in the field 1j * H (both leading
+# states are translation invariant), bracketed on a logarithmic grid and refined to 1e-32 relative
+# exact critical temperature: a lower pair of eigenvalues leaves the real axis before the leading pair meets
 H_edge = lee_yang_edge(6, 2.0 / np.log(1.0 + np.sqrt(2.0)))
 assert isinstance(H_edge, float)
-assert abs(H_edge / 0.029976092836555227 - 1.0) < 1e-8, H_edge
+assert abs(H_edge / 0.02997609283655467 - 1.0) < 1e-8, H_edge
 
 # --- test case 1 ---
 import numpy as np
 
+# target: root, found with 40-digit arithmetic (mpmath), of Re((a - b)**2) for the two eigenvalues a, b of
+# largest modulus of the zero-momentum block of the transfer matrix in the field 1j * H (both leading
+# states are translation invariant), bracketed on a logarithmic grid and refined to 1e-32 relative
+# above Tc, widest strip of the range
 H_edge = lee_yang_edge(8, 3.0)
 assert isinstance(H_edge, float)
-assert abs(H_edge / 0.17998354627962412 - 1.0) < 1e-8, H_edge
+assert abs(H_edge / 0.17998354627962332 - 1.0) < 1e-8, H_edge
 
 # --- test case 2 ---
 import numpy as np
 
+# target: root, found with 40-digit arithmetic (mpmath), of Re((a - b)**2) for the two eigenvalues a, b of
+# largest modulus of the zero-momentum block of the transfer matrix in the field 1j * H (both leading
+# states are translation invariant), bracketed on a logarithmic grid and refined to 1e-32 relative
+# below Tc the edge closes exponentially with the width
 H_edge = lee_yang_edge(7, 1.5)
 assert isinstance(H_edge, float)
-assert abs(H_edge / 0.00013216250013612187 - 1.0) < 1e-8, H_edge
+assert abs(H_edge / 0.00013216250013609133 - 1.0) < 1e-8, H_edge
 
 # --- test case 3 ---
 import numpy as np
 
+# target: root, found with 40-digit arithmetic (mpmath), of Re((a - b)**2) for the two eigenvalues a, b of
+# largest modulus of the zero-momentum block of the transfer matrix in the field 1j * H (both leading
+# states are translation invariant), bracketed on a logarithmic grid and refined to 1e-32 relative
+# high temperature
 H_edge = lee_yang_edge(4, 10.0)
 assert isinstance(H_edge, float)
 assert abs(H_edge / 5.939074347274278 - 1.0) < 1e-8, H_edge
@@ -29,17 +45,28 @@ assert abs(H_edge / 5.939074347274278 - 1.0) < 1e-8, H_edge
 # --- test case 4 ---
 import numpy as np
 
+# target: root, found with 40-digit arithmetic (mpmath), of Re((a - b)**2) for the two eigenvalues a, b of
+# largest modulus of the zero-momentum block of the transfer matrix in the field 1j * H (both leading
+# states are translation invariant), bracketed on a logarithmic grid and refined to 1e-32 relative
+# below Tc
 H_edge = lee_yang_edge(5, 2.0)
 assert isinstance(H_edge, float)
-assert abs(H_edge / 0.015847934855761598 - 1.0) < 1e-8, H_edge
+assert abs(H_edge / 0.015847934855761532 - 1.0) < 1e-8, H_edge
 
 # --- test case 5 ---
 import numpy as np
 
-# lower width endpoint L = 3, at both ends of the temperature range (cross-checked by the two solutions, 1e-13)
+# target: root, found with 40-digit arithmetic (mpmath), of Re((a - b)**2) for the two eigenvalues a, b of
+# largest modulus of the zero-momentum block of the transfer matrix in the field 1j * H (both leading
+# states are translation invariant), bracketed on a logarithmic grid and refined to 1e-32 relative
+# ends of the domain: L = 3 at both ends of the temperature range, and the smallest edge of the domain,
+# L = 8 at T = 1.5
 H_edge = lee_yang_edge(3, 1.5)
 assert isinstance(H_edge, float)
-assert abs(H_edge / 0.013280762164504314 - 1.0) < 1e-8, H_edge
+assert abs(H_edge / 0.013280762164504243 - 1.0) < 1e-8, H_edge
 H_edge = lee_yang_edge(3, 10.0)
 assert isinstance(H_edge, float)
-assert abs(H_edge / 6.125990933020653 - 1.0) < 1e-8, H_edge
+assert abs(H_edge / 6.12599093302067 - 1.0) < 1e-8, H_edge
+H_edge = lee_yang_edge(8, 1.5)
+assert isinstance(H_edge, float)
+assert abs(H_edge / 4.821088064950643e-05 - 1.0) < 1e-8, H_edge

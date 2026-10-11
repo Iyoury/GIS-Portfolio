@@ -1,7 +1,8 @@
 # Tests for step 5: layered_paleoclimate_perturbation (paleoclimate signal in a layered column).
 # Targets: the erfc half-space for a uniform column, the image series of Carslaw and Jaeger (1959, sec. 12.8)
 # for a layer over a half-space evaluated with math.erfc, and 90-digit mpmath values (transfer-matrix
-# transform, mpmath Talbot inversion) stored inline for two multilayer columns. Accuracy 1e-8 K per kelvin
+# transform, mpmath Talbot inversion) stored inline for two multilayer columns and for six depths of a 50-layer
+# column (forward transfer matrices, Talbot and Gaver-Stehfest inversion in mpmath). Accuracy 1e-8 K per kelvin
 # of the largest |dT|; comparisons between two computed outputs use twice that.
 
 # --- test case 0 ---
@@ -214,8 +215,14 @@ def _halfspace(z, kappa, t_years, dT):
     return tot
 
 # 1000 depths, 50 layers and 20 history intervals in one call. With one conductivity in every layer
-# the column is a half-space (erfc solution); with varying conductivities every depth agrees with a
-# single-depth call
+# the column is a half-space (erfc solution). With conductivities rising from 1.5 to 5 W/m/K, six depths
+# (z[j] for the keys j below, from 30 m to the bottom half-space) are compared with values computed
+# once in mpmath: forward transfer-matrix propagation of (F, k dF/dz) from the surface with the
+# working precision raised above the cancellation of the growing exponentials (270 to 390 digits),
+# fixed-Talbot inversion of degree 60 and 90 (identical to 30 digits) and Gaver-Stehfest inversion with
+# 60 terms (agreement 2e-16); every depth also agrees with a single-depth call
+_T_50 = {10: 0.068114570909863410906, 137: 0.0079265466347630448992, 300: -0.069516821647734808719,
+         500: -0.044596166873253997665, 700: -0.041732061948786446801, 999: -0.074038663511355877646}
 z = np.linspace(0.0, 3000.0, 1000)
 t_y, d = np.logspace(2.0, 5.5, 20), np.sin(np.arange(20.0))
 tops = np.linspace(0.0, 2450.0, 50)
@@ -226,6 +233,8 @@ assert np.max(np.abs(out - want)) < 1e-8 * np.max(np.abs(d))
 k = np.linspace(1.5, 5.0, 50)
 out = np.asarray(layered_paleoclimate_perturbation(z, tops, k, 2.4e6, t_y, d))
 assert out.shape == (1000,) and np.all(np.isfinite(out))
+for j, v in _T_50.items():
+    assert abs(out[j] - v) < 1e-8 * np.max(np.abs(d)), (j, out[j], v)
 for j in (0, 137, 500, 999):
     one = layered_paleoclimate_perturbation(float(z[j]), tops, k, 2.4e6, t_y, d)
     assert abs(out[j] - one) < 2e-8 * np.max(np.abs(d)), (j, out[j], one)

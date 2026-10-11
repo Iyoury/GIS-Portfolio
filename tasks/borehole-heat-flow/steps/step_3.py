@@ -14,7 +14,8 @@ def paleoclimate_perturbation(z, t_years, dT, kappa):
     surface temperature by dT[i] (K). Before t_years[-1] the surface stayed
     at the reference temperature long enough for the ground to be in steady
     state. The subsurface is a homogeneous conductive half-space with thermal
-    diffusivity kappa. Times in years are converted with SECONDS_PER_YEAR.
+    diffusivity kappa. Times in years are converted with 1 year = 365.25 x
+    86400 s.
 
     Parameters
     ----------

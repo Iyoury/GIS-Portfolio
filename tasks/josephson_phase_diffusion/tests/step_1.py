@@ -53,11 +53,11 @@ def _t_rel(x, y):
     return abs(x - y) / abs(y)
 
 for _t_i, _t_th in ((0.5, 0.2), (0.9, 0.1), (1.0, 0.05), (1.3, 0.3), (2.5, 1.0), (0.2, 3.0)):
-    out = mean_voltage(_t_i, _t_th)
-    assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(x, float) for x in out), out
+    _t_out = mean_voltage(_t_i, _t_th)
+    assert isinstance(_t_out, tuple) and len(_t_out) == 2 and all(isinstance(x, float) for x in _t_out), _t_out
     _t_v, _t_dv = _t_cf(_t_i, _t_th, want_D=False)
-    assert _t_rel(out[0], _t_v) < 1e-9, (_t_i, _t_th, out, _t_v)
-    assert _t_rel(out[1], _t_dv) < 1e-8, (_t_i, _t_th, out, _t_dv)
+    assert _t_rel(_t_out[0], _t_v) < 1e-9, (_t_i, _t_th, _t_out, _t_v)
+    assert _t_rel(_t_out[1], _t_dv) < 1e-8, (_t_i, _t_th, _t_out, _t_dv)
 
 # --- test case 1 ---
 # low noise below the critical current, exponentially small voltage
@@ -114,12 +114,12 @@ def _t_rel(x, y):
 
 # (thermally activated phase slips; the forward and backward slips nearly cancel at small i)
 for _t_i, _t_th in ((0.3, 0.03), (0.05, 0.05), (0.6, 0.02), (0.95, 0.025)):
-    out = mean_voltage(_t_i, _t_th)
+    _t_out = mean_voltage(_t_i, _t_th)
     _t_vb = _t_v_bessel(_t_i, _t_th)
     _t_v, _t_dv = _t_cf(_t_i, _t_th, want_D=False)
     assert _t_rel(_t_vb, _t_v) < 1e-12
-    assert _t_rel(out[0], _t_vb) < 1e-9, (_t_i, _t_th, out, _t_vb)
-    assert _t_rel(out[1], _t_dv) < 1e-8, (_t_i, _t_th, out, _t_dv)
+    assert _t_rel(_t_out[0], _t_vb) < 1e-9, (_t_i, _t_th, _t_out, _t_vb)
+    assert _t_rel(_t_out[1], _t_dv) < 1e-8, (_t_i, _t_th, _t_out, _t_dv)
 
 # --- test case 2 ---
 # equilibrium (i = 0): no voltage (|v| <= 1e-12), linear-response resistance 1 / I_0(1/theta)**2
@@ -130,10 +130,10 @@ def _t_rel(x, y):
     return abs(x - y) / abs(y)
 
 for _t_th in (0.02, 0.1, 1.0, 40.0):
-    out = mean_voltage(0.0, _t_th)
-    assert abs(out[0]) <= 1e-12, out
+    _t_out = mean_voltage(0.0, _t_th)
+    assert abs(_t_out[0]) <= 1e-12, _t_out
     _t_lin = 1.0 / float(_t_mp.besseli(0, 1.0 / _t_th)) ** 2
-    assert _t_rel(out[1], _t_lin) < 1e-8, (_t_th, out, _t_lin)
+    assert _t_rel(_t_out[1], _t_lin) < 1e-8, (_t_th, _t_out, _t_lin)
 
 # --- test case 3 ---
 # reversed bias, strong bias and very strong noise; noiseless and ohmic bounds
@@ -179,11 +179,11 @@ def _t_rel(x, y):
     return abs(x - y) / abs(y)
 
 for _t_i, _t_th in ((-0.7, 0.15), (-4.0, 0.05), (10.0, 0.02), (7.5, 50.0), (-1.0, 0.02), (-10.0, 0.5)):
-    out = mean_voltage(_t_i, _t_th)
+    _t_out = mean_voltage(_t_i, _t_th)
     _t_v, _t_dv = _t_cf(_t_i, _t_th, want_D=False)
-    assert _t_rel(out[0], _t_v) < 1e-9, (_t_i, _t_th, out, _t_v)
-    assert _t_rel(out[1], _t_dv) < 1e-8, (_t_i, _t_th, out, _t_dv)
-    assert np.sqrt(max(_t_i ** 2 - 1.0, 0.0)) < abs(out[0]) < abs(_t_i)
+    assert _t_rel(_t_out[0], _t_v) < 1e-9, (_t_i, _t_th, _t_out, _t_v)
+    assert _t_rel(_t_out[1], _t_dv) < 1e-8, (_t_i, _t_th, _t_out, _t_dv)
+    assert np.sqrt(max(_t_i ** 2 - 1.0, 0.0)) < abs(_t_out[0]) < abs(_t_i)
 _t_p, _t_m = mean_voltage(0.8, 0.07), mean_voltage(-0.8, 0.07)
 # two computed outputs: twice the single-output tolerances (relative 1e-9 for v, 1e-8 for r_d)
 assert _t_rel(-_t_m[0], _t_p[0]) < 2e-9 and _t_rel(_t_m[1], _t_p[1]) < 2e-8, (_t_p, _t_m)
@@ -191,7 +191,7 @@ assert _t_rel(-_t_m[0], _t_p[0]) < 2e-9 and _t_rel(_t_m[1], _t_p[1]) < 2e-8, (_t
 # --- test case 4 ---
 # non-finite input, |i| > 10 or theta outside [0.02, 50] raises ValueError
 import numpy as np
-for _t_bad in ((float("nan"), 0.1), (0.5, float("inf")), (10.5, 0.1), (-11.0, 1.0), (0.5, 0.019), (0.5, 51.0), (0.5, 0.0), (0.5, -1.0)):
+for _t_bad in ((float("nan"), 0.1), (0.5, float("nan")), (0.5, float("inf")), (10.5, 0.1), (-11.0, 1.0), (0.5, 0.019), (0.5, 51.0), (0.5, 0.0), (0.5, -1.0)):
     try:
         mean_voltage(*_t_bad)
     except ValueError:

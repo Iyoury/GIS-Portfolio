@@ -10,7 +10,7 @@ def fastest_mode(N, s, u, v):
     Inputs:
       N: int, population size, 1 <= N <= 400.
       s: float, selection coefficient of A, -0.5 <= s <= 0.5.
-      u, v: float, mutation probabilities A -> a and a -> A per generation, 0 <= u, v <= 0.1
+      u, v: float, mutation probabilities A -> a and a -> A per generation, each either 0 or in [1e-12, 0.1]
             (v = 0 makes i = 0 absorbing, u = 0 makes i = N absorbing).
 
     Output:
@@ -23,7 +23,8 @@ def fastest_mode(N, s, u, v):
 
     Raises:
       ValueError if N is not an integer in [1, 400] (bool and float are not accepted), if s, u or v
-      is not finite or is outside its range, or if N = 1 and u = v = 0.
+      is not finite or is outside its range (0 < u < 1e-12 and 0 < v < 1e-12 included), or if N = 1
+      and u = v = 0.
     '''
     if isinstance(N, (bool, np.bool_)) or not isinstance(N, (int, np.integer)):
         raise ValueError("N must be an integer")
@@ -35,6 +36,8 @@ def fastest_mode(N, s, u, v):
         raise ValueError("s, u and v must be finite")
     if not (-0.5 <= s <= 0.5 and 0.0 <= u <= 0.1 and 0.0 <= v <= 0.1):
         raise ValueError("need -0.5 <= s <= 0.5 and 0 <= u, v <= 0.1")
+    if 0.0 < u < 1e-12 or 0.0 < v < 1e-12:
+        raise ValueError("a positive mutation rate must be at least 1e-12")
     if N == 1 and u == 0.0 and v == 0.0:
         raise ValueError("with N = 1 and u = v = 0 both states are absorbing")
     # Perron pair of |P^-1| with the inverse taken numerically from the double-precision matrix
@@ -45,6 +48,8 @@ def fastest_mode(N, s, u, v):
     lam_min = float(1.0 / ev[j].real)
     mode = np.abs(W[:, j].real) * np.where(np.arange(N + 1) % 2 == 0, 1.0, -1.0)
     mode = mode / np.max(np.abs(mode))
-    first = mode[np.nonzero(mode)[0][0]]
-    mode = mode / np.sign(first)
+    # stated normalisation: the first entry that is not on an absorbing state is positive
+    i0 = 0 if v > 0.0 else 1
+    if mode[i0] < 0:
+        mode = -mode
     return lam_min, mode

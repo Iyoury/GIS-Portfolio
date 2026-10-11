@@ -47,7 +47,10 @@ def surface_heat_flow(survey_md, survey_inc, survey_azi, log_md, log_temp,
     rms_residual below 1e-6 K; for noisy temperatures, T0, q0 and g within
     5e-4 K, 2e-6 W m^-2 and 2e-3 K of the exact least-squares solution, the
     three standard errors within 2 % and rms_residual within 1 % (relative);
-    n_used exact.
+    n_used exact. The noise-free limits presume P accurate to 1e-8 K per
+    kelvin of the largest |hist_dT_shape| or better (an error at the 1e-6 K
+    per K limit of step 3 can move q0 by a few 1e-7 W m^-2); the accuracies
+    of steps 1, 2 and 4 propagate within these limits.
 
     Raises
     ------

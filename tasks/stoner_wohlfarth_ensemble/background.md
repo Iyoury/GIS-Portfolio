@@ -61,5 +61,5 @@ barriers; Brown's asymptote (2 / sqrt(pi)) sigma^1.5 exp(-sigma) (h = 0) holds o
 sigma. The integral relaxation time tau_int of the magnetization weights every mode by its
 contribution; in a strong field the shallow well is almost empty, the slow mode barely shows in
 <z(t) z(0)>, and tau_int falls orders of magnitude below 1 / lam1 (Coffey, Kalmykov, Garanin).
-Accurate numbers need care: lam1 can be 1e-24 next to eigenvalues of order 100, and the two
-wells can differ in Boltzmann weight by 1e-94.
+Accurate numbers need care: lam1 can be as small as about 4.5e-24 next to eigenvalues of order 100,
+and the two wells can differ in Boltzmann weight by a factor down to about 1e-94.

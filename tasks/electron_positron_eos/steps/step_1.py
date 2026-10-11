@@ -1,7 +1,6 @@
 import numpy as np
 import math
-import warnings
-from scipy.integrate import quad, IntegrationWarning
+from scipy.integrate import quad
 from scipy.optimize import brentq
 
 

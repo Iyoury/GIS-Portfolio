@@ -2,117 +2,127 @@ import numpy as np
 import mpmath as mp
 from scipy.optimize import brentq
 
-# Second solution: instead of the Stratonovich / Reimann double integrals, solve the
-# stationary Fokker-Planck equation and the homogenization cell problem directly in a
-# Fourier (Galerkin) basis, with tridiagonal (Thomas) eliminations carried out in
-# extended precision so that exponentially small currents keep their relative accuracy.
-# The effective diffusion is the average of theta (1 + chi')**2 p, chi the corrector.
+# Second solution. It uses neither the Stratonovich / Reimann quadrature of the reference nor the
+# Fourier continued fractions of the test targets. The Boltzmann factors of the tilted washboard are
+# expanded with the Jacobi-Anger identity exp(z cos x) = sum_m I_m(z) exp(i m x), z = 1 / theta, so
+# that every integral over the shift y is done in closed form,
+#   int_0^{2 pi} exp(-(b + i m) y) dy = (1 - exp(-2 pi b)) / (b + i m),   b = |i| / theta.
+# This gives (Ambegaokar-Halperin voltage as a Bessel series)
+#   v = a / Phi,  Phi = I_0(z)**2 + 2 sum_{n>=1} (-1)**n I_n(z)**2 b**2 / (b**2 + n**2),  a = |i|,
+# and the Reimann diffusion coefficient D = theta <I_+**2 I_-> / <I_+>**3 as an average of Fourier
+# series: with q = 1 - exp(-2 pi b), I_+(x) = q / (theta b) exp(-z cos x) Gp(x) and
+# I_-(x) = q / (theta b) exp(z cos x) Gm(x), where
+#   Gp(x) = sum_m I_m b / (b + i m) e^{imx},  Gm(x) = sum_m (-1)**m I_m b / (b - i m) e^{imx},
+# so that, with W(x) = exp(-z cos x) = sum_m (-1)**m I_m e^{imx} and <W Gp> = Phi,
+#   D = theta <W Gp**2 Gm> / Phi**3   (Lifson-Jackson theta / I_0**2 at b = 0).
+# The series alternate and cancel by up to about 0.87 / theta digits, so they are summed in mpmath
+# with 30 + 1.8 / theta digits; the Fourier products are formed with exact integer (fixed-point)
+# convolutions. Derivatives in i and theta are taken analytically from the series
+# (dI_n/dz = (I_{n-1} + I_{n+1}) / 2). Step 6 (Kramers equation) is described at _b_kramers.
 
 
-def _g_size(theta):
-    # working digits: the cancellation in v = i + Im(...) costs about 0.87 / theta digits
+def _b_table(theta):
+    # working digits and I_m(1/theta) for m = 0..M+1, with I_M below 10**-(dps+5) I_0
     dps = 30 + int(1.8 / theta)
-    n = 40 + int(1.3 * np.sqrt(2.0 * dps * 2.303 / theta))
-    return dps, n
+    with mp.workdps(dps + 10):
+        z = 1 / mp.mpf(theta)
+        I = [mp.besseli(0, z)]
+        tol = I[0] * mp.mpf(10) ** (-dps - 5)
+        m = 1
+        while True:
+            I.append(mp.besseli(m, z))
+            if m > 2 and I[-1] < tol:
+                break
+            m += 1
+        I.append(mp.besseli(m + 1, z))
+    return dps, I
 
 
-def _g_thomas(sub, diag, sup, rhs):
-    # tridiagonal solve (lists of mp numbers), sub[0] and sup[-1] unused
-    n = len(diag)
-    cp, dp = [None] * n, [None] * n
-    cp[0] = sup[0] / diag[0]
-    dp[0] = rhs[0] / diag[0]
-    for k in range(1, n):
-        den = diag[k] - sub[k] * cp[k - 1]
-        cp[k] = sup[k] / den if k < n - 1 else 0
-        dp[k] = (rhs[k] - sub[k] * dp[k - 1]) / den
-    x = [None] * n
-    x[-1] = dp[-1]
-    for k in range(n - 2, -1, -1):
-        x[k] = dp[k] - cp[k] * x[k + 1]
-    return x
-
-
-def _g_density(a, th, N):
-    # Galerkin: (fP)_n = a c_n - (c_{n-1} - c_{n+1}) / (2 j); stationarity for n = 1..N:
-    # -c_{n-1} + (2 th n + 2 j a) c_n + c_{n+1} = 0 with c_0 = 1 / (2 pi), c_{N+1} = 0
-    J = mp.mpc(0, 1)
-    c0 = 1 / (2 * mp.pi)
-    sub = [mp.mpf(-1)] * N
-    sup = [mp.mpf(1)] * N
-    diag = [2 * th * n + 2 * J * a for n in range(1, N + 1)]
-    rhs = [mp.mpc(0)] * N
-    rhs[0] = c0
-    c = _g_thomas(sub, diag, sup, rhs)
-    # derivative in a: same matrix, right-hand side -(dA/da) c = -2 j c
-    dc = _g_thomas(sub, diag, sup, [-2 * J * ck for ck in c])
-    return c0, c, dc
-
-
-def _g_velocity(i, theta):
-    dps, N = _g_size(theta)
+def _b_phi(a, theta, tab):
+    # Phi, dPhi/da and z dPhi/dz (z = 1/theta, total derivative at fixed a); v = a / Phi
+    dps, I = tab
+    M = len(I) - 2
     with mp.workdps(dps):
-        a, th = mp.mpf(abs(i)), mp.mpf(theta)
-        c0, c, dc = _g_density(a, th, N)
-        # current J = a c_0 + 2 Im(c_1) ... v = 2 pi J
-        v = 2 * mp.pi * (a * c0 + mp.im(c[0]))
-        dv = 2 * mp.pi * (c0 + mp.im(dc[0]))
-        return float(v if i >= 0 else -v), float(dv)
+        z = 1 / mp.mpf(theta)
+        b = mp.mpf(a) * z
+        s = sb = sz = mp.mpf(0)
+        for n in range(1, M + 1):
+            sg = -1 if n % 2 else 1
+            den = b * b + n * n
+            In2 = I[n] ** 2
+            s += sg * In2 / den
+            sb += sg * In2 * n * n / den ** 2
+            sz += sg * I[n] * (I[n - 1] + I[n + 1]) / den
+        Phi = I[0] ** 2 + 2 * b * b * s
+        dPhi_db = 4 * b * sb
+        dPhi_dz = 2 * I[0] * I[1] + 2 * b * b * sz + mp.mpf(a) * dPhi_db
+        return Phi, z * dPhi_db, z * dPhi_dz
 
 
-def _g_dlogv_dlogtheta(i, theta):
-    # differentiate the Galerkin system in theta: A dc/dtheta = -(dA/dtheta) c, dA/dtheta = diag(2 n)
-    dps, N = _g_size(theta)
-    dps += 20
-    with mp.workdps(dps):
-        a, th = mp.mpf(i), mp.mpf(theta)
-        c0, c, _ = _g_density(a, th, N)
-        diag = [2 * th * n + 2 * mp.mpc(0, 1) * a for n in range(1, N + 1)]
-        dc = _g_thomas([mp.mpf(-1)] * N, diag, [mp.mpf(1)] * N, [-2 * n * c[n - 1] for n in range(1, N + 1)])
-        v = 2 * mp.pi * (a * c0 + mp.im(c[0]))
-        dv = 2 * mp.pi * mp.im(dc[0])
-        return float(th * dv / v)
+def _b_velocity(i, theta, tab):
+    a = abs(float(i))
+    Phi, dPa, _ = _b_phi(a, theta, tab)
+    with mp.workdps(tab[0]):
+        v = a / Phi
+        dv = (Phi - a * dPa) / Phi ** 2
+    return float(v if i >= 0 else -v), float(dv)
 
 
-def _g_diffusion(i, theta):
-    dps, N = _g_size(theta)
-    with mp.workdps(dps):
-        a, th = mp.mpf(abs(i)), mp.mpf(theta)
+def _b_fixed(seq, bits):
+    # complex mp sequence -> (real ints, imaginary ints), fixed point with 'bits' fraction bits
+    sc = mp.mpf(2) ** bits
+    re = np.array([int(mp.nint(mp.re(x) * sc)) for x in seq], dtype=object)
+    im = np.array([int(mp.nint(mp.im(x) * sc)) for x in seq], dtype=object)
+    return re, im
+
+
+def _b_conv(A, B):
+    # exact complex convolution of integer sequences
+    ar, ai = A
+    br, bi = B
+    return (np.convolve(ar, br) - np.convolve(ai, bi), np.convolve(ar, bi) + np.convolve(ai, br))
+
+
+def _b_mean_product(P, R):
+    # mean over x of the product of two real periodic functions from their Fourier coefficients
+    # (indexed -K..K): <p r> = Re sum_k P_k R_{-k}
+    return int(np.sum(P[0] * R[0][::-1]) - np.sum(P[1] * R[1][::-1]))
+
+
+def _b_diffusion(i, theta, tab, deriv=False):
+    # D = theta <W Gp**2 Gm> / Phi**3, and optionally d ln D / da
+    dps, I = tab
+    M = len(I) - 2
+    a = abs(float(i))
+    bits = int(3.33 * dps) + 30
+    with mp.workdps(dps + 10):
+        z = 1 / mp.mpf(theta)
+        b = mp.mpf(a) * z
         J = mp.mpc(0, 1)
-        c0, c, _ = _g_density(a, th, N)
-        # cell problem (a - sin x) chi' + th chi'' = v - (a - sin x) for g_n = (chi')_n,
-        # n = 1..N: -g_{n-1} + (2 j a - 2 th n) g_n + g_{n+1} = delta_{n1}, g_0 = 0
-        g = _g_thomas([mp.mpf(-1)] * N, [2 * J * a - 2 * th * n for n in range(1, N + 1)],
-                      [mp.mpf(1)] * N, [mp.mpc(1)] + [mp.mpc(0)] * (N - 1))
-        # average of (1 + chi')**2 p over one period from the Fourier coefficients:
-        # int h**2 p dx = 2 pi sum_m (h*h)_m conj(c_m), h = 1 + chi', p real
-        h = np.array([mp.conj(x) for x in g[::-1]] + [mp.mpc(1)] + g, dtype=object)
-        cc = np.array([mp.conj(x) for x in c[::-1]] + [c0] + c, dtype=object)
-        hh = np.convolve(h, h)[N:3 * N + 1]
-        tot = mp.re(mp.fsum(hh * np.array([mp.conj(x) for x in cc], dtype=object)))
-        return float(th * 2 * mp.pi * tot)
+        Ih = [x / I[0] for x in I[:M + 1]]           # I_m / I_0, so all coefficients are <= 1
+        ms = range(-M, M + 1)
+        sg = [-1 if m % 2 else 1 for m in ms]
+        w = [s * Ih[abs(m)] for s, m in zip(sg, ms)]
+        gp = [Ih[abs(m)] * (b / (b + J * m) if m else 1) for m in ms]
+        gm = [s * Ih[abs(m)] * (b / (b - J * m) if m else 1) for s, m in zip(sg, ms)]
+        W, Gp, Gm = (_b_fixed(x, bits) for x in (w, gp, gm))
+        P = _b_conv((W[0], W[0] * 0), Gp)              # coefficients of W Gp
+        R = _b_conv(Gp, Gm)                             # coefficients of Gp Gm
+        T = mp.mpf(_b_mean_product(P, R)) / mp.mpf(2) ** (4 * bits) * I[0] ** 4   # <W Gp**2 Gm>
+        Phi, dPa, _ = _b_phi(a, theta, tab)
+        D = mp.mpf(theta) * T / Phi ** 3
+        if not deriv:
+            return float(D)
+        # d/db of the coefficients: b / (b + i m) -> i m / (b + i m)**2
+        dgp = [Ih[abs(m)] * (J * m / (b + J * m) ** 2 if m else 0) for m in ms]
+        dgm = [s * Ih[abs(m)] * (-J * m / (b - J * m) ** 2 if m else 0) for s, m in zip(sg, ms)]
+        dGp, dGm = _b_fixed(dgp, bits), _b_fixed(dgm, bits)
+        R1, R2 = _b_conv(dGp, Gm), _b_conv(Gp, dGm)
+        dT = mp.mpf(_b_mean_product(P, (2 * R1[0] + R2[0], 2 * R1[1] + R2[1]))) / mp.mpf(2) ** (4 * bits) * I[0] ** 4
+        return float(D), float(z * dT / T - 3 * dPa / Phi)
 
 
-def _g_diffusion_fast(i, theta):
-    # double-precision version of the same Galerkin solve (dense complex systems); used only
-    # to locate the region of the diffusion peak, where D_eff is of order theta
-    N = 40 + int(1.3 * np.sqrt(2.0 * 32 * 2.303 / theta))
-    n = np.arange(1, N + 1)
-    A = np.diag(2 * theta * n + 2j * i) + np.diag(np.ones(N - 1), 1) - np.diag(np.ones(N - 1), -1)
-    rhs = np.zeros(N, complex)
-    rhs[0] = 1 / (2 * np.pi)
-    c = np.linalg.solve(A, rhs)
-    B = np.diag(2j * i - 2 * theta * n) + np.diag(np.ones(N - 1), 1) - np.diag(np.ones(N - 1), -1)
-    e1 = np.zeros(N, complex)
-    e1[0] = 1.0
-    g = np.linalg.solve(B, e1)
-    h = np.concatenate([np.conj(g[::-1]), [1.0], g])
-    cc = np.concatenate([np.conj(c[::-1]), [1 / (2 * np.pi)], c])
-    hh = np.convolve(h, h)[N:3 * N + 1]
-    return float(theta * 2 * np.pi * np.real(np.sum(hh * np.conj(cc))))
-
-
-def _g_check(i, theta):
+def _b_check(i, theta):
     i = float(i)
     theta = float(theta)
     if not (np.isfinite(i) and np.isfinite(theta)):
@@ -124,17 +134,15 @@ def _g_check(i, theta):
 
 def mean_voltage(i, theta):
     '''Stationary dc voltage and differential resistance of a noisy overdamped junction.'''
-    i, theta = _g_check(i, theta)
-    if i == 0.0:
-        return 0.0, _g_velocity(0.0, theta)[1]
-    result = _g_velocity(i, theta)
+    i, theta = _b_check(i, theta)
+    result = _b_velocity(i, theta, _b_table(theta))
     return result
 
 
 def effective_diffusion(i, theta):
     '''Effective diffusion coefficient of the junction phase.'''
-    i, theta = _g_check(i, theta)
-    D = _g_diffusion(i, theta)
+    i, theta = _b_check(i, theta)
+    D = _b_diffusion(i, theta, _b_table(theta))
     return D
 
 
@@ -143,25 +151,35 @@ def diffusion_peak(theta):
     theta = float(theta)
     if not (np.isfinite(theta) and 0.02 <= theta <= 1.0):
         raise ValueError("theta must be in [0.02, 1]")
-    # coarse scan, then secant iterations on dD/di from high-precision central differences
-    grid = np.linspace(0.55, 2.95, 241)
-    vals = [_g_diffusion_fast(x, theta) for x in grid]
-    k = int(np.argmax(vals))
-    h = 1e-5
+    tab = _b_table(theta)
 
-    def slope(x):
-        return (_g_diffusion(x + h, theta) - _g_diffusion(x - h, theta)) / (2 * h)
+    def slope(a):
+        return _b_diffusion(a, theta, tab, deriv=True)[1]
 
-    x0, x1 = grid[k] - 0.005, grid[k] + 0.005
-    f0, f1 = slope(x0), slope(x1)
-    for _ in range(40):
-        x2 = x1 - f1 * (x1 - x0) / (f1 - f0)
-        if abs(x2 - x1) < 1e-11:
-            x1 = x2
+    # scan d ln D / di on a coarse grid for the sign change + -> -, then Illinois regula falsi
+    grid = np.linspace(0.5, 3.0, 11)
+    vals = [slope(a) for a in grid]
+    k = next(j for j in range(10) if vals[j] > 0.0 >= vals[j + 1])
+    lo, hi, flo, fhi = grid[k], grid[k + 1], vals[k], vals[k + 1]
+    side = 0
+    x = lo
+    for _ in range(200):
+        x = (lo * fhi - hi * flo) / (fhi - flo)
+        fx = slope(x)
+        if fx == 0.0 or hi - lo < 1e-13:
             break
-        x0, f0, x1, f1 = x1, f1, x2, slope(x2)
-    i_peak = float(x1)
-    result = (i_peak, float(_g_diffusion(i_peak, theta) / theta))
+        if fx > 0.0:
+            lo, flo = x, fx
+            if side == 1:
+                fhi *= 0.5
+            side = 1
+        else:
+            hi, fhi = x, fx
+            if side == -1:
+                flo *= 0.5
+            side = -1
+    i_peak = float(x)
+    result = (i_peak, float(_b_diffusion(i_peak, theta, tab) / theta))
     return result
 
 
@@ -175,39 +193,45 @@ def noise_temperature(i, v):
         raise ValueError("i must be in (0, 10]")
     if not (np.sqrt(max(i * i - 1.0, 0.0)) < v < i):
         raise ValueError("v must lie strictly between the noiseless and the ohmic voltage")
-    # Illinois regula falsi on ln(v(theta) / v) in the variable 1 / theta
-    def f(u):
-        return np.log(_g_velocity(i, 1.0 / u)[0] / v)
-
-    lo, hi = 1.0 / 50.0, 1.0 / 0.02          # u = 1 / theta; v decreases with u
-    f_lo, f_hi = f(lo), f(hi)
-    v50, v002 = _g_velocity(i, 50.0)[0], _g_velocity(i, 0.02)[0]
-    # endpoint tolerance: relative 1e-11 of the voltage at the endpoint
-    if (v - v50) / v50 > 1e-11 or (v002 - v) / v002 > 1e-11:
+    # stated endpoint rule, relative to the voltages of mean_voltage at theta = 0.02 and 50
+    v_lo, v_hi = mean_voltage(i, 0.02)[0], mean_voltage(i, 50.0)[0]
+    if (v_lo - v) / v_lo > 1e-11 or (v - v_hi) / v_hi > 1e-11:
         raise ValueError("no theta in [0.02, 50] reproduces this voltage")
-    if v >= v50:
-        u = lo
-    elif v <= v002:
-        u = hi
+
+    def kappa_at(theta):
+        Phi, _, zdPz = _b_phi(i, theta, _b_table(theta))
+        return float(Phi / zdPz)               # d ln theta / d ln v = Phi / (z dPhi/dz)
+
+    if v <= v_lo:
+        theta = 0.02
+    elif v >= v_hi:
+        theta = 50.0
     else:
+        # Illinois regula falsi on ln(v(theta) / v) in u = 1 / theta (v decreases with u)
+        def f(u):
+            return np.log(_b_velocity(i, 1.0 / u, _b_table(1.0 / u))[0] / v)
+
+        lo, hi = 1.0 / 50.0, 1.0 / 0.02
+        flo, fhi = np.log(v_hi / v), np.log(v_lo / v)
         side = 0
+        u = lo
         for _ in range(300):
-            u = (lo * f_hi - hi * f_lo) / (f_hi - f_lo)
+            u = (lo * fhi - hi * flo) / (fhi - flo)
             fu = f(u)
             if fu == 0.0 or hi - lo < 1e-14 * u:
                 break
             if fu > 0.0:
-                lo, f_lo = u, fu
+                lo, flo = u, fu
                 if side == 1:
-                    f_hi *= 0.5
+                    fhi *= 0.5
                 side = 1
             else:
-                hi, f_hi = u, fu
+                hi, fhi = u, fu
                 if side == -1:
-                    f_lo *= 0.5
+                    flo *= 0.5
                 side = -1
-    theta = float(1.0 / u)
-    result = (theta, 1.0 / _g_dlogv_dlogtheta(i, theta))
+        theta = float(1.0 / u)
+    result = (theta, kappa_at(theta))
     return result
 
 
@@ -230,11 +254,12 @@ def array_criterion(ics, rs, theta0, v_crit):
     v_crit = float(v_crit)
     if not (np.isfinite(v_crit) and 0.0 < v_crit <= 0.5 * float(np.sum(c * r))):
         raise ValueError("v_crit must be in (0, 0.5 sum(c_k r_k)]")
+    tabs = [_b_table(t) for t in th]
 
     def V(j):
         tot, dtot = 0.0, 0.0
-        for ck, rk, tk in zip(c, r, th):
-            v, dv = _g_velocity(j / ck, tk)
+        for ck, rk, tk, tb in zip(c, r, th, tabs):
+            v, dv = _b_velocity(j / ck, tk, tb)
             tot += ck * rk * v
             dtot += rk * dv
         return tot, dtot
@@ -258,16 +283,52 @@ def array_criterion(ics, rs, theta0, v_crit):
         j = jn
     j_star = float(j)
     r_diff = float(V(j_star)[1])
-    s_v = float(sum(2.0 * ck * rk * _g_diffusion(j_star / ck, tk) for ck, rk, tk in zip(c, r, th)))
+    s_v = float(sum(2.0 * ck * rk * _b_diffusion(j_star / ck, tk, tb)
+                    for ck, rk, tk, tb in zip(c, r, th, tabs)))
     result = (j_star, r_diff, s_v)
     return result
 
 
+def _b_kramers(i, theta, beta_c, v0, N=130, P=64):
+    # Kramers equation in Hermite functions of the velocity centred at v0 and a REAL Fourier basis
+    # (1, cos p x, sin p x) of the phase, so that every matrix is real for real i. The matrix
+    # continued fraction is then evaluated at the complex bias i + 1j * eps (complex-step
+    # differentiation): Re gives v, Im / eps gives dv/di to rounding accuracy, with no
+    # finite-difference error. The centre v0 is held fixed (the converged v does not depend on it).
+    vth = np.sqrt(theta / beta_c)
+    gam = 1.0 / beta_c
+    K = 2 * P + 1
+    Dx = np.zeros((K, K))
+    Sx = np.zeros((K, K))
+    Sx[P + 1, 0] = 1.0                                   # sin x * 1
+    for p in range(1, P + 1):
+        Dx[p, P + p] = p                                 # (sin p x)' = p cos p x
+        Dx[P + p, p] = -p                                # (cos p x)' = -p sin p x
+        if p + 1 <= P:                                   # sin x cos p x = [sin(p+1)x - sin(p-1)x] / 2
+            Sx[P + p + 1, p] += 0.5
+            Sx[p + 1, P + p] -= 0.5                      # sin x sin p x = [cos(p-1)x - cos(p+1)x] / 2
+        if p - 1 >= 1:
+            Sx[P + p - 1, p] -= 0.5
+        Sx[p - 1, P + p] += 0.5
+    eps = 1e-20
+    ic = complex(i, eps)
+    Dm = vth * Dx
+    F = ((ic - v0) / beta_c) * np.eye(K) - Sx / beta_c
+    Dh = Dm - F / vth
+    V0 = v0 * Dx
+    S = np.zeros((K, K), complex)
+    for n in range(N, 0, -1):
+        S = -np.linalg.solve(gam * n * np.eye(K) + V0 + np.sqrt(n + 1) * Dm @ S, np.sqrt(n) * Dh)
+    Q = V0 + Dm @ S                                      # its constant-mode row is zero
+    c0 = np.zeros(K, complex)
+    c0[0] = 1.0
+    c0[1:] = np.linalg.solve(Q[1:, 1:], -Q[1:, 0])
+    w = v0 + vth * (S @ c0)[0]
+    return float(w.real), float(w.imag / eps)
+
+
 def rcsj_voltage(i, theta, beta_c):
     '''Stationary dc voltage and differential resistance of a noisy junction with capacitance (RCSJ).'''
-    # Other route: the Kramers equation in Hermite functions centred at the overdamped mean
-    # velocity (shifted basis, so the truncated system differs from an expansion about v = 0),
-    # solved by a matrix continued fraction; dv/di from a central difference.
     i = float(i)
     theta = float(theta)
     beta_c = float(beta_c)
@@ -277,33 +338,10 @@ def rcsj_voltage(i, theta, beta_c):
         raise ValueError("need |i| <= 2.5, 0.1 <= theta <= 2 and beta_c = 0 or 0.1 <= beta_c <= 2")
     if beta_c == 0.0:
         return mean_voltage(i, theta)
-    vth = np.sqrt(theta / beta_c)
-    gam = 1.0 / beta_c
-    P, N = 64, 130
-    ps = np.arange(-P, P + 1)
-    M = ps.size
-
-    def velocity(x):
-        if x == 0.0:
-            return 0.0
-        v0 = _g_velocity(x, theta)[0]          # overdamped mean velocity as the centre
-        D = np.diag(vth * 1j * ps)
-        Fm = np.diag(np.full(M, (x - v0) / beta_c, dtype=complex))
-        Fm += np.diag(np.full(M - 1, -1.0 / (2j * beta_c)), -1) + np.diag(np.full(M - 1, 1.0 / (2j * beta_c)), 1)
-        Dh = D - Fm / vth
-        V0 = np.diag(v0 * 1j * ps)
-        S = np.zeros((M, M), complex)
-        for n in range(N, 0, -1):
-            S = -np.linalg.solve(gam * n * np.eye(M) + V0 + np.sqrt(n + 1) * D @ S, np.sqrt(n) * Dh)
-        Q = V0 + D @ S
-        rows = [k for k in range(M) if k != P]
-        c0 = np.zeros(M, complex)
-        c0[P] = 1.0
-        c0[rows] = np.linalg.solve(Q[np.ix_(rows, rows)], -Q[np.ix_(rows, [P])][:, 0])
-        return float(v0 + vth * (S @ c0)[P].real)
-
-    h = 1e-4
-    r_d = (velocity(i + h) - velocity(i - h)) / (2 * h)
-    result = (velocity(i), float(r_d))
+    a = abs(i)
+    v0 = mean_voltage(a, theta)[0]                       # overdamped mean velocity as the centre
+    v, r_d = _b_kramers(a, theta, beta_c, v0)
+    if a == 0.0:
+        v = 0.0                                          # v is odd in i
+    result = (v if i >= 0.0 else -v, r_d)
     return result
-

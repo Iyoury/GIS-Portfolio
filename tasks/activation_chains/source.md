@@ -37,8 +37,11 @@ Checks used while building the task:
   - saturation with production, including lam t = 1e-10;
   - two-way branching;
   - target burnup exp(-sigma phi t) down to exp(-200).
-- The second solution (mpmath expm in adaptively doubled precision, bisection plus secant for the
-  flux) agrees with the reference to about 1e-14.
+- The second solution agrees with the reference to about 1e-14. (Versions 1-13: mpmath expm in
+  adaptively doubled precision, bisection plus secant for the flux. From version 14: the generalized
+  Bateman solution in extended precision, bisection plus secant; agreement about 4e-14 on 60 random
+  networks. Its precision control was first "double until two evaluations agree" and is, at the end of
+  version 14, a running error bound; see the last items of version 14.)
 - Standard methods fail the tests:
   - scipy.linalg.expm and the Bateman sum in double precision both fail step 1;
   - squaring the diagonal in scaling and squaring (instead of resetting it) loses the amounts on the
@@ -50,7 +53,8 @@ Checks used while building the task:
 Version 2 (content-check fixes):
 - Accuracy rule: the relative bound applies to exact entries that are positive and at least
   1e-250 * S; every other entry, exact zeros included, must lie within max(1e-250 * S, 1e-300). This
-  covers S = 0 (an empty inventory), which is now tested in steps 1-3.
+  covers S = 0 (an empty inventory), which is now tested in steps 1-3. (Historical: since version 14
+  the relative bound applies to exact entries of at least F = max(1e-250 * S, 1e-300).)
 - Branching column sums: one rule everywhere, at most 1 + 1e-12 (1 up to rounding). Step 2 tests a
   sum of 1 + 5e-13 (accepted) and 1 + 1e-9 (rejected). Step 3 checks the branching matrix itself
   before the history, so an empty history no longer skips the check.
@@ -133,6 +137,7 @@ Version 9 (content-check fixes):
     returned) and at 1.01e-9 outside (ValueError).
 
 Version 10 (content-check fixes):
+- (Historical: since version 14 the rule is A(flux_lo) >= lam[k] * max(1e-250 * sum(n0), 1e-300).)
 - Step 4 domain closed: A(flux_lo) >= 1e-250 * lam[k] * sum(n0), i.e. the measured nuclide holds at
   least 1e-250 of the initial atoms at flux_lo, the range where step 3 promises relative accuracy.
   Otherwise ValueError. This excludes the case where the per-atom product fraction underflows
@@ -197,23 +202,45 @@ targets, the tolerances of the individual outputs and the domain are unchanged.
   - Regression test: reference, second solution and the +-1e-12 shift pass case 3.
 - Floating-point equality in target generation (tests/step_2.py case 0).
   - Finding: the closed-form target branched on "_t_lam == 0.0" (not an assertion).
+  - Cause: the target special-cases lam = 0, where (1 - exp(-lam t)) / lam becomes t, and the branch was
+    written as an exact float comparison, a pattern the conformance check flags.
   - Change: written as "if _t_lam > 0.0 ... else ..." (same meaning, lam >= 0), so no float equality
     pattern remains in the tests. No assertion compares floats exactly or with zero tolerance.
+  - Regression test: crown_check format finds no float-equality pattern; reference, second solution and
+    the +-1e-12 shift pass step 2 case 0 with the same targets as before.
 - Stated but untested error rules.
   - Finding: the prompts promise ValueError for a non-finite initial amount and a non-finite t (step 1),
     a non-finite entry (step 2), a capture_to of the wrong shape (step 3) and non-finite flux bounds
     (step 4); none of these inputs was tested.
+  - Cause: the error cases tested one representative input per rule and were not extended when the
+    finiteness and shape rules were stated for every input.
   - Change: one entry each added to the existing error cases: n0 = [1, NaN] and t = NaN (step 1 case 6),
     n0 = [1, NaN] (step 2 case 5), capture_to of length 1 for n = 2 (step 3 case 5), flux_lo = NaN
     (step 4 case 5). Reference and second solution raise ValueError for each.
-- tests/general.py case 1: the comment called the history "two-cycle" and the flux "of the second cycle";
-  the history is one irradiation (3e6 s) and one cooling (2e5 s). Comment corrected; test unchanged.
-- Step 2 prompt and contract: the prompt said "Generalize step 1 (chain_inventory)", naming a function that
-  step 2 does not use, while its step_dependencies is []. It now reads "Generalize the linear chain of
-  step 1 to a branching network with constant production."
-- Metadata added to problem.yaml: subfield, tags, expert_time_estimate_hours, relevant_experience (a
-  placeholder for the author), difficulty_explanation, solution_explanation, verification_explanation,
-  author, affiliation, and edit_label: grading_fix.
+  - Regression test: a validation written as np.any(n0 < 0) (False for NaN) lets n0 = [1, NaN] through and
+    returns NaN amounts, so the case fails; the reference and the second solution pass every error case.
+- tests/general.py case 1 comment.
+  - Finding: the comment called the history "two-cycle" and the flux "of the second cycle"; the history
+    is one irradiation (3e6 s) and one cooling (2e5 s).
+  - Cause: the comment was not updated to the history the case actually uses (comment-only defect).
+  - Change: comment corrected; test unchanged.
+  - Regression test: none needed for a comment; the case was rerun unchanged (reference, second solution,
+    shift, whole-task mutant).
+- Step 2 prompt and contract.
+  - Finding: the prompt said "Generalize step 1 (chain_inventory)", naming a function that step 2 does
+    not use, while its step_dependencies is [].
+  - Cause: the prompt referred to step 1 by its function name although the step 2 reference exponentiates
+    the augmented network matrix itself and never calls chain_inventory.
+  - Change: it now reads "Generalize the linear chain of step 1 to a branching network with constant
+    production."
+  - Regression test: step_dependencies [] matches the prompt; the step 2 reference passes all its cases
+    with no earlier step in the context (rerun in version 14).
+- Metadata added to problem.yaml.
+  - Finding: subfield, tags, expert_time_estimate_hours, relevant_experience, difficulty_explanation,
+    solution_explanation, verification_explanation, author, affiliation and edit_label were missing.
+  - Cause: the task was built on an earlier skeleton without these fields.
+  - Change: all added (relevant_experience as a placeholder for the author; edit_label: grading_fix).
+  - Regression test: crown_check format reports no missing metadata key.
 - Mutants built from a stale reference (mutants/step_4_linear_response.py,
   mutants/whole_task_barn_in_square_metres.py).
   - Finding (independent verifier): both mutants had been copied from monitor_flux as it was before
@@ -251,3 +278,264 @@ Rerun: tools/crown_check.py, all modes, every case alone in a fresh process:
 - solution.py, the concatenated solution/step_*.py and second_solution.py were each run twice in clean
   processes and once with single-threaded BLAS on the 238U series, a random network, the gold monitor and
   two flux inversions: identical outputs (bitwise) in every run.
+
+## Version 14 (grading_fix: authoring-guide conformance, pass 2)
+
+Second audit against the authoring guide and the round-1 independent verification. The science, the
+reference algorithms (solution/, solution.py), the existing targets and the 1e-10 and 1e-8 output
+tolerances are unchanged. The input domain is unchanged except for the floor of 1e-300 atoms added to
+the accuracy threshold of steps 1-3 and to the domain rule of step 4 after the verifier's round on this
+pass (last item before the rerun). edit_label stays grading_fix.
+
+- General case 0 did not call the final function.
+  - Finding: tests/general.py case 0 checked only chain_inventory and network_inventory on the 238U
+    series; whole-task tests must call monitor_flux, and only case 1 did (crown_check format: "general
+    case 0 never calls the final function monitor_flux").
+  - Cause: case 0 was written as an integrated check of the decay part only.
+  - Change: the existing chain and network checks are kept, and the case continues with the aged ore
+    (the exact 600-digit amounts after 3e5 years, 206Pb holding the rest of the 1e20 atoms) irradiated
+    for one day and cooled for three days. The network has 18 nuclides: the 15 members of the series,
+    then 239U (23.45 min), 239Np (2.356 d) and 239Pu (2.411e4 y, its decay leaves the network); only
+    238U captures (2.68 b, into 239U), the captures of the products are left out. These half-lives and
+    the cross section are rounded standard values; the test only needs physically plausible in-domain
+    inputs, and its target is computed from exactly these inputs. For fluxes 5e11 and 2e14 the 239Np
+    activity is computed independently as the 600-digit Bateman sum of the capture branch (during the
+    irradiation the linear chain lam0 + r, l239U, l239Np, l239Pu with its products scaled by
+    r / (lam0 + r), r = sigma 1e-24 flux; during the cooling the chain l239U, l239Np, l239Pu), and
+    monitor_flux on [1e8, 1e16] must return the flux to the stated 1e-8. Link with step 1: the same
+    activity predicted with two chain_inventory calls (the same decomposition) must also give back the
+    flux, to 2e-8, about twice the single-output tolerance since that input carries the step-1 error
+    (<= 2e-10, i.e. <= 2e-10 in the flux at slope 1).
+  - Regression test: crown_check format no longer reports the case; reference and second solution
+    recover both fluxes to 3e-15 or better by both routes; the whole-task barn mutant now fails general
+    cases 0 and 1 (before: 1 only); the general shift check (every evaluated function scaled by
+    1 +- 1e-12) passes.
+- Step 4 end-tolerance band inconsistent with the accuracy of step 3.
+  - Finding (verifier and lead): the prompt let the end tolerance |ln(activity / A(end))| <= 1e-9 be
+    uncertain only within 1e-12 in ln, and case 3 tested it there. This requires A(flux_lo) and
+    A(flux_hi) to about 1e-12, a hundred times better than the relative 1e-10 that activation_inventory,
+    which step 4 is built on, promises. With the step-3 context scaled by (1 + 5e-12) or (1 - 5e-12),
+    still within its contract, the version-13 case 3 fails.
+  - Cause: in version 12 the band was sized to the rounding of a forward model accurate to about 1e-14
+    (the reference), not to the stated accuracy of step 3.
+  - Change: the prompt and the docstring now say that A is computed with activation_inventory (step 3),
+    which gives it to a relative 1e-10, so the tolerance holds up to 1e-10 in ln: for
+    1e-9 - 1e-10 < |ln| <= 1e-9 + 1e-10 the end, the root and (outside the interval) ValueError are all
+    correct. Case 3 tests, at both ends and on both sides, the representable activity adjacent to
+    |ln| = 1e-9 - 1e-10 from inside (the end) and to |ln| = 1e-9 + 1e-10 from beyond (ValueError outside
+    the interval, a flux within 1e-8 of the end inside it). The threshold 1e-9, the 5e-10 and 2e-9
+    checks and every other tolerance are unchanged; this fixes an inconsistency of the error budget and
+    is not a tuning of the pass rate.
+  - Regression test: the step 4 tests run with the step-3 context scaled by (1 + 9e-11), by (1 - 9e-11),
+    and by opposite factors at the two ends (-9e-11 at 1e8, +9e-11 at 1e13): every case passes; the
+    version-13 step 4 tests fail case 3 for each of these perturbations and for +-5e-12. The reference
+    with end cutoffs at 0.85e-9 or 1.15e-9 fails case 3; cutoffs at 0.95e-9 and 1.05e-9 lie inside the
+    stated band and pass.
+- Unstated accuracy of the returned end.
+  - Finding (verifier): cases 3 and 5 compare a returned end with flux_lo or flux_hi to a relative
+    1e-11, a number that no visible text stated (the output accuracy stated is 1e-8, and the roots of
+    the inside-band activities lie only 5e-10 to 1.1e-9 from the ends).
+  - Cause: "return flux_lo" was meant as an exact discrete result and the float slack was not written.
+  - Change: prompt and docstring: the end is returned as the given bound itself (not a root estimate),
+    equal to it to a relative 1e-11; the docstring also states that flux_lo is checked first.
+  - Regression test: tests unchanged; a variant of the reference that returns the root instead of the
+    end for activities inside the interval fails case 3 ((100000000.05, 1e8) for an activity 5e-10
+    inside A(1e8)).
+- Second solution used the oracle's method (rule: genuinely different method, not a test oracle).
+  - Finding: second_solution.py computed every inventory with mpmath's expm in adaptively doubled
+    precision, which is the algorithm of the tests' 300-digit oracle (_t_expm_apply) with a different
+    precision.
+  - Cause: it was written as an extended-precision alternative to the double-precision reference
+    without considering the test oracles.
+  - Change: a new engine, _exp_poly_apply: the generalized Bateman solution. Every amount is a finite
+    sum of terms c t**p exp(-a t); going down the network in topological order, each feeding term is
+    convolved with exp(-r_j t) in closed form (t**(p+1) / (p+1) for a = r_j, so equal rates are exact;
+    p! / d**(p+1) [exp(-r_j t) - exp(-a t) sum_m (d t)**m / m!] for d = a - r_j otherwise), the
+    production entering as a term with a = 0. (Its precision control was replaced later in this version
+    by a running error bound, see the item "Accuracy threshold and step 4 domain below 1e-300 atoms".)
+    It is evaluated in mpmath from 30 digits, doubling the
+    precision until two evaluations agree to 1e-13 in every entry (or to 1e-3 of the absolute floor
+    max(1e-250 S, 1e-300)). chain_inventory, network_inventory and every period of
+    activation_inventory (built directly from decay and capture rates, without branching fractions) use
+    it; monitor_flux keeps bisection on ln flux followed by secant steps (the reference uses brentq).
+    Remaining overlap, stated plainly: for linear chains with distinct constants the second solution
+    and the Bateman oracle of steps 1-3 and of the general tests expand the same closed form, but by
+    different algorithms (recursive convolution with confluent terms in adaptive precision, versus the
+    explicit product formula at a fixed 600 digits); the reference uses an unrelated method
+    (subtraction-free scaling and squaring), and the network oracle is mpmath expm.
+  - Regression test: the second solution passes every case (steps 7/7, 6/6, 6/6, 6/6, general 2/2).
+    It agrees with the reference to 3.7e-14 (relative rule above 1e-250 S, absolute below) on 60 random
+    networks (2 to 30 nuclides, decay constants 1e-12 to 1e6, many exactly equal or 1e-13 apart, some
+    zero, production, non-topological order, t from 1e-3 to 1e9), to 2e-14 on the 238U series from 1e-3
+    to 1e20 s and on chains with constants one to a few rounding units apart, and to 2e-15 on the gold
+    monitor inventories; both solutions recover the flux of three gold round trips (1e8, 1e12 and
+    1.6454e14) to 5e-15 or better.
+- Stated error rules and boundaries tested only through one representative (verifier).
+  - Finding: negative decay constants or branching entries and infinite values (step 2); negative
+    decay constants, cross sections, initial amounts or durations (step 3); infinite activity, flux
+    bound or time (step 4) were stated as errors but not tested; n = 30 was tested in step 3 only with
+    an empty history, which returns n0 trivially.
+  - Cause: the error cases had one representative input per rule.
+  - Change, entries added to existing cases only (n_test_cases unchanged: 7, 6, 6, 6): step 2 case 5:
+    lam = [-1, 1], a branching entry -0.1, source = [inf, 0]; step 3 case 5: lam = [-1e-3, 1], sigma =
+    [-5, 0], n0 = [1, -1], a duration of -1 s; step 4 case 5: activity = inf, flux_hi = inf,
+    t_irr = inf. Step 3 case 4: a 30-nuclide network with a non-empty history, a stable target followed
+    by 29 radioactive products each made by a capture on the previous one (sigma 1e2 to 1e4 b, lam 1e-6
+    to 1e-3 per s, 1e5 s at 1e15 n / (cm^2 s), then 2e4 s of cooling), against the 600-digit Bateman sum
+    of a chain with transfer rates sigma 1e-24 phi and removal rates lam + sigma 1e-24 phi (amounts down
+    to 8e-54 atoms, 8e-74 of n0).
+  - Regression test: reference and second solution raise ValueError for every added entry and pass the
+    30-nuclide check (3e-15 and 2e-15); the step 3 barn mutant still fails cases 0, 1, 2 and 4.
+- Prompts exposing test inputs or misstating the domain (rule B).
+  - Finding: step 1 said "relative differences down to 1e-13", the spacing used in step 1 case 2 and
+    inaccurate as a domain statement (closer constants are allowed and handled); step 4 said "This
+    includes activities as small as 1e-11 Bq", pointing at the 199Au round trip (2.2e-11 Bq) and
+    understating the domain (there is no lower limit other than the domain rule).
+  - Cause: regime statements written from the test inputs.
+  - Change: step 1: "Decay constants may be equal or arbitrarily close to one another, and they may span
+    more than 20 decades in one chain"; step 4: the accuracy holds "for activities of any size within
+    the domain below" (prompt and docstring). So that this statement is tested, step 4 case 1 gains a
+    round trip near the bottom of the double range: a two-capture product with lam[k] = 1e-295 per s
+    (sigma 1e7 b, 100 s at 1e12 n / (cm^2 s), 10 s of cooling), about 5e-302 Bq at the root, whose
+    activity at flux_lo (about 5e-330 Bq) is below the smallest positive double while the product holds
+    5e-35 of the target atoms (inside the domain); target from the 300-digit forward model.
+  - Regression test: the reference and the second solution pass the new round trip; it covers the stated
+    behaviour but is not a discriminator: a variant that forms lam[k] * x[k] before the logarithm also
+    passes (brentq accepts the -inf at the lower end). The reference agrees with the second solution to
+    about 1e-15 for chains whose constants are one to two rounding units apart; every prompt and
+    docstring was reread for exact test inputs.
+- Earlier functions named in the prompts (step dependencies).
+  - Finding: step 3 named network_inventory only as a definition ("decays as in network_inventory") and
+    step 4 did not say that A is computed with activation_inventory, although their references call
+    these functions (step_dependencies [2] and [3]).
+  - Cause: the prompts described the model by reference to the earlier steps without saying which
+    function to use.
+  - Change: step 3: "use network_inventory (step 2) for the periods"; step 4: "The predicted activity
+    A(phi) is computed with activation_inventory (step 3)". step_dependencies unchanged ([], [2], [3]).
+  - Regression test: the step references pass all their cases with only the listed dependencies in the
+    context: step 2 with no earlier step, step 3 with step 2 only, step 4 with steps 2 and 3 (step 3
+    calls step 2).
+- Contracts did not match the prompts (verifier).
+  - Finding: step 2 gave "column sums of branching <= 1" (the prompt accepts 1 + 1e-12) and omitted
+    sum(n0) + t sum(source) <= 1e100; step 3 omitted sum(n0) <= 1e100, the capture_to rules, the history
+    container and lam + sigma 1e-24 flux <= 1e10; step 4 omitted k, activity, monotonicity and the domain
+    rule A(flux_lo) >= 1e-250 lam[k] sum(n0).
+  - Cause: the contracts were written as short summaries.
+  - Change: valid_input_ranges of steps 1-4 now list the prompts' ranges and conditions in full.
+  - Regression test: every contract range was read against its prompt; crown_check format checks the
+    contract keys.
+- Duplicate mutant names (verifier).
+  - Finding: step 1 and step 2 both had a mutant named squared_diagonal.
+  - Cause: the same mistake was introduced in both steps under one name.
+  - Change: renamed chain_squared_diagonal (step 1) and network_squared_diagonal (step 2); files and
+    descriptions unchanged.
+  - Regression test: crown_check mut reports both names, failing step 1 cases 3, 4, 5 and step 2 cases
+    3, 4.
+- Inaccurate test comments (verifier).
+  - Finding: step 4 case 3 said the exact root next to |ln| = 1e-9 + 1e-12 was "about 2e-9 away" (the
+    slope d ln A / d ln flux is 1.00 at 1e8 and 0.96 at 1e13, so about 1e-9); the header of general
+    case 0 said "against the Bateman sum" for a network checked with mpmath expm; the file headers of
+    tests/step_1.py and tests/step_4.py listed oracles those files do not use.
+  - Cause: comments copied between files and not updated.
+  - Change: comments corrected (step 4 case 3 now: the root next to |ln| = 1e-9 + 1e-10 is about
+    1.1e-9 away); each test file header lists the oracles it uses.
+  - Regression test: comments only; every case rerun.
+- Metadata and source.md truthfulness.
+  - Finding: verification_explanation described the old second solution and the old end band; the
+    "Checks used while building the task" section described the old second solution without a version;
+    several version-13 items had no cause or regression test.
+  - Cause: the texts were not updated with this pass and the version-13 notes were incomplete.
+  - Change: difficulty_explanation and verification_explanation rewritten for the current code and
+    tests (new second solution, band 1e-10, general case 0, error-budget check, the runs below); the
+    second-solution note in the checks section is labelled by version; the version-13 items now each
+    give finding, cause, change and regression test. relevant_experience is still the author placeholder.
+  - Regression test: the explanations were read against the code and the crown_check output below.
+
+- Accuracy threshold and step 4 domain below 1e-300 atoms (verifier, round on this pass; blocking).
+  - Finding: the relative 1e-10 rule of steps 1-3 applied to every exact entry of at least 1e-250 * S,
+    and S has no lower bound. For S below about 2.2e-58 that threshold is a subnormal double, for S below
+    about 2.5e-64 entries near it cannot be represented to a relative 1e-10 by any double (subnormals are
+    spaced 4.9e-324), and for S below about 5e-74 it underflows to 0. Example: chain_inventory([1], [1e-70],
+    570) has the exact value 2.83e-318 > 1e-250 S = 1e-320, and both solutions return it with a relative
+    error of 1.7e-7 (the nearest subnormal). The step 4 domain rule x[k](flux_lo) >= 1e-250 sum(n0)
+    admitted such amounts, so its promise of 1e-8 "for activities of any size within the domain" failed:
+    lam = [0, 1e-3], sigma = [1, 0], capture_to = [1, -1], n0 = [1e-70, 0], t_irr = 1e-225, t_cool = 0,
+    activity 1e-320 Bq on [1, 1e4] (x[1](flux_lo) is about 1e-319, 1e-249 of the atoms): the reference
+    returned 99.998862 against the exact root 99.998887 (relative error 2.5e-7), while the second
+    solution raised ValueError.
+  - Cause: the threshold was designed as a fraction of the inventory and validated only for inventories
+    of order 1 and above (every tested S is 0 or at least 7e-5); the floor 1e-300 was written into the
+    absolute branch of the rule but not into its relative threshold, nor into the step 4 domain rule.
+  - Change: with F = max(1e-250 * S, 1e-300), every exact entry of at least F must have a relative error
+    below 1e-10 and every other entry, exact zeros included, must lie within F (prompts of steps 1-3, the
+    docstrings of chain_inventory, network_inventory and activation_inventory in problem.yaml, steps/,
+    solution/, solution.py, second_solution.py and mutants/). The step 4 domain rule is now
+    x[k](flux_lo) >= max(1e-250 * sum(n0), 1e-300), i.e. A(flux_lo) >= lam[k] * max(1e-250 * sum(n0),
+    1e-300), evaluated in logarithms (prompt, Errors list, problem_io, function_header, contract,
+    solution/step_4.py, solution.py, second_solution.py and, so that they stay the current reference with
+    one mistake, the domain line of mutants/step_4_linear_response.py and
+    mutants/whole_task_barn_in_square_metres.py). Every amount the rule then promises to a relative 1e-10
+    is a normal double, and so is x[k] on the whole bracket of step 4 (A increases from flux_lo). The
+    helpers _t_check of steps 1-3 and of tests/general.py (and _t_check_pair of step 3 case 3) use the
+    same threshold; for every existing entry (S = 0 or S >= 7e-5) they decide exactly as before. New
+    entries in existing cases (n_test_cases unchanged: 7, 6, 6, 6): step 1 case 0 and step 2 case 0, a
+    single nuclide with n0 = 1e-70 at lam t = 500 (about 7e-288, relative rule) and 570 (about 3e-318, a
+    subnormal above 1e-250 S but below F, absolute rule), and in step 2 a production of 1e-200 per unit
+    time alone (S = 2e-200, amount 1.26e-200, relative rule); step 3 case 0, burnup of 1e-70 atoms at
+    sigma phi t = 500 and 570; step 4 case 1, a round trip with n0 = [1e-70, 0], t_irr = 1e-200 s and
+    t_cool = 10 s on [1, 1e4] (about 1e-294 atoms of the product at flux_lo, inside the domain; about
+    1e-295 Bq at the root, target from the 300-digit forward model); step 4 case 5, the verifier's corner
+    above (outside the domain now, with the activity between A(flux_lo) and A(flux_hi), so the domain rule
+    is the only reason for the ValueError). Targets: closed forms n0 exp(-lam t), n0 exp(-sigma phi t) and
+    q (1 - exp(-lam t)) / lam (mpmath at 40-50 digits where the tests already used it).
+  - Second solution, defect found by the new step 4 round trip: its precision control (double the digits
+    until two evaluations agree to 1e-13 or to 1e-3 of the floor) accepted 0 for the product amount,
+    about 1e-294, because the closed form exp(-r1 t) - exp(-r0 t) at t = 1e-200 cancels to 0 at both 30
+    and 60 digits (it raised ValueError: x[k](flux_lo) below the domain floor). It now carries, next to
+    every coefficient of the generalized Bateman form, the sum of the magnitudes it was built from (the
+    same operations on absolute values) and raises the precision until 1e5 eps times that magnitude sum
+    is below 1e-14 of every amount or of the floor F (a running error bound, which cancellation cannot
+    fool). The method (generalized Bateman solution in extended precision) is unchanged.
+  - Regression tests: under the version-14 rule, the new entry n0 = 1e-70, lam t = 570 of step 1 (and
+    its counterparts in steps 2 and 3) asks for a relative 1e-10 of 2.83e-318, which reference and second
+    solution miss (1.66e-7); under the new rule it passes. A variant of the reference with the version-14
+    domain line (no floor) fails step 4 case 5 ("fewer than 1e-300 atoms of the measured nuclide at flux_lo
+    must raise ValueError"). The second solution with the old precision control fails step 4 case 1
+    (ValueError); with the running error bound it passes every case and agrees with the reference to
+    3.7e-14 on the 60 random networks used above (the same set), to 1.4e-14 on 60 further random networks
+    (2 to 30 nuclides, rates 1e-12 to 1e6 with many exactly equal or 1e-13 apart, some zero, production,
+    non-topological order), to 2.8e-15 on 30 networks with inventories scaled to 1e-280 to 1e-50 and to
+    2.2e-16 on 30 networks over times of 1e-250 to 1e-20 (relative above F; below F both agree to far
+    better than F); on 12 of the tiny-time networks (up to 8 nuclides) both agree with mpmath expm at 600
+    digits to 2.1e-16 or better above F. Both solutions recover the gold-monitor flux at 1e8, 1e12 and
+    1.6454e14 to 5.1e-15 or better. The error budget of step 4 was rerun with the new tests (step-3 context
+    scaled by 1 +- 9e-11, by opposite factors at the two ends, and by 1 +- 5e-12: every case passes; end
+    cutoffs 0.85e-9 and 1.15e-9 fail case 3, 0.95e-9 and 1.05e-9 pass; the variant returning the root
+    inside the end tolerance fails case 3). The step references pass with only their listed dependencies
+    in the context (step 2 alone, step 3 with step 2, step 4 with steps 2 and 3).
+  - Metadata: difficulty_explanation (the floor 1e-300), solution_explanation (the domain rule
+    x[k](flux_lo) >= max(1e-250 sum(n0), 1e-300)) and verification_explanation (the tiny-inventory tests,
+    the domain floor tested on both sides, the second solution's running error bound and its agreement
+    figures) were updated; problem_description_main now says that the amounts are required with a small
+    relative error down to the floor stated in each step (it said "every amount").
+
+Rerun: tools/crown_check.py, all modes, every case alone in a fresh process (single-threaded BLAS, -j 2),
+after the last item above (final state of version 14):
+- FORMAT OK (zero problems; every general case calls monitor_flux).
+- REF: step 1 7/7, step 2 6/6, step 3 6/6, step 4 6/6, general 2/2; solution.py also passes every step
+  file (7/7, 6/6, 6/6, 6/6).
+- SECOND: 7/7, 6/6, 6/6, 6/6, general 2/2.
+- Mutants: float_bateman fails 5/7 (cases 1-5), chain_squared_diagonal 3/7 (3, 4, 5),
+  transposed_branching 4/6 (1-4), network_squared_diagonal 2/6 (3, 4), barn_in_square_metres 4/6
+  (0, 1, 2, 4), linear_response 4/6 (0, 1, 2, 3), whole-task barn mutant 2/2 general cases (0, 1).
+- SHIFT +-1e-12: every step case passes, and every general case passes with every evaluated function
+  shifted.
+- Controls: all-None and all-zero stubs pass 0 cases in every step and in general.
+- SUMMARY ALL OK.
+- Error budget of step 4 (perturbed step-3 context) and the end-cutoff and root-returning variants: as
+  given in the last item above (rerun with the final tests).
+- solution.py, the concatenated solution/step_*.py and second_solution.py were each run twice in clean
+  processes with single-threaded BLAS (and solution.py once more with default threads) on the 238U series
+  at 3e5 y, a random 12-nuclide network with production, the gold monitor at 1e14 and two flux
+  inversions: identical outputs (bitwise) within each solution, and the reference and the concatenated
+  steps identical to each other.
