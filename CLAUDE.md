@@ -60,3 +60,15 @@ The authoritative standard is the authoring guide, saved in full here:
 5. All-None / all-zero controls fail.
 
 `tools/crown_check.py` (repo root) runs 1-5 for one task folder.
+
+## Task status (keep updated)
+
+- borehole-heat-flow: v9 rollouts "Too easy 8/8"; versions used 9 of 10 -> v10 is the LAST version (a send-back
+  closes the task); difficulty misses in a row 1 of 2. v10 = new integrated final step (joint inversion of q0, T0,
+  g and the deglaciation time t_end with the layered paleoclimate perturbation, Wald errors and profile-likelihood
+  95% interval). Design brief kept in the session scratchpad (bh10/DESIGN.md).
+- wright_fisher_relaxation v11 and activation_chains v12: queued for rollouts on the platform when last seen.
+- stoner_wohlfarth_ensemble v12 (eased: budgets, step-6 hints, tolerance 1e-5): awaiting rollouts when last seen.
+- All tasks: authoring-guide conformance passes 1-2 (2026-10-10/11); relevant_experience is a TODO placeholder
+  the author must fill; affiliation "Independent Researcher" pending confirmation.
+- layered-surface-wave and basin-backstripping: not in the repo (zips never received).

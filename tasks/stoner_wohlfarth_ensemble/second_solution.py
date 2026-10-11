@@ -244,12 +244,15 @@ def switching_field_statistics(psi, a, f0, rate):
     '''
     # Other method: u = (f0 / rate) I(H_s), with I(h) = int_h^h_sw Gamma / f0, is an exponential
     # random variable with mean 1 (P = exp(-u)). With s = ln u the switching field is a monotone
-    # function h(s), with dh/ds = -e^s / ((f0 / rate) Gamma(h) / f0); its median is h(ln ln 2) and
-    # its mean int h(s) exp(s - e^s) ds (a Gumbel weight, plus the atom exp(-u_max) at -h_sw). One
-    # ODE run for I(h) (dense output, purely relative accuracy down to (f0 / rate) I ~ 1e-30) gives
-    # the median by bisection and the starting field h(-40); the ODE for h(s) is then integrated
-    # upwards to s = 5 with the weighted integral carried along. Upwards in s the ODE contracts
-    # (a perturbation of h decays like e^-(s - s_start)); the weight outside [-40, 5] is below 1e-17.
+    # function h(s), the field where (f0 / rate) I = e^s; its median is h(ln ln 2) and its mean
+    # int h(s) exp(s - e^s) ds (a Gumbel weight), plus the atom exp(-u_max) at -h_sw. One DOP853 run for
+    # I(h) (dense output, purely relative accuracy down to (f0 / rate) I ~ 1e-30) gives h(s) by
+    # bisection on the dense output, all quadrature nodes at once. The s-integral runs from s = -40
+    # (the weight below is e^-40) to ln u_end and is taken by tanh-sinh quadrature, its step halved until
+    # the result settles to 1e-12. h(s) is nearly a jump where the escape rate has a deep valley between
+    # two switching windows (psi above about pi/4: one window at positive fields, one towards -h_sw); the
+    # valley lies near h = 0, where both barriers are 1/2, so the s-range is split at the s of h = 0 and
+    # the steep part sits at the ends of two tanh-sinh ranges, where the nodes cluster.
     psi = float(psi)
     if not (0.0 <= psi <= 0.5 * np.pi):
         raise ValueError("psi must be between 0 and pi/2")
@@ -283,29 +286,46 @@ def switching_field_statistics(psi, a, f0, rate):
     u_end = lam * run.y[0, -1]
 
     def field_at(u):
-        # the field where (f0 / rate) I = u, by bisection on the dense output (I falls with h)
-        lo, hi = run.t[-1], h_sw
-        for _ in range(100):
+        # the fields where (f0 / rate) I = u (an array), by bisection on the dense output (I falls with h)
+        u = np.asarray(u, dtype=float)
+        lo = np.full(u.shape, run.t[-1])
+        hi = np.full(u.shape, h_sw)
+        for _ in range(64):
             mid = 0.5 * (lo + hi)
-            if lam * run.sol(mid)[0] < u:
-                hi = mid
-            else:
-                lo = mid
+            below = lam * run.sol(mid)[0] < u
+            hi = np.where(below, mid, hi)
+            lo = np.where(below, lo, mid)
         return 0.5 * (lo + hi)
 
-    h_median = field_at(np.log(2.0))
+    h_median = float(field_at(np.array([np.log(2.0)]))[0])
 
-    def rhs_s(s, y):
-        x = min(max(y[0], -inside), inside)
-        return [-np.exp(s) / (lam * max(gamma_over_f0(x), 1e-300)), x * np.exp(s - np.exp(s))]
-
-    s_low, s_top = -40.0, min(5.0, np.log(u_end))
-    sweep = solve_ivp(rhs_s, (s_low, s_top), [field_at(np.exp(s_low)), 0.0], method="DOP853",
-                      rtol=1e-12, atol=1e-14)
-    if sweep.status < 0:
-        raise RuntimeError(sweep.message)
-    # beyond s_top the particle has left by -h_sw at the latest (weight exp(-e^s_top))
-    h_mean = float(sweep.y[1, -1] - h_sw * np.exp(-np.exp(s_top)))
+    s_low, s_top = -40.0, float(np.log(u_end))
+    cuts = [s_low, s_top]
+    if run.t[-1] < 0.0 and run.sol(0.0)[0] > 0.0:
+        s_zero = float(np.log(lam * run.sol(0.0)[0]))
+        if s_low < s_zero < s_top:
+            cuts.insert(1, s_zero)
+    previous = None
+    for level in range(3, 10):
+        # tanh-sinh nodes on each range: t on [-3.5, 3.5] with step 2^-level; the position is written
+        # as a fraction of the range from its lower end, (1 + tanh(g)) / 2 = 1 / (1 + exp(-2 g))
+        step = 2.0 ** -level
+        t = step * np.arange(-int(3.5 / step), int(3.5 / step) + 1)
+        g = 0.5 * np.pi * np.sinh(t)
+        frac = 1.0 / (1.0 + np.exp(-2.0 * g))
+        weight = step * 0.5 * np.pi * np.cosh(t) / np.cosh(g) ** 2
+        s = np.concatenate([sa + (sb - sa) * frac for sa, sb in zip(cuts[:-1], cuts[1:])])
+        ws = np.concatenate([0.5 * (sb - sa) * weight for sa, sb in zip(cuts[:-1], cuts[1:])])
+        value = float(np.sum(ws * field_at(np.exp(s)) * np.exp(s - np.exp(s))))
+        if previous is not None and abs(value - previous) < 1e-12:
+            break
+        previous = value
+    else:
+        raise RuntimeError("the tanh-sinh quadrature of the mean did not settle")
+    # below s_low the field is h_sw to within rounding; if the run reached -h_sw, the particle is there
+    # with the probability exp(-u_end) (if it stopped at u = 200, that remainder is negligible)
+    atom = np.exp(-u_end) if run.status == 0 else 0.0
+    h_mean = float(value + h_sw * (1.0 - np.exp(-np.exp(s_low))) - h_sw * atom)
     result = (float(h_median), h_mean)
     return result
 

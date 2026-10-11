@@ -26,8 +26,12 @@ difficulty_explanation: |-
   field angle, including the degenerate end points psi = 0 and psi = pi/2, where a floating-point
   h_sw slightly below 1 already matters for f0 / rate up to 1e13. The survival probability needs a
   quadrature with a purely relative tolerance, because only an escape integral of order rate / f0
-  matters, and the mean switching field follows from the identity E[H_s] = h_sw - int P dh rather
-  than from a density that is sharply peaked. Step 5 stands apart from the chain and computes the
+  matters, and the mean switching field follows from the identity E[H_s] = h_sw - int P dh. The
+  switching field need not fall in one window: for psi above about pi/4 the lower barrier also has a
+  local minimum at a positive field (at or just below +h_sw close to the hard axis, where the other
+  minimum forms next to the original one), so the escape rate peaks there too and the distribution
+  can be bimodal, with a deep valley of the rate near h = 0; P must be integrated over both windows,
+  not over one window placed around the median. Step 5 stands apart from the chain and computes the
   exact relaxation from Brown's Fokker-Planck equation; it is hard because of exponential scale
   separation, not because of extra digits: lam1 falls to about 4.5e-24 (sigma = 60, h = 0) next to
   eigenvalues of order 100, and in a strong field the shallow well holds a relative Boltzmann
@@ -45,9 +49,14 @@ solution_explanation: |-
   maxima by the alternating sign of e'' and measures both barriers from the minimum with cos(theta) > 0.
   Step 3 integrates exp(-2 a low) + exp(-2 a high) from h to h_sw with an adaptive quadrature at
   relative tolerance 1e-12 and returns exp(-(f0 / rate) I); step 4 solves (f0 / rate) I = ln 2 for the
-  median with Brent's method and evaluates E[H_s] = h_sw - int P dh on a composite Gauss-Legendre window
-  sized from the local escape rate. Step 5 writes Brown's equation in Sturm-Liouville form with the
-  Boltzmann weight w, represents functions by piecewise Chebyshev interpolation in theta, and runs
+  median with Brent's method and evaluates E[H_s] = h_sw - int P dh by adaptive composite 16-point
+  Gauss-Legendre quadrature in h: U = (f0 / rate) I is accumulated from h_sw downwards with the
+  adaptive quadrature at the panel edges (h = 0, a window around the median, edges graded towards both
+  ends +-h_sw and a coarse uniform set) and inside each panel by a Gauss-Legendre rule per gap between
+  nodes; a panel is halved until halving changes its integral of P by at most 1e-12 and the gap rules
+  reproduce the edge values, so both switching windows are resolved when there are two. Step 5 writes
+  Brown's equation in Sturm-Liouville form with the Boltzmann weight w, represents functions by
+  piecewise Chebyshev interpolation in theta, and runs
   inverse iteration in which every step is two cumulative integrals (the flux taken from the nearer end
   on each side of the barrier, the start vector a step at the barrier); lam1 is the Rayleigh quotient
   of positive integrals and tau_int comes from Garanin's quadrature. The final step 6 builds the
@@ -60,7 +69,10 @@ verification_explanation: |-
   golden-section search along the equilibrium curve (no astroid formula), plus the closed-form barriers
   at psi = 0 and pi/2; steps 3 and 4 use the closed erfc / erf forms at psi = 0 and pi/2 and, at other
   angles, an adaptive quadrature or one ODE run on the grid barriers and a Newton step that must not
-  move the returned median; step 5 uses an extended-precision (mpmath) Legendre-polynomial expansion of
+  move the returned median (step 4 case 5, three near-hard-axis particles whose switching field has two
+  windows, holds the rate at its value 1e-7 below h_sw over the last 1e-7, where the grid no longer
+  separates the merging extrema; its targets agree to 8.4e-12 with a Richardson-extrapolated trapezoid
+  rule on up to 4e5 nodes); step 5 uses an extended-precision (mpmath) Legendre-polynomial expansion of
   Brown's operator solved by banded elimination (converged: 80 more modes and 25 more digits change
   nothing at sigma = 60). Step 6 and the whole-task tests (ensemble_switching of solution.py) use a
   Newton step with analytic derivatives on the independently computed ensemble magnetization and
@@ -69,8 +81,9 @@ verification_explanation: |-
   method in every step, none of them a test oracle: quartic roots in tan(theta/2) with h_sw from the
   fold of the equilibrium curve (step 1); bracketing of each extremum (step 2); one DOP853 ODE run for
   the escape integral (step 3); for step 4 the median by bisection on the dense output of that run and
-  the mean from the exponential law of u = (f0 / rate) I(H_s), as int h(s) exp(s - e^s) ds with h(s)
-  integrated as an ODE in s = ln u; for step 5 a finite-volume chain (2000 and 4000 cells, Richardson
+  the mean from the exponential law of u = (f0 / rate) I(H_s), as int h(s) exp(s - e^s) ds by
+  tanh-sinh quadrature in s = ln u, split at the s of h = 0, with h(s) from bisection on the same dense
+  output; for step 5 a finite-volume chain (2000 and 4000 cells, Richardson
   extrapolation) whose smallest nonzero eigenvalue is located by an inertia (Sturm) count with pivots in
   differential form, and Garanin's quadrature with closed-form (erfi) inner integrals and tanh-sinh
   outer quadrature in mpmath; per-particle ODE runs with bisection for step 6. Against the reference it
@@ -388,11 +401,14 @@ sub_steps:
           '''
     return_line: return result
     step_background: |-
-      The switching field is spread over a narrow window; its distribution is skewed
-      because the escape rate rises steeply as the field falls. Sharrock-type formulas
-      give the median only approximately; here it must follow from the full field
-      dependence of both barriers.
-    n_test_cases: 5
+      The switching field is usually spread over a narrow window at negative fields; its
+      distribution is skewed because the escape rate rises steeply as the field falls. For
+      psi above about pi/4 the lower barrier also passes through a local minimum at a
+      positive field (at or just below +h_sw close to the hard axis, where the other minimum
+      forms next to the original one), so the escape rate peaks there too and for small a and
+      slow sweeps the distribution can be bimodal. Sharrock-type formulas give the median only
+      approximately; here it must follow from the full field dependence of both barriers.
+    n_test_cases: 6
     contract:
       quantity: Median and mean of the random switching field of one particle under thermally activated escape.
       assumptions: Same model as step 3.

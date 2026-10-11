@@ -42,6 +42,12 @@ Consistency checks run while building the task:
   Rechecked in version 12 on a new set of 40 random points (8 of them below the critical
   current at theta <= 0.05): largest relative difference 4.4e-15 for v, 3.6e-14 for dv/di and
   1.3e-15 for D_eff, with v and D_eff down to about 3e-25.
+- The thermometric sensitivity kappa = d ln theta / d ln v of the reference (since the second round of
+  version 12) agrees with the extended-precision central difference of the continued-fraction voltage to
+  4.8e-11 relative on a 14 x 10 grid of (i, theta) over 0.01 <= i <= 10, 0.02 <= theta <= 50, where kappa
+  ranges from 0.0102 to 2.42e7 (the previous reference was off by up to 4.4e-5 where kappa exceeds 1e6).
+  On a 25 x 50 grid over the domain d ln v / d ln i = i r_d / v is never below 1 (minimum
+  1.0000000000000016, approached in linear response); this bounds the step 5 error budget.
 - The second solution (since version 12) uses a third exact representation for steps 1 to 5,
   independent of both the reference and the test targets. The Jacobi-Anger expansion
   exp(z cos x) = sum_m I_m(z) e^{imx}, z = 1 / theta, makes every shift integral of the
@@ -79,8 +85,8 @@ No target is copied from the reference solution. Every test computes its own tar
 | D_eff (steps 2, 3, 5) | homogenization: D = theta int (1 + chi')**2 p dx with the corrector chi and the density p both from continued fractions in extended precision; Fourier convolution for the average | about 1e-15 relative |
 | D_eff at i = 0 (step 2) | Lifson-Jackson, theta / I_0(1/theta)**2 | exact |
 | diffusion peak (step 3) | one Newton step on dD/di = 0 with central differences (h = 2e-5) of the continued-fraction D must move i_peak by less than 1e-6; D lower at i_peak +- 0.05 | truncation of the differences below 1e-8 |
-| noise temperature (step 4) | the voltage is generated at a known theta (including the endpoints 0.02 and 50) by the continued fraction (or the Bessel integral); the returned theta must recover it. The endpoint rule is defined with the voltages of mean_voltage (step 1) at theta = 0.02 and 50, so its probe voltages are built from mean_voltage, which the case first checks against the continued fraction to its stated 1e-9 | relative 1e-7; probes 0.9e-11 (accepted) and 1.1e-11 (rejected) beyond the endpoint voltage |
-| thermometric sensitivity kappa (step 4) | central difference of ln v in ln theta with step 1e-15 theta, the continued fraction evaluated at 60 + 1.8 / theta digits | about 1e-15 relative |
+| noise temperature (step 4) | inside the range the voltage is generated at a known theta by the continued fraction (or the Bessel integral) and the returned theta must recover it. The endpoint rule is defined with the voltages of mean_voltage (step 1) at theta = 0.02 and 50, so the endpoint inputs (v_lo and v_hi themselves in case 2, the probes beyond them in case 3) are built from mean_voltage, which each case first checks against the continued fraction to its stated 1e-9 | relative 1e-7 + 2e-9 |kappa| (kappa the extended-precision sensitivity at the known theta): theta is defined through mean_voltage, whose relative error (below 1e-9) enters theta multiplied by |kappa|; probes 0.9e-11 (accepted) and 1.1e-11 (rejected) beyond the endpoint voltage (since the second round of version 12; before: relative 1e-7, see the version 12 note) |
+| thermometric sensitivity kappa (step 4) | central difference of ln v in ln theta with step 1e-15 theta, the continued fraction evaluated at 60 + 1.8 / theta digits, at the theta returned by the candidate (since the second round of version 12; before: at the known theta) | about 1e-15 relative; compared with relative tolerance 1e-6 |
 | array criterion (step 5) | one Newton step on V(J) = v_crit with V and dV/dJ from the continued fractions must move j_star by less than 1e-9 relative; r_diff and s_v compared with the continued-fraction sums; for one junction or identical junctions j_star is known from the Bessel-integral voltage | relative 1e-9 / 1e-8 |
 | v and dv/di with capacitance (step 6, general) | Kramers equation in Hermite functions centred at the shifted velocity v0 = 0.6 i (N = 120, |p| <= 60), its own matrix continued fraction; dv/di by the fourth-order five-point central difference (h = 1e-3); beta_c = 0 against the overdamped continued fraction; in the general test also rcsj_voltage(i, theta, 0) against mean_voltage | against N = 220, |p| <= 110 with the same stencil on the 13 tested points: v within 5e-5 of its tolerance, dv/di within 1.7e-7 relative at the smallest tested voltage (rounding in the shifted basis) and within 1e-12 elsewhere; against the analytic dv/di of the reference within about 3e-7 at that voltage (stencil truncation 2.6e-7 plus rounding) and 1e-9 elsewhere (version 12; before version 12: N = 150, |p| <= 72 and a central difference h = 1e-4, see the version 12 note) |
 
@@ -272,9 +278,13 @@ Rerun: tools/crown_check.py, all modes, every case alone in a fresh process (OPE
 
 ## Version 12 (grading_fix: authoring-guide conformance, pass 2)
 
-Second conformance pass, driven by the findings of an independent verifier on version 11. The model, the
-reference algorithms (solution.py and solution/step_*.py, apart from the step 4 docstring and one comment),
-the domain and every stated tolerance are unchanged. edit_label stays grading_fix.
+Second conformance pass, driven by the findings of an independent verifier on version 11. In the first round
+of this pass the model, the reference algorithms (solution.py and solution/step_*.py, apart from the step 4
+docstring and one comment), the domain and every stated tolerance were unchanged. A second round, after an
+independent verification of the first round (see "Second round" at the end of this section), corrected the
+first-round step 4 endpoint entry, changed the step 4 kappa algorithm of the reference and stated the
+propagated step 4 theta tolerance; the model, the domain and every other tolerance are unchanged.
+edit_label stays grading_fix.
 
 - Second solution shared the test targets' method (second_solution.py; rule: a genuinely different method).
   - Finding: for steps 1 to 5 the second solution solved, by Thomas elimination, the same truncated Fourier
@@ -370,6 +380,12 @@ the domain and every stated tolerance are unchanged. edit_label stays grading_fi
     the independent targets. The reference already used mean_voltage for the rule.
   - Regression test: step 4 case 3 passes for the reference, the second solution and the +-1e-12 shift;
     the step 4 mutants still fail their cases.
+  - Correction (second round): this change was incomplete. tests/step_4.py case 2 still passed the exact
+    continued-fraction voltages at theta = 0.02 and 50 as endpoint inputs. Under the rule these inputs are
+    valid only if mean_voltage is within a relative 1e-11 of the exact voltage, but step 1 promises only
+    1e-9, so case 2 still depended on an accuracy that is not stated. The claim above that the defect was
+    removed was therefore wrong for case 2. The second round fixes it (entry "Step 4 case 2 endpoint
+    inputs" below).
 - Test-namespace names (tests/step_1.py cases 0-3, tests/step_2.py cases 0-3).
   - Finding: the unprefixed module-level names out and D could rebind a candidate's global of the same name.
   - Cause: these two names were not given the _t_ prefix used by every other test name.
@@ -404,8 +420,8 @@ the domain and every stated tolerance are unchanged. edit_label stays grading_fi
   covering all six functions with identical outputs, and solution.py agrees bitwise with the concatenated
   solution/step_*.py.
 
-Rerun (version 12): tools/crown_check.py, all modes, every case alone in a fresh process, single-threaded
-BLAS (OMP_NUM_THREADS = OPENBLAS_NUM_THREADS = MKL_NUM_THREADS = 1), -j 2:
+Rerun (version 12, first round; superseded by the second-round rerun below): tools/crown_check.py, all
+modes, every case alone in a fresh process, single-threaded BLAS (OMP_NUM_THREADS = OPENBLAS_NUM_THREADS = MKL_NUM_THREADS = 1), -j 2:
 - FORMAT OK (no problem reported; repeated after the last documentation edits, which changed no test or
   solution file, again OK).
 - REF: step 1 5/5, step 2 5/5, step 3 4/4, step 4 5/5, step 5 6/6, step 6 4/4, general 2/2 (solution.py

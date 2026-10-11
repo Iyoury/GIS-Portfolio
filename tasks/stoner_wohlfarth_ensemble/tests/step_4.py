@@ -293,3 +293,135 @@ for _t_bad in ((-0.1, 100.0, 1e9, 1.0), (1.7, 100.0, 1e9, 1.0), (0.5, float("nan
         pass
     else:
         raise AssertionError("switching_field_statistics%r must raise ValueError" % (_t_bad,))
+
+# --- test case 5 ---
+# Bimodal switching field. For psi above about pi/4 the lower barrier has a second local minimum at a
+# positive field (at or just below +h_sw close to the hard axis, where the other minimum forms next to
+# the original one), so the escape rate also peaks there and some particles switch at positive fields,
+# far above the usual window at negative fields. Three particles, f0 / rate = 1e9, 3e12 and 1e9:
+# psi = 1.31, a = 45: 1.5 % switch next to +h_sw, the median is in the lower window;
+# psi = 1.08, a = 42: the second peak lies inside (0, h_sw) (near h = 0.39), 0.05 % switch there;
+# psi = 1.54, a = 300: 91 % switch next to +h_sw (the median is there) and 9 % in the lower window.
+# A mean taken from one window only is off by 4e-3, 4e-5 and 3e-6. Median by one Newton step and
+# mean from one ODE run of the escape integral and int P dh, both on the grid barriers. Within 1e-7 of
+# h_sw the grid no longer separates the two extrema that merge there, so the rate is held at its value
+# at h_sw - 1e-7 (this changes the escape integral times f0 / rate by less than 1e-10 here).
+import numpy as np
+from scipy.integrate import quad as _t_quad
+
+_T_HP = 0.5 * np.pi
+
+_T_GOLD = 0.5 * (np.sqrt(5.0) - 1.0)
+
+_T_Q = np.concatenate([np.geomspace(1e-9, 1e-2, 40), np.linspace(0.0125, 0.9875, 400),
+                       1.0 - np.geomspace(1e-2, 1e-9, 40)])
+
+def _t_fold(psi):
+    # (h_sw, theta_fold): scan of the curve, then golden-section search for its lowest field
+    if psi <= 0.0:
+        return 1.0, 0.0
+    if psi >= _T_HP:
+        return 1.0, -_T_HP
+
+    def H(t):
+        return -np.sin(2.0 * t) / (2.0 * np.sin(t - psi))
+
+    ts = psi - np.pi + np.pi * _T_Q
+    i = int(np.argmin(H(ts)))
+    a, b = ts[max(i - 1, 0)], ts[min(i + 1, len(ts) - 1)]
+    c, d = b - _T_GOLD * (b - a), a + _T_GOLD * (b - a)
+    fc, fd = H(c), H(d)
+    while b - a > 1e-13:
+        if fc < fd:
+            b, d, fd = d, c, fc
+            c = b - _T_GOLD * (b - a)
+            fc = H(c)
+        else:
+            a, c, fc = c, d, fd
+            d = a + _T_GOLD * (b - a)
+            fd = H(d)
+    t = 0.5 * (a + b)
+    return -float(H(t)), float(t)
+
+_T_NG = 20000
+
+_T_GRID = -np.pi + 1.234567e-4 + 2.0 * np.pi * np.arange(_T_NG) / _T_NG
+
+_T_DG = 2.0 * np.pi / _T_NG
+
+def _t_slope(t, h, psi):
+    return 0.5 * np.sin(2.0 * t) + h * np.sin(t - psi)
+
+def _t_energy(t, h, psi):
+    return 0.5 * np.sin(t) ** 2 - h * np.cos(t - psi)
+
+def _t_extrema(h, psi):
+    # minima (e' from - to +) and maxima (e' from + to -) of e on the circle grid, bisected
+    g = _t_slope(_T_GRID, h, psi)
+    found = []
+    for mask in ((g < 0.0) & (np.roll(g, -1) >= 0.0), (g > 0.0) & (np.roll(g, -1) <= 0.0)):
+        roots = []
+        for i in np.where(mask)[0]:
+            lo, hi = _T_GRID[i], _T_GRID[i] + _T_DG
+            s_lo = _t_slope(lo, h, psi)
+            for _ in range(60):
+                mid = 0.5 * (lo + hi)
+                if _t_slope(mid, h, psi) * s_lo > 0.0:
+                    lo = mid
+                else:
+                    hi = mid
+            roots.append(0.5 * (lo + hi))
+        found.append(roots)
+    return found[0], found[1]
+
+def _t_gamma(x, psi, a):
+    # escape rate over f0: both routes, exponent 2 a Delta_e because E = 2 K V e; held at its value at
+    # h_sw - 1e-7 above that field
+    hs = _t_fold(psi)[0]
+    x = min(x, hs - 1e-7)
+    mins, maxs = _t_extrema(x, psi)
+    if len(mins) < 2 or len(maxs) < 2:
+        return 0.0
+    t_o = max(mins, key=np.cos)
+    e_o = _t_energy(t_o, x, psi)
+    return sum(np.exp(-2.0 * a * (_t_energy(t, x, psi) - e_o)) for t in maxs)
+
+def _t_P(h, psi, a, ratio):
+    # survival probability exp(-(f0 / rate) int_h^h_sw Gamma / f0), quadrature on the grid barriers
+    hs = _t_fold(psi)[0]
+    if h >= hs:
+        return 1.0
+    if h <= -hs:
+        return 0.0
+    I = _t_quad(lambda x: _t_gamma(x, psi, a), h, hs, epsabs=0.0, epsrel=1e-12, limit=1000)[0]
+    return float(np.exp(-ratio * I))
+
+def _t_median_step(h_med, psi, a, ratio):
+    # one Newton step on P(h) = 1/2 from the returned median, with dP/dh = ratio * Gamma/f0 * P
+    p = _t_P(h_med, psi, a, ratio)
+    return (p - 0.5) / (ratio * _t_gamma(h_med, psi, a) * p)
+
+def _t_mean(psi, a, ratio):
+    # E[H_s] = h_sw - int P dh: I = int Gamma / f0 and K = int P from one ODE run down from h_sw
+    from scipy.integrate import solve_ivp
+    hs = _t_fold(psi)[0]
+
+    def rhs(x, y):
+        g = _t_gamma(x, psi, a) if abs(x) < hs else 0.0
+        return [-g, -np.exp(-ratio * y[0])]
+
+    def done(x, y):
+        return ratio * y[0] - 80.0
+
+    done.terminal = True
+    sol = solve_ivp(rhs, (hs, -hs), [0.0, 0.0], method="DOP853", rtol=1e-12,
+                    atol=[1e-13 / ratio, 1e-15], events=done)
+    return hs - sol.y[1, -1]
+
+for _t_psi, _t_a, _t_f0, _t_rate in ((1.31, 45.0, 3e9, 3.0), (1.08, 42.0, 3e12, 1.0), (1.54, 300.0, 1e10, 10.0)):
+    ratio = _t_f0 / _t_rate
+    out = switching_field_statistics(_t_psi, _t_a, _t_f0, _t_rate)
+    assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(v, float) for v in out)
+    assert abs(_t_median_step(out[0], _t_psi, _t_a, ratio)) < 1e-7, (_t_psi, out)
+    _t_m = _t_mean(_t_psi, _t_a, ratio)
+    assert abs(out[1] - _t_m) < 1e-7, (_t_psi, out, _t_m)

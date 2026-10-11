@@ -32,10 +32,14 @@ field both barriers are Delta_e = 1/2, i.e. dE = K V. Particles with a above abo
 are stable for years at zero field (magnetic recording needs a of 40 to 60).
 
 During a field sweep the barrier of the occupied minimum shrinks as the field comes
-down, so the escape rate rises by many orders of magnitude over a short field interval.
-The particle therefore switches at a random field spread over a narrow window, well
-before the zero-temperature switching field; slower sweeps and smaller a switch at
-smaller fields. Sharrock's law, h_s ~ h_sw [1 - (ln(f0 t) / a)**n] with n about 1/2 to
+down towards -h_sw, so the escape rate rises by many orders of magnitude over a short field
+interval. The particle therefore usually switches at a random field spread over a narrow
+window, well before the zero-temperature switching field; slower sweeps and smaller a
+switch at smaller fields. For field angles above about pi/4 the lower barrier is not
+monotonic along the sweep: it already passes through a local minimum at a positive field
+(close to the hard axis at +h_sw itself, where the other minimum is born next to the
+occupied one), so the rate has a second peak there and, for small a and slow sweeps, part of
+the particles switch at positive fields: the switching field then has two windows. Sharrock's law, h_s ~ h_sw [1 - (ln(f0 t) / a)**n] with n about 1/2 to
 2/3, captures this trend only approximately; an exact treatment needs the full field
 dependence of both barriers along the sweep.
 

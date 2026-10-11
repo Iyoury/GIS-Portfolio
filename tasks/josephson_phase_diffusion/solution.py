@@ -202,21 +202,48 @@ def _s4_nodes(i, theta):
     return y, w
 
 
+def _s4_g(y):
+    # g(y) = y cos(y/2) - 2 sin(y/2) = -y**3 / 12 + y**5 / 480 - ..., summed as its series for
+    # y < 1, where the two terms of the closed form cancel
+    y = np.asarray(y, dtype=float)
+    out = y * np.cos(0.5 * y) - 2.0 * np.sin(0.5 * y)
+    m = y < 1.0
+    t = -(0.5 * y[m]) ** 2
+    term = np.ones_like(t)
+    s = np.zeros_like(t)
+    f = 1.0
+    for k in range(1, 12):
+        term = term * t
+        f *= (2 * k) * (2 * k + 1)                      # (2k + 1)!
+        s += term * (2 * k) / f
+    out[m] = y[m] * s
+    return out
+
+
 def _s4_dlogv_dlogtheta(i, theta):
     # d ln v / d ln theta at fixed i > 0 from the Stratonovich formula v = 2 pi q / S,
-    # q = 1 - exp(-2 pi i / theta), S = (1/theta) int int exp(E / theta), differentiated
-    # under the integral sign (dE/theta / dtheta = -E / theta**2)
+    # q = 1 - exp(-z), z = 2 pi i / theta, S = (1/theta) int_0^{2 pi} dx int_0^{2 pi} dy exp(E / theta),
+    # E = cos(x - y) - cos(x) - i y. The theta-derivative is taken with the shift scaled as
+    # y = theta u, so that the tilt term -i u does not depend on theta; differentiating
+    # [cos(x - theta u) - cos(x)] / theta and the upper limit 2 pi / theta gives
+    #   theta dS/dtheta = (1 / theta**2) int int exp(E / theta) F dx dy - 4 pi**2 exp(-z) / theta,
+    #   F = cos(x) - cos(x - y) + y sin(x - y) = sin(x - y/2) g(y) - y sin(y/2) cos(x - y/2).
+    # F = O(y**2) where the weight exp(E / theta) is concentrated, so d ln v / d ln theta is
+    # obtained without the cancellation of differentiating exp(E / theta) directly, which loses
+    # the relative accuracy when d ln v / d ln theta is tiny (kappa up to about 2e7 at large bias
+    # and weak noise).
     nx = 2 * int(40 + 30 / np.sqrt(theta))
     x = 2.0 * np.pi * np.arange(nx) / nx
     y, w = _s4_nodes(i, theta)
     X, Y = x[:, None], y[None, :]
-    E = (np.cos(X - Y) - np.cos(X) - i * Y) / theta
-    ex = np.exp(E)
-    S = np.mean(ex @ w) / theta
-    dS = -np.mean((ex * E) @ w) / theta ** 2 - S / theta
+    ex = np.exp((np.cos(X - Y) - np.cos(X) - i * Y) / theta)
+    F = np.sin(X - 0.5 * Y) * _s4_g(y)[None, :] - Y * np.sin(0.5 * Y) * np.cos(X - 0.5 * Y)
+    A = np.mean((ex * F) @ w)
+    B = np.mean(ex @ w)
     z = 2.0 * np.pi * i / theta
-    dlogq = -(z / theta) * np.exp(-z) / (-np.expm1(-z))
-    return theta * (dlogq - dS / S)
+    ez = np.exp(-z)
+    # theta d ln q / dtheta - theta d ln S / dtheta
+    return -z * ez / (-np.expm1(-z)) + 2.0 * np.pi * ez / B - A / (theta * B)
 
 
 def noise_temperature(i, v):
@@ -229,11 +256,15 @@ def noise_temperature(i, v):
 
     Output:
       (theta, kappa): tuple of two Python floats.
-        theta: noise strength in [0.02, 50] with mean_voltage(i, theta)[0] == v,
-               relative error below 1e-7 (the endpoints 0.02 and 50 are allowed).
-        kappa: thermometric sensitivity d ln(theta) / d ln(v) at fixed i, evaluated at
-               theta (a relative voltage error dv/v gives the relative temperature error
-               kappa dv/v), relative error below 1e-6.
+        theta: noise strength in [0.02, 50] with mean_voltage(i, theta)[0] == v (the
+               endpoints 0.02 and 50 are allowed). It is graded against the noise strength
+               at which the exact stationary voltage equals v, relative error below
+               1e-7 + 2e-9 * |kappa| (the relative error of mean_voltage, below 1e-9,
+               enters theta multiplied by |kappa|).
+        kappa: thermometric sensitivity d ln(theta) / d ln(v) of the exact stationary
+               voltage at fixed i, evaluated at the returned theta (a relative voltage
+               error dv/v gives the relative temperature error kappa dv/v), relative error
+               below 1e-6. Over the domain kappa ranges from about 0.01 to about 2e7.
 
     Raises:
       ValueError if i or v is not finite, if i is not in (0, 10], if v is not strictly

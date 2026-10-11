@@ -13,11 +13,15 @@ def noise_temperature(i, v):
 
     Output:
       (theta, kappa): tuple of two Python floats.
-        theta: noise strength in [0.02, 50] with mean_voltage(i, theta)[0] == v,
-               relative error below 1e-7 (the endpoints 0.02 and 50 are allowed).
-        kappa: thermometric sensitivity d ln(theta) / d ln(v) at fixed i, evaluated at
-               theta (a relative voltage error dv/v gives the relative temperature error
-               kappa dv/v), relative error below 1e-6.
+        theta: noise strength in [0.02, 50] with mean_voltage(i, theta)[0] == v (the
+               endpoints 0.02 and 50 are allowed). It is graded against the noise strength
+               at which the exact stationary voltage equals v, relative error below
+               1e-7 + 2e-9 * |kappa| (the relative error of mean_voltage, below 1e-9,
+               enters theta multiplied by |kappa|).
+        kappa: thermometric sensitivity d ln(theta) / d ln(v) of the exact stationary
+               voltage at fixed i, evaluated at the returned theta (a relative voltage
+               error dv/v gives the relative temperature error kappa dv/v), relative error
+               below 1e-6. Over the domain kappa ranges from about 0.01 to about 2e7.
 
     Raises:
       ValueError if i or v is not finite, if i is not in (0, 10], if v is not strictly

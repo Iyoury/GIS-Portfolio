@@ -49,13 +49,16 @@ Checks used while building the task:
     golden-section search for a maximum that nearly merges with a minimum within rounding of
     |h| = h_sw; the reference uses the companion-matrix quartic in a shifted tan(theta/2);
   - step 3: one DOP853 ODE run for the escape integral; the reference uses adaptive quadrature;
-  - step 4: the median by bisection on the dense output of one DOP853 run for the escape
-    integral I(h); the mean from the exact statement that u = (f0 / rate) I(H_s) is an
-    exponential variable with mean 1, so that with s = ln u the mean switching field is
-    int h(s) exp(s - e^s) ds, h(s) being integrated as an ODE (dh/ds = -e^s / ((f0 / rate)
-    Gamma / f0)) from the median at s = ln ln 2; the reference uses Brent's method and a
-    composite Gauss-Legendre window on E[H_s] = h_sw - int P dh, and the test oracle one ODE
-    run for I and int P dh;
+  - step 4 (state after version 14, item 11): the median by bisection on the dense output of
+    one DOP853 run for the escape integral I(h); the mean from the exact statement that
+    u = (f0 / rate) I(H_s) is an exponential variable with mean 1, so that with s = ln u the
+    mean switching field is int h(s) exp(s - e^s) ds plus the atom at -h_sw, taken by tanh-sinh
+    quadrature in s from s = -40 to ln u_end (step halved until the result settles to 1e-12),
+    with h(s) = the field where (f0 / rate) I = e^s from vectorized bisection on the same dense
+    output and the s-range split at the s of h = 0 (the valley of the rate between two
+    switching windows); the reference uses Brent's method and adaptive composite
+    Gauss-Legendre quadrature in h on E[H_s] = h_sw - int P dh, and the test oracle one ODE run
+    for I and int P dh;
   - step 5 (Brown's equation): lam1 from a finite-volume chain in theta (2000 and 4000 cells,
     exact two-point conductances, Richardson extrapolation) whose smallest nonzero eigenvalue is
     located by an inertia (Sturm) count of A - mu M with the pivots written in differential form,
@@ -69,8 +72,8 @@ Checks used while building the task:
   Cross-checks of version 14 (each output against the other method, in clean processes): Brown
   step against the Legendre oracle on 26 points 6e-12 (lam1) and 4e-15 (tau_int) relative, and
   against the reference on 58 more points (random and corners, sigma from 1e-9 to 60) 6e-12 and
-  2e-13; step 4 against the reference on 26 inputs (corners of the domain, psi = 0, pi/2, 1e-9 and
-  pi/2 - 1e-9, random) 1.6e-15 (median) and 3.5e-14 (mean); step 3 next to the hard axis
+  2e-13; step 4: see version 14, item 11 (the 26-input comparison of the first version-14 draft,
+  1.6e-15 and 3.5e-14, did not sample the near-hard-axis regime and is superseded); step 3 next to the hard axis
   (psi = pi/2 - 1e-12 ... pi/2 - 0.3, the four corners of (a, f0 / rate) and a = 300 with
   1e9, fields 1e-6 ... 1 below h_sw) 2e-11, and at 60 random (psi, a, f0 / rate) with six fields
   each 2.3e-13; step 6 against the reference on 10 random ensembles 1.0e-14.
@@ -85,7 +88,7 @@ No target is copied from the reference solution. Every test computes its own tar
 | barriers (step 2) | minima and maxima of e from the same grid search, refined by bisection; original minimum = the one with cos(theta) > 0 | exact to rounding; closed forms at h = 0, psi = 0 and psi = pi/2 |
 | survival probability (step 3) | closed form with erfc at psi = 0 and with erf / erfc at psi = pi/2 (barriers (1 -+ h)**2 / 2, h >= 0); for other angles an adaptive quadrature (purely relative tolerance) of the escape rate built on the grid barriers, at fields far below h_sw | about 1e-14 |
 | median switching field (steps 4, 6) | closed form with the inverse erfc at psi = 0 (and the erf form at psi = pi/2); otherwise one Newton step on P = 1/2 from the returned value, with dP/dh = (f0 / rate) (Gamma / f0) P | must move it by less than 1e-7 |
-| mean switching field (step 4) | E[H_s] = h_sw - int P dh, with P from the closed forms (psi = 0 and psi = pi/2, adaptive quadrature of P) or from one ODE run for the escape integral and int P dh on the grid barriers | about 1e-12 |
+| mean switching field (step 4) | E[H_s] = h_sw - int P dh, with P from the closed forms (psi = 0 and psi = pi/2, adaptive quadrature of P) or from one ODE run for the escape integral and int P dh on the grid barriers; in case 5 (three particles with two switching windows, see version 14, item 10) the rate is held at its value at h_sw - 1e-7 over the last 1e-7 below h_sw, where the 20000-point grid no longer separates the two merging extrema (this changes (f0 / rate) I by less than 1e-10 there) | about 1e-12; the case 5 targets agree to 8.4e-12 with a Richardson-extrapolated trapezoid rule in u (h = h_sw sin u, 2e5 and 4e5 nodes, cumulative escape integral on the same nodes); without the hold the oracle is off by 6.7e-7 for the psi = 1.54 particle |
 | h_c and h_half (step 6, general) | one Newton step on the expected ensemble magnetization (or on the switched weight minus 1/2), with analytic derivatives: dP/dh as above and dm/dh = sin(theta - psi)**2 / e''(theta) along each minimum | must move them by less than 1e-6; for one particle at psi = 0 both equal minus the closed-form median; for a psi = 0 particle (weight 2) with a psi = pi/2 particle (weight 1), whose magnetization is h in both minima, 4 P0(-h_c) - 2 - h_c = 0 and P0(-h_half) = 3/4 with the closed-form P0 |
 | lam1 and tau_int (step 5) | Legendre expansion of Brown's operator (pentadiagonal, N = 60 + 3 sigma modes), solved in extended precision with mpmath by banded elimination: inverse iteration for lam1, one linear solve for tau_int | 30 + sigma (1 + abs(h))**2 / 2 digits; exact 1 and 1 at sigma = 0; converged (see version 14, item 1); agrees with the version-14 second solution (finite-volume inertia count, closed-form Garanin quadrature) to 6e-12 (lam1) and 4e-15 (tau_int) relative on 26 points that include every step 5 test point (up to the sign of h) |
 | sanity values | barriers 1/2 at h = 0; P = 1 above h_sw and 0 below -h_sw; P depends on f0 and rate only through f0 / rate | exact |
@@ -360,8 +363,11 @@ Rerun for version 13 (after items 8-12):
 ## Version 14 (grading_fix: authoring-guide conformance, pass 2)
 
 Second conformance pass, after an independent verification of version 13. Step numbering as in version
-13 (Brown's equation = step 5, ensemble = final step 6). No reference algorithm, test target, test input
-or single-output tolerance was changed; the test changes are the float type check (item 6) only. Each
+13 (Brown's equation = step 5, ensemble = final step 6). Items 1-9: no reference algorithm, test target,
+test input or single-output tolerance was changed; the test changes are the float type check (item 6)
+only. Items 10-12 come from a second independent verification of this version: they replace the
+reference algorithm for the mean switching field of step 4 (a reference bug), replace the second
+solution's mean again, and add step 4 case 5 (no existing target, input or tolerance changed). Each
 item gives the finding, its cause, the change, the regression test and what was rerun.
 
 1. Second solution of Brown's equation was the test oracle.
@@ -413,6 +419,10 @@ item gives the finding, its cause, the change, the regression test and what was 
    - Regression test: against the reference on 26 inputs (the four corners of (a, f0 / rate) at
      psi = pi/2 and two at psi = 0, psi = 1e-9 and pi/2 - 1e-9, psi = pi/4, 0.7, 0.3 and 1.2, and 12
      random inputs): median 1.6e-15, mean 3.5e-14; crown_check SECOND step 4 5/5.
+   - Superseded (item 11): this s-ODE turned out to be stiff between two switching windows and failed
+     on many near-hard-axis inputs, and the 26 inputs above did not sample that regime, in which the
+     reference itself was wrong (item 10). The mean of the second solution is now a quadrature in s,
+     not an ODE; the I-run, the bisection for the median and the end-point treatment above are kept.
 3. Second solution near |h| = h_sw and next to the hard axis.
    - Finding: escape_barriers of the second solution raised ValueError ("f(a) and f(b) must have
      different signs") for fields within rounding of +-h_sw (psi = 0.0083 above, psi = pi/2 - 1e-9), and

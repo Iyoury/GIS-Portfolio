@@ -29,7 +29,10 @@ difficulty_explanation: >-
   theta / i, extended-precision continued fractions or Bessel series. Out of equilibrium the diffusion coefficient is not theta dv/di (Einstein relation),
   and locating the flat giant-diffusion maximum to 1e-6 in bias needs D_eff or its derivative far more
   accurately than that. The thermometry step inverts an exponentially sensitive voltage over theta in
-  [0.02, 50] with a stated endpoint rule and needs d ln v / d ln theta, which step 1 does not provide; the
+  [0.02, 50] with a stated endpoint rule and needs d ln v / d ln theta, which step 1 does not provide, to a
+  relative 1e-6 also where it is as small as about 4e-8 (far above the critical current at weak noise),
+  where differentiating the Boltzmann factors of the Stratonovich integrals directly loses that accuracy
+  to cancellation, and the theta it returns inherits the voltage error of step 1 amplified by kappa. The
   array step requires each junction's own noise strength theta0 / c_k and its own reduced time, so the
   voltage noise scales with c_k r_k, not (c_k r_k)**2. The final RCSJ step has no closed form: the
   stationary Kramers equation in phase and velocity must be solved to a relative 1e-7 at strong inertia and
@@ -44,8 +47,12 @@ solution_explanation: >-
   effective_diffusion uses the Reimann et al. formula D = theta <I_+**2 I_-> / <I_+>**3 with the same
   quadrature, and diffusion_peak solves d ln D / di = 0 with brentq on (0.5, 3), the derivative taken
   analytically under the integrals. noise_temperature applies the stated endpoint rule with the voltages of
-  mean_voltage at theta = 0.02 and 50, solves ln v(theta) = ln v by brentq in ln theta, and obtains kappa
-  from the analytic theta-derivative of the Stratonovich integrals. array_criterion finds the criterion current by brentq on the summed
+  mean_voltage at theta = 0.02 and 50, solves ln v(theta) = ln v with mean_voltage by brentq in ln theta,
+  and obtains kappa from the theta-derivative of the Stratonovich integrals taken with the shift scaled
+  as y = theta u: the derivative becomes the integral of the Boltzmann factor times
+  F = cos x - cos(x - y) + y sin(x - y) = O(y**2) (evaluated without cancellation) plus a boundary term
+  in exp(-2 pi i / theta), which keeps its relative accuracy where d ln v / d ln theta is tiny.
+  array_criterion finds the criterion current by brentq on the summed
   junction voltages c_k r_k v(J / c_k, theta0 / c_k) and sums r_k dv_k/di and 2 c_k r_k D_k for the
   differential resistance and the zero-frequency voltage noise. rcsj_voltage expands the stationary Kramers
   equation in Hermite functions of the velocity (110 terms) and Fourier modes of the phase (|p| <= 56),
@@ -58,10 +65,22 @@ verification_explanation: >-
   digits), the single-integral Bessel form of the Ambegaokar-Halperin voltage at 40 digits, the closed
   forms at i = 0 (1 / I_0(1/theta)**2 and the Lifson-Jackson D), Newton-step criteria on those targets for
   the diffusion peak and the array criterion current, and a central difference for kappa in at least
-  60-digit arithmetic (60 + 1.8 / theta digits, step 1e-15 theta). The step 4 endpoint rule is defined with
-  the voltages of mean_voltage at theta = 0.02 and 50, so its probes are built from mean_voltage, which the
-  case first checks against the continued fraction to its stated 1e-9; theta and kappa are checked against
-  the independent targets. For the RCSJ step the target is a Hermite expansion centred at the shifted
+  60-digit arithmetic (60 + 1.8 / theta digits, step 1e-15 theta). Step 4 defines theta through
+  mean_voltage, whose relative error (below 1e-9) enters theta multiplied by |kappa| (kappa from about
+  0.01 to about 2e7 over the domain), so theta is graded against the theta of the continued-fraction
+  voltage with the stated propagated tolerance 1e-7 + 2e-9 |kappa| (kappa from the extended-precision
+  difference at that theta), and kappa against the extended-precision difference at the returned theta to
+  1e-6; the endpoint rule is defined with the voltages of mean_voltage at theta = 0.02 and 50, so the
+  endpoint inputs (v_lo and v_hi themselves and the probes 0.9e-11 and 1.1e-11 beyond them) are built from
+  mean_voltage, which each case first checks against the continued fraction to its stated 1e-9. The
+  reference kappa agrees with the extended-precision difference to 5e-11 relative on a 14 x 10 grid of
+  (i, theta) over the domain (kappa from 0.01 to 2.4e7), and step 4 test case 1 includes a point with kappa
+  about 2.4e6. Steps 3 to 6 were also run case by case with the earlier reference functions they call
+  perturbed to just inside their stated accuracy (mean_voltage v by +-9.9e-10 and r_d by +-9.9e-9,
+  effective_diffusion by +-9.9e-10; for step 4 also v by +-5e-10): every case passes. For step 5 the
+  relative voltage error enters j_star divided by d ln V / d ln J, which is at least 1 (checked on a grid;
+  it tends to 1 in linear response), so the 1e-9 of mean_voltage uses up the 1e-9 j_star tolerance there
+  with no margin; this is recorded in source.md. For the RCSJ step the target is a Hermite expansion centred at the shifted
   velocity 0.6 i with its own truncation (120 Hermite terms, |p| <= 60) and dv/di from a fourth-order
   five-point central difference (h = 1e-3); against 220 terms, |p| <= 110 its v is within 5e-5 of the v
   tolerance and its dv/di within 1e-12 relative except at the smallest tested voltage, where the stencil
@@ -338,22 +357,27 @@ sub_steps:
     tests: tests/step_4.py
     step_description_prompt: |-
       Noise thermometry. A junction biased at i > 0 shows the measured reduced voltage v. Find
-      the noise strength theta for which the exact mean voltage of mean_voltage (step 1)
+      the noise strength theta at which the mean voltage of step 1, mean_voltage(i, theta)[0],
       equals v. At fixed i > 0 the mean voltage rises strictly with theta, from the noiseless
       value sqrt(max(i**2 - 1, 0)) as theta -> 0 to the ohmic value i as theta -> infinity, so
       the answer is unique when it exists. Below the critical current v can be exponentially
       small. The endpoints theta = 0.02 and theta = 50 are valid answers.
 
-      Also return the thermometric sensitivity kappa = d ln(theta) / d ln(v) at fixed bias i,
-      evaluated at the theta found: a relative error dv / v of the measured voltage produces
-      the relative error kappa dv / v of the inferred temperature. mean_voltage gives only
-      dv/di, not the derivative with respect to theta, so the derivative of the exact stationary
-      voltage with respect to the noise strength must be obtained here; near the ohmic limit
-      d ln(v) / d ln(theta) is very small and must still have the stated relative accuracy.
+      Also return the thermometric sensitivity kappa = d ln(theta) / d ln(v) of the exact
+      stationary voltage at fixed bias i, evaluated at the returned theta: a relative error
+      dv / v of the measured voltage produces the relative error kappa dv / v of the inferred
+      temperature. mean_voltage gives only dv/di, not the derivative with respect to theta, so
+      the derivative of the exact stationary voltage with respect to the noise strength must be
+      obtained here. Over the domain kappa ranges from about 0.01 to about 2e7: where the
+      voltage hardly depends on theta (near the ohmic limit, and above the critical current at
+      weak noise) d ln(v) / d ln(theta) is very small and must still have the stated relative
+      accuracy.
 
       Inputs: i (float, 0 < i <= 10) and v (float). Return the tuple (theta, kappa) of two
-      Python floats, theta with a relative error below 1e-7 and kappa with a relative error
-      below 1e-6.
+      Python floats. theta is graded against the noise strength at which the exact stationary
+      voltage equals v, with a relative error below 1e-7 + 2e-9 |kappa|: the relative error of
+      mean_voltage (below 1e-9), which defines theta, enters theta multiplied by |kappa|. kappa
+      must have a relative error below 1e-6.
       Endpoint rule: let v_lo = mean_voltage(i, 0.02)[0] and v_hi = mean_voltage(i, 50)[0] be the
       endpoint voltages given by mean_voltage (step 1). A v with v_lo * (1 - 1e-11) <= v <= v_lo
       returns theta = 0.02 and a v with v_hi <= v <= v_hi * (1 + 1e-11) returns theta = 50, each
@@ -372,11 +396,15 @@ sub_steps:
 
           Output:
             (theta, kappa): tuple of two Python floats.
-              theta: noise strength in [0.02, 50] with mean_voltage(i, theta)[0] == v,
-                     relative error below 1e-7 (the endpoints 0.02 and 50 are allowed).
-              kappa: thermometric sensitivity d ln(theta) / d ln(v) at fixed i, evaluated at
-                     theta (a relative voltage error dv/v gives the relative temperature error
-                     kappa dv/v), relative error below 1e-6.
+              theta: noise strength in [0.02, 50] with mean_voltage(i, theta)[0] == v (the
+                     endpoints 0.02 and 50 are allowed). It is graded against the noise strength
+                     at which the exact stationary voltage equals v, relative error below
+                     1e-7 + 2e-9 * |kappa| (the relative error of mean_voltage, below 1e-9,
+                     enters theta multiplied by |kappa|).
+              kappa: thermometric sensitivity d ln(theta) / d ln(v) of the exact stationary
+                     voltage at fixed i, evaluated at the returned theta (a relative voltage
+                     error dv/v gives the relative temperature error kappa dv/v), relative error
+                     below 1e-6. Over the domain kappa ranges from about 0.01 to about 2e7.
 
           Raises:
             ValueError if i or v is not finite, if i is not in (0, 10], if v is not strictly
@@ -397,7 +425,7 @@ sub_steps:
     n_test_cases: 5
     contract:
       quantity: "Noise strength k_B T / E_J inferred from a measured dc voltage, and the thermometric sensitivity d ln(theta) / d ln(v)."
-      assumptions: "Same model as step 1; the measured voltage is the exact stationary mean voltage."
+      assumptions: "Same model as step 1; theta solves mean_voltage(i, theta)[0] = v and is graded against the theta of the exact stationary voltage with the relative tolerance 1e-7 + 2e-9 |kappa| (the 1e-9 accuracy of mean_voltage amplified by kappa); kappa is the exact sensitivity at the returned theta, relative tolerance 1e-6."
       result_kind: exact
       valid_input_ranges: "0 < i <= 10; v strictly between sqrt(max(i**2 - 1, 0)) and i and within [v_lo (1 - 1e-11), v_hi (1 + 1e-11)], v_lo and v_hi the voltages of mean_voltage at theta = 0.02 and 50; resulting theta in [0.02, 50] (endpoints included)."
       units: "theta dimensionless (k_B T / E_J); kappa dimensionless."
