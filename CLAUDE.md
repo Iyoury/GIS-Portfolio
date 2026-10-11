@@ -70,6 +70,13 @@ The authoritative standard is the authoring guide, saved in full here:
   closes the task); difficulty misses in a row 1 of 2. v10 = new integrated final step (joint inversion of q0, T0,
   g and the deglaciation time t_end with the layered paleoclimate perturbation, Wald errors and profile-likelihood
   95% interval). Design brief kept in the session scratchpad (bh10/DESIGN.md).
+- Blind-solver calibration (2026-10-11): my spec-only blind solvers (Claude subagents) passed stoner v10 2/2 and
+  wright-fisher v10 2/2, while the platform rollouts gave 1/8 and 7/8. The platform model is clearly weaker than
+  the blind-solver proxy: a 100 % blind score does NOT mean "too easy" on the platform; use blind solvers to find
+  spec gaps and unfair tests, not to predict the band.
+- borehole-heat-flow v10 final design: step 6 single-hole joint inversion (q0, T0, g, t_end; Wald + profile
+  interval) and step 7 regional ML over several holes with AR(1) noise (exact likelihood, expected Fisher
+  information, likelihood-ratio interval). Blind solvers 7/7 passed (proxy optimistic, see above).
 - wright_fisher_relaxation v11 and activation_chains v12: queued for rollouts on the platform when last seen.
 - stoner_wohlfarth_ensemble v12 (eased: budgets, step-6 hints, tolerance 1e-5): awaiting rollouts when last seen.
 - All tasks: authoring-guide conformance passes 1-2 (2026-10-10/11); relevant_experience is a TODO placeholder
