@@ -1,4 +1,4 @@
-# Scientific background: heat flow from an inclined Shield borehole
+# Scientific background: heat flow and the end of the last glaciation from Shield boreholes
 
 ## Why this workflow exists
 
@@ -126,7 +126,7 @@ domain, where each layer contributes exponentials in z. Near strong contrasts
 the paleoclimate perturbation of layered ground differs from the half-space
 formula by up to tens of percent of the surface departure.
 
-## 6. When did the glaciation end? The final inversion
+## 6. When did the glaciation end? One borehole
 
 The glacial history enters the observation model through its shape and its
 amplitude, but the time at which the last glaciation ended, t_end, is itself
@@ -159,6 +159,34 @@ t_end weakly.
 The readings and the layer contacts are converted to vertical depth with the
 same trajectory, and the shallow readings are removed with a cut on vertical
 depth before the inversion.
+
+## 7. Several boreholes of one region: maximum likelihood
+
+A single log constrains t_end only loosely, but the holes of one region record
+the same ground-surface history through different columns and depths. Step 7
+combines them: g and t_end are common to all holes, while every hole keeps its
+own T0, q0, column, heat production, volumetric heat capacity and cut-off
+depth. The logs also differ in quality (probe, logging speed, convection in
+wide holes), so every hole h has its own, unknown, noise standard deviation
+σ_h.
+
+With independent normal errors the estimates are the maximum-likelihood ones.
+Because the σ_h are estimated together with the shared parameters, each hole is
+weighted by its own residual variance at the solution: a long noisy log does
+not dominate a short precise one, as it would in pooled least squares with one
+common variance, and the result also differs from a fit whose weights are fixed
+in advance from single-hole inversions. The amplitude enters linearly, but with
+a free variance per hole the likelihood is not quadratic in g, and the end of
+the glaciation enters nonlinearly through the layered perturbation of every
+hole.
+
+The precision of the estimates is summarized by the expected (Fisher)
+information at the estimates, and the 95 % interval of t_end by the
+likelihood-ratio test: t_end values whose profile log-likelihood, maximized over
+all other parameters including the σ_h, lies within half the 0.95 quantile of
+the chi-square distribution with one degree of freedom of the maximum. As for a
+single hole, the interval is asymmetric when the model is curved in t_end, and
+a short glaciation can give the profile a second maximum.
 
 ## References
 

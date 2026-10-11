@@ -12,8 +12,9 @@
 | Fixed Talbot inversion (step 5 reference, mpmath targets) | Abate & Valkó (2004) | Contour s = rθ(cot θ + i), r = 2M/5t, and the trapezoid weights |
 | Hyperbolic contour (step 5 second solution) | Weideman & Trefethen (2007) | s(u) = μ(1 + sin(iu − α)) with α = 1.1721, h = 1.0818/N, μ = 4.4921 N/t |
 | Gaver–Stehfest inversion (step 5 mutant, cross-check of the 50-layer targets) | Stehfest (1970) | Weights V_k and nodes k ln 2 / t |
-| Branch-cut (real-axis) inversion (step 6 and whole-task test oracle) | Author's derivation (version 10, difficulty_increase, item 4) | Bromwich contour collapsed on the cut of √s; checked against the stored 90-digit values and erfc |
+| Branch-cut (real-axis) inversion (steps 6 and 7 and whole-task test oracle) | Author's derivation (version 10, difficulty_increase, item 4) | Bromwich contour collapsed on the cut of √s; checked against the stored 90-digit values and erfc |
 | Wald covariance and profile-likelihood interval of t_end (step 6) | Standard nonlinear least squares; derivation in the version 10 (difficulty_increase) note, item 3 | s² (JᵀJ)⁻¹ with n − 4 degrees of freedom; threshold RSS_min (1 + F₀.₉₅(1, n − 4)/(n − 4)) |
+| Maximum likelihood with an unknown variance per hole, expected Fisher information, likelihood-ratio interval (step 7) | Standard likelihood theory; derivation in the version 10 (difficulty_increase) note, item 12c | Concentrated likelihood −Σ (n_h/2)(log(2π RSS_h/n_h) + 1); information Σ J_hᵀJ_h/σ_h²; threshold l_max − χ²₀.₉₅(1)/2 |
 
 Full references: Abate, J., Valkó, P.P. (2004) Multi-precision Laplace transform inversion. International
 Journal for Numerical Methods in Engineering 60, 979–993. Weideman, J.A.C., Trefethen, L.N. (2007) Parabolic
@@ -29,6 +30,8 @@ Everything else is the author's own design:
 - the joint estimation of the glacial amplitude together with T0 and q0;
 - the joint estimation of the end of the glaciation t_end with the layered perturbation (version 10,
   difficulty_increase);
+- the regional maximum-likelihood inversion of several boreholes with their own noise levels and the
+  weighted-score construction of its exact targets (version 10, difficulty_increase, item 12);
 - the conventions (reference temperature, history intervals, z_min cut in
   TVD, OLS covariance);
 - all test cases.
@@ -37,9 +40,10 @@ No public code was copied.
 
 ## Data
 
-Since version 10 (difficulty_increase, at the end of this file) the boreholes of `tests/step_6.py` and
-`tests/general.py` are built by a different generator (orthogonal-residual construction for the new final
-function `deglaciation_heat_flow_inversion`); they are described there. The rest of this section describes the
+Since version 10 (difficulty_increase, at the end of this file) the boreholes of `tests/step_6.py` are built by
+a different generator (orthogonal-residual construction for `deglaciation_heat_flow_inversion`), and those of
+`tests/step_7.py` and `tests/general.py` by the weighted-score construction of item 12 for the final function
+`regional_deglaciation_inversion`; they are described there. The rest of this section describes the
 boreholes and the generator of the `surface_heat_flow` tests of versions 5 to 11 (historical).
 
 All data are **synthetic**. Real boreholes do not come with a known true heat
@@ -909,7 +913,8 @@ ALL OK:
 This note is numbered after the platform versions: version 9 was the last upload. The two notes above,
 internal revisions 10a and 10b (first headed "Version 10" and "Version 11"), are conformance revisions written
 before this one; all three are part of the platform version 10 upload. Steps 1-5 (prompts,
-headers, references, second solution, tests, mutants) are unchanged; the final step is new.
+headers, references, second solution, tests, mutants) are unchanged; items 1-11 describe the new step 6
+(round 1), and item 12 the regional final step 7 added in a second round before the upload.
 
 1. Finding. The platform reported version 9 "Too easy": 8 of 8 rollouts solved (strong model, maximum effort,
    4 h, mean score 1.0). The content check had classed step 6 (`surface_heat_flow`) as a transcription step.
@@ -1177,3 +1182,192 @@ headers, references, second solution, tests, mutants) are unchanged; the final s
     i. Reruns: tools/crown_check.py in all modes (item 9 tables, updated), the blind solutions on every case,
        the margins of the new calls for the reference and the second solution, the dense oracle scans of the
        new bounds and the domain-floor budget of item 6.
+
+12. Second difficulty round before upload: a regional final step (step 7). Each finding with its cause, change,
+    regression test and reruns.
+    a. Finding (calibration, item 11h): two solutions written from the visible specification alone passed all
+       71 cases of the round-1 task, with margins larger than the reference's, and the verifier estimated 5 to 7
+       of 8 rollouts. Version 9 was "too easy" (8 of 8) and version 10 is the last version allowed, so the
+       round-1 design would very likely miss the band (3 to 6 of 8) again.
+       Cause: the single-hole inversion of step 6 is ordinary nonlinear least squares whose conventions (profile
+       RSS, Wald covariance with n_used - 4, F threshold) are standard and completely stated; strong agents
+       implement them reliably. The difficulty to add has to come from scientific and statistical reasoning, not
+       from tolerances, hidden conventions or runtime.
+    b. Change: a new final step 7, `regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape,
+       t_end_bounds)` (problem_io, function_header, scaffold, solution/step_7.py, solution.py,
+       second_solution.py, tests/step_7.py, tests/general.py, mutants). Several boreholes of one region share the
+       glacial amplitude g and the end of the glaciation t_end; every hole keeps its own T0, q0, column, heat
+       production, rho_c, z_min and an unknown noise level sigma_h (logs of different quality). Each hole is a
+       dict with exactly the ten keys of the step 6 arguments it replaces. The prompt states the statistical
+       model (independent normal errors, one unknown variance per hole) and the definitions of the results:
+       maximum likelihood for all parameters with g on the whole real line and t_end the global maximizer over
+       [t_lo, t_hi] of the profile log-likelihood (maximum over all other parameters); the log-likelihood as the
+       natural logarithm of the joint normal density with its normalizing constants; standard errors from the
+       inverse of the expected Fisher information of all parameters at the estimates; the 95 % likelihood-ratio
+       interval with scipy.stats.chi2.ppf(0.95, 1) and the crossings nearest to t_end; at least 6 used readings
+       per hole (the likelihood is unbounded when a hole can be fitted exactly); a resolvability rule for
+       [1, R_h]; the end-point and containment rules of step 6; the domain of noise levels. It does not give the
+       concentrated likelihood, the structure in g, the information matrix or an algorithm. Earlier functions
+       named: true_vertical_depth, layer_integrals and layered_paleoclimate_perturbation (step_dependencies
+       [1, 2, 5]). Steps 1-6 are unchanged (prompts, headers, references, second solution, tests, mutants; the
+       round-1 whole-task tests and mutants of step 6 are replaced by step 7 ones, and step 6 keeps its own 7
+       cases and 12 mutants). problem_description_main, problem_io, the subfield and tags, the expert time (18 h),
+       the difficulty, solution and verification explanations and background.md (new section 7) were rewritten;
+       edit_label stays difficulty_increase.
+    c. Statistics (derivation, standard likelihood theory; no external source needed). For fixed (g, t) the
+       maximum over T0_h and q0_h is the least-squares residual RSS_h(g, t) = a_h g^2 - 2 b_h g + c_h of hole h
+       on [1, R_h], and the maximum over sigma_h is sigma_h^2 = RSS_h / n_h, so
+       l(g, t) = -sum_h (n_h/2) (log(2 pi RSS_h(g, t)/n_h) + 1). In g this is a sum of Student-type log factors,
+       not a quadratic: every stationary point lies between the holes' own optima b_h/a_h, and pooled least
+       squares (one variance) or fixed weights are different estimators. The expected information of the
+       normal model is block diagonal between the regression parameters and the sigma_h, so its inverse restricted
+       to (T0_h, q0_h, g, t_end) is (sum_h J_h^T J_h / sigma_h^2)^-1, with J_h the Jacobian of hole h's mean;
+       the observed information differs (curvature of the model in t_end, and per-hole scores of g and t_end that
+       do not vanish separately). The likelihood-ratio statistic 2 (l_max - l_p(t)) is chi-square(1) to first
+       order. With n_h - 2 <= 2 residual dimensions left after T0_h and q0_h, the two-parameter family
+       g M_h P_h(t) (M_h the projection off [1, R_h]) can reach the data of the hole exactly and the likelihood
+       is unbounded; with three the surface can still pass close to the data. The stated rule n_h >= 6 keeps at
+       least four residual dimensions (tested at n_h = 6, valid, and 5, ValueError).
+    d. Targets: weighted-score orthogonal construction (tests/step_7.py header; author's design). On the used
+       readings of hole h, y_h = T + A S = T0_h + q0_h R_h + g P_h(t_end) + r_h with r_h = b_h + c_h: b_h = the
+       seeded Gaussian vector projected off the four oracle Jacobian columns [1, R_h, P_h, g dP_h/dt_end] and
+       scaled to the stated rms; c_h = noise_h (k1 e1 + k2 e2) with e1, e2 an orthonormal basis of the projections
+       p_h, d_h of P_h and g dP_h/dt_end off [1, R_h] (stated coefficients) for every hole but one; for that hole
+       c = -lambda X G^-1 v with X = [p, d], G = X^T X, v = sum over the other holes of (n_h/|r_h|^2) X_h^T c_h,
+       and lambda the smaller root of s lambda^2 - n lambda + |b|^2 = 0 (s = v^T G^-1 v), so that the weighted
+       scores sum_h (n_h/|r_h|^2) [P_h, g dP_h/dt_end]^T r_h vanish exactly. With sigma_h^2 = |r_h|^2/n_h every
+       score of the log-likelihood is zero at the generating values: the weighted shared scores are below
+       4e-12 of the largest single-hole term, and the cosines between r_h and the columns 1 and R_h below 3e-13, on
+       every region. The unweighted scores do not vanish, and pooled least squares lands elsewhere (table). Readings
+       shallower than z_min get disturbed values (T0 + 1.5 + 0.02 z + 0.3 N(0, 1)). Offline checks in a clean
+       process (scratch scripts, not part of the upload): a scan of the oracle profile log-likelihood at 2000
+       logarithmically spaced times over the bounds of every region and at 201 times within 4 sigma_t of t_end
+       finds no value above l_max (largest excess 1e-11, at t_end itself, rounding); the profile in g at t_end
+       (20001 points between and around the holes' optima) has a single maximum, at g; the interval ends, the
+       information and l_max follow from the oracle as in the test header. A first, unscaled version of the
+       reference's polynomial in g was ill-conditioned for precise logs (the region of step case 0 rebuilt with
+       0.1 mK logs: polynomial roots rejected, log-likelihood 5.7 too low); the budget runs of item f found it,
+       and the reference now writes the polynomial in a scaled variable and polishes the roots by Newton steps.
+       A region with a discordant hole that would make the profile in g bimodal at t_end was explored and not
+       used: with a precise hole of few readings the global maximum moved to another t_end (dense scan), so the
+       generating values were not the maximum-likelihood solution.
+
+       | Case | Holes: n_used (noise, mK) | g, t_end | sigma_t (yr) | 95 % interval (yr) | pooled LS t_end (x t_end limit) | feature |
+       |---|---|---|---|---|---|---|
+       | step 0 | inclined 7 layers 163 (4.0); 4 layers 137 (12.3); 3 layers 136 (25.6) | 7.8, 11500 | 180.7 | 11147.9-11871.7 | 11401.8 (4.3) | output types |
+       | step 1 | contrasted 1000 m 24 (2.1); deep 2400 m 220 (20.2) | 6.0, 9000 | 38.2 | 8925.1-9080.1 | 9168.9 (9.4) | RSS/(n - 2) changes the short hole's weight by 9 % |
+       | step 2 | uniform k = 3.1, collar at z_min = 0, 121 (6.0); uniform k = 2.4, 57 (15.8) | 6.2, 10500 | 704.4 | 9271.8-12113.5 | 11938.8 (68.5) | erfc oracle, asymmetric interval |
+       | step 3 | inclined (5 m) 326 (5.0); 137 (10.1); 136 (20.2); glaciation 24 ka | 7.8, 11500 | 338.4 | 10884.2-12227.7 | 11431.7 (3.0) | second maximum at 17.98 ka, 9.96 below l_max, valley at 15.7 ka (20.5 below) |
+       | step 4 | step 0 region; bounds 3-11 and 12-60 ka (ValueError), 11-12 ka (valid) | | | | | single maximum over 3-60 ka |
+       | step 5 | step 1 region; bounds 8.95-29.9 and 1.5-9.05 ka (ValueError), 8.9-9.1 ka (valid) | | | | | |
+       | step 6 | vertical, 6 of 8 readings (4.6; z_min 400 m keeps 5: ValueError); 137 (8.0) | 7.0, 10000 | 376.5 | 9245.7-10793.1 | 9877.4 (6.1) | 34 invalid inputs |
+       | general 0 | deep 220 (10.1); steep 1400 m 109 (3.1); 136 (18.2) | 5.0, 9800 | 46.8 | 9707.2-9895.7 | 9940.8 (7.2) | four-interval history |
+       | general 1 | step 1 geometry, other seed and coefficients: 24 (2.1); 220 (20.3) | 6.0, 9000 | 38.3 | 8919.7-9076.2 | 8809.7 (10.6) | + 0.75 K on one log, reversed hole order |
+       | general 2 | step 3 geometry, other seed: 326 (6.0); 137 (11.1); 136 (18.1); glaciation 24 ka | 7.4, 11800 | 466.8 | 10977.0-12843.5 | 11756.3 (1.9) | second maximum at 17.92 ka, 4.62 below l_max |
+
+    e. Tests. tests/step_7.py (7 cases, each self-contained with the generator, the branch-cut oracle and the
+       checks): the table above; every output is compared with the exact values, the interval ends with the
+       oracle's nearest crossings (outward march, Illinois bisection to 1e-12), the chi-square quantile comes from
+       math.erf by bisection, and the maximum over g in the oracle profile is bracketed by the sign changes of its
+       derivative on a 4001-point grid between the holes' own optima (neither solution's method). Oracle premises
+       are asserted where a case depends on them (six used readings, the collar reading used, the asymmetric
+       interval, the second basin of the short glaciation). Validation (step case 6): one hole, holes not a list,
+       a hole that is not a dict, a missing and an extra key, five readings, unequal or 2-D log arrays, a NaN
+       temperature, negative or NaN heat production, rho_c = 0, a zero or missing conductivity, a layer top or a
+       reading beyond the survey, a survey not starting at 0, all readings at one depth ([1, R_h] not resolvable),
+       and the history and bounds rules of step 6 (16 entries). tests/general.py (3 cases) calls
+       regional_deglaciation_inversion with every earlier step from the candidate: a deep three-hole region, a
+       two-hole region with the invariance checks (twice the single-output limits) and a second short-glaciation
+       region.
+    f. Tolerances and error budget (stated in the prompt, the header and the contract): g and t_end relative
+       2e-3; every q0 relative 5e-4; every T0 2e-3 K; the four kinds of standard errors relative 1e-2; t_end_low
+       and t_end_high relative 5e-4; noise_sd relative 3e-3; log_likelihood 0.1 (absolute); n_used exact; domain
+       noise_sd from 1e-4 K to 0.03 K in every hole. Measured as for step 6 (item 6): the reference final step run
+       on every test region with steps 1, 2 and 5 perturbed at their stated accuracies (P by 1e-8 K per K, four
+       patterns smooth in depth and time and one irregular pattern that changes completely with t_end; TVD by
+       1e-6 m; R and S by a relative 1e-9); worst error / limit:
+
+       | Regions | smooth P | irregular P | TVD, R, S | exact inputs |
+       |---|---|---|---|---|
+       | 10 step 7 and whole-task regions | 0.061 | 0.373 (sigma_q0, general case 2) | 0.020 | 0.006 |
+       | rebuilt at 0.1 mK: step 0, step 1, step 6 and step 2 regions | 0.319 (log-likelihood, 436 readings) | 0.520 (noise_sd, six-reading hole) | 0.020 | 0.011 |
+       | rebuilt at 30 mK: step 6, short-glaciation and uniform regions | 0.118 | 0.282 | 0.061 | 0.021 |
+
+       The first limits tried (g, t_end relative 5e-4 and standard errors 5e-3, as in step 6) were exceeded
+       (1.32 times, step case 6, irregular P error): with irregular errors the flat maximum of the profile moves
+       by up to 0.015 standard errors of t_end, which is more than 5e-4 t_end on regions with sigma_t / t_end of
+       3 to 4 %; the interval ends lie on the steep flanks of the profile and stay within 0.016 of 5e-4. The limits
+       on g, t_end and the standard errors were therefore set to 2e-3 and 1e-2 before any platform run (design
+       stage, from the budget, not from pass rates). The log-likelihood limit covers the largest budget error
+       (0.032 at the 0.1 mK floor with 436 readings); noise_sd 3e-3 covers 1.6e-3 (six-reading hole at 0.1 mK,
+       irregular P error). The upper end of the domain (0.03 K) was added so that the stated limits hold over the
+       whole domain: the absolute error of the flat maximum grows like the square root of the noise level. The
+       scientific errors stay outside the limits (item i).
+    g. Second solution (second_solution.py, step 7): Fisher scoring on all regression parameters (iteratively
+       reweighted Gauss-Newton with the noise variances re-estimated at every iterate, Levenberg damping, the
+       log-likelihood as merit function) from every maximum of an 80-point profile scan; at fixed t_end the
+       amplitude by the iteratively reweighted fixed-point (minorize-maximize) ascent from every hole's own
+       optimum and from the pooled value; dP/dt_end from the impulse response of its own hyperbolic-contour
+       layered solver; covariance from the QR factor of the weighted Jacobian; the chi-square quantile as
+       scipy.stats.norm.ppf(0.975)^2; interval ends by Illinois regula falsi; [1, R_h] resolvability from the
+       singular values |u +- v|/sqrt(2) of the two unit columns. It shares neither the concentrated polynomial, the
+       Talbot inversion, the finite difference, scipy.stats.chi2 nor Brent's methods with the reference, and no
+       code with the test oracle. Largest error-to-limit ratio on the step 7 and general cases: 5.3e-4 (noise_sd, step case 1); 1.0 to 2.8 s per call.
+    h. Mutants. Step 7 (each the current reference with one error): pooled_least_squares, two_stage_weights,
+       information_variance_n_minus_2, observed_information, information_blocks_inverted_separately,
+       profile_with_fixed_noise_levels, lr_threshold_without_factor_2, log_likelihood_without_constant,
+       local_search_without_scan, first_hole_rho_c_for_all, halfspace_mean_diffusivity, measured_depth_as_depth,
+       z_min_on_measured_depth, z_min_cut_strict. Whole task (solution.py with one error in the final function):
+       pooled least squares, half-space perturbation, MD as depth, z_min on MD, local search without a scan, the
+       first hole's rho_c for all holes; the five round-1 whole-task mutants (errors in step 6) were removed,
+       since the general tests no longer call step 6. Not registered: the local maximization over g from the
+       pooled value (no test region has a bimodal profile in g, item d), and a mutant without the end-point rule
+       (indistinguishable from the containment rule, as in item 8).
+
+       | Where | Mutant | Cases failed |
+       |---|---|---|
+       | step 7 | pooled_least_squares | 7 of 7 |
+       | step 7 | two_stage_weights | 7 of 7 |
+       | step 7 | information_variance_n_minus_2 | 4 of 7 (1, 2, 5, 6) |
+       | step 7 | observed_information | 5 of 7 (0, 1, 4, 5, 6) |
+       | step 7 | information_blocks_inverted_separately | 7 of 7 |
+       | step 7 | profile_with_fixed_noise_levels | 7 of 7 |
+       | step 7 | lr_threshold_without_factor_2 | 7 of 7 |
+       | step 7 | log_likelihood_without_constant | 7 of 7 |
+       | step 7 | local_search_without_scan | 1 of 7 (case 3) |
+       | step 7 | first_hole_rho_c_for_all | 7 of 7 |
+       | step 7 | halfspace_mean_diffusivity | 6 of 7 |
+       | step 7 | measured_depth_as_depth | 6 of 7 |
+       | step 7 | z_min_on_measured_depth | 6 of 7 |
+       | step 7 | z_min_cut_strict | 1 of 7 (case 2) |
+       | whole task | whole_task_pooled_least_squares | 3 of 3 |
+       | whole task | whole_task_halfspace_mean_diffusivity | 3 of 3 |
+       | whole task | whole_task_measured_depth_as_depth | 3 of 3 |
+       | whole task | whole_task_z_min_on_measured_depth | 3 of 3 |
+       | whole task | whole_task_local_search_without_scan | 1 of 3 (case 2) |
+       | whole task | whole_task_first_hole_rho_c_for_all | 3 of 3 |
+
+       Steps 1-6 mutants: unchanged results (item 9 and the revision 10b table), rerun in this round.
+
+    i. Regression tests and reruns. tools/crown_check.py, all modes, every case alone in a fresh process, one
+       BLAS/OpenMP thread, -j 2, on the shipped files: summary ALL OK:
+
+       | Mode | Result |
+       |---|---|
+       | format | OK (every general case calls regional_deglaciation_inversion) |
+       | REF steps 1-7, general (solution.py) | 22/22, 12/12, 12/12, 7/7, 8/8, 7/7, 7/7, 3/3; solution.py passes every step file |
+       | SECOND steps 1-7, general | 22/22, 12/12, 12/12, 7/7, 8/8, 7/7, 7/7, 3/3 |
+       | MUT | every step and whole-task mutant fails at least one case of its target tests |
+       | SHIFT +-1e-12 (step outputs; every evaluated function in general) | all cases pass |
+       | CONTROL None / 0.0 | 0 cases pass in every step and in general |
+
+       Reference final call 0.3 to 1.1 s; each step 7 or general case takes at most 4.1 s with the reference
+       and 6.7 s with the second solution. The offline evidence scripts of items d and f were rerun on the final
+       files. solution.py and second_solution.py were each run twice with one thread and once with two threads on
+       four of the regions (step cases 0, 3 and 6, general case 2): identical SHA-256 digests of the outputs.
+    j. Not changed or open. relevant_experience is still the author's placeholder. The difficulty band cannot be
+       measured locally, and no blind-solver calibration of step 7 was run in this round (no independent solver
+       was available in this session): whether strong agents solve the regional step reliably is not known. The
+       difficulty comes from the statistical model (per-hole variances estimated jointly, concentrated
+       likelihood, global maximization in g and t_end, expected information, likelihood-ratio profile with the
+       variances re-maximized); every convention needed for a unique answer is stated.

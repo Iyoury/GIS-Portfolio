@@ -39,6 +39,18 @@ Differences from solution.py (method, not formatting):
     Illinois regula falsi (solution.py: variable projection over t_end with
     a 121-point scan, bounded Brent and Gauss-Newton polish, a fourth-order
     finite difference for dP/dt_end, scipy.stats.f and Brent's root finder).
+  * Regional inversion (step 7): Fisher scoring (iteratively reweighted
+    Gauss-Newton with Levenberg damping and the log-likelihood as merit
+    function) on all regression parameters, the noise variances re-estimated
+    at every iterate, from every maximum of a coarse profile scan; at fixed
+    t_end the amplitude by iteratively reweighted fixed-point ascent from every
+    hole's own optimum and from the pooled value; dP/dt_end from the impulse
+    response on its own contour; covariance from the QR factor of the weighted
+    Jacobian; the chi-square quantile as the square of scipy.stats.norm.ppf;
+    interval ends by Illinois regula falsi (solution.py: concentrated profile
+    likelihood with the roots of the stationarity polynomial in g, Brent on a
+    121-point scan, a fourth-order finite difference, scipy.stats.chi2 and
+    Brent's root finder).
 """
 import math
 import numpy as np
@@ -498,3 +510,243 @@ def deglaciation_heat_flow_inversion(survey_md, survey_inc, survey_azi, log_md, 
             "sigma_T0": float(sig[0]), "sigma_q0": float(sig[1]), "sigma_amplitude": float(sig[2]),
             "sigma_t_end": float(sig[3]), "t_end_low": float(t_low), "t_end_high": float(t_high),
             "rms_residual": float(np.sqrt(cmin / n)), "n_used": n}
+
+
+# ---------------------------------------------------------------- step 7 (second solution)
+def _sr_irls_g(co, g0):
+    """Fixed-point (iteratively reweighted) ascent of -sum_h (n_h / 2) log(a_h g^2 - 2 b_h g + c_h) from g0: with
+    the weights w_h = n_h / Q_h(g_k) frozen, the update g_{k+1} = sum w_h b_h / sum w_h a_h maximizes the
+    minorizing quadratic (log Q <= log Q_k + Q / Q_k - 1), so the log-likelihood never decreases."""
+    g = float(g0)
+    for _ in range(5000):
+        w = [n / (a * g * g - 2.0 * b * g + c) for a, b, c, n in co]
+        gn = sum(wi * b for wi, (a, b, c, n) in zip(w, co)) / sum(wi * a for wi, (a, b, c, n) in zip(w, co))
+        if abs(gn - g) <= 1e-15 * max(1.0, abs(g)):
+            return gn
+        g = gn
+    return g
+
+
+def regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape, t_end_bounds):
+    """Second solution: per-hole response by the hyperbolic contour with its impulse response for dP/dt_end;
+    the amplitude at fixed t_end by iteratively reweighted fixed-point ascent from every hole's own optimum;
+    a coarse profile scan; Fisher scoring (iteratively reweighted Gauss-Newton with Levenberg damping) on all
+    regression parameters from every scan maximum; covariance from the QR factor of the weighted Jacobian;
+    chi-square quantile from the normal quantile; interval ends by Illinois regula falsi."""
+    keys = {"survey_md", "survey_inc", "survey_azi", "log_md", "log_temp", "layer_top_md", "layer_k",
+            "heat_production", "rho_c", "z_min"}
+    if not isinstance(holes, (list, tuple)) or len(holes) < 2:
+        raise ValueError("need a list of at least two holes")
+    if any(not isinstance(hd, dict) or set(hd.keys()) != keys for hd in holes):
+        raise ValueError("bad hole record")
+    sh = np.asarray(hist_dT_shape, float)
+    tk = np.asarray(hist_t_years, float)
+    if sh.ndim != 1 or tk.ndim != 1 or sh.size < 2 or tk.size + 1 != sh.size:
+        raise ValueError("bad history")
+    if not np.all(np.isfinite(np.concatenate([sh, tk]))) or tk[0] <= 0 or np.any(np.diff(tk) <= 0):
+        raise ValueError("bad history")
+    if not sh[0] != sh[1]:
+        raise ValueError("t_end not identifiable")
+    if np.asarray(t_end_bounds).shape != (2,):
+        raise ValueError("bad bounds")
+    lo, hi = (float(v) for v in np.asarray(t_end_bounds, float))
+    if not (math.isfinite(lo) and math.isfinite(hi) and 0 < lo < hi < tk[0]):
+        raise ValueError("bad bounds")
+    dsh = sh[0] - sh[1]
+    H = len(holes)
+    W = []
+    for hd in holes:
+        lm = np.asarray(hd["log_md"], float)
+        lt = np.asarray(hd["log_temp"], float)
+        if lm.ndim != 1 or lt.shape != lm.shape or not np.all(np.isfinite(lt)):
+            raise ValueError("bad log")
+        A = hd["heat_production"]
+        if not (np.isfinite(A) and A >= 0):
+            raise ValueError("bad heat production")
+        zr = true_vertical_depth(hd["survey_md"], hd["survey_inc"], hd["survey_azi"], lm)
+        tops = np.asarray(true_vertical_depth(hd["survey_md"], hd["survey_inc"], hd["survey_azi"],
+                                              np.asarray(hd["layer_top_md"], float)), float)
+        use = np.asarray(zr) >= hd["z_min"]
+        n = int(use.sum())
+        if n < 6:
+            raise ValueError("fewer than 6 readings in a hole")
+        z = np.asarray(zr, float)[use]
+        R, S = layer_integrals(tops, hd["layer_k"], z)
+        layered_paleoclimate_perturbation(z[:1], tops, hd["layer_k"], hd["rho_c"], tk, sh[1:])   # validation
+        B = np.column_stack([np.ones(n), R])
+        nb = np.linalg.norm(B, axis=0)
+        # column-scaled [1, R] = [u, v]: the singular values are |u + v| / sqrt(2) and |u - v| / sqrt(2)
+        if nb[1] == 0:
+            raise ValueError("T0 and q0 not resolvable")
+        u, v = B[:, 0] / nb[0], B[:, 1] / nb[1]
+        if min(np.linalg.norm(u - v), np.linalg.norm(u + v)) / math.sqrt(2.0) < 1e-8:
+            raise ValueError("T0 and q0 not resolvable")
+        Qb, _ = np.linalg.qr(B)
+        y = lt[use] + float(A) * S
+        W.append(dict(n=n, z=z, tops=tops, k=np.asarray(hd["layer_k"], float), rc=float(hd["rho_c"]), R=R, y=y, Qb=Qb,
+                      memo={}))
+
+    def resp(w, t):
+        if t not in w["memo"]:
+            U = np.ones(w["n"])
+            Rt = np.zeros(w["n"])
+            pos = w["z"] > 0
+            if np.any(pos):
+                u, r = _ss_response_and_rate(w["z"][pos], t * YEAR, w["tops"], w["k"], w["rc"])
+                U[pos], Rt[pos] = u, r * YEAR
+            w["memo"][t] = (U, Rt)
+        return w["memo"][t]
+
+    for w in W:
+        Uk = [resp(w, float(t))[0] for t in tk]
+        Pf = sh[1] * Uk[0]
+        for i in range(2, sh.size):
+            Pf = Pf + sh[i] * (Uk[i - 1] - Uk[i - 2])
+        w["Pf"] = Pf
+
+    def P_dP(w, t):
+        U, Rt = resp(w, float(t))
+        return w["Pf"] + dsh * U, dsh * Rt
+
+    def perp(w, v):
+        return v - w["Qb"] @ (w["Qb"].T @ v)
+
+    def loglik_from_rss(rss):
+        return -sum(0.5 * w["n"] * (math.log(2.0 * math.pi * r / w["n"]) + 1.0) for w, r in zip(W, rss))
+
+    def profile(t):
+        co = []
+        for w in W:
+            p = perp(w, P_dP(w, t)[0])
+            yp = perp(w, w["y"])
+            co.append((float(p @ p), float(p @ yp), float(yp @ yp), w["n"]))
+        starts = [b / a for a, b, c, n in co]
+        starts.append(sum(b for a, b, c, n in co) / sum(a for a, b, c, n in co))
+        best = None
+        for g0 in starts:
+            g = _sr_irls_g(co, g0)
+            val = loglik_from_rss([a * g * g - 2 * b * g + c for a, b, c, n in co])
+            if best is None or val > best[0]:
+                best = (val, g)
+        return best
+
+    def fit_state(th):
+        """residuals of every hole at th = (T0_1, q0_1, ..., T0_H, q0_H, g, t)."""
+        out = []
+        for h, w in enumerate(W):
+            P, dP = P_dP(w, th[-1])
+            r = w["y"] - th[2 * h] - th[2 * h + 1] * w["R"] - th[-2] * P
+            out.append((r, P, dP))
+        return out
+
+    def jac(h, w, P, dP, g):
+        J = np.zeros((w["n"], 2 * H + 2))
+        J[:, 2 * h] = 1.0
+        J[:, 2 * h + 1] = w["R"]
+        J[:, -2] = P
+        J[:, -1] = g * dP
+        return J
+
+    ts = np.exp(np.linspace(math.log(lo), math.log(hi), 80))
+    prof = [profile(t) for t in ts]
+    vals = np.array([p[0] for p in prof])
+    best = None
+    for i in range(1, ts.size - 1):
+        if not (vals[i] >= vals[i - 1] and vals[i] >= vals[i + 1]):
+            continue
+        g0, t0 = prof[i][1], float(ts[i])
+        th = np.zeros(2 * H + 2)
+        for h, w in enumerate(W):
+            m = np.linalg.lstsq(np.column_stack([np.ones(w["n"]), w["R"]]), w["y"] - g0 * P_dP(w, t0)[0], rcond=None)[0]
+            th[2 * h:2 * h + 2] = m
+        th[-2], th[-1] = g0, t0
+        st = fit_state(th)
+        ll = loglik_from_rss([float(r @ r) for r, P, dP in st])
+        lam = 1e-4
+        for _ in range(300):
+            # Fisher scoring with the noise variances at their current maximum-likelihood values
+            Jw, rw = [], []
+            for h, (w, (r, P, dP)) in enumerate(zip(W, st)):
+                s = math.sqrt(w["n"] / float(r @ r))
+                Jw.append(s * jac(h, w, P, dP, th[-2]))
+                rw.append(s * r)
+            Jw, rw = np.vstack(Jw), np.concatenate(rw)
+            sc = np.linalg.norm(Jw, axis=0)
+            A = (Jw / sc).T @ (Jw / sc)
+            gv = (Jw / sc).T @ rw
+            moved = False
+            while lam < 1e10:
+                step = np.linalg.solve(A + lam * np.diag(np.diag(A)), gv) / sc
+                new = th + step
+                new[-1] = min(max(new[-1], lo), hi)
+                stn = fit_state(new)
+                lln = loglik_from_rss([float(r @ r) for r, P, dP in stn])
+                if lln >= ll:
+                    moved = True
+                    break
+                lam *= 8.0
+            if not moved:
+                break
+            done = abs(new[-1] - th[-1]) <= 1e-13 * th[-1] and abs(new[-2] - th[-2]) <= 1e-13 * abs(th[-2]) + 1e-300
+            th, st, ll = new, stn, lln
+            lam = max(lam / 8.0, 1e-12)
+            if done:
+                break
+        if best is None or ll > best[1]:
+            best = (th.copy(), ll, st)
+    if best is None:
+        raise ValueError("maximum of the profile likelihood at an end point")
+    th, l_max, st = best
+    t_hat, g = float(th[-1]), float(th[-2])
+    if not (lo < t_hat < hi) or max(vals[0], vals[-1]) >= l_max:
+        raise ValueError("maximum of the profile likelihood at an end point")
+    # expected Fisher information sum_h J_h^T J_h / sigma_h^2 through the QR factor of the weighted Jacobian
+    Jw = []
+    sds = []
+    for h, (w, (r, P, dP)) in enumerate(zip(W, st)):
+        sd = math.sqrt(float(r @ r) / w["n"])
+        sds.append(sd)
+        Jw.append(jac(h, w, P, dP, g) / sd)
+    Jw = np.vstack(Jw)
+    sc = np.linalg.norm(Jw, axis=0)
+    _, Rj = np.linalg.qr(Jw / sc)
+    Ri = np.linalg.solve(Rj, np.eye(Rj.shape[0]))
+    sig = np.sqrt(np.sum(Ri * Ri, axis=1)) / sc
+    zq = float(stats.norm.ppf(0.975))
+    level = l_max - 0.5 * zq * zq
+
+    def f(t):
+        return profile(t)[0] - level
+
+    def edge(direction):
+        bound = lo if direction < 0 else hi
+        a, fa = t_hat, l_max - level
+        step = 0.1 * sig[-1]
+        while True:
+            b = a + direction * step
+            if direction * (b - bound) >= 0:
+                b = bound
+            fb = f(b)
+            if fb <= 0:
+                break
+            if b == bound:
+                raise ValueError("interval not contained in the bounds")
+            a, fa = b, fb
+            step = min(step * 1.3, 0.4 * sig[-1])
+        for _ in range(300):                    # Illinois regula falsi
+            c = b - fb * (b - a) / (fb - fa)
+            fc = f(c)
+            if fc * fb < 0:
+                a, fa = b, fb
+            else:
+                fa *= 0.5
+            b, fb = c, fc
+            if abs(b - a) <= 1e-12 * t_hat or fc == 0:
+                break
+        return b
+
+    t_low, t_high = edge(-1), edge(+1)
+    out_holes = [{"T0": float(th[2 * h]), "q0": float(th[2 * h + 1]), "sigma_T0": float(sig[2 * h]),
+                  "sigma_q0": float(sig[2 * h + 1]), "noise_sd": float(sds[h]), "n_used": W[h]["n"]} for h in range(H)]
+    return {"g": g, "t_end": t_hat, "sigma_g": float(sig[-2]), "sigma_t_end": float(sig[-1]),
+            "t_end_low": float(t_low), "t_end_high": float(t_high), "log_likelihood": float(l_max), "holes": out_holes}
