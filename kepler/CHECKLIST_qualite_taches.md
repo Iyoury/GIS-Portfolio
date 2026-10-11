@@ -79,3 +79,36 @@ la condition « pas de famille miroir d'une autre autour d'un axe de trou » doi
 du trou, pas seulement aux extrémités (une indécidabilité à mi-trou a produit 13 fausses passes
 dans l'indépendante). Au-delà, pour la bande « résolu rarement », il faut un sujet où l'agent ne
 peut pas vérifier sa propre réponse par la cohérence interne des données.
+
+## Leçon du cas dykes magnétiques (`dyke-swarm-remanence`)
+
+Sujet construit après la consigne « il faut en sciences plus dur, pas la structure » : douze dykes
+de trois essaims en éventail, relevé magnétique au sol et affleurements (susceptibilité des
+échantillons, pas de paléomagnétisme), partition en essaims et pôle de chaque essaim. Les leviers
+sont tous physiques : non-unicité induit/rémanent, composante le long de la direction invisible
+dans un dyke 2D, direction commune résolue seulement par l'essaim, éventails qui se recouvrent,
+rémanence visqueuse le long du champ actuel (reconnue par l'incohérence du modèle naïf et par le
+magnétisme des roches), anomalie = contraste avec l'encaissant (susceptibilité du socle donnée).
+Ce que les sondes locales ont appris :
+
+- La première version (quatre leviers « manuel ») a été résolue en 12 commandes par un Opus à
+  effort par défaut, avec une précision de référence. Un levier qui est du savoir standard est
+  appliqué directement par un agent fort : il fait la faisabilité, pas la difficulté.
+- La rémanence visqueuse (levier de jugement : le modèle naïf devient incohérent, il faut nommer
+  la cause et estimer conjointement le rapport) a été trouvée par la seconde sonde en 18
+  commandes, via le χ² du regroupement. Un jugement découvrable par incohérence est découvert
+  par un agent appliqué ; la bande de difficulté se joue sur le nombre de tels jugements.
+- Un essaim à deux polarités (trois dykes normaux, un inversé) a été construit et abandonné :
+  avec une contrainte à une dimension par dyke, un dyke inversé isolé est indécidable entre son
+  essaim et l'antipode de la projection d'un autre essaim ; le générateur ne trouvait plus
+  d'instance séparable. Règle : avant d'ajouter un levier de jugement, vérifier qu'il reste
+  identifiable avec les degrés de liberté des données (point 5), sinon c'est un jeu de devinettes.
+- Rapport visqueux déterminé à ±0,1 près seulement par les angles : la précision des directions
+  d'essaim est limitée par l'erreur de pendage d'affleurement propagée par la dégénérescence
+  pendage/direction. Les portes ont été fixées sur ce que les données permettent (test avec des
+  affleurements sans erreur : 1°), pas sur ce que la référence obtient par chance.
+- Les deux sondes ont utilisé le module exact du champ total ; le générateur projetait l'anomalie
+  sur le champ (écart de 60 nT sur les dykes forts). Règle : le générateur mesure ce que
+  l'instrument mesure, pas l'approximation d'interprétation.
+- Les instances sont sélectionnées pour que les données décident (déplacement ou échange d'un
+  dyke à ≥ 4σ) ; c'est dit dans le README et dans les limites.
