@@ -5,76 +5,147 @@ from scipy.optimize import brentq, minimize_scalar
 
 _RG_KEYS = ("survey_md", "survey_inc", "survey_azi", "log_md", "log_temp", "layer_top_md", "layer_k",
             "heat_production", "rho_c", "z_min")
+_RG_PHI = np.linspace(-0.995, 0.995, 399)
 
 
-def _rg_best_g(co):
-    """Global maximum over g of -sum_h (n_h / 2) log(a_h g^2 - 2 b_h g + c_h): (g, value without constants).
+def _rg_white(v, phi):
+    """Prais-Winsten transform along axis 0 (readings by increasing MD)."""
+    v = np.asarray(v, float)
+    out = np.empty_like(v)
+    out[0] = np.sqrt(1.0 - phi * phi) * v[0]
+    out[1:] = v[1:] - phi * v[:-1]
+    return out
 
-    Q_h = a_h (g - g_h)^2 + m_h with g_h = b_h / a_h and m_h = c_h - b_h^2 / a_h > 0. Every stationary point lies
-    between the smallest and the largest g_h (the derivative is positive below and negative above them). In the
-    scaled variable x = (g - mid) / half these points are the real roots in [-1, 1] of the polynomial
-    sum_h n_h (x - x_h) / v_h prod_{j != h} (1 + (x - x_j)^2 / v_j), v_h = m_h / (a_h half^2); each root is polished
-    by Newton steps on the stationarity condition. When the holes' widths sqrt(m_h / a_h) differ by many orders of
-    magnitude the polynomial roots can be inaccurate, so the sign changes of the derivative on a grid refined around
-    every hole's optimum (offsets of 1e-3 to 1e3 widths) are added, located with Brent's root finder; the best
-    candidate is returned."""
-    gh = np.array([b / a for a, b, c, n in co])
-    lo, hi = float(gh.min()), float(gh.max())
 
-    def value(g):
-        return -sum(0.5 * n * np.log((a * g * g - 2.0 * b * g + c) / n) for a, b, c, n in co)
+class _RgHole:
+    """Gram polynomials in phi of the whitened [q1, q2, y_c, P_perp] of one hole at one t_end."""
 
-    if hi - lo <= 1e-14 * (abs(lo) + abs(hi)):
-        return lo, float(value(lo))
-    mid, half = 0.5 * (lo + hi), 0.5 * (hi - lo)
-    Pn = np.polynomial.polynomial
-    xh = (gh - mid) / half
-    vh = np.array([(c - b * b / a) / (a * half * half) for a, b, c, n in co])
-    num = np.zeros(1)
-    for i, (a, b, c, n) in enumerate(co):
-        term = np.array([-xh[i], 1.0]) * (n / vh[i])
-        for j in range(len(co)):
-            if j != i:
-                term = Pn.polymul(term, [1.0 + xh[j] ** 2 / vh[j], -2.0 * xh[j] / vh[j], 1.0 / vh[j]])
-        num = Pn.polyadd(num, term)
+    def __init__(self, d, P):
+        Q2 = d["Q2"]
+        pp = P - Q2 @ (Q2.T @ P)
+        yp = d["yp"]
+        self.g0 = float(pp @ yp) / float(pp @ pp)
+        V = np.column_stack([Q2, yp - self.g0 * pp, pp])
+        self.C0 = V.T @ V
+        self.C1 = V[1:].T @ V[:-1] + V[:-1].T @ V[1:]
+        self.C2 = V[:-1].T @ V[:-1] - np.outer(V[0], V[0])
+        self.n = d["n"]
+        # coefficient arrays on the phi grid
+        self.a, self.b, self.c = self.abc(_RG_PHI)
+        self.lp1 = 0.5 * np.log1p(-_RG_PHI * _RG_PHI)
+        self.flat = tuple([float(C[i, j]) for i in range(4) for j in range(4)] for C in (self.C0, self.C1, self.C2))
 
-    def grad(g):
-        return sum(n * (a * g - b) / (a * g * g - 2.0 * b * g + c) for a, b, c, n in co)
+    def abc(self, phi):
+        """(a, b, c) of Q(phi, g) = c - 2 b (g - g0) + a (g - g0)^2 for an array of phi."""
+        phi = np.asarray(phi, float)[..., None, None]
+        G = self.C0 - phi * self.C1 + phi * phi * self.C2
+        A11, A12, A22 = G[..., 0, 0], G[..., 0, 1], G[..., 1, 1]
+        det = A11 * A22 - A12 * A12
+        By, Bp = G[..., 0:2, 2], G[..., 0:2, 3]
 
-    def hess(g):
-        return sum(n * (a * (a * g * g - 2.0 * b * g + c) - 2.0 * (a * g - b) ** 2) / (a * g * g - 2.0 * b * g + c) ** 2
-                   for a, b, c, n in co)
+        def quad(u, v):
+            return (u[..., 0] * (A22 * v[..., 0] - A12 * v[..., 1]) + u[..., 1] * (A11 * v[..., 1] - A12 * v[..., 0])) / det
 
-    cand = [lo, hi]
-    for z in Pn.polyroots(num):
-        if abs(z.imag) <= 1e-3 * (1.0 + abs(z.real)) and abs(z.real) <= 1.0 + 1e-3:
-            g = min(max(mid + half * float(z.real), lo), hi)
-            for _ in range(8):           # Newton polish on the stationarity condition
-                hg = hess(g)
-                if hg == 0.0:
-                    break
-                gn = g - grad(g) / hg
-                if not (lo <= gn <= hi) or gn == g:
-                    break
-                g = gn
-            cand.append(g)
-    wh = np.sqrt(np.maximum(vh, 0.0)) * half
+        c = G[..., 2, 2] - quad(By, By)
+        b = G[..., 2, 3] - quad(By, Bp)
+        a = G[..., 3, 3] - quad(Bp, Bp)
+        return a, b, c
+
+    def abc1(self, phi):
+        """Scalar version of abc in plain floats."""
+        p2 = phi * phi
+        c0, c1, c2 = self.flat
+        G = [c0[k] - phi * c1[k] + p2 * c2[k] for k in range(16)]
+        A11, A12, A22 = G[0], G[1], G[5]
+        det = A11 * A22 - A12 * A12
+        y1, y2, p1, q2 = G[2], G[6], G[3], G[7]
+        cyy = G[10] - (y1 * (A22 * y1 - A12 * y2) + y2 * (A11 * y2 - A12 * y1)) / det
+        cyp = G[11] - (y1 * (A22 * p1 - A12 * q2) + y2 * (A11 * q2 - A12 * p1)) / det
+        cpp = G[15] - (p1 * (A22 * p1 - A12 * q2) + q2 * (A11 * q2 - A12 * p1)) / det
+        return cpp, cyp, cyy
+
+    def value(self, phi, g):
+        """-(n/2) log Q(phi, g) + (1/2) log(1 - phi^2) for a scalar phi."""
+        a, b, c = self.abc1(phi)
+        x = g - self.g0
+        q = c - 2.0 * b * x + a * x * x
+        if not (q > 0.0) or not (abs(phi) < 1.0):
+            return -np.inf
+        return -0.5 * self.n * np.log(q) + 0.5 * np.log1p(-phi * phi)
+
+    def grid_values(self, g):
+        """Values on the phi grid for an array of g: shape (len(phi grid), len(g))."""
+        x = np.atleast_1d(g)[None, :] - self.g0
+        q = self.c[:, None] - 2.0 * self.b[:, None] * x + self.a[:, None] * x * x
+        with np.errstate(divide="ignore", invalid="ignore"):
+            v = -0.5 * self.n * np.log(q) + self.lp1[:, None]
+        return np.where(q > 0, v, -np.inf)
+
+    def best_phi(self, g):
+        """Maximum over phi of value(phi, g): best grid point refined by bounded Brent over its neighbouring cells,
+        every grid maximum within 1 of the best one refined."""
+        v = self.grid_values(g)[:, 0]
+        m = v.size
+        best = (-np.inf, 0.0)
+        top = float(np.max(v))
+        for i in range(m):
+            if v[i] < top - 1.0:
+                continue
+            if (i > 0 and v[i] < v[i - 1]) or (i < m - 1 and v[i] < v[i + 1]):
+                continue
+            lo, hi = _RG_PHI[max(i - 1, 0)], _RG_PHI[min(i + 1, m - 1)]
+            if i == 0:
+                lo = -0.99999
+            if i == m - 1:
+                hi = 0.99999
+            res = minimize_scalar(lambda p: -self.value(p, g), bounds=(lo, hi), method="bounded",
+                                  options={"xatol": 1e-11, "maxiter": 200})
+            if -res.fun > best[0]:
+                best = (float(-res.fun), float(res.x))
+        return best
+
+
+def _rg_profile_at(hs):
+    """Maximum over g and every phi_h of sum_h value_h(phi_h, g) (all other parameters concentrated):
+    (value, g, [phi_h])."""
+    own = []
+    glo, ghi = np.inf, -np.inf
+    for hh in hs:
+        with np.errstate(divide="ignore", invalid="ignore"):
+            gopt = hh.g0 + hh.b / hh.a
+            vopt = -0.5 * hh.n * np.log(hh.c - hh.b * hh.b / hh.a) + hh.lp1
+        k = int(np.argmax(vopt))
+        width = np.sqrt(max((hh.c[k] - hh.b[k] ** 2 / hh.a[k]) / hh.a[k], 0.0))
+        own.append((float(gopt[k]), float(width)))
+        glo, ghi = min(glo, float(np.min(gopt))), max(ghi, float(np.max(gopt)))
+    span = ghi - glo
+    glo, ghi = glo - 0.05 * span - 1e-12, ghi + 0.05 * span + 1e-12
     offs = np.concatenate((-np.geomspace(1e3, 1e-3, 61), [0.0], np.geomspace(1e-3, 1e3, 61)))
-    pts = np.unique(np.clip(np.concatenate([np.linspace(lo, hi, 201)] + [g0 + w0 * offs for g0, w0 in zip(gh, wh)]),
-                            lo, hi))
-    ca = np.array([[a, b, c, n] for a, b, c, n in co], float)
-    dv = np.sum(ca[:, 3:4] * (ca[:, 0:1] * pts - ca[:, 1:2])
-                / (ca[:, 0:1] * pts * pts - 2.0 * ca[:, 1:2] * pts + ca[:, 2:3]), axis=0)
-    for i in np.nonzero((dv[:-1] < 0.0) & (dv[1:] >= 0.0))[0]:
-        cand.append(brentq(grad, pts[i], pts[i + 1], xtol=1e-15 * max(1.0, abs(pts[i])), rtol=1e-15, maxiter=300)
-                    if dv[i + 1] > 0.0 else float(pts[i + 1]))
-    vals = [value(g) for g in cand]
-    k = int(np.argmax(vals))
-    return cand[k], float(vals[k])
+    pts = np.unique(np.clip(np.concatenate([np.linspace(glo, ghi, 201)] + [g0 + w0 * offs for g0, w0 in own]), glo, ghi))
+    tot = np.zeros(pts.size)
+    for hh in hs:
+        tot += np.max(hh.grid_values(pts), axis=0)
+
+    def total(g):
+        return sum(hh.best_phi(g)[0] for hh in hs)
+
+    cand = []
+    m = pts.size
+    for i in range(m):
+        if (i > 0 and tot[i] < tot[i - 1]) or (i < m - 1 and tot[i] < tot[i + 1]):
+            continue
+        lo, hi = pts[max(i - 1, 0)], pts[min(i + 1, m - 1)]
+        res = minimize_scalar(lambda g: -total(g), bounds=(lo, hi), method="bounded",
+                              options={"xatol": 1e-13 * max(1.0, abs(pts[i])), "maxiter": 300})
+        cand.append((float(-res.fun), float(res.x)))
+    val, g = max(cand)
+    phis = [hh.best_phi(g)[1] for hh in hs]
+    return val, g, phis
 
 
 def regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape, t_end_bounds):
-    """Maximum-likelihood regional estimate of the glacial amplitude g and the end of the glaciation t_end."""
+    """Maximum-likelihood regional estimate of the glacial amplitude g and the end of the glaciation t_end with
+    stationary AR(1) noise in every hole."""
     if not isinstance(holes, (list, tuple)) or len(holes) < 2:
         raise ValueError("holes must be a list of at least 2 boreholes")
     for hd in holes:
@@ -111,11 +182,12 @@ def regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape, t_end_bo
         z_all = true_vertical_depth(hd["survey_md"], hd["survey_inc"], hd["survey_azi"], log_md)
         tops = true_vertical_depth(hd["survey_md"], hd["survey_inc"], hd["survey_azi"],
                                    np.asarray(hd["layer_top_md"], float))
-        keep = np.asarray(z_all >= hd["z_min"])
-        n = int(np.count_nonzero(keep))
-        if n < 6:
-            raise ValueError("fewer than 6 readings with TVD >= z_min in a hole")
-        z, T = np.asarray(z_all, float)[keep], log_temp[keep]
+        used = np.nonzero(np.asarray(z_all) >= hd["z_min"])[0]
+        n = int(used.size)
+        if n < 8:
+            raise ValueError("fewer than 8 readings with TVD >= z_min in a hole")
+        used = used[np.argsort(log_md[used], kind="stable")]          # the AR(1) order: increasing MD
+        z, T = np.asarray(z_all, float)[used], log_temp[used]
         R, S = layer_integrals(tops, hd["layer_k"], z)
         R, S = np.asarray(R, float), np.asarray(S, float)
         G2 = np.column_stack([np.ones(n), R])
@@ -129,7 +201,7 @@ def regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape, t_end_bo
             z, tops, hd["layer_k"], hd["rho_c"], np.concatenate(([t_lo], t_known)),
             np.concatenate(([shape[1]], shape[1:]))), float)
         data.append({"n": n, "z": z, "tops": tops, "k": hd["layer_k"], "rc": hd["rho_c"], "R": R, "y": y,
-                     "Q2": Q2, "yp": yp, "c": float(yp @ yp), "P_fix": P_fix, "cache": {}})
+                     "Q2": Q2, "yp": yp, "P_fix": P_fix, "cache": {}})
 
     def U(d, t):
         t = float(t)
@@ -142,20 +214,19 @@ def regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape, t_end_bo
         return d["P_fix"] + ds * U(d, t)
 
     def dPdt(d, t):
-        h = 1e-3 * t
+        h = 1e-2 * t
         u = [U(d, t + j * h) for j in (-2, -1, 1, 2)]
         return ds * (u[0] - 8.0 * u[1] + 8.0 * u[2] - u[3]) / (12.0 * h)
 
-    const = -0.5 * sum(d["n"] for d in data) * (np.log(2.0 * np.pi) + 1.0)
+    const = -0.5 * sum(d["n"] * (np.log(2.0 * np.pi / d["n"]) + 1.0) for d in data)
+    memo = {}
 
     def profile(t):
-        co = []
-        for d in data:
-            p = P(d, t)
-            p = p - d["Q2"] @ (d["Q2"].T @ p)
-            co.append((float(p @ p), float(p @ d["yp"]), d["c"], d["n"]))
-        g, v = _rg_best_g(co)
-        return v + const, g
+        t = float(t)
+        if t not in memo:
+            v, g, phis = _rg_profile_at([_RgHole(d, P(d, t)) for d in data])
+            memo[t] = (v + const, g, phis)
+        return memo[t]
 
     def lp(t):
         return profile(t)[0]
@@ -180,36 +251,44 @@ def regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape, t_end_bo
     if best_t is None or max(vals[0], vals[-1]) >= best_v or not (t_lo < best_t < t_hi):
         raise ValueError("the maximum of the profile likelihood over [t_lo, t_hi] lies at an end point")
     t_hat = best_t
-    l_max, g = profile(t_hat)
-    # per-hole estimates, ML noise levels and the expected Fisher information at the estimate
+    _, g, phis = profile(t_hat)
+    # per-hole estimates (generalized least squares at the estimates), noise parameters, exact log-likelihood and the
+    # expected Fisher information of the regression parameters at the estimate
     H = len(data)
     npar = 2 * H + 2
     info = np.zeros((npar, npar))
     out_holes = []
+    l_max = 0.0
     for h, d in enumerate(data):
+        ph = phis[h]
         Ph = P(d, t_hat)
         G2 = np.column_stack([np.ones(d["n"]), d["R"]])
-        m, *_ = np.linalg.lstsq(G2, d["y"] - g * Ph, rcond=None)
-        r = d["y"] - g * Ph - G2 @ m
-        s2 = float(r @ r) / d["n"]
+        m, *_ = np.linalg.lstsq(_rg_white(G2, ph), _rg_white(d["y"] - g * Ph, ph), rcond=None)
+        u = _rg_white(d["y"] - g * Ph - G2 @ m, ph)
+        s2 = float(u @ u) / d["n"]
+        l_max += -0.5 * d["n"] * (np.log(2.0 * np.pi * s2) + 1.0) + 0.5 * np.log1p(-ph * ph)
         J = np.zeros((d["n"], npar))
         J[:, 2 * h] = 1.0
         J[:, 2 * h + 1] = d["R"]
         J[:, -2] = Ph
         J[:, -1] = g * dPdt(d, t_hat)
-        info += J.T @ J / s2
-        out_holes.append({"T0": float(m[0]), "q0": float(m[1]), "noise_sd": float(np.sqrt(s2)), "n_used": d["n"]})
+        Jw = _rg_white(J, ph)
+        info += Jw.T @ Jw / s2
+        out_holes.append({"T0": float(m[0]), "q0": float(m[1]), "phi": float(ph), "innovation_sd": float(np.sqrt(s2)),
+                          "n_used": d["n"]})
     sc = 1.0 / np.sqrt(np.diag(info))
     cov = np.linalg.inv(info * np.outer(sc, sc)) * np.outer(sc, sc)
     sig = np.sqrt(np.diag(cov))
-    sig_gt = np.sqrt(np.diag(np.linalg.inv(info[-2:, -2:])))   # MUTANT: (g, t_end) block inverted alone
-    sig_h = [np.sqrt(np.diag(np.linalg.inv(info[2 * h:2 * h + 2, 2 * h:2 * h + 2]))) for h in range(H)]
-    sig = np.concatenate([np.concatenate(sig_h), sig_gt])
+    # MUTANT: the (g, t_end) block and each hole's (T0_h, q0_h) block inverted separately
+    sig = np.zeros(npar)
+    sig[-2:] = np.sqrt(np.diag(np.linalg.inv(info[-2:, -2:])))
+    for h in range(H):
+        sig[2 * h:2 * h + 2] = np.sqrt(np.diag(np.linalg.inv(info[2 * h:2 * h + 2, 2 * h:2 * h + 2])))
     for h, oh in enumerate(out_holes):
         oh["sigma_T0"] = float(sig[2 * h])
         oh["sigma_q0"] = float(sig[2 * h + 1])
-    # 95 % likelihood-ratio interval: nearest crossings of l_max - chi2_0.95(1) / 2 on each side of t_hat
-    thr = l_max - 0.5 * stats.chi2.ppf(0.95, 1)
+    # 95 % likelihood-ratio interval: nearest crossings of l_p(t_hat) - chi2_0.95(1) / 2 on each side of t_hat
+    thr = lp(t_hat) - 0.5 * stats.chi2.ppf(0.95, 1)
 
     def crossing(direction):
         bound = t_lo if direction < 0 else t_hi

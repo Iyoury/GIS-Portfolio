@@ -160,33 +160,39 @@ The readings and the layer contacts are converted to vertical depth with the
 same trajectory, and the shallow readings are removed with a cut on vertical
 depth before the inversion.
 
-## 7. Several boreholes of one region: maximum likelihood
+## 7. Several boreholes of one region: maximum likelihood with correlated noise
 
 A single log constrains t_end only loosely, but the holes of one region record
 the same ground-surface history through different columns and depths. Step 7
 combines them: g and t_end are common to all holes, while every hole keeps its
 own T0, q0, column, heat production, volumetric heat capacity and cut-off
-depth. The logs also differ in quality (probe, logging speed, convection in
-wide holes), so every hole h has its own, unknown, noise standard deviation
-σ_h.
+depth.
 
-With independent normal errors the estimates are the maximum-likelihood ones.
-Because the σ_h are estimated together with the shared parameters, each hole is
-weighted by its own residual variance at the solution: a long noisy log does
-not dominate a short precise one, as it would in pooled least squares with one
-common variance, and the result also differs from a fit whose weights are fixed
-in advance from single-hole inversions. The amplitude enters linearly, but with
-a free variance per hole the likelihood is not quadratic in g, and the end of
-the glaciation enters nonlinearly through the layered perturbation of every
-hole.
+The misfit of a temperature log to a conductive model is not independent from
+reading to reading. Thin layers whose conductivity differs from the value
+assigned to their unit, and slow movement of the fluid in the hole, produce
+deviations that persist over several neighbouring readings, on top of the
+probe noise; the logs also differ in quality from hole to hole. The simplest
+model of such noise is a stationary first-order autoregressive sequence along
+the readings of each hole, taken in the order of measured depth: every error
+is a fraction φ_h of the previous one plus a fresh independent normal
+innovation of standard deviation s_h, and the first error has the stationary
+variance s_h²/(1 − φ_h²). Both φ_h and s_h are unknown and are estimated with
+the other parameters.
 
-The precision of the estimates is summarized by the expected (Fisher)
-information at the estimates, and the 95 % interval of t_end by the
-likelihood-ratio test: t_end values whose profile log-likelihood, maximized over
-all other parameters including the σ_h, lies within half the 0.95 quantile of
-the chi-square distribution with one degree of freedom of the maximum. As for a
-single hole, the interval is asymmetric when the model is curved in t_end, and
-a short glaciation can give the profile a second maximum.
+The estimates are the maximum-likelihood ones, from the exact joint density of
+all readings. Because the noise parameters are estimated together with the
+shared parameters, each hole is weighted by its own noise, a long noisy log
+does not dominate a short precise one, and correlated deviations are not
+mistaken for the glacial curvature. Correlated noise carries less information
+on a smooth signal than independent noise of the same variance, so the
+precision of the estimates, summarized by the expected (Fisher) information at
+the estimates, depends on φ_h. The 95 % interval of t_end comes from the
+likelihood-ratio test: t_end values whose profile log-likelihood, maximized
+over all other parameters including φ_h and s_h, lies within half the 0.95
+quantile of the chi-square distribution with one degree of freedom of the
+maximum. As for a single hole, the interval is asymmetric when the model is
+curved in t_end, and a short glaciation can give the profile a second maximum.
 
 ## References
 

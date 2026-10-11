@@ -276,7 +276,7 @@ def _crown_case():
                     fv = [f(a) for a in grid]
                     roots = []
                     for i in range(grid.size - 1):
-                        if fv[i] == 0.0 or fv[i] * fv[i + 1] < 0:
+                        if fv[i] * fv[i + 1] <= 0:
                             a0, a1, f0 = grid[i], grid[i + 1], fv[i]
                             for _ in range(80):
                                 am = 0.5 * (a0 + a1)
@@ -413,7 +413,7 @@ def _crown_case():
                         if fn >= fx:
                             moved = True
                             break
-                    mu = 1e-3 if mu == 0.0 else mu * 10.0
+                    mu = 1e-3 if mu < 1e-300 else mu * 10.0
                 if not moved:
                     break
                 done = float(np.max(np.abs(xn - x))) < 1e-9
@@ -748,7 +748,7 @@ def _crown_case():
                     fv = [f(a) for a in grid]
                     roots = []
                     for i in range(grid.size - 1):
-                        if fv[i] == 0.0 or fv[i] * fv[i + 1] < 0:
+                        if fv[i] * fv[i + 1] <= 0:
                             a0, a1, f0 = grid[i], grid[i + 1], fv[i]
                             for _ in range(80):
                                 am = 0.5 * (a0 + a1)
@@ -885,7 +885,7 @@ def _crown_case():
                         if fn >= fx:
                             moved = True
                             break
-                    mu = 1e-3 if mu == 0.0 else mu * 10.0
+                    mu = 1e-3 if mu < 1e-300 else mu * 10.0
                 if not moved:
                     break
                 done = float(np.max(np.abs(xn - x))) < 1e-9
@@ -964,7 +964,8 @@ def _crown_case():
 _crown_case()
 
 # --- test case 2 ---
-# short glaciation: the whole chain on a region with a long asymmetric interval
+# short glaciation: the whole chain; the statistic falls below the quantile again around a second profile maximum,
+# outside the interval
 import numpy as np
 
 
@@ -1236,7 +1237,7 @@ def _crown_case():
                     fv = [f(a) for a in grid]
                     roots = []
                     for i in range(grid.size - 1):
-                        if fv[i] == 0.0 or fv[i] * fv[i + 1] < 0:
+                        if fv[i] * fv[i + 1] <= 0:
                             a0, a1, f0 = grid[i], grid[i + 1], fv[i]
                             for _ in range(80):
                                 am = 0.5 * (a0 + a1)
@@ -1373,7 +1374,7 @@ def _crown_case():
                         if fn >= fx:
                             moved = True
                             break
-                    mu = 1e-3 if mu == 0.0 else mu * 10.0
+                    mu = 1e-3 if mu < 1e-300 else mu * 10.0
                 if not moved:
                     break
                 done = float(np.max(np.abs(xn - x))) < 1e-9
@@ -1423,12 +1424,18 @@ def _crown_case():
         return _tg_Bore(_tg_g_survey(900, 20, 15, 22, 200, 215, 0.5, 4), ([0, 90, 400], [3.8, 2.4, 3.1]), 0.5e-6, 2.5e6, 80.0,
                         log_step=6.0, log_top=10.0)
 
-    # glaciation from t_end = 11.8 ka to 24 ka; lag-one correlations 0.5, 0.7 and 0.3; the 95 % interval is long and
-    # asymmetric (about 10.1 to 18.5 ka)
-    reg = _tg_Region([_tg_incl7(5.0), _tg_mid4(), _tg_short3()], [4.1, 3.2, 5.0], [0.037, 0.048, 0.031], 7.4, 11800.0, [0.0, -1.0, 0.25],
-                     [2.4e4, 1.2e5], [0.006, 0.011, 0.018], [0.5, 0.7, 0.3], [None, (1.0, -1.0), (-1.0, 1.0)], 77, 0)
+    # glaciation from t_end = 11.07 ka to 24 ka; innovation sd 5, 9 and 15 mK, lag-one correlations 0.5, 0.7 and 0.3. The
+    # profile log-likelihood has a second local maximum near 18.2 ka, only about 1.25 below l_max, behind a valley near
+    # 15.5 ka (about 6.1 below): the likelihood-ratio statistic falls below the 0.95 quantile again in a region around 18 ka,
+    # which is not part of the interval (the nearest crossing above t_end lies near 12.5 ka); the bounds contain both maxima
+    # and a local search over the bounds without a global scan ends in the second basin.
+    reg = _tg_Region([_tg_incl7(5.0), _tg_mid4(), _tg_short3()], [4.1, 3.2, 5.0], [0.037, 0.048, 0.031], 7.4, 11070.0, [0.0, -1.0, 0.25],
+                     [2.4e4, 1.2e5], [0.005, 0.009, 0.015], [0.5, 0.7, 0.3], [None, (1.0, -1.0), (-1.0, 1.0)], 77, 0)
     r = regional_deglaciation_inversion(reg.holes, [2.4e4, 1.2e5], [0.0, -1.0, 0.25], (9000.0, 23900.0))
     _tg_check(r, reg, "short glaciation")
+    # oracle premise: a second region below the quantile around 18.2 ka, separated from the interval by the valley
+    assert reg.lp(18160.0) > reg.thr and reg.lp(15530.0) < reg.thr - 3.0
+    assert float(r["t_end_high"]) < 15530.0, r["t_end_high"]      # the nearest crossing, not the far side of the second region
 
 
 _crown_case()

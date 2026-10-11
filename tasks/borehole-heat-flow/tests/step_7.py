@@ -295,7 +295,7 @@ def _crown_case():
                     fv = [f(a) for a in grid]
                     roots = []
                     for i in range(grid.size - 1):
-                        if fv[i] == 0.0 or fv[i] * fv[i + 1] < 0:
+                        if fv[i] * fv[i + 1] <= 0:
                             a0, a1, f0 = grid[i], grid[i + 1], fv[i]
                             for _ in range(80):
                                 am = 0.5 * (a0 + a1)
@@ -432,7 +432,7 @@ def _crown_case():
                         if fn >= fx:
                             moved = True
                             break
-                    mu = 1e-3 if mu == 0.0 else mu * 10.0
+                    mu = 1e-3 if mu < 1e-300 else mu * 10.0
                 if not moved:
                     break
                 done = float(np.max(np.abs(xn - x))) < 1e-9
@@ -777,7 +777,7 @@ def _crown_case():
                     fv = [f(a) for a in grid]
                     roots = []
                     for i in range(grid.size - 1):
-                        if fv[i] == 0.0 or fv[i] * fv[i + 1] < 0:
+                        if fv[i] * fv[i + 1] <= 0:
                             a0, a1, f0 = grid[i], grid[i + 1], fv[i]
                             for _ in range(80):
                                 am = 0.5 * (a0 + a1)
@@ -914,7 +914,7 @@ def _crown_case():
                         if fn >= fx:
                             moved = True
                             break
-                    mu = 1e-3 if mu == 0.0 else mu * 10.0
+                    mu = 1e-3 if mu < 1e-300 else mu * 10.0
                 if not moved:
                     break
                 done = float(np.max(np.abs(xn - x))) < 1e-9
@@ -1245,7 +1245,7 @@ def _crown_case():
                     fv = [f(a) for a in grid]
                     roots = []
                     for i in range(grid.size - 1):
-                        if fv[i] == 0.0 or fv[i] * fv[i + 1] < 0:
+                        if fv[i] * fv[i + 1] <= 0:
                             a0, a1, f0 = grid[i], grid[i + 1], fv[i]
                             for _ in range(80):
                                 am = 0.5 * (a0 + a1)
@@ -1382,7 +1382,7 @@ def _crown_case():
                         if fn >= fx:
                             moved = True
                             break
-                    mu = 1e-3 if mu == 0.0 else mu * 10.0
+                    mu = 1e-3 if mu < 1e-300 else mu * 10.0
                 if not moved:
                     break
                 done = float(np.max(np.abs(xn - x))) < 1e-9
@@ -1708,7 +1708,7 @@ def _crown_case():
                     fv = [f(a) for a in grid]
                     roots = []
                     for i in range(grid.size - 1):
-                        if fv[i] == 0.0 or fv[i] * fv[i + 1] < 0:
+                        if fv[i] * fv[i + 1] <= 0:
                             a0, a1, f0 = grid[i], grid[i + 1], fv[i]
                             for _ in range(80):
                                 am = 0.5 * (a0 + a1)
@@ -1845,7 +1845,7 @@ def _crown_case():
                         if fn >= fx:
                             moved = True
                             break
-                    mu = 1e-3 if mu == 0.0 else mu * 10.0
+                    mu = 1e-3 if mu < 1e-300 else mu * 10.0
                 if not moved:
                     break
                 done = float(np.max(np.abs(xn - x))) < 1e-9
@@ -1895,14 +1895,15 @@ def _crown_case():
         return _t7_Bore(_t7_g_survey(900, 20, 15, 22, 200, 215, 0.5, 4), ([0, 90, 400], [3.8, 2.4, 3.1]), 0.5e-6, 2.5e6, 80.0,
                         log_step=6.0, log_top=10.0)
 
-    # The glaciation lasts from t_end to 24 ka only. The amplitude-timing trade-off gives the profile log-likelihood a second
-    # local maximum near 17.6 ka, about 8.3 below l_max, behind a valley near 15.7 ka (about 11.6 below l_max); both lie
-    # inside the bounds 9000-23900 years, and a local search over the bounds without a global scan ends in the second basin.
-    reg = _t7_Region([_t7_incl7(5.0), _t7_mid4(), _t7_short3()], [4.1, 3.2, 5.0], [0.037, 0.048, 0.031], 7.8, 11500.0, [0.0, -1.0, 0.25],
+    # The glaciation lasts from t_end = 11.1 ka to 24 ka only. The amplitude-timing trade-off gives the profile
+    # log-likelihood a second local maximum near 17.9 ka, about 10.0 below l_max, behind a valley near 15.6 ka (about 16.6
+    # below l_max); both lie inside the bounds 9000-23900 years, and a local search over the bounds without a global scan
+    # ends in the second basin.
+    reg = _t7_Region([_t7_incl7(5.0), _t7_mid4(), _t7_short3()], [4.1, 3.2, 5.0], [0.037, 0.048, 0.031], 7.8, 11100.0, [0.0, -1.0, 0.25],
                      [2.4e4, 1.2e5], [0.0025, 0.005, 0.010], [0.6, 0.45, 0.75], [None, (1.5, -1.0), (-1.0, 1.5)], 21, 0)
     r = regional_deglaciation_inversion(reg.holes, [2.4e4, 1.2e5], [0.0, -1.0, 0.25], (9000.0, 23900.0))
     _t7_check(r, reg, "short glaciation")
-    assert reg.lp(17640.0) - reg.lp(15730.0) > 2.0 and reg.lp(17640.0) < reg.thr      # oracle premise: second basin
+    assert reg.lp(17910.0) - reg.lp(15620.0) > 5.0 and reg.lp(17910.0) < reg.thr      # oracle premise: second basin
 
 
 _crown_case()
@@ -2181,7 +2182,7 @@ def _crown_case():
                     fv = [f(a) for a in grid]
                     roots = []
                     for i in range(grid.size - 1):
-                        if fv[i] == 0.0 or fv[i] * fv[i + 1] < 0:
+                        if fv[i] * fv[i + 1] <= 0:
                             a0, a1, f0 = grid[i], grid[i + 1], fv[i]
                             for _ in range(80):
                                 am = 0.5 * (a0 + a1)
@@ -2318,7 +2319,7 @@ def _crown_case():
                         if fn >= fx:
                             moved = True
                             break
-                    mu = 1e-3 if mu == 0.0 else mu * 10.0
+                    mu = 1e-3 if mu < 1e-300 else mu * 10.0
                 if not moved:
                     break
                 done = float(np.max(np.abs(xn - x))) < 1e-9
@@ -2385,7 +2386,8 @@ def _crown_case():
     # near-boundary valid controls of the end-point rule: precise logs (innovation sd 1 mK, lag-one correlations 0.1, 0.2
     # and 0.3; 326, 137 and 136 readings) give a profile with a single maximum at 11500 years (dense scans over both pairs
     # of bounds, source.md) and an interval of about 11445-11559 years. With t_lo = 11423 or t_hi = 11577 the maximum over the
-    # closed interval is still interior, 77 years from the bound, the profile at the bound lies about 4.4 below l_max and
+    # closed interval is still interior, 77 years from the bound; the profile at the bound lies 3.9 (t_lo) or 3.1 (t_hi)
+    # below l_max, higher than at the nearest points of a 121-point logarithmic grid over the bounds (8.1 and 7.5 below), and
     # both crossings lie inside the bounds: no ValueError
     regp = _t7_Region([_t7_incl7(5.0), _t7_mid4(), _t7_short3()], [4.1, 3.2, 5.0], [0.037, 0.048, 0.031], 7.8, 11500.0,
                       [0.0, -1.0, 0.25], [1.0e5, 1.2e5], [0.001, 0.001, 0.001], [0.1, 0.2, 0.3], [None, (2.0, -1.5), (-1.5, 2.0)], 5, 0)
@@ -2669,7 +2671,7 @@ def _crown_case():
                     fv = [f(a) for a in grid]
                     roots = []
                     for i in range(grid.size - 1):
-                        if fv[i] == 0.0 or fv[i] * fv[i + 1] < 0:
+                        if fv[i] * fv[i + 1] <= 0:
                             a0, a1, f0 = grid[i], grid[i + 1], fv[i]
                             for _ in range(80):
                                 am = 0.5 * (a0 + a1)
@@ -2806,7 +2808,7 @@ def _crown_case():
                         if fn >= fx:
                             moved = True
                             break
-                    mu = 1e-3 if mu == 0.0 else mu * 10.0
+                    mu = 1e-3 if mu < 1e-300 else mu * 10.0
                 if not moved:
                     break
                 done = float(np.max(np.abs(xn - x))) < 1e-9
@@ -3143,7 +3145,7 @@ def _crown_case():
                     fv = [f(a) for a in grid]
                     roots = []
                     for i in range(grid.size - 1):
-                        if fv[i] == 0.0 or fv[i] * fv[i + 1] < 0:
+                        if fv[i] * fv[i + 1] <= 0:
                             a0, a1, f0 = grid[i], grid[i + 1], fv[i]
                             for _ in range(80):
                                 am = 0.5 * (a0 + a1)
@@ -3280,7 +3282,7 @@ def _crown_case():
                         if fn >= fx:
                             moved = True
                             break
-                    mu = 1e-3 if mu == 0.0 else mu * 10.0
+                    mu = 1e-3 if mu < 1e-300 else mu * 10.0
                 if not moved:
                     break
                 done = float(np.max(np.abs(xn - x))) < 1e-9
@@ -3694,7 +3696,7 @@ def _crown_case():
                     fv = [f(a) for a in grid]
                     roots = []
                     for i in range(grid.size - 1):
-                        if fv[i] == 0.0 or fv[i] * fv[i + 1] < 0:
+                        if fv[i] * fv[i + 1] <= 0:
                             a0, a1, f0 = grid[i], grid[i + 1], fv[i]
                             for _ in range(80):
                                 am = 0.5 * (a0 + a1)
@@ -3831,7 +3833,7 @@ def _crown_case():
                         if fn >= fx:
                             moved = True
                             break
-                    mu = 1e-3 if mu == 0.0 else mu * 10.0
+                    mu = 1e-3 if mu < 1e-300 else mu * 10.0
                 if not moved:
                     break
                 done = float(np.max(np.abs(xn - x))) < 1e-9

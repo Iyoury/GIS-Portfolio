@@ -914,7 +914,9 @@ This note is numbered after the platform versions: version 9 was the last upload
 internal revisions 10a and 10b (first headed "Version 10" and "Version 11"), are conformance revisions written
 before this one; all three are part of the platform version 10 upload. Steps 1-5 (prompts,
 headers, references, second solution, tests, mutants) are unchanged; items 1-11 describe the new step 6
-(round 1), and item 12 the regional final step 7 added in a second round before the upload.
+(round 1), item 12 the regional final step 7 added in a second round before the upload, item 13 its repair, and
+item 14 the third round (serially correlated AR(1) noise in step 7), which supersedes the step 7 statements of
+items 12 and 13 (independent errors, six readings, noise_sd, the round-2 cases and mutants).
 
 1. Finding. The platform reported version 9 "Too easy": 8 of 8 rollouts solved (strong model, maximum effort,
    4 h, mean score 1.0). The content check had classed step 6 (`surface_heat_flow`) as a transcription step.
@@ -1549,3 +1551,367 @@ headers, references, second solution, tests, mutants) are unchanged; items 1-11 
        agent-visible text changed only in the sentence of item e.
     i. Not changed or open. relevant_experience is still the author's placeholder; the author writes it before
        upload (it is not written by the assistant). The difficulty band cannot be measured locally (item f).
+
+14. Third difficulty round before upload: serially correlated (AR(1)) noise in the regional step 7. This round belongs
+    to the same platform version 10 upload, so edit_label stays difficulty_increase. Steps 1-6 (prompts, headers,
+    references, second solution, tests, mutants) are unchanged. Each finding with its cause, change, regression test
+    and reruns.
+    a. Finding (internal calibration of round 2, item 13f): both solutions written from the visible specification
+       alone passed every case of the round-2 files (the lead's count for the two solvers: 84 of 84 case runs).
+       Version 9 was "too easy" (8 of 8), version 10 is the last version allowed, and the platform band includes 1 of
+       8 (only 0 of 8 is "too hard"), so the aim is a per-attempt success probability of about 0.3 to 0.5.
+       Cause: the round-2 regional step assumed independent normal errors with one variance per hole; its
+       concentrated likelihood (a sum of log-quadratics in g) and its information matrix are textbook material, and
+       strong agents implement them reliably. The difficulty has to come from scientific and statistical reasoning,
+       not from tolerances, hidden conventions or runtime.
+    b. Change (step 7 only): the residuals of a temperature log about a conductive model are not independent from
+       reading to reading (thin layers whose conductivity differs from that of their unit, slow movement of the
+       borehole fluid). The noise of every hole is now a stationary Gaussian first-order autoregressive sequence
+       along its used readings numbered by increasing MD: e_1 ~ N(0, s_h^2/(1 - phi_h^2)), e_i = phi_h e_(i-1) + w_i
+       with independent w_i ~ N(0, s_h^2), |phi_h| < 1 and s_h > 0 unknown, the holes independent; the process is
+       defined on the reading index, whatever the spacing. The visible text (step 7 prompt, function_header,
+       problem_io; problem_description_main updated) states the model and the definitions only: exact maximum
+       likelihood of all parameters (natural logarithm of the joint normal density of all used readings, the first
+       reading of every hole included, constants included), the profile log-likelihood and its global maximizer over
+       [t_lo, t_hi] (end-point rule unchanged), at least 8 used readings per hole (the likelihood is unbounded when
+       a hole can be fitted exactly; the margin also leaves readings for the two noise parameters), the domain
+       (maximum-likelihood s_h from 1e-3 K to 0.03 K and phi_h from -0.9 to 0.95), standard errors from the inverse
+       of the expected Fisher information of the regression parameters at the estimates with phi_h and s_h held at
+       their estimates, the 95 % likelihood-ratio interval with every other parameter, the phi_h and s_h included,
+       re-maximized at every t_end (nearest crossings; containment rule unchanged), log_md need not be sorted. The
+       per-hole results "phi" and "innovation_sd" replace "noise_sd". It does not give the Prais-Winsten transform,
+       the concentrated likelihood, the determinant of the AR(1) covariance, the information formula or an
+       algorithm. Accuracy: as in round 2, plus every phi within 2e-3 (absolute) and every innovation_sd within a
+       relative 3e-3; the noise floor of the domain moves from 1e-4 K to 1e-3 K (item f). Other files:
+       steps/step_7.py, solution/step_7.py, solution.py (step 7 section and module docstring), second_solution.py
+       (step 7 section and docstring), tests/step_7.py, tests/general.py, the step 7 and whole-task mutants, the step 7
+       background and contract, the subfield and tags, the expert time (22 h), the three explanations and
+       background.md section 7.
+    c. Statistics (derivation; standard likelihood theory, no external source needed). With L(phi) the n x n matrix
+       with first row sqrt(1 - phi^2) e_1 and rows e_i - phi e_(i-1) (i >= 2), L e = (sqrt(1 - phi^2) e_1, w_2, ...,
+       w_n) has independent N(0, s^2) entries, so the covariance of the hole is s^2 (L^T L)^-1 with
+       det L = sqrt(1 - phi^2), and the log-likelihood of a hole is -(n/2) log(2 pi s^2) + (1/2) log(1 - phi^2) -
+       |L r|^2/(2 s^2). The maximum over s is at s^2 = |L r|^2/n and over T0, q0 at the generalized least-squares
+       values, so the concentrated contribution is -(n/2)(log(2 pi Q/n) + 1) + (1/2) log(1 - phi^2) with Q the
+       generalized least-squares residual on [1, R]; dropping the first reading gives the conditional
+       (Cochrane-Orcutt) likelihood, a different estimator. For a normal model with mean mu(theta) and covariance
+       Sigma(psi) the expected information is block diagonal between theta and psi (the cross terms are odd moments
+       of the errors), so the inverse expected information of all parameters, restricted to the regression
+       parameters, equals (sum_h J_h^T L_h^T L_h J_h / s_h^2)^-1: the stated definition (noise parameters held at
+       their estimates) and the inverse of the full information agree. The same information follows from the
+       prediction-error decomposition used by the second solution: innovations v_1 = r_1 with variance
+       F_1 = s^2/(1 - phi^2) and v_i = r_i - phi r_(i-1) with F_i = s^2, and I_ab = sum_i [(1/2) F_i^-2 dF_i/da dF_i/db
+       + F_i^-1 E(dv_i/da dv_i/db)], which gives I_phi,phi = 2 phi^2/(1 - phi^2)^2 + (n - 1)/(1 - phi^2),
+       I_phi,s = 2 phi/(s (1 - phi^2)) and I_s,s = 2n/s^2 (checked against the exact (1/2) tr(Sigma^-1 dSigma
+       Sigma^-1 dSigma) with numerical derivatives of the dense AR(1) covariance: agreement to 1e-8 relative for
+       n = 8 to 200, phi = -0.5 to 0.9). A stationary AR(1) covariance is a symmetric Toeplitz matrix, so the
+       likelihood is the same for the readings in increasing or decreasing MD order; a mutant "readings by decreasing
+       depth" would be indistinguishable from the reference and is not used; a random order (or the order of two
+       logging runs) is not equivalent and gives the mutant readings_in_input_order. With phi -> +-1 the term (1/2) log(1 - phi^2)
+       sends the likelihood to -infinity unless the differenced residual vanishes, which takes at most four readings
+       per hole (T0 drops out of the differences, q0, g and t_end remain); the rule n_h >= 8 keeps a margin.
+    d. Targets: whitened-space construction (tests/step_7.py header; author's design). On the used readings of hole h,
+       ordered by MD, y_h = T + A S = T0_h + q0_h R_h + g P_h(t_end) + r_h, and r_h = L(phi_h)^-1 u_h with
+       u_h = b_h + c_h: c_h = noise_h (k1 e1 + k2 e2) in the span of the projections of L P_h and L g dP_h/dt_end off
+       L[1, R_h] (stated coefficients) for every hole but one, and for that hole c = -lambda X G^-1 v with lambda the
+       smaller root of s lambda^2 - n lambda + |b|^2 = 0 as in item 12d, so that the weighted shared scores
+       sum_h (n_h/|u_h|^2) [., .]^T u_h vanish; b_h, with |b_h|^2 = n_h noise_h^2, is orthogonal to the four whitened
+       oracle Jacobian columns and starts at a seeded Gaussian vector; it is moved on its sphere along great circles
+       through the current vector and the projected gradient of the phi score
+       n (sum_(i>=2) u_i r_(i-1) + phi r_1^2) - |u|^2 phi/(1 - phi^2) until that score vanishes (the root nearest to
+       the current vector; |u_h| does not change, so the shared scores stay zero). With s_h^2 = |u_h|^2/n_h every
+       score of the exact log-likelihood vanishes at the generating values: fourth-order central differences of the
+       full log-likelihood in all 4H + 2 parameters (steps of 0.002 standard deviations) give scores times standard
+       deviations below 6e-9 on all ten regions. The construction makes the generating values a stationary
+       point, not automatically the global maximum, and two failure modes were met and removed in the design: (1) with
+       the closed-form balance carried by a long noisy hole, the short precise hole of the step case 1 and whole-task
+       case 1 regions reached a higher maximum elsewhere by taking phi near 1 (the misfit absorbed by a nearly
+       integrated noise; found by the reference's global search, 4.8 above the generating values); the balance is now
+       carried by the most precise hole, with small coefficients for the others; (2) for the eight-reading hole of
+       step case 6 the root of the phi score was a minimum of the phi profile for phi = 0.2 and 0.3 (eight seeds each),
+       so that hole has phi = 0 (a maximum, checked by a 397-point scan of phi). Readings shallower than z_min get
+       disturbed values (T0 + 1.5 + 0.02 z + 0.3 N(0, 1)). P and dP/dt_end come from the branch-cut oracle of item 4
+       (erfc for uniform columns). The standard errors come from the oracle Jacobians whitened with phi_h and divided
+       by s_h^2, l_max from the generating residuals (with the term (1/2) log(1 - phi_h^2)), the chi-square quantile
+       from math.erf. The interval ends are checked against the oracle profile log-likelihood, computed in the test:
+       at fixed t and phi the generalized least-squares coefficients by the Prais-Winsten transform and QR, the
+       maximum over g by sign changes of its derivative on a 4001-point grid between the holes' own optima and
+       bisection, and the maximum over the phi_h by damped Newton steps with central-difference derivatives, started
+       from the solution at the nearest t already evaluated; the test requires the profile to be above the threshold
+       l_max - chi2_0.95(1)/2 at each returned end moved by a relative 5e-4 towards t_end and below it at the end moved
+       5e-4 away (a crossing within the stated accuracy), and above it at 5 interior points on each side (the
+       nearest crossing).
+    e. Global maximum (offline, clean processes; scratch scripts, not part of the upload). For every region a dense scan
+       of the oracle profile at 600 logarithmically spaced times over its bounds plus 101 within 4 sigma_t of t_end
+       (both pairs of near-boundary bounds of step case 4 scanned separately); at each time a grid search over g and
+       every phi_h (131 values from -0.97 to 0.995), using the separability of the phi_h at fixed g, followed by the
+       oracle's Newton polish from the best grid point. No value above l_max (largest excess 5.5e-12, rounding); the
+       grid value never exceeds the polished one. Local maxima besides t_end: step case 3, a second maximum near 17.9 ka
+       9.95 below l_max behind a valley near 15.6 ka 16.65 below (a bounded local search of the oracle profile over
+       9000-23900 years ends at 17.9 ka); whole-task case 2 as first built, a second maximum near 18.1 ka 3.98 below
+       l_max (outside the 95 % interval, the statistic 7.95 > 3.84) behind a valley near 15.5 ka 19.34 below (retuned in
+       item 15c: second maximum near 18.17 ka 1.25 below l_max, the statistic 2.50 < 3.84, behind a valley near 15.54 ka
+       6.07 below); the step case 1 / 5 region has a local maximum
+       near 2.1 ka 102.7 below l_max with phi near 1 (outside the stated domain). Near-boundary controls of step case 4
+       (precise logs, sigma_t 25.9 years, interval 11445.5-11559.3): l_p(11423) = l_max - 3.894 while the first
+       interior point of a 121-point logarithmic grid over (11423, 99000), 11630.4 years, is at -8.121; l_p(11577) =
+       l_max - 3.137 while the last interior grid point over (1700, 11577), 11393.4 years, is at -7.548.
+
+       | Case | Holes: n_used (s mK, phi) | g, t_end | sigma_g, sigma_t (yr) | 95 % interval (yr) | feature |
+       |---|---|---|---|---|---|
+       | step 0 | inclined 7 layers 163 (4.01, 0.35); 4 layers 137 (12.27, 0.70); 3 layers 136 (25.57, 0.85) | 7.8, 11500 | 0.2339, 310.9 | 10865.5-12178.1 | output types |
+       | step 1 (and 5) | contrasted 1000 m 24 (2.40, -0.30); deep 2400 m 220 (20.01, 0.60), listed as two logging runs | 6.0, 9000 | 0.0568, 65.8 | 8861.8-9134.6 | negative phi, MD order; case 5: bounds 8800-9200 valid, 8900-29900 and 1500-9100 raise |
+       | step 2 | uniform k = 3.1, collar at z_min = 0, 121 (6.02, 0.50); uniform k = 2.4, 57 (15.80, 0.25) | 6.2, 10500 | 1.0171, 1310.5 | 8374.3-14770.2 | erfc oracle, asymmetric interval |
+       | step 3 | inclined 7 layers (5 m) 326 (2.51, 0.60); 137 (5.06, 0.45); 136 (10.12, 0.75), glaciation to 24 ka | 7.8, 11100 | 0.4421, 305.3 | 10496.5-11837.4 | second maximum near 17.9 ka |
+       | step 4 | the step 0 region with bounds 10700-12400 (valid), 3000-10700 and 12400-60000 (end points); precise logs 326 (1.01, 0.10); 137 (1.02, 0.20); 136 (1.02, 0.30) | 7.8, 11500 | precise: 0.0200, 25.9 | precise: 11445.5-11559.3 | near-boundary controls 11423-99000 and 1700-11577 |
+       | step 6 | vertical, 8 of 10 readings used (4.46, 0.00); 4 layers 137 (8.01, 0.50) | 7.0, 10000 | 0.4539, 522.7 | 8976.6-11245.6 | 8 readings valid, 7 and 33 other invalid inputs raise |
+       | step 7 | 1200 m logged every 30 m, 37 (3.00, 0.90); 3 layers 136 (10.01, 0.40) | 7.5, 11000 | 1.2348, 1347.0 | 8694.3-14519.6 | strong correlation, first reading |
+       | whole 0 | deep 220 (10.00, 0.80); steep 109 (3.39, 0.30); 3 layers 136 (18.00, 0.55) | 5.0, 9800 | 0.0640, 117.8 | 9562.2-10040.9 | deep region |
+       | whole 1 | contrasted 24 (2.16, 0.40); deep 220 (20.01, 0.65) | 6.0, 9000 | 0.0662, 82.4 | 8834.1-9169.5 | offset, hole order and reading order invariances |
+       | whole 2 (item 15c) | inclined (5 m) 326 (5.00, 0.50); 137 (9.07, 0.70); 136 (15.11, 0.30), glaciation to 24 ka | 7.4, 11070 | 0.8444, 618.8 | 9983.2-12584.3 | second maximum near 18.17 ka 1.25 below l_max: the statistic falls below the quantile again over 17767-18444 years, outside the interval (as first built: 2.50, 4.53, 7.55 mK, 0.4222, 309.4, 10488.6-11755.1, second maximum 3.98 below) |
+
+    f. Tolerances and error budget. Limits as stated (g and t_end relative 2e-3; q0 relative 5e-4; T0 2e-3 K;
+       standard errors relative 1e-2; interval ends relative 5e-4; phi 2e-3 absolute; innovation_sd relative 3e-3;
+       log_likelihood 0.1; n_used exact). The step 7 limits of round 2 are kept; phi and innovation_sd are new. Error
+       budget (scratch scripts budget3.py and budget_all.py, clean processes, one thread): the reference was run with the
+       step 5 perturbation P perturbed by 1e-8 K per K of the largest shape value in four patterns (none; smooth in depth
+       and time; irregular, an independent pseudo-random value at every depth and time; aligned with the sign of each
+       reading's generating residual, the adversarial pattern for the log-likelihood and the noise parameters), and with
+       the TVD of step 1 perturbed by 1e-6 m and R, S of step 2 by a relative 1e-9 (geometry); the interval ends were
+       converted to a relative error with the oracle profile and its slope. Worst error / limit over 13 calls (the ten
+       valid calls of the step 7 cases and the three whole-task regions) and over three rebuilt regions at
+       the ends of the stated domain (the step 0 region with s_h = 1 mK, with s_h = 30 mK, and with phi = -0.9, 0.95,
+       0.5 at 4 mK):
+
+       | Pattern | test regions | rebuilt domain-end regions |
+       |---|---|---|
+       | none (exact inputs) | 0.014 (phi of the eight-reading hole) | 0.019 (g at 30 mK) |
+       | smooth | 0.023 | 0.023 |
+       | geometry (TVD, R, S) | 0.048 (g, strong-correlation region) | 0.018 |
+       | irregular | 0.607 (g, uniform columns; 0.596 short glaciation) | 0.769 (g at 30 mK) |
+       | aligned with the residual sign | 0.716 (log_likelihood, precise region of step case 4) | 0.680 (t_end_high at 30 mK) |
+
+       Domain floor: in a first budget on the step 0 region rebuilt with s_h = 1e-4 K for every hole (the round-2 floor;
+       run before the finite-difference repair below, which does not affect phi or the log-likelihood),
+       the irregular pattern moved phi of the 0.7 hole by 3.5 times its limit (sigma_T0 1.4 times) and the aligned one
+       the log-likelihood by 4.0 times; at 5e-4 K 0.36 and 0.80; at 1e-3 K 0.19 and 0.40. The innovation noise floor of
+       the domain is therefore 1e-3 K (a precision reached by temperature logs in good holes). Reference repair found by
+       the budget: with the finite-difference step 1e-3 t_end of round 2 the round-off of the step 5 Talbot sum
+       (about 3e-11, irregular in t) gave dP/dt_end errors of 6e-8 to 4e-7 relative against the oracle's analytic
+       derivative; with 1e-2 t_end they are 1e-8 to 3e-8 (truncation of the fourth-order formula stays below that; 3e-2
+       gives 7e-7 to 1e-6), so the reference (and its mutants) now use 1e-2 t_end. Consistency of the standard errors
+       with the estimates: the stated standard errors are evaluated at the estimates, so an error in t_end moves them by
+       their elasticity d ln(sigma)/d ln(t_end) times the relative error. In the ordinary regions this elasticity is 2.3
+       to 3.3 (0.5 to 0.7 % at the t_end limit); in the short-glaciation regions it reached 22 for the q0 error of the
+       inclined hole at t_end = 11.5 ka (19 at 11.8 ka), so that a t_end error of half its limit would have moved that
+       standard error by 2 %, and the irregular budget pattern reached 0.94 of its limit. The elasticity of that standard
+       error changes sign near t_end = 11.08 ka; the two short-glaciation regions were therefore placed at t_end =
+       11.1 ka (step case 3) and 11.07 ka (whole-task case 2), where the largest elasticity is 5.0 and 5.2 (that of
+       sigma_g), and their irregular budget dropped to 0.596 and 0.241 (0.210 for the retuned whole-task case 2 of item
+       15c). With exact inputs the reference reaches at most 0.014 of a limit (the phi of the eight-reading hole, 2.8e-5
+       absolute; 0.0143 for g in the retuned whole-task case 2). Correction (item 15b): the limits on g, t_end and the
+       standard errors do not nest along the amplitude-timing ridge; the g limit binds before the t_end limit in the
+       short-glaciation regions, and the set of limits rests on the combined budget above.
+    g. Second solution (second_solution.py, step 7): the exact likelihood through the innovations (prediction-error)
+       decomposition of each hole's readings sorted by MD, Fisher scoring with Levenberg damping and the
+       log-likelihood as merit function on all 4H + 2 parameters (T0, q0, phi, s of every hole, g and t_end) with the
+       expected information of item c, the profile at fixed t_end by scoring from several starts (continuation from
+       the previous scan point, each hole's own least-squares amplitude and their mean) on an 80-point logarithmic
+       scan, scoring in all parameters from every scan maximum (an end value not below its neighbour included),
+       dP/dt_end from the impulse response on its own hyperbolic contour, standard errors from the inverse of the whole
+       information matrix (noise block included), the chi-square quantile as the square of scipy.stats.norm.ppf and
+       Illinois regula falsi for the interval ends. It shares no code with the reference (Prais-Winsten transform,
+       Gram matrices polynomial in phi, nested Brent searches, finite-difference dP/dt_end) or with the test oracle.
+       With exact inputs it reaches at most 0.006 of a limit on the
+       step 7 and whole-task regions and on the rebuilt domain-end regions (budget_all.py with the second solution).
+    h. Mutants. Step 7 (21) and whole-task (7; an eighth, interval_outermost_crossings, in item 15c) mutants, each the current reference (solution/step_7.py or
+       solution.py, with the finite-difference step of item f) with one named error. New: iid_noise_model (the round-2
+       estimator, phi = 0), conditional_likelihood (first reading dropped, no log-determinant term),
+       determinant_term_omitted, two_stage_phi_from_lag1_autocorrelation, two_stage_noise_parameters (phi and s from
+       single-hole fits, held fixed), pooled_noise_model (one phi and one s for all holes), readings_in_input_order,
+       information_with_independent_errors (J^T J divided by the marginal variance s^2/(1 - phi^2)),
+       lr_profile_with_phi_fixed, profile_with_fixed_noise_parameters (phi and s fixed). Kept with the AR(1) model
+       (rebuilt on the current reference): information_variance_n_minus_2, observed_information (negative Hessian of
+       the exact log-likelihood in all 4H + 2 parameters), information_blocks_inverted_separately,
+       lr_threshold_without_factor_2, log_likelihood_without_constant, local_search_without_scan,
+       first_hole_rho_c_for_all, halfspace_mean_diffusivity, measured_depth_as_depth, z_min_on_measured_depth,
+       z_min_cut_strict. Removed: pooled_least_squares, two_stage_weights and profile_with_fixed_noise_levels (replaced
+       by their AR(1) counterparts above) and amplitude_local_ascent_from_pooled (item k). A mutant "readings by
+       decreasing depth" is not used (item c). Results (tools/crown_check.py mut, final files):
+
+       | Where | Mutant | Cases failed |
+       |---|---|---|
+       | step 7 | iid_noise_model | 8 of 8 (0, 1, 2, 3, 4, 5, 6, 7) |
+       | step 7 | conditional_likelihood | 8 of 8 (0, 1, 2, 3, 4, 5, 6, 7) |
+       | step 7 | determinant_term_omitted | 8 of 8 (0, 1, 2, 3, 4, 5, 6, 7) |
+       | step 7 | two_stage_phi_from_lag1_autocorrelation | 8 of 8 (0, 1, 2, 3, 4, 5, 6, 7) |
+       | step 7 | two_stage_noise_parameters | 8 of 8 (0, 1, 2, 3, 4, 5, 6, 7) |
+       | step 7 | pooled_noise_model | 8 of 8 (0, 1, 2, 3, 4, 5, 6, 7) |
+       | step 7 | readings_in_input_order | 2 of 8 (1, 5) |
+       | step 7 | information_with_independent_errors | 8 of 8 (0, 1, 2, 3, 4, 5, 6, 7) |
+       | step 7 | information_variance_n_minus_2 | 5 of 8 (1, 2, 5, 6, 7) |
+       | step 7 | observed_information | 8 of 8 (0, 1, 2, 3, 4, 5, 6, 7) |
+       | step 7 | information_blocks_inverted_separately | 8 of 8 (0, 1, 2, 3, 4, 5, 6, 7) |
+       | step 7 | lr_profile_with_phi_fixed | 8 of 8 (0, 1, 2, 3, 4, 5, 6, 7) |
+       | step 7 | profile_with_fixed_noise_parameters | 8 of 8 (0, 1, 2, 3, 4, 5, 6, 7) |
+       | step 7 | lr_threshold_without_factor_2 | 8 of 8 (0, 1, 2, 3, 4, 5, 6, 7) |
+       | step 7 | log_likelihood_without_constant | 8 of 8 (0, 1, 2, 3, 4, 5, 6, 7) |
+       | step 7 | local_search_without_scan | 1 of 8 (3) |
+       | step 7 | first_hole_rho_c_for_all | 8 of 8 (0, 1, 2, 3, 4, 5, 6, 7) |
+       | step 7 | halfspace_mean_diffusivity | 7 of 8 (0, 1, 3, 4, 5, 6, 7) |
+       | step 7 | measured_depth_as_depth | 7 of 8 (0, 1, 3, 4, 5, 6, 7) |
+       | step 7 | z_min_on_measured_depth | 7 of 8 (0, 1, 3, 4, 5, 6, 7) |
+       | step 7 | z_min_cut_strict | 1 of 8 (2) |
+       | whole task | iid_noise_model | 3 of 3 (0, 1, 2) |
+       | whole task | readings_in_input_order | 1 of 3 (1) |
+       | whole task | halfspace_mean_diffusivity | 3 of 3 (0, 1, 2) |
+       | whole task | measured_depth_as_depth | 3 of 3 (0, 1, 2) |
+       | whole task | z_min_on_measured_depth | 3 of 3 (0, 1, 2) |
+       | whole task | local_search_without_scan | 1 of 3 (2) |
+       | whole task | first_hole_rho_c_for_all | 3 of 3 (0, 1, 2) |
+
+       Steps 1-6 mutants: unchanged results (each fails at least one case of its step, as in item 13g). Effects on the
+       test regions (scratch runs of the mutants): independent errors move g by 42 % in the strongly correlated region
+       (10.67 instead of 7.5); the conditional likelihood gives g = 6.19 there and the omitted log-determinant term
+       g = 7.443 and phi off by 0.023; the information with independent errors gives sigma_g 15 to 58 % too small on
+       the ten regions.
+    i. Regression tests and reruns. tools/crown_check.py, all modes, every case alone in a fresh process, one
+       BLAS/OpenMP thread, -j 2, on the final files (the second solution's docstring was reworded afterwards and the
+       format and second modes were rerun on the shipped file): summary ALL OK, FORMAT OK.
+
+       | Mode | Result |
+       |---|---|
+       | format | OK (every case wrapped in _crown_case, markers, counts, no float equality, files, contracts, metadata) |
+       | REF steps 1-7, general (solution.py) | 22/22, 12/12, 12/12, 7/7, 8/8, 7/7, 8/8, 3/3; solution.py also passes every step file |
+       | SECOND steps 1-7, general | 22/22, 12/12, 12/12, 7/7, 8/8, 7/7, 8/8, 3/3 |
+       | MUT | every step and whole-task mutant fails at least one case of its target tests (table h) |
+       | SHIFT +-1e-12 (step outputs; every evaluated function in general) | all cases pass |
+       | CONTROL None / 0.0 | 0 cases pass in every step and in general |
+
+       Runtimes (one thread, two workers): a step 7 case takes 5 to 36 s with the reference (step case 4, five calls)
+       and 7 to 89 s with the second solution; a whole-task case 8 to 15 s and 14 to 44 s. solution.py and
+       second_solution.py were run twice with one thread and once with two threads on three regions (step cases 0 and
+       7, whole-task case 1): identical SHA-256 digests of the outputs. The construction checks of item d, the dense
+       scans of item e, the error budget of item f and the second-solution runs of item g were made on the final
+       regions; the information formula of item c was checked against the dense-covariance trace formula.
+    j. Internal calibration: no blind-solver scoring of the round-3 files was run in this round; the difficulty band
+       cannot be measured locally (scored afterwards: item 15f).
+    k. Not changed or open. relevant_experience is still the author's placeholder (written by the author, not by the
+       assistant). The bimodal-amplitude region of item 13c (step case 7 of round 2) and its mutant
+       amplitude_local_ascent_from_pooled are gone: under AR(1) noise the region could not be rebuilt with the
+       generating values as the global maximum (with the 1 mK floor the disturbed hole's own mode became the higher
+       one, by 425 at t_end, and a smooth disturbance of one hole is absorbed by a high phi of that hole), so no
+       round-3 case has a likelihood bimodal in g; the maximization over g is still exercised by every case, and the
+       maximization over t_end is discriminated by step case 3 and whole-task case 2.
+
+15. Final repair of round 3, after an independent verification of the round-3 files and an internal blind-solver
+    calibration. This is still the platform version 10 upload, so edit_label stays difficulty_increase. Steps 1-6 are
+    unchanged. The step 7 reference, the second solution, tests/step_7.py and the step 7 mutants are unchanged. The
+    visible text changes only by the tie rule of item d. Each finding is listed with its cause, change, regression
+    test and reruns.
+    a. Finding (blocking): relevant_experience still holds the placeholder "TODO(author): ...". Cause: this field
+       describes the author's own experience, so the assistant must not write it. Change: none; it stays open for the
+       author to write truthfully before the upload.
+    b. Finding (advisory): the limits on g, t_end and the standard errors do not nest along the amplitude-timing
+       ridge. The verification_explanation said the short-glaciation regions "were placed where the stated 1e-2 on
+       the standard errors is consistent with the 2e-3 on t_end", which is slightly wrong.
+       Check (the verifier's script, with a dense AR(1) covariance): t_end was moved by exactly its limit (relative
+       +-2e-3) and every other parameter was re-maximized at that t_end.
+       - Step case 3: g moves 4.1e-3 relative, twice its own limit, and sigma_g moves 1.05 to 1.07 %.
+       - Whole-task case 2 as first built: 4.1e-3 and 1.04 to 1.05 %.
+       - Whole-task case 2 retuned (item c): -4.07e-3 and +4.09e-3, and 1.03 to 1.04 %.
+       - Step case 0: 2.2e-3 and 0.45 %.
+       Cause: along the ridge, d ln g / d ln t_end is about 2.05 in the short-glaciation regions and about 1.1 in step
+       case 0. So the g limit binds before the t_end limit. A result within the g limit has t_end within about 1e-3 in
+       those regions, where the standard errors move by about 0.5 %.
+       Change: the sentence in verification_explanation is corrected and item 14f carries a pointer. No tolerance is
+       changed. The set of limits rests on the combined error budget of item 14f (at most 0.61 of a limit on the test
+       regions and 0.77 on the domain-end regions), not on each limit alone. The reference stays within 0.0143 of a
+       limit.
+    c. Finding (advisory): the step 7 rule on nearest crossings ("farther regions where the statistic falls below the
+       quantile again are not part of the interval") was exercised only in step 6. Every step 7 and whole-task
+       profile had a single excursion below the quantile, because the second maxima lay 9.95 (step case 3) and 3.97
+       (whole-task case 2) below l_max, where the statistic is 19.9 and 7.95. A candidate that returned the outermost
+       crossings, or the hull of the set below the quantile, would therefore have passed every step 7 and whole-task
+       test.
+       Change: whole-task case 2 is retuned. The boreholes, history, t_end, g, the phi_h, the kappa coefficients and
+       the seed stay the same; the innovation standard deviations are doubled, from 2.5, 4.5 and 7.5 mK to 5, 9 and 15
+       mK (maximum-likelihood values 5.00, 9.07 and 15.11 mK). The profile now has:
+       - its second maximum at 18.17 ka, only 1.25 below l_max (statistic 2.50 < 3.84);
+       - a valley in between at 15.54 ka, 6.07 below l_max;
+       - so the statistic falls below the quantile again over 17767-18444 years, outside the 95 % interval of
+         9983.2-12584.3 years.
+       The test adds an oracle premise (l_p(18160) above the threshold, l_p(15530) more than 3 below it) and asserts
+       that t_end_high < 15530. The existing interior-point check of the interval also rejects the hull. New whole-task
+       mutant interval_outermost_crossings: the hull bracketed on the 121-point scan grid. It fails whole-task case 2,
+       where an interior point at 13528 years lies below the threshold. whole_task_local_search_without_scan still
+       fails case 2: it ends in the second basin with g = 47.5. tests/step_7.py is unchanged: the rule is exercised
+       by whole-task case 2, which calls the step 7 function, and still by step 6 case 3.
+       Verification of the new region (scratch scripts; not part of the upload):
+       i.   Dense scan as in item 14e: 600 log-spaced times over 9000-23900 years plus 101 near t_end, a grid over g
+            and every phi_h, and a Newton polish. Nothing exceeds l_max: the best scan value, at a point 0.6 years
+            from t_end, is 4.9e-7 below it. Local maxima are at t_end and at 18173 years (-1.2519); minima at 15540
+            (-6.0736) and 20537 (-142.2). The grid value never exceeds the polished one. The scan crosses the
+            threshold near 9974, 12572, 17763 and 18442 years.
+       ii.  The round-3 verifier's own script (dense AR(1) covariance via Cholesky, not Prais-Winsten):
+            - the dense likelihood at the generating values equals l_max within 4.1e-12;
+            - scores times standard deviations are at most 1.4e-8, and the Newton step is at most 2.8e-7 of the
+              tolerances;
+            - the numerical Hessian is negative definite;
+            - the standard errors agree with the targets within 1.2e-11;
+            - its own profile (whitened QR on a 1999-point phi grid, g grid, Brent) finds the second maximum at 18160
+              years, 1.251 below l_max, and interval ends 9983.1892 and 12584.306 years, which agree with the
+              reference within 6e-9 relative.
+            Its phi-mode count finds one maximum in phi per hole at t_end, 0.97 t_end and 1.03 t_end, and one maximum
+            in g at t_end.
+       iii. Error budget (patterns of item 14f, error / limit): none 0.014, smooth 0.012, irregular 0.210, aligned
+            with the residual sign 0.239, geometry 0.009. The second solution with exact inputs reaches 0.001.
+       iv.  The reference, the second solution and the three blind solutions of item f pass the new case.
+    d. Finding (advisory): the AR(1) order was undefined when two used readings of a hole have the same MD. Step 6
+       does not forbid that, and the likelihood depends on how ties are ordered. Change: the step 7 prompt, the
+       function_header, problem_io and the scaffold now say "readings at equal MD in input order"; the contract
+       assumptions and valid_input_ranges say the same. The reference (np.argsort with kind="stable") and the second
+       solution (lexsort on MD, then input index) already follow this rule. No valid test input has ties; the only
+       one with ties is the invalid one_depth input, which raises by the resolvability rule. Grading is unchanged
+       (edit type: clarification).
+    e. Finding (advisory): the visible sentence "These limits include the errors propagated from the stated
+       accuracies of steps 1, 2 and 5" was checked only on the test regions and the three domain-end regions. The
+       adversarial pattern, a step 5 error aligned with the sign of the data residual, grows roughly with
+       |g| sum_h n_h (1 + |phi_h|) / s_h. The domain bounds none of these: not the number of readings or holes, not
+       the amplitude. The verifier's rough scaling: one hole with 1000 readings at 1 mK and phi = 0.95 would reach
+       about twice the log-likelihood limit.
+       Change: the claim is limited in verification_explanation and here.
+       - Errors smooth in depth (the physical form of an inversion error of step 5) stayed below 0.023 of every limit
+         on all the regions.
+       - The irregular and aligned patterns are shown on the stated regions only.
+       The visible text and the tests are unchanged. The tests use only these regions, and a step 5 within its stated
+       accuracy has no reason to align with the residual of the data.
+    f. Internal calibration (blind solvers; internal, not platform rollouts). Three solutions were written in
+       separate sessions from the agent-visible specification of round 3 only (VISIBLE_SPEC3). They were scored case
+       by case in fresh processes, single-threaded, with each blind file as the whole-solution candidate.
+       - Round-3 test files, before this repair: all three pass all 79 cases (22, 12, 12, 7, 8, 7, 8 and 3 per file).
+         Their worst error is 1.6e-3 of a stated limit in step 6, 1.2e-3 in step 7 and 2.3e-4 in the whole-task
+         cases.
+       - Final files, after this repair: all three again pass all 79 cases. The test files had the same checksums
+         before and after the run. In the retuned whole-task case 2 their worst error is 2.0e-4 to 3.2e-4 of a
+         stated limit (g), and their interval ends agree with the reference within 1e-8 relative. All three
+         implement the nearest-crossing rule, so the new region does not separate them. Wall time for the whole
+         suite (two workers): 76, 106 and 85 s.
+       Together with the round-2 count (84 of 84), this suggests the platform result may lie at the easy end of the
+       band. It cannot be measured locally. No tolerance, hidden convention or runtime was changed to influence it.
+    g. Regression tests and reruns. tools/crown_check.py, all modes, every case alone in a fresh process, one
+       BLAS/OpenMP thread, -j 2, on the final files: summary ALL OK, FORMAT OK.
+
+       | Mode | Result |
+       |---|---|
+       | format | OK |
+       | REF steps 1-7, general (solution.py) | 22/22, 12/12, 12/12, 7/7, 8/8, 7/7, 8/8, 3/3 |
+       | SECOND steps 1-7, general | 22/22, 12/12, 12/12, 7/7, 8/8, 7/7, 8/8, 3/3 |
+       | MUT | every mutant fails at least one case of its target tests; the step mutants and the seven earlier whole-task mutants fail the same cases as in table 14h; whole_task_interval_outermost_crossings fails 1 of 3 (2) |
+       | SHIFT +-1e-12 | all cases pass |
+       | CONTROL None / 0.0 | 0 cases pass in every step and in general |
+
+       The new case takes 10 s with the reference and 15 s with the second solution. Error margins in the
+       whole-task cases (error / stated limit, worst output): reference 0.0143 (g, case 2); second solution 0.0019
+       (phi, case 1). Scratch scripts are kept outside the upload: design4.py, fullscan4.py and budget4.py, plus the
+       round-3 verifier's verify_region.py, phi_modes.py and se_elasticity.py run on the new case.

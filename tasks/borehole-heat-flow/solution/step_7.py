@@ -18,7 +18,7 @@ negative above them); the profile over g (each phi_h maximized on a 399-point gr
 around every hole's own optimum and every grid maximum is refined by bounded Brent in g with each phi_h maximized
 by bounded Brent around its best grid point. The profile l_p(t) is scanned on a logarithmic grid and every grid
 maximum is refined with bounded Brent (over the end cell for an end value not below its neighbour); dP/dt_end comes
-from a fourth-order central difference; the expected Fisher information sum_h J_h^T L_h^T L_h J_h / s_h^2 of the
+from a fourth-order central difference with step 1e-2 t_end; the expected Fisher information sum_h J_h^T L_h^T L_h J_h / s_h^2 of the
 regression parameters (block diagonal against the noise parameters) is inverted after diagonal scaling; the
 interval ends are bracketed by stepping outward from the estimate and found with Brent's root finder.
 """
@@ -237,7 +237,7 @@ def regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape, t_end_bo
         return d["P_fix"] + ds * U(d, t)
 
     def dPdt(d, t):
-        h = 1e-3 * t
+        h = 1e-2 * t
         u = [U(d, t + j * h) for j in (-2, -1, 1, 2)]
         return ds * (u[0] - 8.0 * u[1] + 8.0 * u[2] - u[3]) / (12.0 * h)
 

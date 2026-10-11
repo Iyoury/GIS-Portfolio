@@ -540,11 +540,11 @@ def _sr_loglik(v, F):
 def regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape, t_end_bounds):
     """Second solution: exact AR(1) likelihood through the innovations (prediction-error) decomposition; Fisher
     scoring on all parameters (T0_h, q0_h, phi_h, s_h of every hole, g and t_end) with the expected information of
-    the prediction-error decomposition (Harvey 1989, eq. 3.4.69 form) and Levenberg damping; the profile at fixed
-    t_end by Fisher scoring from several starts (continuation from the neighbouring scan point, independent-error
-    start at the pooled amplitude, each hole's own amplitude); per-hole response and dP/dt_end from the impulse
-    response on its own contour; standard errors from the inverse of the whole information matrix; chi-square
-    quantile from the normal quantile; interval ends by Illinois regula falsi."""
+    the prediction-error decomposition, sum_i [(1/2) F_i^-2 dF_i dF_i + F_i^-1 E(dv_i dv_i)], and Levenberg damping;
+    the profile at fixed t_end by Fisher scoring from several starts (continuation from the neighbouring scan point,
+    and independent-error starts at each hole's own least-squares amplitude and at their mean); per-hole response and
+    dP/dt_end from the impulse response on its own contour; standard errors from the inverse of the whole
+    information matrix; chi-square quantile from the normal quantile; interval ends by Illinois regula falsi."""
     keys = {"survey_md", "survey_inc", "survey_azi", "log_md", "log_temp", "layer_top_md", "layer_k",
             "heat_production", "rho_c", "z_min"}
     if not isinstance(holes, (list, tuple)) or len(holes) < 2:

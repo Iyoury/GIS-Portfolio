@@ -640,7 +640,7 @@ def regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape, t_end_bo
         return d["P_fix"] + ds * U(d, t)
 
     def dPdt(d, t):
-        h = 1e-3 * t
+        h = 1e-2 * t
         u = [U(d, t + j * h) for j in (-2, -1, 1, 2)]
         return ds * (u[0] - 8.0 * u[1] + 8.0 * u[2] - u[3]) / (12.0 * h)
 
