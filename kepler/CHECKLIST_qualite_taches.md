@@ -61,3 +61,21 @@ atteignant la verticale (taux non identifiables), structure à cheval sur une li
 (passe de la profondeur consignée, pas de la profondeur interne). Règle retenue : quand les deux
 implémentations se trompent au même endroit, c'est le générateur ou la porte qu'il faut corriger,
 pas les solveurs.
+
+## Leçon du cas carottes orientées (v5 à v6)
+
+La v5 a passé la sonde de facilité mais la sonde de difficulté a résolu 7/7 (un essai en erreur
+plateforme). Deux leviers testés : (a) le biais de Terzaghi appliqué plan par plan (orientations
+échantillonnées inclinées vers l'axe du trou, famille coupée en deux lobes par la zone aveugle) :
+l'effet sature à 3,5-4° à l'échelle du programme quelle que soit la géométrie, trop faible pour une
+porte nette, écarté ; (b) une famille qui n'existe que dans un domaine (joints de décompression
+confinés à la roche altérée, visibles dans lithology.csv et dans la distribution en profondeur,
+rien d'écrit) : l'espacement compté sur toute la longueur des trous est faux d'un facteur 7 à 9,
+porte nette, retenu. La sonde locale (Opus, effort par défaut) l'a quand même trouvé en 17
+commandes : un jugement découvrable est découvert par un agent appliqué. Règles retenues :
+chaque tolérance écrite dans l'instruction (point 3) ; quand une famille partage une région du
+stéréonet avec un artefact, les proportions du mélange doivent pouvoir varier avec la profondeur ;
+la condition « pas de famille miroir d'une autre autour d'un axe de trou » doit tenir tout le long
+du trou, pas seulement aux extrémités (une indécidabilité à mi-trou a produit 13 fausses passes
+dans l'indépendante). Au-delà, pour la bande « résolu rarement », il faut un sujet où l'agent ne
+peut pas vérifier sa propre réponse par la cohérence interne des données.
