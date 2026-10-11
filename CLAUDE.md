@@ -26,6 +26,9 @@ The authoritative standard is the authoring guide, saved in full here:
 - Test files use the parser format `# --- test case N ---`; every case is self-contained (its own imports,
   helpers and setup; no variables or random state from other cases). n_test_cases equals the number of
   cases. tests/general.py calls the final function against solution.py.
+- Every test-case body is wrapped in `def _crown_case(): ...` followed by `_crown_case()` (tools/wrapcases.py),
+  so no test variable or helper leaks into the namespace shared with the candidate's code (a module-level
+  `pi = ...` or a helper class `_Hole` in a test once overwrote the candidate's own names).
 - No timing asserts and no clock reads in tests (no perf_counter, time.time, signal.alarm); do not state a
   per-call time budget in prompts. Runtime must simply be reasonable.
 - No exact floating-point equality and no zero tolerance; near-zero targets get an absolute tolerance.

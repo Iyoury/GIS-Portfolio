@@ -31,17 +31,19 @@ difficulty_explanation: >-
   volumetric heat capacity), its own cut-off depth and its own unknown noise level, so every likelihood
   evaluation needs the layered Laplace-domain solution in every hole. The prompt states the statistical model
   and the definitions of the estimators, not the algorithm. The agent has to see that the noise levels must be
-  estimated jointly with the shared parameters (pooled least squares with one common variance moves t_end by 1.9
+  estimated jointly with the shared parameters (pooled least squares with one common variance moves t_end by up
   to 68 times its tolerance on the test regions, and weights fixed beforehand from single-hole fits also fail),
   concentrate the likelihood over the per-hole parameters, maximize over g on the whole real line (with a free
-  variance per hole the concentrated likelihood is a product of Student-like factors in g, not a quadratic) and
-  over t_end globally on a profile that can have a second maximum (a local search over the bounds ends in the
-  wrong basin in two test regions); form the expected Fisher information at the estimates (the observed
+  variance per hole the concentrated likelihood is a product of Student-like factors in g, not a quadratic; in a
+  test region with a disturbed hole it has two maxima in g at the estimate, and an ascent from the pooled
+  least-squares amplitude stops at the secondary one, 4 % off in g and t_end) and over t_end globally on a profile
+  that can have a second maximum (a local search over the bounds ends in the wrong basin in two test regions); form the expected Fisher information at the estimates (the observed
   information, per-hole variances RSS/(n - 2), or blocks inverted with the other parameters held fixed fail);
   and bound the likelihood-ratio interval with the noise levels re-maximized at every t_end (holding them at
   their estimates fails) at the points nearest to the estimate where twice the log-likelihood drop equals the
   chi-square quantile, with the stated rules for an end-point maximum or an interval not contained in the
-  bounds, and report the log-likelihood with its normalizing constants. Step 6 is the single-hole least-squares
+  bounds (a maximum just inside a bound is not an end-point maximum: precise regions with the maximum 55 years
+  inside either bound must return the estimate), and report the log-likelihood with its normalizing constants. Step 6 is the single-hole least-squares
   version, with the joint Wald covariance (n_used - 4 degrees of freedom) and the F-calibrated profile interval.
   The earlier steps hide the standard mistakes of heat-flow work: the minimum-curvature true vertical depth must
   be exact between stations and for tiny doglegs on long segments, the thermal resistance of a layered column is
@@ -53,107 +55,112 @@ difficulty_explanation: >-
   diffusivity (0.04 to 0.3 K per K) miss the required 1e-8 K per K by orders of magnitude.
 solution_explanation: >-
   Step 1 accumulates the closed-form minimum-curvature increments 0.5 dMD (cos I1 + cos I2) RF(beta), with the
-  dogleg from atan2(|t1 x t2|, t1 . t2) and the ratio factor tan(beta/2)/(beta/2) from its Taylor series for
-  small half-angles; a point inside a segment uses the great-circle tangent written with sinc functions and the
-  ratio factor of the partial arc. Step 2 sums the exact layer contributions (b - a)/k and (b - a)(b + a)/(2k),
-  factored so that the layers below z add exactly zero. Step 3 superposes differences of erfc step responses
-  with times converted with the Julian year. Step 4 checks resolvability with the singular values of the
-  column-normalized design [1, R, P], solves the normal equations for y = T + A S and takes the covariance s^2
-  (G^T G)^-1 with s^2 = RSS/(n - 3). Step 5 Laplace-transforms the layered problem: in each layer the transform
-  is a e^{-qz} + b e^{qz} with q = sqrt(s/kappa_i), the admittance k F'/F is carried up from the bottom
-  half-space with a tanh recursion, F is assembled in logarithms from e^{-2qh} factors only, F/s is inverted on
-  a fixed 32-node Talbot contour (Abate and Valko 2004) and the step responses of the history are superposed.
-  Step 6 converts the readings and the layer tops to TVD, applies the inclusive z_min cut and evaluates R and S;
-  it writes P(z; t) = P_fix(z) + (s_0 - s_1) U(z, t), with U the layered step response (step 5 with a
-  one-interval history) and P_fix the history with intervals 0 and 1 merged, so that the profile RSS(t) is the
-  linear least squares of y = T + A S on [1, R, P(t)] (variable projection); a 121-point logarithmic scan with
-  bounded Brent refinement of every grid minimum and a Gauss-Newton polish gives the global minimum, dP/dt_end
-  comes from a fourth-order central difference with step 1e-3 t, the Wald covariance is s^2 (J^T J)^-1 with J =
-  [1, R, P, g dP/dt_end] and s^2 = RSS_min/(n - 4), and the interval ends at the threshold RSS_min (1 +
-  F_0.95(1, n - 4)/(n - 4)) are bracketed outward from the estimate and located with Brent's root finder. Step 7
-  prepares every hole in the same way. For fixed (g, t) the maximum over T0_h and q0_h is the least-squares
-  residual Q_h(g) = a_h g^2 - 2 b_h g + c_h of hole h on [1, R_h] (projections of y_h and P_h(t) off [1, R_h]),
-  and the maximum over sigma_h gives sigma_h^2 = Q_h/n_h, so the profile is l_p(t) = max_g -sum_h (n_h/2)(log(2
-  pi Q_h(g)/n_h) + 1). Every stationary point in g lies between the holes' own optima b_h/a_h (the derivative is
-  positive below and negative above them); they are the real roots of a polynomial of degree 2H - 1, written in
-  a scaled variable for conditioning and polished by Newton steps, and the best root is the global maximum over
-  g. l_p is scanned at 121 logarithmically spaced times and every interior grid maximum is refined with bounded
-  Brent; the expected information sum_h J_h^T J_h / sigma_h^2 (J_h with the columns 1 and R_h on the hole's own
-  T0_h, q0_h and P_h, g dP_h/dt_end on g and t_end; the sigma block is decoupled in expectation) is inverted
-  after diagonal scaling, with dP/dt_end from the same fourth-order difference; the interval ends where l_p =
-  l_max - chi2.ppf(0.95, 1)/2 are bracketed by stepping outward from the estimate and located with Brent's root
-  finder.
+  dogleg from atan2(|t1 x t2|, t1 . t2) and the ratio factor tan(beta/2)/(beta/2) from its Taylor series for small
+  half-angles; a point inside a segment uses the great-circle tangent written with sinc functions and the ratio
+  factor of the partial arc. Step 2 sums the exact layer contributions (b - a)/k and (b - a)(b + a)/(2k), factored
+  so that the layers below z add exactly zero. Step 3 superposes differences of erfc step responses with times
+  converted with the Julian year. Step 4 checks resolvability with the singular values of the column-normalized
+  design [1, R, P], solves the normal equations for y = T + A S and takes the covariance s^2 (G^T G)^-1 with s^2 =
+  RSS/(n - 3). Step 5 Laplace-transforms the layered problem: in each layer the transform is a e^{-qz} + b e^{qz}
+  with q = sqrt(s/kappa_i), the admittance k F'/F is carried up from the bottom half-space with a tanh recursion, F
+  is assembled in logarithms from e^{-2qh} factors only, F/s is inverted on a fixed 32-node Talbot contour (Abate
+  and Valko 2004) and the step responses of the history are superposed. Step 6 converts the readings and the layer
+  tops to TVD, applies the inclusive z_min cut and evaluates R and S; it writes P(z; t) = P_fix(z) + (s_0 - s_1)
+  U(z, t), with U the layered step response (step 5 with a one-interval history) and P_fix the history with
+  intervals 0 and 1 merged, so that the profile RSS(t) is the linear least squares of y = T + A S on [1, R, P(t)]
+  (variable projection); a 121-point logarithmic scan with bounded Brent refinement of every grid minimum (over the
+  end cell for an end value not above its neighbour, where the minimum can still be interior) and a Gauss-Newton
+  polish gives the global minimum, dP/dt_end comes from a fourth-order central difference with step 1e-3 t, the Wald
+  covariance is s^2 (J^T J)^-1 with J = [1, R, P, g dP/dt_end] and s^2 = RSS_min/(n - 4), and the interval ends at
+  the threshold RSS_min (1 + F_0.95(1, n - 4)/(n - 4)) are bracketed outward from the estimate and located with
+  Brent's root finder. Step 7 prepares every hole in the same way. For fixed (g, t) the maximum over T0_h and q0_h
+  is the least-squares residual Q_h(g) = a_h g^2 - 2 b_h g + c_h of hole h on [1, R_h] (projections of y_h and
+  P_h(t) off [1, R_h]), and the maximum over sigma_h gives sigma_h^2 = Q_h/n_h, so the profile is l_p(t) = max_g
+  -sum_h (n_h/2)(log(2 pi Q_h(g)/n_h) + 1). Every stationary point in g lies between the holes' own optima b_h/a_h
+  (the derivative is positive below and negative above them); they are the real roots of a polynomial of degree 2H -
+  1, written in a scaled variable for conditioning and polished by Newton steps, backed up by the sign changes of
+  the derivative on a grid refined around every hole's optimum (Brent's root finder), and the best candidate is the
+  global maximum over g. l_p is scanned at 121 logarithmically spaced times and every grid maximum is refined with
+  bounded Brent (an end value not below its neighbour over the end cell, where the maximum can still be interior);
+  the expected information sum_h J_h^T J_h / sigma_h^2 (J_h with the columns 1 and R_h on the hole's own T0_h, q0_h
+  and P_h, g dP_h/dt_end on g and t_end; the sigma block is decoupled in expectation) is inverted after diagonal
+  scaling, with dP/dt_end from the same fourth-order difference; the interval ends where l_p = l_max -
+  chi2.ppf(0.95, 1)/2 are bracketed by stepping outward from the estimate and located with Brent's root finder.
 verification_explanation: >-
-  Independent targets for steps 1-5 come from closed forms (straight and constant-build holes, a
-  constant-azimuth segment with inclination linear in MD, hand-computed layer sums, R = z/k1 and S = z^2/(2 k1)
-  at shallow depths under a deep layer stack, erfc forms evaluated with math.erfc, including depths of a few
-  centimetres to metres, the Carslaw-Jaeger image series for a layer over a half-space), from independent
-  computations inside the tests (adaptive quadrature of the arc tangent and of 1/k and z/k with
-  scipy.integrate.quad, numpy.linalg.lstsq with the pseudo-inverse covariance) and from mpmath values stored
-  inline for three multilayer columns (90-digit transfer-matrix transforms with mpmath's Talbot inversion; the
-  50-layer column at 270 to 390 digits with fixed-Talbot inversion of degree 60 and 90 and Gaver-Stehfest
-  inversion with 60 terms). Steps 6 and 7 build every borehole forward (64-point Gauss-Legendre TVD, exact layer
-  sums) and take P and dP/dt_end from an oracle shared with neither solution: the branch-cut (real-axis) form of
-  the Laplace inversion of the layered column, U = 1 + (2/pi) int exp(-w^2) Im F+(w^2/t)/w dw on the upper side
-  of the cut, with real transfer matrices and Gauss-Legendre quadrature; it reproduces the stored 90-digit
-  mpmath values of the step 5 tests to 3e-16 K (five-layer column), 9e-16 K (contrasted column) and 4e-16 K (50
-  layers), and erfc and its time derivative to 7e-16; a uniform column uses math.erfc and its closed-form
-  derivative. For step 6 the temperatures are the model at the generating T0, q0, g and t_end plus a seeded
-  residual orthogonal to the four Jacobian columns 1, R, P, g dP/dt_end, so these values are a stationary point
-  with RSS_min = |r|^2; the Wald errors follow from the oracle Jacobian, the F quantile from the Student t
-  density, and the interval ends are the oracle profile's nearest crossings; the cases cover an inclined
-  seven-layer hole, a short contrasted hole (F against chi-square), a uniform column with the collar reading at
-  z_min = 0, a short glaciation with a second minimum, end-point minima, uncontained intervals, five readings
-  (valid) and four (ValueError) and invalid inputs. For step 7 the residual of hole h is r_h = b_h + c_h, with
-  b_h orthogonal to the hole's four Jacobian columns (seeded), c_h in the span of the projections of P_h and g
-  dP_h/dt_end off [1, R_h], and the c_h of one hole solved in closed form (a quadratic equation) so that the
-  weighted scores sum_h (n_h/|r_h|^2) [P_h, g dP_h/dt_end]^T r_h vanish: with sigma_h^2 = |r_h|^2/n_h every
-  score of the log-likelihood is zero at the generating values (the weighted shared scores are below 4e-12 of
-  the largest single-hole term), while the unweighted scores are not, and pooled least squares lands 1.9 to 68
-  times the t_end tolerance away. Dense scans of the oracle profile log-likelihood (2000 logarithmically spaced
-  times over the bounds of every region and 201 within 4 standard errors of t_end) find no value above l_max,
-  and the profile in g at t_end has a single maximum; the standard errors come from the expected information of
-  the oracle Jacobians at sigma_h, the chi-square quantile from math.erf, l_max from the generating residuals,
-  and the interval ends are the oracle profile's nearest crossings, with the maximum over g bracketed by sign
-  changes of its derivative between the holes' own optima (a method used by neither solution). The step 7 cases
-  cover three holes of different quality, a short precise log with a long noisy one, uniform columns with the
-  erfc oracle and the collar reading at z_min = 0, a short glaciation whose profile has a second maximum inside
-  the bounds, end-point maxima, uncontained intervals, a hole with exactly six readings (valid) and five
-  (ValueError) and 34 invalid inputs; the whole-task cases call the final function on a deep three-hole region,
-  on a two-hole region with the invariance of the shared results to a constant offset of one log (only that
-  hole's T0 moves) and to the order of the holes, and on a second short-glaciation region. The second solution
-  uses different methods throughout (circular-arc geometry of each segment for the TVD; R as a sum of ramps and
-  S by integration by parts; Duhamel convolution integrated by adaptive quadrature in the similarity variable
-  for the half-space perturbation; QR least squares; one global linear system per Laplace node and the
-  Weideman-Trefethen hyperbolic contour for the layered column; for step 6, Levenberg-Marquardt on the four
-  parameters from the minima of a coarse profile scan, dP/dt_end from the impulse response, covariance from the
-  QR factor of J, the Student t quantile and Illinois regula falsi; for step 7, Fisher scoring on all regression
-  parameters with the noise variances re-estimated at every iterate and Levenberg damping from every maximum of
-  a coarse profile scan, the amplitude at fixed t_end by iteratively reweighted fixed-point ascent from every
-  hole's own optimum, dP/dt_end from the impulse response, covariance from the QR factor of the weighted
-  Jacobian, the chi-square quantile as the squared normal quantile and Illinois regula falsi), copies no test
-  oracle and passes every test case. The tolerances of steps 6 and 7 come from error budgets: with P in error by
-  1e-8 K per K (smooth in depth and time, or irregular), the TVD in error by 1e-6 m and R, S by a relative 1e-9,
-  the reference stays within a third of every step 6 limit on the step 6 boreholes (half at rms_residual = 1e-4
-  K), and within 0.37 of every stated step 7 limit on the step 7 and whole-task regions and 0.52 on regions
-  rebuilt with noise levels of 1e-4 K and 0.03 K (the ends of the stated domain); the irregular errors move the
-  flat maximum of the regional profile by up to 0.015 standard errors, which sets the relative 2e-3 limits on g
-  and t_end and 1e-2 on the standard errors of step 7. With exact inputs the reference reaches at most 3.2e-3 of
-  a step 6 limit and 0.006 of a step 7 limit (0.021 on the rebuilt regions), and the second solution 3.2e-4 and
-  5.3e-4. Each step has named scientific mutants (linear TVD interpolation, balanced tangential, arithmetic-mean
-  conductivity, missing 1/2 in S, years not converted, missing factor 2, reversed interval sign, wrong
-  heat-production sign, RSS/n, erfc with a mean or local diffusivity, Gaver-Stehfest in double precision; for
-  step 6 the half-space perturbation, conditional standard errors, the chi-square quantile, n - 3 degrees of
-  freedom, a t_end column without g, a local search, an interval bracketed to the bound, MD as depth, a z_min
-  cut on MD or a strict cut, one mean conductivity; for step 7 pooled least squares, two-stage weights, per-hole
-  variances RSS/(n - 2) or the observed information or separately inverted blocks in the standard errors, noise
-  levels held fixed in the profile, the likelihood-ratio threshold without the factor 2, the log-likelihood
-  without its constants, a local search without a scan, the first hole's rho_c for every hole, the half-space
-  perturbation, MD as depth, a z_min cut on MD or a strict cut) and six whole-task mutants of the final
-  function, and each fails at least one case of its target tests. Every case was run alone in a fresh process
-  with tools/crown_check.py for the per-step references, solution.py, the second solution, the mutants, the
-  all-None and all-zero controls (which pass no case) and with every reference output scaled by 1 +- 1e-12
-  (every evaluated function at once in the whole-task cases; all cases still pass).
+  Independent targets for steps 1-5 come from closed forms (straight and constant-build holes, a constant-azimuth
+  segment with inclination linear in MD, hand-computed layer sums, R = z/k1 and S = z^2/(2 k1) at shallow depths
+  under a deep layer stack, erfc forms evaluated with math.erfc, including depths of a few centimetres to metres,
+  the Carslaw-Jaeger image series for a layer over a half-space), from independent computations inside the tests
+  (adaptive quadrature of the arc tangent and of 1/k and z/k with scipy.integrate.quad, numpy.linalg.lstsq with the
+  pseudo-inverse covariance) and from mpmath values stored inline for three multilayer columns (90-digit
+  transfer-matrix transforms with mpmath's Talbot inversion; the 50-layer column at 270 to 390 digits with
+  fixed-Talbot inversion of degree 60 and 90 and Gaver-Stehfest inversion with 60 terms). Steps 6 and 7 build every
+  borehole forward (64-point Gauss-Legendre TVD, exact layer sums) and take P and dP/dt_end from an oracle shared
+  with neither solution: the branch-cut (real-axis) form of the Laplace inversion of the layered column, U = 1 +
+  (2/pi) int exp(-w^2) Im F+(w^2/t)/w dw on the upper side of the cut, with real transfer matrices and
+  Gauss-Legendre quadrature; it reproduces the stored 90-digit mpmath values of the step 5 tests to 3e-16 K
+  (five-layer column), 9e-16 K (contrasted column) and 4e-16 K (50 layers), and erfc and its time derivative to
+  7e-16; a uniform column uses math.erfc and its closed-form derivative. For step 6 the temperatures are the model
+  at the generating T0, q0, g and t_end plus a seeded residual orthogonal to the four Jacobian columns 1, R, P, g
+  dP/dt_end, so these values are a stationary point with RSS_min = |r|^2; the Wald errors follow from the oracle
+  Jacobian, the F quantile from the Student t density, and the interval ends are the oracle profile's nearest
+  crossings; the cases cover an inclined seven-layer hole, a short contrasted hole (F against chi-square), a uniform
+  column with the collar reading at z_min = 0, a short glaciation with a second minimum, end-point minima,
+  near-boundary valid controls (a precise log whose minimum lies 55 years inside either bound), uncontained
+  intervals, five readings (valid) and four (ValueError) and invalid inputs. For step 7 the residual of hole h is
+  r_h = b_h + c_h, with b_h orthogonal to the hole's four Jacobian columns (seeded), c_h in the span of the
+  projections of P_h and g dP_h/dt_end off [1, R_h], and the c_h of one hole solved in closed form (a quadratic
+  equation) so that the weighted scores sum_h (n_h/|r_h|^2) [P_h, g dP_h/dt_end]^T r_h vanish: with sigma_h^2 =
+  |r_h|^2/n_h every score of the log-likelihood is zero at the generating values (the weighted shared scores are
+  below 4e-12 of the largest single-hole term), while the unweighted scores are not, and pooled least squares lands
+  1.9 to 68 times the t_end tolerance away. Dense scans of the oracle profile log-likelihood (2000 logarithmically
+  spaced times over the bounds of every region and 201 within 4 standard errors of t_end) find no value above l_max,
+  and the profile in g at t_end has a single maximum except in the disturbed-hole region, where it has two and the
+  generating g is the higher by 137.7; the standard errors come from the expected information of the oracle
+  Jacobians at sigma_h, the chi-square quantile from math.erf, l_max from the generating residuals, and the interval
+  ends are the oracle profile's nearest crossings, with the maximum over g bracketed by sign changes of its
+  derivative on a uniform 4001-point grid between the holes' own optima and located by bisection (the reference
+  takes the roots of a polynomial, with a sign-change pass on a grid refined around each optimum as backup, and the
+  second solution fixed-point ascents). The step 7 cases cover three holes of different quality, a short precise log
+  with a long noisy one, uniform columns with the erfc oracle and the collar reading at z_min = 0, a short
+  glaciation whose profile has a second maximum inside the bounds, end-point maxima, near-boundary valid controls
+  (precise logs whose maximum lies 55 years inside either bound), uncontained intervals, a region with a disturbed
+  hole whose likelihood in g is bimodal at the estimate (the pooled least-squares amplitude lies on the side of the
+  secondary maximum), a hole with exactly six readings (valid) and five (ValueError) and 34 invalid inputs; the
+  whole-task cases call the final function on a deep three-hole region, on a two-hole region with the invariance of
+  the shared results to a constant offset of one log (only that hole's T0 moves) and to the order of the holes, and
+  on a second short-glaciation region. The second solution uses different methods throughout (circular-arc geometry
+  of each segment for the TVD; R as a sum of ramps and S by integration by parts; Duhamel convolution integrated by
+  adaptive quadrature in the similarity variable for the half-space perturbation; QR least squares; one global
+  linear system per Laplace node and the Weideman-Trefethen hyperbolic contour for the layered column; for step 6,
+  Levenberg-Marquardt on the four parameters from the minima of a coarse profile scan, dP/dt_end from the impulse
+  response, covariance from the QR factor of J, the Student t quantile and Illinois regula falsi; for step 7, Fisher
+  scoring on all regression parameters with the noise variances re-estimated at every iterate and Levenberg damping
+  from every maximum of a coarse profile scan, the amplitude at fixed t_end by iteratively reweighted fixed-point
+  ascent from every hole's own optimum, dP/dt_end from the impulse response, covariance from the QR factor of the
+  weighted Jacobian, the chi-square quantile as the squared normal quantile and Illinois regula falsi), copies no
+  test oracle and passes every test case. The tolerances of steps 6 and 7 come from error budgets: with P in error
+  by 1e-8 K per K (smooth in depth and time, or irregular), the TVD in error by 1e-6 m and R, S by a relative 1e-9,
+  the reference stays within a third of every step 6 limit on the step 6 boreholes (half at rms_residual = 1e-4 K),
+  and within 0.37 of every stated step 7 limit on the step 7 and whole-task regions and 0.52 on regions rebuilt with
+  noise levels of 1e-4 K and 0.03 K (the ends of the stated domain); the irregular errors move the flat maximum of
+  the regional profile by up to 0.015 standard errors, which sets the relative 2e-3 limits on g and t_end and 1e-2
+  on the standard errors of step 7. With exact inputs the reference reaches at most 3.2e-3 of a step 6 limit and
+  0.006 of a step 7 limit (0.021 on the rebuilt regions), and the second solution 3.2e-4 and 5.3e-4. Each step has
+  named scientific mutants (linear TVD interpolation, balanced tangential, arithmetic-mean conductivity, missing 1/2
+  in S, years not converted, missing factor 2, reversed interval sign, wrong heat-production sign, RSS/n, erfc with
+  a mean or local diffusivity, Gaver-Stehfest in double precision; for step 6 the half-space perturbation,
+  conditional standard errors, the chi-square quantile, n - 3 degrees of freedom, a t_end column without g, a local
+  search, an interval bracketed to the bound, MD as depth, a z_min cut on MD or a strict cut, one mean conductivity;
+  for step 7 pooled least squares, two-stage weights, per-hole variances RSS/(n - 2) or the observed information or
+  separately inverted blocks in the standard errors, noise levels held fixed in the profile, the likelihood-ratio
+  threshold without the factor 2, the log-likelihood without its constants, a local search without a scan, a local
+  amplitude ascent from the pooled least-squares value, the first hole's rho_c for every hole, the half-space
+  perturbation, MD as depth, a z_min cut on MD or a strict cut) and six whole-task mutants of the final function,
+  and each fails at least one case of its target tests. Every case was run alone in a fresh process with
+  tools/crown_check.py for the per-step references, solution.py, the second solution, the mutants, the all-None and
+  all-zero controls (which pass no case) and with every reference output scaled by 1 +- 1e-12 (every evaluated
+  function at once in the whole-task cases; all cases still pass).
 required_dependencies: |-
   import numpy as np
   import math
@@ -878,8 +885,9 @@ sub_steps:
       normal probability density of all the used temperatures, normalizing constants included. The profile
       log-likelihood l_p(t) is its maximum over all the other parameters with t_end fixed at t; t_end is the global
       maximizer of l_p over [t_lo, t_hi], the other estimates are the maximizers at that t_end, and l_max = l_p(t_end).
-      The likelihood is unbounded when a hole can be fitted exactly, so every hole must keep at least 6 used readings,
-      and the domain is that of noisy logs (maximum-likelihood sigma_h from 1e-4 K to 0.03 K in every hole).
+      The likelihood is unbounded when a hole can be fitted exactly; to keep it bounded with a margin, every hole must
+      keep at least 6 used readings, and the domain is that of noisy logs (maximum-likelihood sigma_h from 1e-4 K to
+      0.03 K in every hole).
       Standard errors: the square roots of the diagonal of the inverse of the expected (Fisher) information matrix of
       all the parameters (T0_h, q0_h and sigma_h of every hole, g and t_end, with t_end in years), evaluated at the
       maximum-likelihood estimates; report those of g, t_end and of every T0_h and q0_h.
@@ -980,7 +988,7 @@ sub_steps:
       known distribution of the statistic (chi-square with one degree of freedom) it is asymmetric when the model is
       curved in t_end. A short glaciation lets amplitude trade against timing, and the profile can then have several
       maxima.
-    n_test_cases: 7
+    n_test_cases: 8
     contract:
       quantity: "Regional maximum-likelihood estimate of the glacial amplitude g and of the end of the last glaciation t_end shared by several boreholes, with every hole's T0, q0 and noise level, standard errors from the expected Fisher information, the 95 % likelihood-ratio interval of t_end and the maximized log-likelihood."
       assumptions: "Every hole as in step 6 (minimum-curvature trajectory, horizontal layers logged in MD, one-dimensional conduction with uniform heat production, the layered-column perturbation of step 5 with the hole's own rho_c, inclusive z_min cut on TVD); amplitude and history (shape, known interval ends, unknown t_end) shared by all holes; independent normal errors with an unknown variance for every hole; maximum likelihood with g unrestricted and t_end the global maximizer of the profile log-likelihood on [t_lo, t_hi]; standard errors from the inverse expected Fisher information at the estimates; interval ends where 2 (l_max - l_p) equals the chi-square(1) 0.95 quantile, nearest crossings; the stated accuracy includes the propagated accuracies of steps 1, 2 and 5."
@@ -1017,6 +1025,9 @@ sub_steps:
       - name: local_search_without_scan
         description: "t_end from one local bounded Brent search of the profile over [t_lo, t_hi] without a global scan: a local maximum in another basin can be returned."
         file: mutants/step_7_local_search_without_scan.py
+      - name: amplitude_local_ascent_from_pooled
+        description: "Amplitude at fixed t_end from a local fixed-point (iteratively reweighted) ascent started at the pooled least-squares amplitude instead of the global maximum over g: when the likelihood in g is bimodal the ascent can stop at the secondary maximum."
+        file: mutants/step_7_amplitude_local_ascent_from_pooled.py
       - name: first_hole_rho_c_for_all
         description: "The volumetric heat capacity of the first hole used in the glacial perturbation of every hole."
         file: mutants/step_7_first_hole_rho_c_for_all.py

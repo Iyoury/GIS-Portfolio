@@ -14,7 +14,10 @@ def _rg_best_g(co):
     between the smallest and the largest g_h (the derivative is positive below and negative above them). In the
     scaled variable x = (g - mid) / half these points are the real roots in [-1, 1] of the polynomial
     sum_h n_h (x - x_h) / v_h prod_{j != h} (1 + (x - x_j)^2 / v_j), v_h = m_h / (a_h half^2); each root is polished
-    by Newton steps on the stationarity condition and the best one is returned."""
+    by Newton steps on the stationarity condition. When the holes' widths sqrt(m_h / a_h) differ by many orders of
+    magnitude the polynomial roots can be inaccurate, so the sign changes of the derivative on a grid refined around
+    every hole's optimum (offsets of 1e-3 to 1e3 widths) are added, located with Brent's root finder; the best
+    candidate is returned."""
     gh = np.array([b / a for a, b, c, n in co])
     lo, hi = float(gh.min()), float(gh.max())
 
@@ -55,6 +58,16 @@ def _rg_best_g(co):
                     break
                 g = gn
             cand.append(g)
+    wh = np.sqrt(np.maximum(vh, 0.0)) * half
+    offs = np.concatenate((-np.geomspace(1e3, 1e-3, 61), [0.0], np.geomspace(1e-3, 1e3, 61)))
+    pts = np.unique(np.clip(np.concatenate([np.linspace(lo, hi, 201)] + [g0 + w0 * offs for g0, w0 in zip(gh, wh)]),
+                            lo, hi))
+    ca = np.array([[a, b, c, n] for a, b, c, n in co], float)
+    dv = np.sum(ca[:, 3:4] * (ca[:, 0:1] * pts - ca[:, 1:2])
+                / (ca[:, 0:1] * pts * pts - 2.0 * ca[:, 1:2] * pts + ca[:, 2:3]), axis=0)
+    for i in np.nonzero((dv[:-1] < 0.0) & (dv[1:] >= 0.0))[0]:
+        cand.append(brentq(grad, pts[i], pts[i + 1], xtol=1e-15 * max(1.0, abs(pts[i])), rtol=1e-15, maxiter=300)
+                    if dv[i + 1] > 0.0 else float(pts[i + 1]))
     vals = [value(g) for g in cand]
     k = int(np.argmax(vals))
     return cand[k], float(vals[k])

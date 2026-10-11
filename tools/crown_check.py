@@ -158,6 +158,10 @@ def mode_format(t):
     pre, _ = cases_of(t.p(g))
     if re.search(r"^\s*(import|from|def|class|[A-Za-z_]\w*\s*=)", pre, re.M):
         probs.append("general: code before the first test case")
+    for rel in [s["tests"] for s in t.steps] + [g]:
+        for i, c in enumerate(cases_of(t.p(rel))[1]):
+            if "def _crown_case():" not in c or not re.search(r"^_crown_case\(\)\s*$", c, re.M):
+                probs.append(f"{rel} case {i}: body not wrapped in _crown_case() (tools/wrapcases.py)")
     final = t.funcs[max(t.funcs)]
     for i, c in enumerate(cases_of(t.p(g))[1]):
         if not re.search(r"\b" + re.escape(final) + r"\s*\(", c):

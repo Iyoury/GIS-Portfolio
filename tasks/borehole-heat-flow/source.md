@@ -1230,27 +1230,28 @@ headers, references, second solution, tests, mutants) are unchanged; items 1-11 
        least four residual dimensions (tested at n_h = 6, valid, and 5, ValueError).
     d. Targets: weighted-score orthogonal construction (tests/step_7.py header; author's design). On the used
        readings of hole h, y_h = T + A S = T0_h + q0_h R_h + g P_h(t_end) + r_h with r_h = b_h + c_h: b_h = the
-       seeded Gaussian vector projected off the four oracle Jacobian columns [1, R_h, P_h, g dP_h/dt_end] and
-       scaled to the stated rms; c_h = noise_h (k1 e1 + k2 e2) with e1, e2 an orthonormal basis of the projections
-       p_h, d_h of P_h and g dP_h/dt_end off [1, R_h] (stated coefficients) for every hole but one; for that hole
-       c = -lambda X G^-1 v with X = [p, d], G = X^T X, v = sum over the other holes of (n_h/|r_h|^2) X_h^T c_h,
-       and lambda the smaller root of s lambda^2 - n lambda + |b|^2 = 0 (s = v^T G^-1 v), so that the weighted
-       scores sum_h (n_h/|r_h|^2) [P_h, g dP_h/dt_end]^T r_h vanish exactly. With sigma_h^2 = |r_h|^2/n_h every
-       score of the log-likelihood is zero at the generating values: the weighted shared scores are below
-       4e-12 of the largest single-hole term, and the cosines between r_h and the columns 1 and R_h below 3e-13, on
-       every region. The unweighted scores do not vanish, and pooled least squares lands elsewhere (table). Readings
-       shallower than z_min get disturbed values (T0 + 1.5 + 0.02 z + 0.3 N(0, 1)). Offline checks in a clean
-       process (scratch scripts, not part of the upload): a scan of the oracle profile log-likelihood at 2000
-       logarithmically spaced times over the bounds of every region and at 201 times within 4 sigma_t of t_end
-       finds no value above l_max (largest excess 1e-11, at t_end itself, rounding); the profile in g at t_end
-       (20001 points between and around the holes' optima) has a single maximum, at g; the interval ends, the
-       information and l_max follow from the oracle as in the test header. A first, unscaled version of the
-       reference's polynomial in g was ill-conditioned for precise logs (the region of step case 0 rebuilt with
-       0.1 mK logs: polynomial roots rejected, log-likelihood 5.7 too low); the budget runs of item f found it,
-       and the reference now writes the polynomial in a scaled variable and polishes the roots by Newton steps.
-       A region with a discordant hole that would make the profile in g bimodal at t_end was explored and not
-       used: with a precise hole of few readings the global maximum moved to another t_end (dense scan), so the
-       generating values were not the maximum-likelihood solution.
+       seeded Gaussian vector projected off the four oracle Jacobian columns [1, R_h, P_h, g dP_h/dt_end] and scaled
+       to the stated rms; c_h = noise_h (k1 e1 + k2 e2) with e1, e2 an orthonormal basis of the projections p_h, d_h
+       of P_h and g dP_h/dt_end off [1, R_h] (stated coefficients) for every hole but one; for that hole c = -lambda
+       X G^-1 v with X = [p, d], G = X^T X, v = sum over the other holes of (n_h/|r_h|^2) X_h^T c_h, and lambda the
+       smaller root of s lambda^2 - n lambda + |b|^2 = 0 (s = v^T G^-1 v), so that the weighted scores sum_h
+       (n_h/|r_h|^2) [P_h, g dP_h/dt_end]^T r_h vanish exactly. With sigma_h^2 = |r_h|^2/n_h every score of the
+       log-likelihood is zero at the generating values: the weighted shared scores are below 4e-12 of the largest
+       single-hole term, and the cosines between r_h and the columns 1 and R_h below 3e-13, on every region. The
+       unweighted scores do not vanish, and pooled least squares lands elsewhere (table). Readings shallower than
+       z_min get disturbed values (T0 + 1.5 + 0.02 z + 0.3 N(0, 1)). Offline checks in a clean process (scratch
+       scripts, not part of the upload): a scan of the oracle profile log-likelihood at 2000 logarithmically spaced
+       times over the bounds of every region and at 201 times within 4 sigma_t of t_end finds no value above l_max
+       (largest excess 1e-11, at t_end itself, rounding); the profile in g at t_end (20001 points between and around
+       the holes' optima) has a single maximum, at g, on the ten regions of this table (the region added in item 13c
+       has two); the interval ends, the information and l_max follow from the oracle as in the test header. A first,
+       unscaled version of the reference's polynomial in g was ill-conditioned for precise logs (the region of step
+       case 0 rebuilt with 0.1 mK logs: polynomial roots rejected, log-likelihood 5.7 too low); the budget runs of
+       item f found it, and the reference now writes the polynomial in a scaled variable and polishes the roots by
+       Newton steps. A region with a discordant hole that would make the profile in g bimodal at t_end was explored
+       and not used: with a precise hole of few readings the global maximum moved to another t_end (dense scan), so
+       the generating values were not the maximum-likelihood solution. Item 13c adds such a region, with more
+       readings in the precise hole, in which the dense scans confirm the generating values as the global maximum.
 
        | Case | Holes: n_used (noise, mK) | g, t_end | sigma_t (yr) | 95 % interval (yr) | pooled LS t_end (x t_end limit) | feature |
        |---|---|---|---|---|---|---|
@@ -1265,17 +1266,18 @@ headers, references, second solution, tests, mutants) are unchanged; items 1-11 
        | general 1 | step 1 geometry, other seed and coefficients: 24 (2.1); 220 (20.3) | 6.0, 9000 | 38.3 | 8919.7-9076.2 | 8809.7 (10.6) | + 0.75 K on one log, reversed hole order |
        | general 2 | step 3 geometry, other seed: 326 (6.0); 137 (11.1); 136 (18.1); glaciation 24 ka | 7.4, 11800 | 466.8 | 10977.0-12843.5 | 11756.3 (1.9) | second maximum at 17.92 ka, 4.62 below l_max |
 
-    e. Tests. tests/step_7.py (7 cases, each self-contained with the generator, the branch-cut oracle and the
-       checks): the table above; every output is compared with the exact values, the interval ends with the
-       oracle's nearest crossings (outward march, Illinois bisection to 1e-12), the chi-square quantile comes from
-       math.erf by bisection, and the maximum over g in the oracle profile is bracketed by the sign changes of its
-       derivative on a 4001-point grid between the holes' own optima (neither solution's method). Oracle premises
-       are asserted where a case depends on them (six used readings, the collar reading used, the asymmetric
-       interval, the second basin of the short glaciation). Validation (step case 6): one hole, holes not a list,
-       a hole that is not a dict, a missing and an extra key, five readings, unequal or 2-D log arrays, a NaN
-       temperature, negative or NaN heat production, rho_c = 0, a zero or missing conductivity, a layer top or a
-       reading beyond the survey, a survey not starting at 0, all readings at one depth ([1, R_h] not resolvable),
-       and the history and bounds rules of step 6 (16 entries). tests/general.py (3 cases) calls
+    e. Tests. tests/step_7.py (7 cases, 8 since item 13c, each self-contained with the generator, the branch-cut
+       oracle and the checks): the table above; every output is compared with the exact values, the interval ends
+       with the oracle's nearest crossings (outward march, Illinois bisection to 1e-12), the chi-square quantile
+       comes from math.erf by bisection, and the maximum over g in the oracle profile is bracketed by the sign
+       changes of its derivative on a 4001-point grid between the holes' own optima (neither solution's main method;
+       since item 13d the reference adds a sign-change pass on a width-adapted grid with Brent's root finder as a
+       backup). Oracle premises are asserted where a case depends on them (six used readings, the collar reading
+       used, the asymmetric interval, the second basin of the short glaciation). Validation (step case 6): one hole,
+       holes not a list, a hole that is not a dict, a missing and an extra key, five readings, unequal or 2-D log
+       arrays, a NaN temperature, negative or NaN heat production, rho_c = 0, a zero or missing conductivity, a
+       layer top or a reading beyond the survey, a survey not starting at 0, all readings at one depth ([1, R_h] not
+       resolvable), and the history and bounds rules of step 6 (16 entries). tests/general.py (3 cases) calls
        regional_deglaciation_inversion with every earlier step from the candidate: a deep three-hole region, a
        two-hole region with the invariance checks (twice the single-output limits) and a second short-glaciation
        region.
@@ -1319,10 +1321,10 @@ headers, references, second solution, tests, mutants) are unchanged; items 1-11 
        local_search_without_scan, first_hole_rho_c_for_all, halfspace_mean_diffusivity, measured_depth_as_depth,
        z_min_on_measured_depth, z_min_cut_strict. Whole task (solution.py with one error in the final function):
        pooled least squares, half-space perturbation, MD as depth, z_min on MD, local search without a scan, the
-       first hole's rho_c for all holes; the five round-1 whole-task mutants (errors in step 6) were removed,
-       since the general tests no longer call step 6. Not registered: the local maximization over g from the
-       pooled value (no test region has a bimodal profile in g, item d), and a mutant without the end-point rule
-       (indistinguishable from the containment rule, as in item 8).
+       first hole's rho_c for all holes; the five round-1 whole-task mutants (errors in step 6) were removed, since
+       the general tests no longer call step 6. Not registered in this round: the local maximization over g from the
+       pooled value (no test region had a bimodal profile in g, item d; registered in item 13c with the new region),
+       and a mutant without the end-point rule (indistinguishable from the containment rule, as in item 8).
 
        | Where | Mutant | Cases failed |
        |---|---|---|
@@ -1366,8 +1368,184 @@ headers, references, second solution, tests, mutants) are unchanged; items 1-11 
        files. solution.py and second_solution.py were each run twice with one thread and once with two threads on
        four of the regions (step cases 0, 3 and 6, general case 2): identical SHA-256 digests of the outputs.
     j. Not changed or open. relevant_experience is still the author's placeholder. The difficulty band cannot be
-       measured locally, and no blind-solver calibration of step 7 was run in this round (no independent solver
-       was available in this session): whether strong agents solve the regional step reliably is not known. The
-       difficulty comes from the statistical model (per-hole variances estimated jointly, concentrated
-       likelihood, global maximization in g and t_end, expected information, likelihood-ratio profile with the
-       variances re-maximized); every convention needed for a unique answer is stated.
+       measured locally, and no blind-solver calibration of step 7 was run in this round (no independent solver was
+       available in this session): whether strong agents solve the regional step reliably is not known (a
+       calibration of step 7 was run in item 13f). The difficulty comes from the statistical model (per-hole
+       variances estimated jointly, concentrated likelihood, global maximization in g and t_end, expected
+       information, likelihood-ratio profile with the variances re-maximized); every convention needed for a unique
+       answer is stated.
+
+13. Final repair of the version 10 upload, round 2 (independent verifier and blind-solver scoring of step 7). This
+    round belongs to the same platform version 10 upload, so edit_label stays difficulty_increase; the changes are a
+    reference repair, a grading fix of the test harness and one added discriminating case. Each finding with its
+    cause, change, regression test and reruns.
+    a. Finding (blocking, independent verifier): the end-point rule of both solutions was wrong on part of the
+       stated domain. Both refined only the interior maxima of their t_end scan, so when the maximum lay inside the
+       first (or last) grid cell and the end value was higher than the neighbouring grid point, both raised "maximum
+       at an end point" although the maximum was interior and the interval contained. The verifier's demonstration:
+       the step case 0 region rebuilt with 0.4, 1.2 and 2.5 mK and bounds (11433, 99000): exact t_end 11500,
+       interval 11463.8-11536.2 inside the bounds, l_p(t_lo) - l_max = -6.46, l_p(grid[1]) - l_max = -26.6;
+       solution.py and second_solution.py both raised. Step 6 had the same pattern for the minimum of RSS(t). Cause:
+       a reference bug (no test exercised a maximum in an end cell). Change: in solution/step_6.py,
+       solution/step_7.py and solution.py, an end value not below (step 6: not above) its neighbour is now also
+       refined by bounded Brent over the end cell, and the end point is declared the extremum only if no refined
+       value beats it; the second solution starts its Levenberg-Marquardt (step 6) and Fisher-scoring (step 7)
+       iterations also from such an end point. Every mutant that carries the reference scan was updated in the same
+       way, so that each still differs from the reference by its one named error. A maximum closer to the bound than
+       the threshold crossing cannot change the outcome: then l_p(t_lo) > l_max - chi2/2, the crossing on that side
+       does not exist inside the bounds and the containment rule raises the same ValueError. After the change the
+       verifier's demonstration returns t_end = 11499.989 (reference) and 11500.000 (second solution) with the
+       interval 11463.76-11536.19.
+       Regression tests (near-boundary valid controls of the stated end-point rule, added to the end-point cases):
+       - step 6 case 4: the same inclined hole logged with 0.5 mK (326 readings used): single minimum at 11500
+         years, sigma_t 19.29 years, interval 11462.18-11538.07. With bounds (11445, 60000) (RSS(t_lo) -
+         RSS_min)/s^2 = 8.21, s^2 = RSS_min/(n_used - 4), while the first point of a 121-point logarithmic grid
+         (11604.1 years) is at 28.6; with bounds (3000, 11555) the end value is 8.06 and the last interior grid
+         point (11425.9 years) 14.96. Both calls must return the estimate.
+       - step 7 case 4: the case 0 region with 0.4, 1.2 and 2.5 mK (noise_sd 0.402, 1.227, 2.557 mK): sigma_t 18.07
+         years, interval 11463.76-11536.19. Bounds (11445, 60000): l_p(t_lo) - l_max = -4.386, -15.20 at 11604.1
+         years; bounds (3000, 11555): -4.402 at t_hi, -7.87 at 11425.9 years.
+       Evidence (offline, clean process): dense scans of the oracle profiles (2000 logarithmically spaced times over
+       each pair of bounds and 201 within 4 sigma_t of t_end) find a single extremum, at the generating t_end (no
+       RSS below RSS_min beyond rounding, -4.7e-14 relative; no l_p above l_max, the largest value 7.4e-9 below
+       l_max); the profile in g at t_end has a single maximum. The verifier's verify_ml.py, run on both step 7
+       calls: normalized scores 7.6e-12 (oracle), the reference step 5 P within 1.3e-10 of the oracle, its dense
+       scan with the reference P and a brute-force maximization over g finds no value above l_max. The old reference
+       and the old second solution both fail the two new case 4 calls (ValueError at an end point); the new ones
+       pass. Error budget of the new calls (P perturbed by 1e-8 K per K as in items 6 and 12f): step 7 worst
+       error/limit 0.009 (smooth), 0.059 (irregular), 0.003 (exact inputs); step 6 0.005, 0.019 and 0.000; second
+       solution with exact inputs <= 0.001. An adversarial pattern aligned with the sign of the residual gives 0.717
+       of the log-likelihood limit on the precise step 7 region and 0.245 of the rms_residual limit on the precise
+       step 6 hole.
+    b. Finding (blind-solver scoring, unfair failure): two solutions written from the visible specification failed
+       all 7 step 6 cases with "too many values to unpack". Cause: a grading defect of the test harness, not a
+       scientific error. Each test case is appended after the candidate's code; every step 6 case defined a
+       module-level class _Hole (the synthetic-borehole oracle), and both blind solutions used the same name for a
+       private helper class called inside deglaciation_heat_flow_inversion, so the test's class replaced theirs
+       before the call. The reference, the second solution and the mutants never used that name, so crown_check
+       could not see it. The same exposure existed for every module-level helper and constant of the tests (for
+       example _check, _bc_U, _g_tvd, _YEAR, _GL_X, YEAR, KEYS, and exp, which step 3 and step 5 cases assigned
+       before calling the candidate; a candidate with "from math import exp" would have failed). Change: in all
+       eight test files every module-level function and class, every module-level name with a capital letter or a
+       leading underscore and the names exp and e now carry a test-specific prefix (_t1_ to _t7_, _tg_ for general;
+       e.g. _t6_Hole, _t7_Region, _tg_check, _t3_YEAR, _t3_exp). The renaming was done by a scope-aware script: only
+       references that resolve to the module-level binding were changed (locals and parameters inside functions kept
+       their names), it checked that no renamed name is a keyword argument, a class member or used inside an
+       f-string, and it left no module-level reference to an old name (counts: step 1 4 names / 37 references, step
+       2 8 / 79, step 3 4 / 39, step 4 12 / 134, step 5 8 / 45, step 6 16 / 238, step 7 25 / 301, general 23 / 136).
+       No assertion, input or target changed. Regression: both blind solutions now pass every step 6 case (table in
+       item f); crown_check results are unchanged in every mode.
+    c. Finding (advisory, verifier): the stated maximization of g "on the whole real line" had no discriminating
+       test: in all 10 regions the likelihood in g at t_end had a single maximum, so a local maximizer started from
+       the pooled value passed every case. Cause: inadequate tests (item 12d had explored a bimodal region and
+       rejected it because its generating values were not the global maximum). Change: new step 7 case 7, a region
+       with a disturbed hole built so that the generating values are the global maximum. Three holes: the inclined
+       seven-layer hole logged every 10 m with 0.3 mK (163 readings used, noise_sd 0.314 mK), the four-layer hole
+       with 8 mK (137, 8.015 mK) and the deep 2400 m hole (220, 18.25 mK) whose residual carries a component along
+       its own projected glacial column, c = noise (-89 e1) in the construction of item 12d (one hole, the precise
+       one, solved for the zero weighted scores). Alone the deep hole would give g = 7.5525, the others 7.8006 and
+       7.8198 (widths sqrt(m_h/a_h) 0.041, 0.010 and 0.463). At t_end = 11500 years the likelihood in g has two
+       maxima: the global one at the generating g = 7.8 and a second one at g = 7.5588, 137.74 lower, separated by a
+       minimum at 7.6867; the pooled least-squares amplitude 7.5880 lies on the side of the second maximum. g 7.8,
+       t_end 11500 years, sigma_g 0.0123, sigma_t 16.39 years, interval 11460.03-11535.89, bounds (3000, 60000).
+       Evidence (offline): a dense scan of the oracle profile (2000 logarithmically spaced times over the bounds and
+       201 within 4 sigma_t) finds a single maximum, at the generating t_end (largest excess 1.0e-8, rounding); the
+       end values are 1713.6 and 1363.7 below l_max; the likelihood in g is bimodal only for t_end between about
+       11.1 and 16.3 ka (161 times from 9 to 20 ka), where its second maximum lies 83 to 152 below the first. The
+       verifier's verify_ml.py: normalized scores 1.9e-12 (oracle) and 1.3e-7 with the reference P, a dense scan
+       with the reference P and a brute-force maximization over g finds no value above l_max (excess -2.7e-7), and
+       two local maxima in g at t_end. Pooled least squares gives t_end = 11133 years (16 times the t_end limit) and
+       g = 7.397. New mutant amplitude_local_ascent_from_pooled (step 7): at fixed t_end the amplitude by the
+       fixed-point (iteratively reweighted) ascent started at the pooled least-squares value; it returns g = 7.4912,
+       t_end = 11090 years and log-likelihood 2077.5 instead of 7.8, 11500 and 2118.947, and fails case 7 (the only
+       case where the likelihood in g is bimodal). The reference, solution.py, the second solution and both blind
+       solutions pass case 7. Error budget of case 7: worst error/limit 0.017 (smooth P error), 0.037 (irregular),
+       0.014 with exact inputs (noise_sd of the 0.3 mK hole), 0.690 of the log-likelihood limit for the adversarial
+       pattern aligned with the residual sign; second solution 0.002 with exact inputs. The difficulty_explanation
+       and verification_explanation now describe this case; item 12d, 12e and 12h statements that no region is
+       bimodal are superseded.
+    d. Finding (advisory, verifier): with H = 6 or 8 holes whose standard errors in g are about 1e-6 of the spread
+       of their own optima, the reference's polynomial roots lost the global maximum over g in 2 of 1000 synthetic
+       trials (85 and 1064 below; rerun here on the previous file: 2 trials above 0.01), far from t_end; no test
+       affected. Change (robustness): _rg_best_g also brackets the sign changes of the derivative on a grid refined
+       around every hole's optimum (offsets of 1e-3 to 1e3 widths, plus 201 uniform points) and adds their Brent
+       roots as candidates (also in the step 7 and whole-task mutants, which carry the reference function). Rerun of
+       the verifier's stress scripts (1000 trials, H = 2..8): no trial with a deficit above 0.01; the remaining
+       deficits (at most 4.6e-3, with g equal to about 8 significant digits) are the rounding of a_h g^2 - 2 b_h g +
+       c_h when the widths are 1e-6 of the spread. The second solution's fixed-point ascent misses by 0.12 in one
+       trial (unchanged; it is the alternative method and is not used for any target).
+    e. Finding (advisory, verifier): "The likelihood is unbounded when a hole can be fitted exactly, so every hole
+       must keep at least 6 used readings" read as a non sequitur (with 5 readings the likelihood is already
+       bounded; the margin argument was only in item 12c). Change (clarification of wording, same rule): "...; to
+       keep it bounded with a margin, every hole must keep at least 6 used readings". The rule and its tests (6
+       valid, 5 ValueError) are unchanged.
+    f. Blind-solver calibration (internal calibration, not an independent review). The two blind solutions of this
+       round (written from the visible specification only; each used as the whole candidate for every step file and
+       for general, every case alone in a fresh process, one thread, 2 workers):
+
+       | Test file (cases) | blind solution 3, before | blind solution 3, after | blind solution 4, before | blind solution 4, after |
+       |---|---|---|---|---|
+       | step 1 (22) | 22/22 | 22/22 | 22/22 | 22/22 |
+       | step 2 (12) | 12/12 | 12/12 | 12/12 | 12/12 |
+       | step 3 (12) | 12/12 | 12/12 | 12/12 | 12/12 |
+       | step 4 (7) | 7/7 | 7/7 | 7/7 | 7/7 |
+       | step 5 (8) | 8/8 | 8/8 | 8/8 | 8/8 |
+       | step 6 (7) | 0/7 (name clash, item b) | 7/7 | 0/7 (name clash, item b) | 7/7 |
+       | step 7 (7 before, 8 after) | 7/7 | 8/8 | 7/7 | 8/8 |
+       | general (3) | 3/3 | 3/3 | 3/3 | 3/3 |
+
+       "Before" is the scoring of the files before this round (the step 6 failures were the harness defect of item
+       b; with the test class renamed in a scratch copy both passed step 6 7/7, at most 6.5e-4 of a limit). "After"
+       is the final test files. Both blind solutions scan the profile in t_end and refine the end cells (a linear
+       241-point grid with bounded Brent from every grid minimum including the ends; a 161-point logarithmic grid
+       with derivative sign changes), and both maximize over g globally (sign changes of the derivative on a grid
+       refined around every hole's optimum), so the new calls of items a and c do not catch them. Two of two
+       spec-only solutions therefore pass the whole task; the discriminators added in this round (a maximum in an
+       end cell, a bimodal likelihood in g) catch coarser implementations, not these two.
+
+    g. Mutants. New: amplitude_local_ascent_from_pooled (step 7). Every step 6, step 7 and whole-task mutant was
+       rebuilt for items a and d (same single error each). Results on the final tests:
+
+       | Where | Mutant | Cases failed |
+       |---|---|---|
+       | step 6 | the 12 mutants of item 9 | unchanged: 6, 7, 4, 4, 3, 7, 1, 6, 3, 1, 6 and 1 of 7 (same cases as item 9) |
+       | step 7 | pooled_least_squares | 8 of 8 |
+       | step 7 | two_stage_weights | 8 of 8 |
+       | step 7 | information_variance_n_minus_2 | 4 of 8 (1, 2, 5, 6) |
+       | step 7 | observed_information | 6 of 8 (0, 1, 4, 5, 6, 7) |
+       | step 7 | information_blocks_inverted_separately | 8 of 8 |
+       | step 7 | profile_with_fixed_noise_levels | 8 of 8 |
+       | step 7 | lr_threshold_without_factor_2 | 8 of 8 |
+       | step 7 | log_likelihood_without_constant | 8 of 8 |
+       | step 7 | local_search_without_scan | 1 of 8 (case 3) |
+       | step 7 | amplitude_local_ascent_from_pooled (new) | 1 of 8 (case 7) |
+       | step 7 | first_hole_rho_c_for_all | 8 of 8 |
+       | step 7 | halfspace_mean_diffusivity | 7 of 8 |
+       | step 7 | measured_depth_as_depth | 7 of 8 |
+       | step 7 | z_min_on_measured_depth | 7 of 8 |
+       | step 7 | z_min_cut_strict | 1 of 8 (case 2) |
+       | whole task | the six whole-task mutants of item 12h | unchanged: 3, 3, 3, 3, 1 (case 2) and 3 of 3 |
+
+       Steps 1-5 mutants: unchanged results.
+
+    h. Regression tests and reruns. tools/crown_check.py, all modes, every case alone in a fresh process, one
+       BLAS/OpenMP thread, -j 2, on the shipped files: summary ALL OK:
+
+       | Mode | Result |
+       |---|---|
+       | format | OK |
+       | REF steps 1-7, general (solution.py) | 22/22, 12/12, 12/12, 7/7, 8/8, 7/7, 8/8, 3/3 |
+       | SECOND steps 1-7, general | 22/22, 12/12, 12/12, 7/7, 8/8, 7/7, 8/8, 3/3 |
+       | MUT | every step and whole-task mutant fails at least one case of its target tests (table g) |
+       | SHIFT +-1e-12 (step outputs; every evaluated function in general) | all cases pass |
+       | CONTROL None / 0.0 | 0 cases pass in every step and in general |
+
+       Each new call takes 1 to 4 s with the reference (step 7 case 4 now 8.4 s with its five calls, case 7 3.6 s)
+       and up to 14 s with the second solution (step 7 case 4). solution.py and second_solution.py were each run
+       twice with one thread and once with two threads on the five new calls: identical SHA-256 digests.
+
+       The verifier's edge-cell demonstration, its verify_ml.py on the new regions, its stress scripts for the
+       maximization in g, the dense oracle scans and the error-budget runs above were rerun on the final files. The
+       agent-visible text changed only in the sentence of item e.
+    i. Not changed or open. relevant_experience is still the author's placeholder; the author writes it before
+       upload (it is not written by the assistant). The difficulty band cannot be measured locally (item f).

@@ -342,16 +342,23 @@ def deglaciation_heat_flow_inversion(survey_md, survey_inc, survey_azi, log_md, 
         _, r = _dg_profile_fit(y, R, P(t))
         return float(r @ r)
 
-    # global minimum of the profile on the closed interval
+    # global minimum of the profile on the closed interval: every interior grid minimum is refined over its two
+    # neighbouring cells, and an end value not above its neighbour over the end cell, where the minimum can still
+    # be interior; the end point is the minimum only if no refined value is below it
     grid = np.geomspace(t_lo, t_hi, 121)
     vals = np.array([rss(t) for t in grid])
+    m_g = grid.size - 1
+    cells = [(i - 1, i + 1, i) for i in range(1, m_g) if vals[i] <= vals[i - 1] and vals[i] <= vals[i + 1]]
+    if vals[0] <= vals[1]:
+        cells.append((0, 1, 0))
+    if vals[m_g] <= vals[m_g - 1]:
+        cells.append((m_g - 1, m_g, m_g))
     best_t, best_v = None, np.inf
-    for i in range(1, grid.size - 1):
-        if vals[i] <= vals[i - 1] and vals[i] <= vals[i + 1]:
-            res = minimize_scalar(rss, bounds=(grid[i - 1], grid[i + 1]), method="bounded",
-                                  options={"xatol": 1e-10 * grid[i], "maxiter": 300})
-            if res.fun < best_v:
-                best_t, best_v = float(res.x), float(res.fun)
+    for i, j, c in cells:
+        res = minimize_scalar(rss, bounds=(grid[i], grid[j]), method="bounded",
+                              options={"xatol": 1e-10 * grid[c], "maxiter": 300})
+        if res.fun < best_v:
+            best_t, best_v = float(res.x), float(res.fun)
     if best_t is None or min(vals[0], vals[-1]) <= best_v:
         raise ValueError("the minimum of the profile RSS over [t_lo, t_hi] lies at an end point")
     t_hat = best_t
@@ -421,7 +428,10 @@ def _rg_best_g(co):
     between the smallest and the largest g_h (the derivative is positive below and negative above them). In the
     scaled variable x = (g - mid) / half these points are the real roots in [-1, 1] of the polynomial
     sum_h n_h (x - x_h) / v_h prod_{j != h} (1 + (x - x_j)^2 / v_j), v_h = m_h / (a_h half^2); each root is polished
-    by Newton steps on the stationarity condition and the best one is returned."""
+    by Newton steps on the stationarity condition. When the holes' widths sqrt(m_h / a_h) differ by many orders of
+    magnitude the polynomial roots can be inaccurate, so the sign changes of the derivative on a grid refined around
+    every hole's optimum (offsets of 1e-3 to 1e3 widths) are added, located with Brent's root finder; the best
+    candidate is returned."""
     gh = np.array([b / a for a, b, c, n in co])
     lo, hi = float(gh.min()), float(gh.max())
 
@@ -462,6 +472,16 @@ def _rg_best_g(co):
                     break
                 g = gn
             cand.append(g)
+    wh = np.sqrt(np.maximum(vh, 0.0)) * half
+    offs = np.concatenate((-np.geomspace(1e3, 1e-3, 61), [0.0], np.geomspace(1e-3, 1e3, 61)))
+    pts = np.unique(np.clip(np.concatenate([np.linspace(lo, hi, 201)] + [g0 + w0 * offs for g0, w0 in zip(gh, wh)]),
+                            lo, hi))
+    ca = np.array([[a, b, c, n] for a, b, c, n in co], float)
+    dv = np.sum(ca[:, 3:4] * (ca[:, 0:1] * pts - ca[:, 1:2])
+                / (ca[:, 0:1] * pts * pts - 2.0 * ca[:, 1:2] * pts + ca[:, 2:3]), axis=0)
+    for i in np.nonzero((dv[:-1] < 0.0) & (dv[1:] >= 0.0))[0]:
+        cand.append(brentq(grad, pts[i], pts[i + 1], xtol=1e-15 * max(1.0, abs(pts[i])), rtol=1e-15, maxiter=300)
+                    if dv[i + 1] > 0.0 else float(pts[i + 1]))
     vals = [value(g) for g in cand]
     k = int(np.argmax(vals))
     return cand[k], float(vals[k])
@@ -555,16 +575,23 @@ def regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape, t_end_bo
     def lp(t):
         return profile(t)[0]
 
-    # global maximum of the profile log-likelihood on the closed interval
+    # global maximum of the profile log-likelihood on the closed interval: every interior grid maximum is refined
+    # over its two neighbouring cells, and an end value not below its neighbour over the end cell, where the
+    # maximum can still be interior; the end point is the maximum only if no refined value exceeds it
     grid = np.geomspace(t_lo, t_hi, 121)
     vals = np.array([lp(t) for t in grid])
+    m_g = grid.size - 1
+    cells = [(i - 1, i + 1, i) for i in range(1, m_g) if vals[i] >= vals[i - 1] and vals[i] >= vals[i + 1]]
+    if vals[0] >= vals[1]:
+        cells.append((0, 1, 0))
+    if vals[m_g] >= vals[m_g - 1]:
+        cells.append((m_g - 1, m_g, m_g))
     best_t, best_v = None, -np.inf
-    for i in range(1, grid.size - 1):
-        if vals[i] >= vals[i - 1] and vals[i] >= vals[i + 1]:
-            res = minimize_scalar(lambda t: -lp(t), bounds=(grid[i - 1], grid[i + 1]), method="bounded",
-                                  options={"xatol": 1e-10 * grid[i], "maxiter": 300})
-            if -res.fun > best_v:
-                best_t, best_v = float(res.x), float(-res.fun)
+    for i, j, c in cells:
+        res = minimize_scalar(lambda t: -lp(t), bounds=(grid[i], grid[j]), method="bounded",
+                              options={"xatol": 1e-10 * grid[c], "maxiter": 300})
+        if -res.fun > best_v:
+            best_t, best_v = float(res.x), float(-res.fun)
     if best_t is None or max(vals[0], vals[-1]) >= best_v or not (t_lo < best_t < t_hi):
         raise ValueError("the maximum of the profile likelihood over [t_lo, t_hi] lies at an end point")
     t_hat = best_t

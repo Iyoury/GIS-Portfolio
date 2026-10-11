@@ -76,16 +76,23 @@ def deglaciation_heat_flow_inversion(survey_md, survey_inc, survey_azi, log_md, 
         _, r = _dg_profile_fit(y, R, P(t))
         return float(r @ r)
 
-    # global minimum of the profile on the closed interval
+    # global minimum of the profile on the closed interval: every interior grid minimum is refined over its two
+    # neighbouring cells, and an end value not above its neighbour over the end cell, where the minimum can still
+    # be interior; the end point is the minimum only if no refined value is below it
     grid = np.geomspace(t_lo, t_hi, 121)
     vals = np.array([rss(t) for t in grid])
+    m_g = grid.size - 1
+    cells = [(i - 1, i + 1, i) for i in range(1, m_g) if vals[i] <= vals[i - 1] and vals[i] <= vals[i + 1]]
+    if vals[0] <= vals[1]:
+        cells.append((0, 1, 0))
+    if vals[m_g] <= vals[m_g - 1]:
+        cells.append((m_g - 1, m_g, m_g))
     best_t, best_v = None, np.inf
-    for i in range(1, grid.size - 1):
-        if vals[i] <= vals[i - 1] and vals[i] <= vals[i + 1]:
-            res = minimize_scalar(rss, bounds=(grid[i - 1], grid[i + 1]), method="bounded",
-                                  options={"xatol": 1e-10 * grid[i], "maxiter": 300})
-            if res.fun < best_v:
-                best_t, best_v = float(res.x), float(res.fun)
+    for i, j, c in cells:
+        res = minimize_scalar(rss, bounds=(grid[i], grid[j]), method="bounded",
+                              options={"xatol": 1e-10 * grid[c], "maxiter": 300})
+        if res.fun < best_v:
+            best_t, best_v = float(res.x), float(res.fun)
     if best_t is None or min(vals[0], vals[-1]) <= best_v:
         raise ValueError("the minimum of the profile RSS over [t_lo, t_hi] lies at an end point")
     t_hat = best_t

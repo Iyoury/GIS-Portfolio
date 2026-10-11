@@ -12,169 +12,204 @@
 # --- test case 0 ---
 # zero bias, Lifson-Jackson D = theta / I_0(1/theta)**2 (closed form)
 import numpy as np
-import mpmath as _t_mp
 
-def _t_rel(x, y):
-    return abs(x - y) / abs(y)
 
-for _t_th in (0.02, 0.05, 0.3, 2.0, 50.0):
-    _t_res = effective_diffusion(0.0, _t_th)
-    assert isinstance(_t_res, float), _t_res
-    _t_lj = _t_th / float(_t_mp.besseli(0, 1.0 / _t_th)) ** 2
-    assert _t_rel(_t_res, _t_lj) < 1e-9, (_t_th, _t_res, _t_lj)
+def _crown_case():
+    import numpy as np
+    import mpmath as _t_mp
+
+    def _t_rel(x, y):
+        return abs(x - y) / abs(y)
+
+    for _t_th in (0.02, 0.05, 0.3, 2.0, 50.0):
+        _t_res = effective_diffusion(0.0, _t_th)
+        assert isinstance(_t_res, float), _t_res
+        _t_lj = _t_th / float(_t_mp.besseli(0, 1.0 / _t_th)) ** 2
+        assert _t_rel(_t_res, _t_lj) < 1e-9, (_t_th, _t_res, _t_lj)
+
+
+_crown_case()
 
 # --- test case 1 ---
 # giant diffusion near the critical tilt (D far above theta)
 import numpy as np
-import mpmath as _t_mp
 
-def _t_cf(i, theta, want_D=True):
-    sgn = -1 if i < 0 else 1
-    dps = 30 + int(1.8 / theta)
-    with _t_mp.workdps(dps):
-        a = _t_mp.mpf(abs(i))
-        th = _t_mp.mpf(theta)
-        N = 40 + int(1.3 * _t_mp.sqrt(2 * dps * 2.303 / th))
-        J = _t_mp.mpc(0, 1)
-        r = [_t_mp.mpc(0)] * (N + 2)
-        dr = [_t_mp.mpc(0)] * (N + 2)
-        for n in range(N, 0, -1):
-            r[n] = 1 / (2 * th * n + 2 * J * a + r[n + 1])
-            dr[n] = -r[n] ** 2 * (2 * J + dr[n + 1])
-        v = a + _t_mp.im(r[1])
-        dv = 1 + _t_mp.im(dr[1])
-        if not want_D:
-            return float(sgn * v), float(dv)
-        c = [_t_mp.mpc(0)] * (N + 1)
-        c[0] = 1 / (2 * _t_mp.pi)
-        for n in range(1, N + 1):
-            c[n] = r[n] * c[n - 1]
-        s = [_t_mp.mpc(0)] * (N + 2)
-        for n in range(N, 1, -1):
-            s[n] = 1 / (-2 * th * n + 2 * J * a + s[n + 1])
-        g = [_t_mp.mpc(0)] * (N + 1)
-        g[1] = 1 / (2 * J * a - 2 * th + s[2])
-        for n in range(2, N + 1):
-            g[n] = s[n] * g[n - 1]
-        h = np.array([_t_mp.conj(g[k]) for k in range(N, 0, -1)] + [_t_mp.mpc(1)] + g[1:], dtype=object)
-        cf = np.array([_t_mp.conj(c[k]) for k in range(N, 0, -1)] + c, dtype=object)
-        q = np.convolve(h, h)                       # Fourier coefficients of (1 + chi')**2, index -2N..2N
-        tot = _t_mp.fsum(q[N:3 * N + 1][::-1] * cf)  # sum_m q_m c_{-m}, |m| <= N
-        D = th * 2 * _t_mp.pi * _t_mp.re(tot)
-        return float(sgn * v), float(dv), float(D)
 
-def _t_rel(x, y):
-    return abs(x - y) / abs(y)
+def _crown_case():
+    import numpy as np
+    import mpmath as _t_mp
 
-for _t_i, _t_th in ((1.0, 0.03), (0.99, 0.05), (1.02, 0.1), (1.15, 0.5)):
-    _t_res = effective_diffusion(_t_i, _t_th)
-    _t_D = _t_cf(_t_i, _t_th)[2]
-    assert _t_D > 1.5 * _t_th
-    assert _t_rel(_t_res, _t_D) < 1e-9, (_t_i, _t_th, _t_res, _t_D)
+    def _t_cf(i, theta, want_D=True):
+        sgn = -1 if i < 0 else 1
+        dps = 30 + int(1.8 / theta)
+        with _t_mp.workdps(dps):
+            a = _t_mp.mpf(abs(i))
+            th = _t_mp.mpf(theta)
+            N = 40 + int(1.3 * _t_mp.sqrt(2 * dps * 2.303 / th))
+            J = _t_mp.mpc(0, 1)
+            r = [_t_mp.mpc(0)] * (N + 2)
+            dr = [_t_mp.mpc(0)] * (N + 2)
+            for n in range(N, 0, -1):
+                r[n] = 1 / (2 * th * n + 2 * J * a + r[n + 1])
+                dr[n] = -r[n] ** 2 * (2 * J + dr[n + 1])
+            v = a + _t_mp.im(r[1])
+            dv = 1 + _t_mp.im(dr[1])
+            if not want_D:
+                return float(sgn * v), float(dv)
+            c = [_t_mp.mpc(0)] * (N + 1)
+            c[0] = 1 / (2 * _t_mp.pi)
+            for n in range(1, N + 1):
+                c[n] = r[n] * c[n - 1]
+            s = [_t_mp.mpc(0)] * (N + 2)
+            for n in range(N, 1, -1):
+                s[n] = 1 / (-2 * th * n + 2 * J * a + s[n + 1])
+            g = [_t_mp.mpc(0)] * (N + 1)
+            g[1] = 1 / (2 * J * a - 2 * th + s[2])
+            for n in range(2, N + 1):
+                g[n] = s[n] * g[n - 1]
+            h = np.array([_t_mp.conj(g[k]) for k in range(N, 0, -1)] + [_t_mp.mpc(1)] + g[1:], dtype=object)
+            cf = np.array([_t_mp.conj(c[k]) for k in range(N, 0, -1)] + c, dtype=object)
+            q = np.convolve(h, h)                       # Fourier coefficients of (1 + chi')**2, index -2N..2N
+            tot = _t_mp.fsum(q[N:3 * N + 1][::-1] * cf)  # sum_m q_m c_{-m}, |m| <= N
+            D = th * 2 * _t_mp.pi * _t_mp.re(tot)
+            return float(sgn * v), float(dv), float(D)
+
+    def _t_rel(x, y):
+        return abs(x - y) / abs(y)
+
+    for _t_i, _t_th in ((1.0, 0.03), (0.99, 0.05), (1.02, 0.1), (1.15, 0.5)):
+        _t_res = effective_diffusion(_t_i, _t_th)
+        _t_D = _t_cf(_t_i, _t_th)[2]
+        assert _t_D > 1.5 * _t_th
+        assert _t_rel(_t_res, _t_D) < 1e-9, (_t_i, _t_th, _t_res, _t_D)
+
+
+_crown_case()
 
 # --- test case 2 ---
 # tilted states away from equilibrium (Einstein relation D = theta dv/di fails)
 import numpy as np
-import mpmath as _t_mp
 
-def _t_cf(i, theta, want_D=True):
-    sgn = -1 if i < 0 else 1
-    dps = 30 + int(1.8 / theta)
-    with _t_mp.workdps(dps):
-        a = _t_mp.mpf(abs(i))
-        th = _t_mp.mpf(theta)
-        N = 40 + int(1.3 * _t_mp.sqrt(2 * dps * 2.303 / th))
-        J = _t_mp.mpc(0, 1)
-        r = [_t_mp.mpc(0)] * (N + 2)
-        dr = [_t_mp.mpc(0)] * (N + 2)
-        for n in range(N, 0, -1):
-            r[n] = 1 / (2 * th * n + 2 * J * a + r[n + 1])
-            dr[n] = -r[n] ** 2 * (2 * J + dr[n + 1])
-        v = a + _t_mp.im(r[1])
-        dv = 1 + _t_mp.im(dr[1])
-        if not want_D:
-            return float(sgn * v), float(dv)
-        c = [_t_mp.mpc(0)] * (N + 1)
-        c[0] = 1 / (2 * _t_mp.pi)
-        for n in range(1, N + 1):
-            c[n] = r[n] * c[n - 1]
-        s = [_t_mp.mpc(0)] * (N + 2)
-        for n in range(N, 1, -1):
-            s[n] = 1 / (-2 * th * n + 2 * J * a + s[n + 1])
-        g = [_t_mp.mpc(0)] * (N + 1)
-        g[1] = 1 / (2 * J * a - 2 * th + s[2])
-        for n in range(2, N + 1):
-            g[n] = s[n] * g[n - 1]
-        h = np.array([_t_mp.conj(g[k]) for k in range(N, 0, -1)] + [_t_mp.mpc(1)] + g[1:], dtype=object)
-        cf = np.array([_t_mp.conj(c[k]) for k in range(N, 0, -1)] + c, dtype=object)
-        q = np.convolve(h, h)                       # Fourier coefficients of (1 + chi')**2, index -2N..2N
-        tot = _t_mp.fsum(q[N:3 * N + 1][::-1] * cf)  # sum_m q_m c_{-m}, |m| <= N
-        D = th * 2 * _t_mp.pi * _t_mp.re(tot)
-        return float(sgn * v), float(dv), float(D)
 
-def _t_rel(x, y):
-    return abs(x - y) / abs(y)
+def _crown_case():
+    import numpy as np
+    import mpmath as _t_mp
 
-for _t_i, _t_th in ((0.5, 0.05), (0.3, 0.2), (0.8, 0.02), (2.0, 0.3), (6.0, 0.05), (9.0, 30.0), (10.0, 0.02), (10.0, 50.0)):
-    _t_res = effective_diffusion(_t_i, _t_th)
-    _t_D = _t_cf(_t_i, _t_th)[2]
-    assert _t_rel(_t_res, _t_D) < 1e-9, (_t_i, _t_th, _t_res, _t_D)
+    def _t_cf(i, theta, want_D=True):
+        sgn = -1 if i < 0 else 1
+        dps = 30 + int(1.8 / theta)
+        with _t_mp.workdps(dps):
+            a = _t_mp.mpf(abs(i))
+            th = _t_mp.mpf(theta)
+            N = 40 + int(1.3 * _t_mp.sqrt(2 * dps * 2.303 / th))
+            J = _t_mp.mpc(0, 1)
+            r = [_t_mp.mpc(0)] * (N + 2)
+            dr = [_t_mp.mpc(0)] * (N + 2)
+            for n in range(N, 0, -1):
+                r[n] = 1 / (2 * th * n + 2 * J * a + r[n + 1])
+                dr[n] = -r[n] ** 2 * (2 * J + dr[n + 1])
+            v = a + _t_mp.im(r[1])
+            dv = 1 + _t_mp.im(dr[1])
+            if not want_D:
+                return float(sgn * v), float(dv)
+            c = [_t_mp.mpc(0)] * (N + 1)
+            c[0] = 1 / (2 * _t_mp.pi)
+            for n in range(1, N + 1):
+                c[n] = r[n] * c[n - 1]
+            s = [_t_mp.mpc(0)] * (N + 2)
+            for n in range(N, 1, -1):
+                s[n] = 1 / (-2 * th * n + 2 * J * a + s[n + 1])
+            g = [_t_mp.mpc(0)] * (N + 1)
+            g[1] = 1 / (2 * J * a - 2 * th + s[2])
+            for n in range(2, N + 1):
+                g[n] = s[n] * g[n - 1]
+            h = np.array([_t_mp.conj(g[k]) for k in range(N, 0, -1)] + [_t_mp.mpc(1)] + g[1:], dtype=object)
+            cf = np.array([_t_mp.conj(c[k]) for k in range(N, 0, -1)] + c, dtype=object)
+            q = np.convolve(h, h)                       # Fourier coefficients of (1 + chi')**2, index -2N..2N
+            tot = _t_mp.fsum(q[N:3 * N + 1][::-1] * cf)  # sum_m q_m c_{-m}, |m| <= N
+            D = th * 2 * _t_mp.pi * _t_mp.re(tot)
+            return float(sgn * v), float(dv), float(D)
+
+    def _t_rel(x, y):
+        return abs(x - y) / abs(y)
+
+    for _t_i, _t_th in ((0.5, 0.05), (0.3, 0.2), (0.8, 0.02), (2.0, 0.3), (6.0, 0.05), (9.0, 30.0), (10.0, 0.02), (10.0, 50.0)):
+        _t_res = effective_diffusion(_t_i, _t_th)
+        _t_D = _t_cf(_t_i, _t_th)[2]
+        assert _t_rel(_t_res, _t_D) < 1e-9, (_t_i, _t_th, _t_res, _t_D)
+
+
+_crown_case()
 
 # --- test case 3 ---
 # mirror symmetry D(-i) = D(i)
 import numpy as np
-import mpmath as _t_mp
 
-def _t_cf(i, theta, want_D=True):
-    sgn = -1 if i < 0 else 1
-    dps = 30 + int(1.8 / theta)
-    with _t_mp.workdps(dps):
-        a = _t_mp.mpf(abs(i))
-        th = _t_mp.mpf(theta)
-        N = 40 + int(1.3 * _t_mp.sqrt(2 * dps * 2.303 / th))
-        J = _t_mp.mpc(0, 1)
-        r = [_t_mp.mpc(0)] * (N + 2)
-        dr = [_t_mp.mpc(0)] * (N + 2)
-        for n in range(N, 0, -1):
-            r[n] = 1 / (2 * th * n + 2 * J * a + r[n + 1])
-            dr[n] = -r[n] ** 2 * (2 * J + dr[n + 1])
-        v = a + _t_mp.im(r[1])
-        dv = 1 + _t_mp.im(dr[1])
-        if not want_D:
-            return float(sgn * v), float(dv)
-        c = [_t_mp.mpc(0)] * (N + 1)
-        c[0] = 1 / (2 * _t_mp.pi)
-        for n in range(1, N + 1):
-            c[n] = r[n] * c[n - 1]
-        s = [_t_mp.mpc(0)] * (N + 2)
-        for n in range(N, 1, -1):
-            s[n] = 1 / (-2 * th * n + 2 * J * a + s[n + 1])
-        g = [_t_mp.mpc(0)] * (N + 1)
-        g[1] = 1 / (2 * J * a - 2 * th + s[2])
-        for n in range(2, N + 1):
-            g[n] = s[n] * g[n - 1]
-        h = np.array([_t_mp.conj(g[k]) for k in range(N, 0, -1)] + [_t_mp.mpc(1)] + g[1:], dtype=object)
-        cf = np.array([_t_mp.conj(c[k]) for k in range(N, 0, -1)] + c, dtype=object)
-        q = np.convolve(h, h)                       # Fourier coefficients of (1 + chi')**2, index -2N..2N
-        tot = _t_mp.fsum(q[N:3 * N + 1][::-1] * cf)  # sum_m q_m c_{-m}, |m| <= N
-        D = th * 2 * _t_mp.pi * _t_mp.re(tot)
-        return float(sgn * v), float(dv), float(D)
 
-def _t_rel(x, y):
-    return abs(x - y) / abs(y)
+def _crown_case():
+    import numpy as np
+    import mpmath as _t_mp
 
-for _t_i, _t_th in ((-0.7, 0.1), (-1.0, 0.04), (-3.0, 2.0), (-10.0, 0.5)):
-    _t_res = effective_diffusion(_t_i, _t_th)
-    _t_D = _t_cf(-_t_i, _t_th)[2]
-    assert _t_rel(_t_res, _t_D) < 1e-9, (_t_i, _t_th, _t_res, _t_D)
+    def _t_cf(i, theta, want_D=True):
+        sgn = -1 if i < 0 else 1
+        dps = 30 + int(1.8 / theta)
+        with _t_mp.workdps(dps):
+            a = _t_mp.mpf(abs(i))
+            th = _t_mp.mpf(theta)
+            N = 40 + int(1.3 * _t_mp.sqrt(2 * dps * 2.303 / th))
+            J = _t_mp.mpc(0, 1)
+            r = [_t_mp.mpc(0)] * (N + 2)
+            dr = [_t_mp.mpc(0)] * (N + 2)
+            for n in range(N, 0, -1):
+                r[n] = 1 / (2 * th * n + 2 * J * a + r[n + 1])
+                dr[n] = -r[n] ** 2 * (2 * J + dr[n + 1])
+            v = a + _t_mp.im(r[1])
+            dv = 1 + _t_mp.im(dr[1])
+            if not want_D:
+                return float(sgn * v), float(dv)
+            c = [_t_mp.mpc(0)] * (N + 1)
+            c[0] = 1 / (2 * _t_mp.pi)
+            for n in range(1, N + 1):
+                c[n] = r[n] * c[n - 1]
+            s = [_t_mp.mpc(0)] * (N + 2)
+            for n in range(N, 1, -1):
+                s[n] = 1 / (-2 * th * n + 2 * J * a + s[n + 1])
+            g = [_t_mp.mpc(0)] * (N + 1)
+            g[1] = 1 / (2 * J * a - 2 * th + s[2])
+            for n in range(2, N + 1):
+                g[n] = s[n] * g[n - 1]
+            h = np.array([_t_mp.conj(g[k]) for k in range(N, 0, -1)] + [_t_mp.mpc(1)] + g[1:], dtype=object)
+            cf = np.array([_t_mp.conj(c[k]) for k in range(N, 0, -1)] + c, dtype=object)
+            q = np.convolve(h, h)                       # Fourier coefficients of (1 + chi')**2, index -2N..2N
+            tot = _t_mp.fsum(q[N:3 * N + 1][::-1] * cf)  # sum_m q_m c_{-m}, |m| <= N
+            D = th * 2 * _t_mp.pi * _t_mp.re(tot)
+            return float(sgn * v), float(dv), float(D)
+
+    def _t_rel(x, y):
+        return abs(x - y) / abs(y)
+
+    for _t_i, _t_th in ((-0.7, 0.1), (-1.0, 0.04), (-3.0, 2.0), (-10.0, 0.5)):
+        _t_res = effective_diffusion(_t_i, _t_th)
+        _t_D = _t_cf(-_t_i, _t_th)[2]
+        assert _t_rel(_t_res, _t_D) < 1e-9, (_t_i, _t_th, _t_res, _t_D)
+
+
+_crown_case()
 
 # --- test case 4 ---
 # non-finite input, |i| > 10 or theta outside [0.02, 50] raises ValueError
 import numpy as np
-for _t_bad in ((float("nan"), 0.1), (0.5, float("nan")), (10.01, 0.1), (-10.01, 0.1), (0.5, 0.01), (0.5, 60.0), (0.5, -0.1)):
-    try:
-        effective_diffusion(*_t_bad)
-    except ValueError:
-        pass
-    else:
-        raise AssertionError("effective_diffusion%r must raise ValueError" % (_t_bad,))
+
+
+def _crown_case():
+    import numpy as np
+    for _t_bad in ((float("nan"), 0.1), (0.5, float("nan")), (10.01, 0.1), (-10.01, 0.1), (0.5, 0.01), (0.5, 60.0), (0.5, -0.1)):
+        try:
+            effective_diffusion(*_t_bad)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("effective_diffusion%r must raise ValueError" % (_t_bad,))
+
+
+_crown_case()

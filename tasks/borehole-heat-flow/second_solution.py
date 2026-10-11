@@ -31,7 +31,8 @@ Differences from solution.py (method, not formatting):
     Weideman and Trefethen (2007) (solution.py carries the admittance with a
     tanh recursion and inverts on the fixed Talbot contour).
   * Joint inversion (step 6): Levenberg-Marquardt on all four parameters
-    (T0, q0, g, t_end) started from every minimum of a coarse profile scan,
+    (T0, q0, g, t_end) started from every minimum of a coarse profile scan
+    (an end value not above its neighbour included),
     with dP/dt_end from the inverse transform of F itself (the impulse
     response) on the hyperbolic contour of its own layered solver, the
     covariance from the QR factor of the Jacobian, the threshold from the
@@ -42,7 +43,8 @@ Differences from solution.py (method, not formatting):
   * Regional inversion (step 7): Fisher scoring (iteratively reweighted
     Gauss-Newton with Levenberg damping and the log-likelihood as merit
     function) on all regression parameters, the noise variances re-estimated
-    at every iterate, from every maximum of a coarse profile scan; at fixed
+    at every iterate, from every maximum of a coarse profile scan (an end
+    value not below its neighbour included); at fixed
     t_end the amplitude by iteratively reweighted fixed-point ascent from every
     hole's own optimum and from the pooled value; dP/dt_end from the impulse
     response on its own contour; covariance from the QR factor of the weighted
@@ -348,7 +350,8 @@ def _ss_response_and_rate(z, tau, tops, k, rc, N=40):
 def deglaciation_heat_flow_inversion(survey_md, survey_inc, survey_azi, log_md, log_temp,
                                      layer_top_md, layer_k, heat_production, rho_c,
                                      hist_t_years, hist_dT_shape, t_end_bounds, z_min):
-    """Second solution: Levenberg-Marquardt on (T0, q0, g, t_end) from the minima of a coarse profile scan,
+    """Second solution: Levenberg-Marquardt on (T0, q0, g, t_end) from the minima of a coarse profile scan (ends
+    included when not above their neighbour),
     analytic dP/dt_end from the impulse response of the layered column, covariance from QR, threshold
     from the Student t quantile, interval ends by regula falsi (Illinois)."""
     log_md = np.asarray(log_md, float)
@@ -420,6 +423,8 @@ def deglaciation_heat_flow_inversion(survey_md, survey_inc, survey_azi, log_md, 
     ts = np.exp(np.linspace(np.log(lo), np.log(hi), 90))
     vals = np.array([lin_fit(t)[1] for t in ts])
     starts = [i for i in range(1, ts.size - 1) if vals[i] <= vals[i - 1] and vals[i] <= vals[i + 1]]
+    # an end value not above its neighbour: start there too (the minimum can lie inside the end cell)
+    starts += [i for i, j in ((0, 1), (ts.size - 1, ts.size - 2)) if vals[i] <= vals[j]]
     best = None
     for i in starts:
         m = lin_fit(ts[i])[0]
@@ -531,8 +536,9 @@ def regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape, t_end_bo
     """Second solution: per-hole response by the hyperbolic contour with its impulse response for dP/dt_end;
     the amplitude at fixed t_end by iteratively reweighted fixed-point ascent from every hole's own optimum;
     a coarse profile scan; Fisher scoring (iteratively reweighted Gauss-Newton with Levenberg damping) on all
-    regression parameters from every scan maximum; covariance from the QR factor of the weighted Jacobian;
-    chi-square quantile from the normal quantile; interval ends by Illinois regula falsi."""
+    regression parameters from every scan maximum (ends included when not below their neighbour); covariance
+    from the QR factor of the weighted Jacobian; chi-square quantile from the normal quantile; interval ends by
+    Illinois regula falsi."""
     keys = {"survey_md", "survey_inc", "survey_azi", "log_md", "log_temp", "layer_top_md", "layer_k",
             "heat_production", "rho_c", "z_min"}
     if not isinstance(holes, (list, tuple)) or len(holes) < 2:
@@ -651,9 +657,10 @@ def regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape, t_end_bo
     prof = [profile(t) for t in ts]
     vals = np.array([p[0] for p in prof])
     best = None
-    for i in range(1, ts.size - 1):
-        if not (vals[i] >= vals[i - 1] and vals[i] >= vals[i + 1]):
-            continue
+    starts = [i for i in range(1, ts.size - 1) if vals[i] >= vals[i - 1] and vals[i] >= vals[i + 1]]
+    # an end value not below its neighbour: start there too (the maximum can lie inside the end cell)
+    starts += [i for i, j in ((0, 1), (ts.size - 1, ts.size - 2)) if vals[i] >= vals[j]]
+    for i in starts:
         g0, t0 = prof[i][1], float(ts[i])
         th = np.zeros(2 * H + 2)
         for h, w in enumerate(W):

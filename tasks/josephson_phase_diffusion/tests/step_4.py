@@ -19,160 +19,174 @@
 # --- test case 0 ---
 # thermally activated phase slips below the critical current
 import numpy as np
-import mpmath as _t_mp
 
-def _t_cf(i, theta, want_D=True):
-    sgn = -1 if i < 0 else 1
-    dps = 30 + int(1.8 / theta)
-    with _t_mp.workdps(dps):
-        a = _t_mp.mpf(abs(i))
-        th = _t_mp.mpf(theta)
-        N = 40 + int(1.3 * _t_mp.sqrt(2 * dps * 2.303 / th))
-        J = _t_mp.mpc(0, 1)
-        r = [_t_mp.mpc(0)] * (N + 2)
-        dr = [_t_mp.mpc(0)] * (N + 2)
-        for n in range(N, 0, -1):
-            r[n] = 1 / (2 * th * n + 2 * J * a + r[n + 1])
-            dr[n] = -r[n] ** 2 * (2 * J + dr[n + 1])
-        v = a + _t_mp.im(r[1])
-        dv = 1 + _t_mp.im(dr[1])
-        if not want_D:
-            return float(sgn * v), float(dv)
-        c = [_t_mp.mpc(0)] * (N + 1)
-        c[0] = 1 / (2 * _t_mp.pi)
-        for n in range(1, N + 1):
-            c[n] = r[n] * c[n - 1]
-        s = [_t_mp.mpc(0)] * (N + 2)
-        for n in range(N, 1, -1):
-            s[n] = 1 / (-2 * th * n + 2 * J * a + s[n + 1])
-        g = [_t_mp.mpc(0)] * (N + 1)
-        g[1] = 1 / (2 * J * a - 2 * th + s[2])
-        for n in range(2, N + 1):
-            g[n] = s[n] * g[n - 1]
-        h = np.array([_t_mp.conj(g[k]) for k in range(N, 0, -1)] + [_t_mp.mpc(1)] + g[1:], dtype=object)
-        cf = np.array([_t_mp.conj(c[k]) for k in range(N, 0, -1)] + c, dtype=object)
-        q = np.convolve(h, h)                       # Fourier coefficients of (1 + chi')**2, index -2N..2N
-        tot = _t_mp.fsum(q[N:3 * N + 1][::-1] * cf)  # sum_m q_m c_{-m}, |m| <= N
-        D = th * 2 * _t_mp.pi * _t_mp.re(tot)
-        return float(sgn * v), float(dv), float(D)
 
-def _t_rel(x, y):
-    return abs(x - y) / abs(y)
+def _crown_case():
+    import numpy as np
+    import mpmath as _t_mp
 
-def _t_kappa(i, theta):
-    # d ln theta / d ln v from a central difference of the continued-fraction voltage
-    # carried out entirely in extended precision (step 1e-15 theta, 60 + 1.8 / theta digits)
-    dps = 60 + int(1.8 / theta)
-    with _t_mp.workdps(dps):
-        a, th = _t_mp.mpf(i), _t_mp.mpf(theta)
-        N = 40 + int(1.3 * _t_mp.sqrt(2 * dps * 2.303 / th))
-        J = _t_mp.mpc(0, 1)
-
-        def v(t):
-            r = _t_mp.mpc(0)
+    def _t_cf(i, theta, want_D=True):
+        sgn = -1 if i < 0 else 1
+        dps = 30 + int(1.8 / theta)
+        with _t_mp.workdps(dps):
+            a = _t_mp.mpf(abs(i))
+            th = _t_mp.mpf(theta)
+            N = 40 + int(1.3 * _t_mp.sqrt(2 * dps * 2.303 / th))
+            J = _t_mp.mpc(0, 1)
+            r = [_t_mp.mpc(0)] * (N + 2)
+            dr = [_t_mp.mpc(0)] * (N + 2)
             for n in range(N, 0, -1):
-                r = 1 / (2 * t * n + 2 * J * a + r)
-            return a + _t_mp.im(r)
+                r[n] = 1 / (2 * th * n + 2 * J * a + r[n + 1])
+                dr[n] = -r[n] ** 2 * (2 * J + dr[n + 1])
+            v = a + _t_mp.im(r[1])
+            dv = 1 + _t_mp.im(dr[1])
+            if not want_D:
+                return float(sgn * v), float(dv)
+            c = [_t_mp.mpc(0)] * (N + 1)
+            c[0] = 1 / (2 * _t_mp.pi)
+            for n in range(1, N + 1):
+                c[n] = r[n] * c[n - 1]
+            s = [_t_mp.mpc(0)] * (N + 2)
+            for n in range(N, 1, -1):
+                s[n] = 1 / (-2 * th * n + 2 * J * a + s[n + 1])
+            g = [_t_mp.mpc(0)] * (N + 1)
+            g[1] = 1 / (2 * J * a - 2 * th + s[2])
+            for n in range(2, N + 1):
+                g[n] = s[n] * g[n - 1]
+            h = np.array([_t_mp.conj(g[k]) for k in range(N, 0, -1)] + [_t_mp.mpc(1)] + g[1:], dtype=object)
+            cf = np.array([_t_mp.conj(c[k]) for k in range(N, 0, -1)] + c, dtype=object)
+            q = np.convolve(h, h)                       # Fourier coefficients of (1 + chi')**2, index -2N..2N
+            tot = _t_mp.fsum(q[N:3 * N + 1][::-1] * cf)  # sum_m q_m c_{-m}, |m| <= N
+            D = th * 2 * _t_mp.pi * _t_mp.re(tot)
+            return float(sgn * v), float(dv), float(D)
 
-        h = th * _t_mp.mpf(10) ** -15
-        dlv = (_t_mp.log(v(th + h)) - _t_mp.log(v(th - h))) / (_t_mp.log(th + h) - _t_mp.log(th - h))
-        return float(1 / dlv)
+    def _t_rel(x, y):
+        return abs(x - y) / abs(y)
 
-def _t_check_temp(i, theta_true, v):
-    # theta: relative 1e-7 + 2e-9 |kappa| with kappa the exact sensitivity at theta_true;
-    # kappa: relative 1e-6 against the exact sensitivity at the returned theta
-    out = noise_temperature(i, v)
-    assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(x, float) for x in out), out
-    k_true = _t_kappa(i, theta_true)
-    assert _t_rel(out[0], theta_true) < 1e-7 + 2e-9 * abs(k_true), (i, v, out, theta_true, k_true)
-    k = _t_kappa(i, out[0])
-    assert _t_rel(out[1], k) < 1e-6, (i, v, out, k)
-    return out
+    def _t_kappa(i, theta):
+        # d ln theta / d ln v from a central difference of the continued-fraction voltage
+        # carried out entirely in extended precision (step 1e-15 theta, 60 + 1.8 / theta digits)
+        dps = 60 + int(1.8 / theta)
+        with _t_mp.workdps(dps):
+            a, th = _t_mp.mpf(i), _t_mp.mpf(theta)
+            N = 40 + int(1.3 * _t_mp.sqrt(2 * dps * 2.303 / th))
+            J = _t_mp.mpc(0, 1)
 
-# (Arrhenius regime: kappa is small, close to theta / barrier, so the thermometer is sensitive)
-for _t_i, _t_th in ((0.5, 0.05), (0.2, 0.3), (0.9, 0.025), (0.05, 0.08)):
-    _t_o = _t_check_temp(_t_i, _t_th, _t_cf(_t_i, _t_th, want_D=False)[0])
-    assert 0.0 < _t_o[1] < 0.5
+            def v(t):
+                r = _t_mp.mpc(0)
+                for n in range(N, 0, -1):
+                    r = 1 / (2 * t * n + 2 * J * a + r)
+                return a + _t_mp.im(r)
+
+            h = th * _t_mp.mpf(10) ** -15
+            dlv = (_t_mp.log(v(th + h)) - _t_mp.log(v(th - h))) / (_t_mp.log(th + h) - _t_mp.log(th - h))
+            return float(1 / dlv)
+
+    def _t_check_temp(i, theta_true, v):
+        # theta: relative 1e-7 + 2e-9 |kappa| with kappa the exact sensitivity at theta_true;
+        # kappa: relative 1e-6 against the exact sensitivity at the returned theta
+        out = noise_temperature(i, v)
+        assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(x, float) for x in out), out
+        k_true = _t_kappa(i, theta_true)
+        assert _t_rel(out[0], theta_true) < 1e-7 + 2e-9 * abs(k_true), (i, v, out, theta_true, k_true)
+        k = _t_kappa(i, out[0])
+        assert _t_rel(out[1], k) < 1e-6, (i, v, out, k)
+        return out
+
+    # (Arrhenius regime: kappa is small, close to theta / barrier, so the thermometer is sensitive)
+    for _t_i, _t_th in ((0.5, 0.05), (0.2, 0.3), (0.9, 0.025), (0.05, 0.08)):
+        _t_o = _t_check_temp(_t_i, _t_th, _t_cf(_t_i, _t_th, want_D=False)[0])
+        assert 0.0 < _t_o[1] < 0.5
+
+
+_crown_case()
 
 # --- test case 1 ---
 # at and above the critical current, strong noise, largest bias i = 10, and far above the critical
 # current at weak noise, where d ln v / d ln theta is about 4e-7 (kappa about 2.4e6)
 import numpy as np
-import mpmath as _t_mp
 
-def _t_cf(i, theta, want_D=True):
-    sgn = -1 if i < 0 else 1
-    dps = 30 + int(1.8 / theta)
-    with _t_mp.workdps(dps):
-        a = _t_mp.mpf(abs(i))
-        th = _t_mp.mpf(theta)
-        N = 40 + int(1.3 * _t_mp.sqrt(2 * dps * 2.303 / th))
-        J = _t_mp.mpc(0, 1)
-        r = [_t_mp.mpc(0)] * (N + 2)
-        dr = [_t_mp.mpc(0)] * (N + 2)
-        for n in range(N, 0, -1):
-            r[n] = 1 / (2 * th * n + 2 * J * a + r[n + 1])
-            dr[n] = -r[n] ** 2 * (2 * J + dr[n + 1])
-        v = a + _t_mp.im(r[1])
-        dv = 1 + _t_mp.im(dr[1])
-        if not want_D:
-            return float(sgn * v), float(dv)
-        c = [_t_mp.mpc(0)] * (N + 1)
-        c[0] = 1 / (2 * _t_mp.pi)
-        for n in range(1, N + 1):
-            c[n] = r[n] * c[n - 1]
-        s = [_t_mp.mpc(0)] * (N + 2)
-        for n in range(N, 1, -1):
-            s[n] = 1 / (-2 * th * n + 2 * J * a + s[n + 1])
-        g = [_t_mp.mpc(0)] * (N + 1)
-        g[1] = 1 / (2 * J * a - 2 * th + s[2])
-        for n in range(2, N + 1):
-            g[n] = s[n] * g[n - 1]
-        h = np.array([_t_mp.conj(g[k]) for k in range(N, 0, -1)] + [_t_mp.mpc(1)] + g[1:], dtype=object)
-        cf = np.array([_t_mp.conj(c[k]) for k in range(N, 0, -1)] + c, dtype=object)
-        q = np.convolve(h, h)                       # Fourier coefficients of (1 + chi')**2, index -2N..2N
-        tot = _t_mp.fsum(q[N:3 * N + 1][::-1] * cf)  # sum_m q_m c_{-m}, |m| <= N
-        D = th * 2 * _t_mp.pi * _t_mp.re(tot)
-        return float(sgn * v), float(dv), float(D)
 
-def _t_rel(x, y):
-    return abs(x - y) / abs(y)
+def _crown_case():
+    import numpy as np
+    import mpmath as _t_mp
 
-def _t_kappa(i, theta):
-    # d ln theta / d ln v from a central difference of the continued-fraction voltage
-    # carried out entirely in extended precision (step 1e-15 theta, 60 + 1.8 / theta digits)
-    dps = 60 + int(1.8 / theta)
-    with _t_mp.workdps(dps):
-        a, th = _t_mp.mpf(i), _t_mp.mpf(theta)
-        N = 40 + int(1.3 * _t_mp.sqrt(2 * dps * 2.303 / th))
-        J = _t_mp.mpc(0, 1)
-
-        def v(t):
-            r = _t_mp.mpc(0)
+    def _t_cf(i, theta, want_D=True):
+        sgn = -1 if i < 0 else 1
+        dps = 30 + int(1.8 / theta)
+        with _t_mp.workdps(dps):
+            a = _t_mp.mpf(abs(i))
+            th = _t_mp.mpf(theta)
+            N = 40 + int(1.3 * _t_mp.sqrt(2 * dps * 2.303 / th))
+            J = _t_mp.mpc(0, 1)
+            r = [_t_mp.mpc(0)] * (N + 2)
+            dr = [_t_mp.mpc(0)] * (N + 2)
             for n in range(N, 0, -1):
-                r = 1 / (2 * t * n + 2 * J * a + r)
-            return a + _t_mp.im(r)
+                r[n] = 1 / (2 * th * n + 2 * J * a + r[n + 1])
+                dr[n] = -r[n] ** 2 * (2 * J + dr[n + 1])
+            v = a + _t_mp.im(r[1])
+            dv = 1 + _t_mp.im(dr[1])
+            if not want_D:
+                return float(sgn * v), float(dv)
+            c = [_t_mp.mpc(0)] * (N + 1)
+            c[0] = 1 / (2 * _t_mp.pi)
+            for n in range(1, N + 1):
+                c[n] = r[n] * c[n - 1]
+            s = [_t_mp.mpc(0)] * (N + 2)
+            for n in range(N, 1, -1):
+                s[n] = 1 / (-2 * th * n + 2 * J * a + s[n + 1])
+            g = [_t_mp.mpc(0)] * (N + 1)
+            g[1] = 1 / (2 * J * a - 2 * th + s[2])
+            for n in range(2, N + 1):
+                g[n] = s[n] * g[n - 1]
+            h = np.array([_t_mp.conj(g[k]) for k in range(N, 0, -1)] + [_t_mp.mpc(1)] + g[1:], dtype=object)
+            cf = np.array([_t_mp.conj(c[k]) for k in range(N, 0, -1)] + c, dtype=object)
+            q = np.convolve(h, h)                       # Fourier coefficients of (1 + chi')**2, index -2N..2N
+            tot = _t_mp.fsum(q[N:3 * N + 1][::-1] * cf)  # sum_m q_m c_{-m}, |m| <= N
+            D = th * 2 * _t_mp.pi * _t_mp.re(tot)
+            return float(sgn * v), float(dv), float(D)
 
-        h = th * _t_mp.mpf(10) ** -15
-        dlv = (_t_mp.log(v(th + h)) - _t_mp.log(v(th - h))) / (_t_mp.log(th + h) - _t_mp.log(th - h))
-        return float(1 / dlv)
+    def _t_rel(x, y):
+        return abs(x - y) / abs(y)
 
-def _t_check_temp(i, theta_true, v):
-    # theta: relative 1e-7 + 2e-9 |kappa| with kappa the exact sensitivity at theta_true;
-    # kappa: relative 1e-6 against the exact sensitivity at the returned theta
-    out = noise_temperature(i, v)
-    assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(x, float) for x in out), out
-    k_true = _t_kappa(i, theta_true)
-    assert _t_rel(out[0], theta_true) < 1e-7 + 2e-9 * abs(k_true), (i, v, out, theta_true, k_true)
-    k = _t_kappa(i, out[0])
-    assert _t_rel(out[1], k) < 1e-6, (i, v, out, k)
-    return out
+    def _t_kappa(i, theta):
+        # d ln theta / d ln v from a central difference of the continued-fraction voltage
+        # carried out entirely in extended precision (step 1e-15 theta, 60 + 1.8 / theta digits)
+        dps = 60 + int(1.8 / theta)
+        with _t_mp.workdps(dps):
+            a, th = _t_mp.mpf(i), _t_mp.mpf(theta)
+            N = 40 + int(1.3 * _t_mp.sqrt(2 * dps * 2.303 / th))
+            J = _t_mp.mpc(0, 1)
 
-# (near the ohmic limit, and far above the critical current at weak noise, the voltage hardly
-# depends on theta and kappa is large)
-for _t_i, _t_th in ((1.0, 0.2), (1.5, 0.04), (3.0, 2.0), (0.7, 20.0), (10.0, 5.0), (8.0, 0.04)):
-    _t_o = _t_check_temp(_t_i, _t_th, _t_cf(_t_i, _t_th, want_D=False)[0])
-    assert _t_o[1] > 0.0
+            def v(t):
+                r = _t_mp.mpc(0)
+                for n in range(N, 0, -1):
+                    r = 1 / (2 * t * n + 2 * J * a + r)
+                return a + _t_mp.im(r)
+
+            h = th * _t_mp.mpf(10) ** -15
+            dlv = (_t_mp.log(v(th + h)) - _t_mp.log(v(th - h))) / (_t_mp.log(th + h) - _t_mp.log(th - h))
+            return float(1 / dlv)
+
+    def _t_check_temp(i, theta_true, v):
+        # theta: relative 1e-7 + 2e-9 |kappa| with kappa the exact sensitivity at theta_true;
+        # kappa: relative 1e-6 against the exact sensitivity at the returned theta
+        out = noise_temperature(i, v)
+        assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(x, float) for x in out), out
+        k_true = _t_kappa(i, theta_true)
+        assert _t_rel(out[0], theta_true) < 1e-7 + 2e-9 * abs(k_true), (i, v, out, theta_true, k_true)
+        k = _t_kappa(i, out[0])
+        assert _t_rel(out[1], k) < 1e-6, (i, v, out, k)
+        return out
+
+    # (near the ohmic limit, and far above the critical current at weak noise, the voltage hardly
+    # depends on theta and kappa is large)
+    for _t_i, _t_th in ((1.0, 0.2), (1.5, 0.04), (3.0, 2.0), (0.7, 20.0), (10.0, 5.0), (8.0, 0.04)):
+        _t_o = _t_check_temp(_t_i, _t_th, _t_cf(_t_i, _t_th, want_D=False)[0])
+        assert _t_o[1] > 0.0
+
+
+_crown_case()
 
 # --- test case 2 ---
 # the inclusive endpoints: v equal to the endpoint voltage v_lo = mean_voltage(i, 0.02)[0] or
@@ -180,93 +194,100 @@ for _t_i, _t_th in ((1.0, 0.2), (1.5, 0.04), (3.0, 2.0), (0.7, 20.0), (10.0, 5.0
 # against the continued fraction to the 1e-9 stated for step 1), returns theta = 0.02 or 50; and a
 # Bessel-integral voltage
 import numpy as np
-import mpmath as _t_mp
 
-def _t_cf(i, theta, want_D=True):
-    sgn = -1 if i < 0 else 1
-    dps = 30 + int(1.8 / theta)
-    with _t_mp.workdps(dps):
-        a = _t_mp.mpf(abs(i))
-        th = _t_mp.mpf(theta)
-        N = 40 + int(1.3 * _t_mp.sqrt(2 * dps * 2.303 / th))
-        J = _t_mp.mpc(0, 1)
-        r = [_t_mp.mpc(0)] * (N + 2)
-        dr = [_t_mp.mpc(0)] * (N + 2)
-        for n in range(N, 0, -1):
-            r[n] = 1 / (2 * th * n + 2 * J * a + r[n + 1])
-            dr[n] = -r[n] ** 2 * (2 * J + dr[n + 1])
-        v = a + _t_mp.im(r[1])
-        dv = 1 + _t_mp.im(dr[1])
-        if not want_D:
-            return float(sgn * v), float(dv)
-        c = [_t_mp.mpc(0)] * (N + 1)
-        c[0] = 1 / (2 * _t_mp.pi)
-        for n in range(1, N + 1):
-            c[n] = r[n] * c[n - 1]
-        s = [_t_mp.mpc(0)] * (N + 2)
-        for n in range(N, 1, -1):
-            s[n] = 1 / (-2 * th * n + 2 * J * a + s[n + 1])
-        g = [_t_mp.mpc(0)] * (N + 1)
-        g[1] = 1 / (2 * J * a - 2 * th + s[2])
-        for n in range(2, N + 1):
-            g[n] = s[n] * g[n - 1]
-        h = np.array([_t_mp.conj(g[k]) for k in range(N, 0, -1)] + [_t_mp.mpc(1)] + g[1:], dtype=object)
-        cf = np.array([_t_mp.conj(c[k]) for k in range(N, 0, -1)] + c, dtype=object)
-        q = np.convolve(h, h)                       # Fourier coefficients of (1 + chi')**2, index -2N..2N
-        tot = _t_mp.fsum(q[N:3 * N + 1][::-1] * cf)  # sum_m q_m c_{-m}, |m| <= N
-        D = th * 2 * _t_mp.pi * _t_mp.re(tot)
-        return float(sgn * v), float(dv), float(D)
 
-def _t_v_bessel(i, theta):
-    # Single-integral form of the Ambegaokar-Halperin voltage (inner integral done exactly):
-    # v = theta (1 - exp(-2 pi i / theta)) / int_0^{2 pi} I_0(2 sin(y/2) / theta) exp(-i y / theta) dy
-    with _t_mp.workdps(40):
-        a, th = _t_mp.mpf(i), _t_mp.mpf(theta)
-        f = lambda y: _t_mp.besseli(0, 2 * _t_mp.sin(y / 2) / th) * _t_mp.exp(-a * y / th)
-        pts = _t_mp.linspace(0, 2 * _t_mp.pi, 41)
-        den = _t_mp.quad(f, pts)
-        return float(th * (-_t_mp.expm1(-2 * _t_mp.pi * a / th)) / den)
+def _crown_case():
+    import numpy as np
+    import mpmath as _t_mp
 
-def _t_rel(x, y):
-    return abs(x - y) / abs(y)
-
-def _t_kappa(i, theta):
-    # d ln theta / d ln v from a central difference of the continued-fraction voltage
-    # carried out entirely in extended precision (step 1e-15 theta, 60 + 1.8 / theta digits)
-    dps = 60 + int(1.8 / theta)
-    with _t_mp.workdps(dps):
-        a, th = _t_mp.mpf(i), _t_mp.mpf(theta)
-        N = 40 + int(1.3 * _t_mp.sqrt(2 * dps * 2.303 / th))
-        J = _t_mp.mpc(0, 1)
-
-        def v(t):
-            r = _t_mp.mpc(0)
+    def _t_cf(i, theta, want_D=True):
+        sgn = -1 if i < 0 else 1
+        dps = 30 + int(1.8 / theta)
+        with _t_mp.workdps(dps):
+            a = _t_mp.mpf(abs(i))
+            th = _t_mp.mpf(theta)
+            N = 40 + int(1.3 * _t_mp.sqrt(2 * dps * 2.303 / th))
+            J = _t_mp.mpc(0, 1)
+            r = [_t_mp.mpc(0)] * (N + 2)
+            dr = [_t_mp.mpc(0)] * (N + 2)
             for n in range(N, 0, -1):
-                r = 1 / (2 * t * n + 2 * J * a + r)
-            return a + _t_mp.im(r)
+                r[n] = 1 / (2 * th * n + 2 * J * a + r[n + 1])
+                dr[n] = -r[n] ** 2 * (2 * J + dr[n + 1])
+            v = a + _t_mp.im(r[1])
+            dv = 1 + _t_mp.im(dr[1])
+            if not want_D:
+                return float(sgn * v), float(dv)
+            c = [_t_mp.mpc(0)] * (N + 1)
+            c[0] = 1 / (2 * _t_mp.pi)
+            for n in range(1, N + 1):
+                c[n] = r[n] * c[n - 1]
+            s = [_t_mp.mpc(0)] * (N + 2)
+            for n in range(N, 1, -1):
+                s[n] = 1 / (-2 * th * n + 2 * J * a + s[n + 1])
+            g = [_t_mp.mpc(0)] * (N + 1)
+            g[1] = 1 / (2 * J * a - 2 * th + s[2])
+            for n in range(2, N + 1):
+                g[n] = s[n] * g[n - 1]
+            h = np.array([_t_mp.conj(g[k]) for k in range(N, 0, -1)] + [_t_mp.mpc(1)] + g[1:], dtype=object)
+            cf = np.array([_t_mp.conj(c[k]) for k in range(N, 0, -1)] + c, dtype=object)
+            q = np.convolve(h, h)                       # Fourier coefficients of (1 + chi')**2, index -2N..2N
+            tot = _t_mp.fsum(q[N:3 * N + 1][::-1] * cf)  # sum_m q_m c_{-m}, |m| <= N
+            D = th * 2 * _t_mp.pi * _t_mp.re(tot)
+            return float(sgn * v), float(dv), float(D)
 
-        h = th * _t_mp.mpf(10) ** -15
-        dlv = (_t_mp.log(v(th + h)) - _t_mp.log(v(th - h))) / (_t_mp.log(th + h) - _t_mp.log(th - h))
-        return float(1 / dlv)
+    def _t_v_bessel(i, theta):
+        # Single-integral form of the Ambegaokar-Halperin voltage (inner integral done exactly):
+        # v = theta (1 - exp(-2 pi i / theta)) / int_0^{2 pi} I_0(2 sin(y/2) / theta) exp(-i y / theta) dy
+        with _t_mp.workdps(40):
+            a, th = _t_mp.mpf(i), _t_mp.mpf(theta)
+            f = lambda y: _t_mp.besseli(0, 2 * _t_mp.sin(y / 2) / th) * _t_mp.exp(-a * y / th)
+            pts = _t_mp.linspace(0, 2 * _t_mp.pi, 41)
+            den = _t_mp.quad(f, pts)
+            return float(th * (-_t_mp.expm1(-2 * _t_mp.pi * a / th)) / den)
 
-def _t_check_temp(i, theta_true, v):
-    # theta: relative 1e-7 + 2e-9 |kappa| with kappa the exact sensitivity at theta_true;
-    # kappa: relative 1e-6 against the exact sensitivity at the returned theta
-    out = noise_temperature(i, v)
-    assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(x, float) for x in out), out
-    k_true = _t_kappa(i, theta_true)
-    assert _t_rel(out[0], theta_true) < 1e-7 + 2e-9 * abs(k_true), (i, v, out, theta_true, k_true)
-    k = _t_kappa(i, out[0])
-    assert _t_rel(out[1], k) < 1e-6, (i, v, out, k)
-    return out
+    def _t_rel(x, y):
+        return abs(x - y) / abs(y)
 
-_t_v02 = mean_voltage(0.9, 0.02)[0]
-assert _t_rel(_t_v02, _t_cf(0.9, 0.02, want_D=False)[0]) < 1e-9     # the voltage of step 1 at theta = 0.02
-_t_check_temp(0.9, 0.02, _t_v02)
-_t_v50 = mean_voltage(0.7, 50.0)[0]
-assert _t_rel(_t_v50, _t_cf(0.7, 50.0, want_D=False)[0]) < 1e-9     # the voltage of step 1 at theta = 50
-_t_check_temp(0.7, 50.0, _t_v50)
-_t_check_temp(0.4, 0.06, _t_v_bessel(0.4, 0.06))
+    def _t_kappa(i, theta):
+        # d ln theta / d ln v from a central difference of the continued-fraction voltage
+        # carried out entirely in extended precision (step 1e-15 theta, 60 + 1.8 / theta digits)
+        dps = 60 + int(1.8 / theta)
+        with _t_mp.workdps(dps):
+            a, th = _t_mp.mpf(i), _t_mp.mpf(theta)
+            N = 40 + int(1.3 * _t_mp.sqrt(2 * dps * 2.303 / th))
+            J = _t_mp.mpc(0, 1)
+
+            def v(t):
+                r = _t_mp.mpc(0)
+                for n in range(N, 0, -1):
+                    r = 1 / (2 * t * n + 2 * J * a + r)
+                return a + _t_mp.im(r)
+
+            h = th * _t_mp.mpf(10) ** -15
+            dlv = (_t_mp.log(v(th + h)) - _t_mp.log(v(th - h))) / (_t_mp.log(th + h) - _t_mp.log(th - h))
+            return float(1 / dlv)
+
+    def _t_check_temp(i, theta_true, v):
+        # theta: relative 1e-7 + 2e-9 |kappa| with kappa the exact sensitivity at theta_true;
+        # kappa: relative 1e-6 against the exact sensitivity at the returned theta
+        out = noise_temperature(i, v)
+        assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(x, float) for x in out), out
+        k_true = _t_kappa(i, theta_true)
+        assert _t_rel(out[0], theta_true) < 1e-7 + 2e-9 * abs(k_true), (i, v, out, theta_true, k_true)
+        k = _t_kappa(i, out[0])
+        assert _t_rel(out[1], k) < 1e-6, (i, v, out, k)
+        return out
+
+    _t_v02 = mean_voltage(0.9, 0.02)[0]
+    assert _t_rel(_t_v02, _t_cf(0.9, 0.02, want_D=False)[0]) < 1e-9     # the voltage of step 1 at theta = 0.02
+    _t_check_temp(0.9, 0.02, _t_v02)
+    _t_v50 = mean_voltage(0.7, 50.0)[0]
+    assert _t_rel(_t_v50, _t_cf(0.7, 50.0, want_D=False)[0]) < 1e-9     # the voltage of step 1 at theta = 50
+    _t_check_temp(0.7, 50.0, _t_v50)
+    _t_check_temp(0.4, 0.06, _t_v_bessel(0.4, 0.06))
+
+
+_crown_case()
 
 # --- test case 3 ---
 # the stated endpoint rule, a relative 1e-11 of the endpoint voltages v_lo = mean_voltage(i, 0.02)[0]
@@ -274,93 +295,107 @@ _t_check_temp(0.4, 0.06, _t_v_bessel(0.4, 0.06))
 # returns the endpoint (theta to the stated tolerance, kappa against the independent kappa at the
 # returned theta), an excess of 1.1e-11 raises ValueError
 import numpy as np
-import mpmath as _t_mp
 
-def _t_cf(i, theta, want_D=True):
-    sgn = -1 if i < 0 else 1
-    dps = 30 + int(1.8 / theta)
-    with _t_mp.workdps(dps):
-        a = _t_mp.mpf(abs(i))
-        th = _t_mp.mpf(theta)
-        N = 40 + int(1.3 * _t_mp.sqrt(2 * dps * 2.303 / th))
-        J = _t_mp.mpc(0, 1)
-        r = [_t_mp.mpc(0)] * (N + 2)
-        dr = [_t_mp.mpc(0)] * (N + 2)
-        for n in range(N, 0, -1):
-            r[n] = 1 / (2 * th * n + 2 * J * a + r[n + 1])
-            dr[n] = -r[n] ** 2 * (2 * J + dr[n + 1])
-        v = a + _t_mp.im(r[1])
-        dv = 1 + _t_mp.im(dr[1])
-        if not want_D:
-            return float(sgn * v), float(dv)
-        c = [_t_mp.mpc(0)] * (N + 1)
-        c[0] = 1 / (2 * _t_mp.pi)
-        for n in range(1, N + 1):
-            c[n] = r[n] * c[n - 1]
-        s = [_t_mp.mpc(0)] * (N + 2)
-        for n in range(N, 1, -1):
-            s[n] = 1 / (-2 * th * n + 2 * J * a + s[n + 1])
-        g = [_t_mp.mpc(0)] * (N + 1)
-        g[1] = 1 / (2 * J * a - 2 * th + s[2])
-        for n in range(2, N + 1):
-            g[n] = s[n] * g[n - 1]
-        h = np.array([_t_mp.conj(g[k]) for k in range(N, 0, -1)] + [_t_mp.mpc(1)] + g[1:], dtype=object)
-        cf = np.array([_t_mp.conj(c[k]) for k in range(N, 0, -1)] + c, dtype=object)
-        q = np.convolve(h, h)                       # Fourier coefficients of (1 + chi')**2, index -2N..2N
-        tot = _t_mp.fsum(q[N:3 * N + 1][::-1] * cf)  # sum_m q_m c_{-m}, |m| <= N
-        D = th * 2 * _t_mp.pi * _t_mp.re(tot)
-        return float(sgn * v), float(dv), float(D)
 
-def _t_rel(x, y):
-    return abs(x - y) / abs(y)
+def _crown_case():
+    import numpy as np
+    import mpmath as _t_mp
 
-def _t_kappa(i, theta):
-    # d ln theta / d ln v from a central difference of the continued-fraction voltage
-    # carried out entirely in extended precision (step 1e-15 theta, 60 + 1.8 / theta digits)
-    dps = 60 + int(1.8 / theta)
-    with _t_mp.workdps(dps):
-        a, th = _t_mp.mpf(i), _t_mp.mpf(theta)
-        N = 40 + int(1.3 * _t_mp.sqrt(2 * dps * 2.303 / th))
-        J = _t_mp.mpc(0, 1)
-
-        def v(t):
-            r = _t_mp.mpc(0)
+    def _t_cf(i, theta, want_D=True):
+        sgn = -1 if i < 0 else 1
+        dps = 30 + int(1.8 / theta)
+        with _t_mp.workdps(dps):
+            a = _t_mp.mpf(abs(i))
+            th = _t_mp.mpf(theta)
+            N = 40 + int(1.3 * _t_mp.sqrt(2 * dps * 2.303 / th))
+            J = _t_mp.mpc(0, 1)
+            r = [_t_mp.mpc(0)] * (N + 2)
+            dr = [_t_mp.mpc(0)] * (N + 2)
             for n in range(N, 0, -1):
-                r = 1 / (2 * t * n + 2 * J * a + r)
-            return a + _t_mp.im(r)
+                r[n] = 1 / (2 * th * n + 2 * J * a + r[n + 1])
+                dr[n] = -r[n] ** 2 * (2 * J + dr[n + 1])
+            v = a + _t_mp.im(r[1])
+            dv = 1 + _t_mp.im(dr[1])
+            if not want_D:
+                return float(sgn * v), float(dv)
+            c = [_t_mp.mpc(0)] * (N + 1)
+            c[0] = 1 / (2 * _t_mp.pi)
+            for n in range(1, N + 1):
+                c[n] = r[n] * c[n - 1]
+            s = [_t_mp.mpc(0)] * (N + 2)
+            for n in range(N, 1, -1):
+                s[n] = 1 / (-2 * th * n + 2 * J * a + s[n + 1])
+            g = [_t_mp.mpc(0)] * (N + 1)
+            g[1] = 1 / (2 * J * a - 2 * th + s[2])
+            for n in range(2, N + 1):
+                g[n] = s[n] * g[n - 1]
+            h = np.array([_t_mp.conj(g[k]) for k in range(N, 0, -1)] + [_t_mp.mpc(1)] + g[1:], dtype=object)
+            cf = np.array([_t_mp.conj(c[k]) for k in range(N, 0, -1)] + c, dtype=object)
+            q = np.convolve(h, h)                       # Fourier coefficients of (1 + chi')**2, index -2N..2N
+            tot = _t_mp.fsum(q[N:3 * N + 1][::-1] * cf)  # sum_m q_m c_{-m}, |m| <= N
+            D = th * 2 * _t_mp.pi * _t_mp.re(tot)
+            return float(sgn * v), float(dv), float(D)
 
-        h = th * _t_mp.mpf(10) ** -15
-        dlv = (_t_mp.log(v(th + h)) - _t_mp.log(v(th - h))) / (_t_mp.log(th + h) - _t_mp.log(th - h))
-        return float(1 / dlv)
+    def _t_rel(x, y):
+        return abs(x - y) / abs(y)
 
-_t_v02 = mean_voltage(0.9, 0.02)[0]
-assert _t_rel(_t_v02, _t_cf(0.9, 0.02, want_D=False)[0]) < 1e-9     # the voltage of step 1 at theta = 0.02
-_t_o = noise_temperature(0.9, _t_v02 * (1.0 - 0.9e-11))
-assert isinstance(_t_o, tuple) and len(_t_o) == 2 and all(isinstance(x, float) for x in _t_o), _t_o
-assert _t_rel(_t_o[0], 0.02) < 1e-7 + 2e-9 * abs(_t_kappa(0.9, 0.02)), _t_o
-assert _t_rel(_t_o[1], _t_kappa(0.9, _t_o[0])) < 1e-6, _t_o     # with the kappa of the endpoint
-_t_v50 = mean_voltage(0.7, 50.0)[0]
-assert _t_rel(_t_v50, _t_cf(0.7, 50.0, want_D=False)[0]) < 1e-9     # the voltage of step 1 at theta = 50
-_t_o = noise_temperature(0.7, _t_v50 * (1.0 + 0.9e-11))
-assert isinstance(_t_o, tuple) and len(_t_o) == 2 and all(isinstance(x, float) for x in _t_o), _t_o
-assert _t_rel(_t_o[0], 50.0) < 1e-7 + 2e-9 * abs(_t_kappa(0.7, 50.0)), _t_o
-assert _t_rel(_t_o[1], _t_kappa(0.7, _t_o[0])) < 1e-6, _t_o
-for _t_bad in ((0.9, _t_v02 * (1.0 - 1.1e-11)), (0.7, _t_v50 * (1.0 + 1.1e-11))):
-    try:
-        noise_temperature(*_t_bad)
-    except ValueError:
-        pass
-    else:
-        raise AssertionError("noise_temperature%r must raise ValueError" % (_t_bad,))
+    def _t_kappa(i, theta):
+        # d ln theta / d ln v from a central difference of the continued-fraction voltage
+        # carried out entirely in extended precision (step 1e-15 theta, 60 + 1.8 / theta digits)
+        dps = 60 + int(1.8 / theta)
+        with _t_mp.workdps(dps):
+            a, th = _t_mp.mpf(i), _t_mp.mpf(theta)
+            N = 40 + int(1.3 * _t_mp.sqrt(2 * dps * 2.303 / th))
+            J = _t_mp.mpc(0, 1)
+
+            def v(t):
+                r = _t_mp.mpc(0)
+                for n in range(N, 0, -1):
+                    r = 1 / (2 * t * n + 2 * J * a + r)
+                return a + _t_mp.im(r)
+
+            h = th * _t_mp.mpf(10) ** -15
+            dlv = (_t_mp.log(v(th + h)) - _t_mp.log(v(th - h))) / (_t_mp.log(th + h) - _t_mp.log(th - h))
+            return float(1 / dlv)
+
+    _t_v02 = mean_voltage(0.9, 0.02)[0]
+    assert _t_rel(_t_v02, _t_cf(0.9, 0.02, want_D=False)[0]) < 1e-9     # the voltage of step 1 at theta = 0.02
+    _t_o = noise_temperature(0.9, _t_v02 * (1.0 - 0.9e-11))
+    assert isinstance(_t_o, tuple) and len(_t_o) == 2 and all(isinstance(x, float) for x in _t_o), _t_o
+    assert _t_rel(_t_o[0], 0.02) < 1e-7 + 2e-9 * abs(_t_kappa(0.9, 0.02)), _t_o
+    assert _t_rel(_t_o[1], _t_kappa(0.9, _t_o[0])) < 1e-6, _t_o     # with the kappa of the endpoint
+    _t_v50 = mean_voltage(0.7, 50.0)[0]
+    assert _t_rel(_t_v50, _t_cf(0.7, 50.0, want_D=False)[0]) < 1e-9     # the voltage of step 1 at theta = 50
+    _t_o = noise_temperature(0.7, _t_v50 * (1.0 + 0.9e-11))
+    assert isinstance(_t_o, tuple) and len(_t_o) == 2 and all(isinstance(x, float) for x in _t_o), _t_o
+    assert _t_rel(_t_o[0], 50.0) < 1e-7 + 2e-9 * abs(_t_kappa(0.7, 50.0)), _t_o
+    assert _t_rel(_t_o[1], _t_kappa(0.7, _t_o[0])) < 1e-6, _t_o
+    for _t_bad in ((0.9, _t_v02 * (1.0 - 1.1e-11)), (0.7, _t_v50 * (1.0 + 1.1e-11))):
+        try:
+            noise_temperature(*_t_bad)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("noise_temperature%r must raise ValueError" % (_t_bad,))
+
+
+_crown_case()
 
 # --- test case 4 ---
 # impossible voltages and bad inputs raise ValueError
 import numpy as np
-for _t_bad in ((0.5, 0.5), (2.0, np.sqrt(3.0)), (0.0, 0.1), (11.0, 10.9), (0.5, float("nan")),
-               (0.5, 1e-60), (0.3, 0.2999999999999), (float("nan"), 0.1)):
-    try:
-        noise_temperature(*_t_bad)
-    except ValueError:
-        pass
-    else:
-        raise AssertionError("noise_temperature%r must raise ValueError" % (_t_bad,))
+
+
+def _crown_case():
+    import numpy as np
+    for _t_bad in ((0.5, 0.5), (2.0, np.sqrt(3.0)), (0.0, 0.1), (11.0, 10.9), (0.5, float("nan")),
+                   (0.5, 1e-60), (0.3, 0.2999999999999), (float("nan"), 0.1)):
+        try:
+            noise_temperature(*_t_bad)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("noise_temperature%r must raise ValueError" % (_t_bad,))
+
+
+_crown_case()
