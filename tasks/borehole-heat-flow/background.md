@@ -85,7 +85,7 @@ Some practical points:
   z > 0.
 
 On the Shield, the last glaciation left temperatures in the upper 1–2 km
-several kelvin warmer than a steady profile would predict. If the correction
+several kelvin colder than a steady profile would predict. If the correction
 is ignored, heat flow from holes shallower than about 1 km is underestimated
 by several mW m^-2.
 
@@ -126,13 +126,39 @@ domain, where each layer contributes exponentials in z. Near strong contrasts
 the paleoclimate perturbation of layered ground differs from the half-space
 formula by up to tens of percent of the surface departure.
 
-## 6. The complete workflow
+## 6. When did the glaciation end? The final inversion
 
-Step 6 of the task chains sections 1-4 on one borehole: the readings and the
-layer contacts are converted to vertical depth with the same trajectory, the
-shallow readings are removed with a cut on vertical depth, R, S and the
-unit-amplitude perturbation P are evaluated at the remaining depths, and T0, q0
-and the glacial amplitude g are estimated jointly.
+The glacial history enters the observation model through its shape and its
+amplitude, but the time at which the last glaciation ended, t_end, is itself
+uncertain, and it controls how deep the post-glacial warming has penetrated.
+Step 6 of the task estimates t_end from the log together with T0, q0 and the
+amplitude g, with the perturbation computed in the layered column (section 5).
+
+Only the boundary between the post-glacial interval and the glaciation moves
+with t_end, so the perturbation of the unit-amplitude history is
+P(z; t_end) = P_fix(z) + (s_0 − s_1) U(z, t_end), where U is the response to a
+unit step of the surface temperature applied a time t_end ago. For a fixed
+t_end the model is linear in T0, q0 and g, and the residual sum of squares
+minimized over these three parameters defines the profile RSS(t_end). The
+least-squares estimate of t_end is the global minimizer of this profile. When
+the glaciation is short, a later end with a larger amplitude can explain the
+log almost as well as an earlier end with a smaller one, and the profile then
+has two minima.
+
+Two uncertainty measures are reported. The linearized (Wald) covariance
+s² (JᵀJ)⁻¹ uses the Jacobian of the model at the estimate, whose t_end column
+is g ∂P/∂t_end, and the unbiased noise variance s² = RSS_min/(n − 4) for four
+fitted parameters. The profile-likelihood interval does not linearize: with an
+unknown noise variance, the likelihood-ratio test for t_end is calibrated with
+the F distribution, and the 95 % interval is the range of t_end around the
+estimate where RSS(t_end) ≤ RSS_min (1 + F₀.₉₅(1, n − 4)/(n − 4)). Because the
+model is curved in t_end, this interval is asymmetric about the estimate, and
+it departs from the symmetric Wald interval most when the log constrains
+t_end weakly.
+
+The readings and the layer contacts are converted to vertical depth with the
+same trajectory, and the shallow readings are removed with a cut on vertical
+depth before the inversion.
 
 ## References
 
