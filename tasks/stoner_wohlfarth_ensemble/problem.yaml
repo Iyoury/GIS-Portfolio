@@ -69,10 +69,10 @@ verification_explanation: |-
   golden-section search along the equilibrium curve (no astroid formula), plus the closed-form barriers
   at psi = 0 and pi/2; steps 3 and 4 use the closed erfc / erf forms at psi = 0 and pi/2 and, at other
   angles, an adaptive quadrature or one ODE run on the grid barriers and a Newton step that must not
-  move the returned median (step 4 case 5, three near-hard-axis particles whose switching field has two
-  windows, holds the rate at its value 1e-7 below h_sw over the last 1e-7, where the grid no longer
-  separates the merging extrema; its targets agree to 8.4e-12 with a Richardson-extrapolated trapezoid
-  rule on up to 4e5 nodes); step 5 uses an extended-precision (mpmath) Legendre-polynomial expansion of
+  move the returned median (step 4 case 5, three particles at angles above pi/4 whose switching field has
+  two windows, holds the rate at its value 1e-7 below h_sw over the last 1e-7, where the grid no longer
+  separates the merging extrema; its mean targets agree to 8.4e-12 or better with a Richardson-extrapolated
+  trapezoid rule on 2e5 and 4e5 nodes); step 5 uses an extended-precision (mpmath) Legendre-polynomial expansion of
   Brown's operator solved by banded elimination (converged: 80 more modes and 25 more digits change
   nothing at sigma = 60). Step 6 and the whole-task tests (ensemble_switching of solution.py) use a
   Newton step with analytic derivatives on the independently computed ensemble magnetization and
@@ -87,8 +87,11 @@ verification_explanation: |-
   extrapolation) whose smallest nonzero eigenvalue is located by an inertia (Sturm) count with pivots in
   differential form, and Garanin's quadrature with closed-form (erfi) inner integrals and tanh-sinh
   outer quadrature in mpmath; per-particle ODE runs with bisection for step 6. Against the reference it
-  agrees to 6e-12 relative (step 5, 58 points), 3.5e-14 (step 4, 26 inputs), 2.3e-13 (step 3, 360
-  evaluations) and 1e-14 (step 6, 10 ensembles), and against the step 5 oracle to 6e-12. For step 3 the
+  agrees to 6e-12 relative (step 5, 58 points), 1.0e-13 (median) and 8.7e-13 (mean) on 425 step 4 inputs
+  (270 of them with psi from 1.15 to 1.55, where the switching field can have two windows; no failure),
+  2.3e-13 (step 3, 360 evaluations) and 1e-14 (step 6, 10 ensembles), and against the step 5 oracle to
+  6e-12. On 141 of the step 4 inputs both means also agree to 2.5e-12 with an independent
+  Richardson-extrapolated trapezoid rule for h_sw - int P dh (nodes h = h_sw sin u). For step 3 the
   1e-8 accuracy is not promised at fields less than 1e-6 below h_sw when 0 < psi < pi/2: next to the hard
   axis P there depends on the last bits of h_sw (the reference is off by 5e-4 at psi = pi/2 - 1e-9,
   f0 / rate = 6e12, a field 1.2e-13 below h_sw, against a 50-digit evaluation); from 1e-6 below h_sw on,

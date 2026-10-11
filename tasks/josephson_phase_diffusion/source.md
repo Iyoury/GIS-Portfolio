@@ -43,11 +43,23 @@ Consistency checks run while building the task:
   current at theta <= 0.05): largest relative difference 4.4e-15 for v, 3.6e-14 for dv/di and
   1.3e-15 for D_eff, with v and D_eff down to about 3e-25.
 - The thermometric sensitivity kappa = d ln theta / d ln v of the reference (since the second round of
-  version 12) agrees with the extended-precision central difference of the continued-fraction voltage to
-  4.8e-11 relative on a 14 x 10 grid of (i, theta) over 0.01 <= i <= 10, 0.02 <= theta <= 50, where kappa
-  ranges from 0.0102 to 2.42e7 (the previous reference was off by up to 4.4e-5 where kappa exceeds 1e6).
-  On a 25 x 50 grid over the domain d ln v / d ln i = i r_d / v is never below 1 (minimum
-  1.0000000000000016, approached in linear response); this bounds the step 5 error budget.
+  version 12) agrees with the extended-precision central difference of the continued-fraction voltage
+  (the step 4 test helper, 60 + 1.8 / theta digits) to 1.9e-11 relative on a geometric 14 x 10 grid of
+  (i, theta) over 0.01 <= i <= 10, 0.02 <= theta <= 50, where kappa ranges from 0.0102 (at i = 0.01,
+  theta = 0.02) to 2.42e7 (at i = 10, theta = 0.02); the reference before the second round was off by up
+  to 2.2e-5 there (at i = 10, theta = 0.02), beyond the 1e-6 tolerance. (Measured again when the second
+  round was completed; an interim record of this round gave 4.8e-11 and 4.4e-5 for a grid whose points
+  were not recorded.)
+- On a geometric 25 x 50 grid over 0.01 <= i <= 10, 0.02 <= theta <= 50, d ln v / d ln i = i r_d / v of
+  the reference is never below 1 (minimum 1.000000000016 at i = 0.01, theta = 50, i.e. in linear
+  response). For the array, J (dV/dJ) / V = sum r_k r_d,k / sum r_k v_k / i_k is then at least 1 as well,
+  so a relative voltage error enters j_star (step 5) divided by a factor of at least 1.
+- The giant-diffusion maximum is flat: d^2 ln D_eff / di^2 at the peak is about -216 at theta = 0.02,
+  -60 at 0.05, -22 at 0.1, -3.8 at 0.3 and -0.26 at theta = 1 (reference, central difference with
+  h = 1e-3). A relative error of D_eff bounded by delta but otherwise arbitrary in i can therefore move the
+  apparent maximum by up to sqrt(4 delta / |d^2 ln D_eff / di^2|), i.e. 4.3e-6 to 1.2e-4 for
+  delta = 1e-9, which is why the step 3 prompt states that the 1e-9 of effective_diffusion does not
+  locate i_peak to 1e-6.
 - The second solution (since version 12) uses a third exact representation for steps 1 to 5,
   independent of both the reference and the test targets. The Jacobi-Anger expansion
   exp(z cos x) = sum_m I_m(z) e^{imx}, z = 1 / theta, makes every shift integral of the
@@ -84,10 +96,10 @@ No target is copied from the reference solution. Every test computes its own tar
 | dv/di at i = 0 (step 1) | linear response, 1 / I_0(1/theta)**2 | exact |
 | D_eff (steps 2, 3, 5) | homogenization: D = theta int (1 + chi')**2 p dx with the corrector chi and the density p both from continued fractions in extended precision; Fourier convolution for the average | about 1e-15 relative |
 | D_eff at i = 0 (step 2) | Lifson-Jackson, theta / I_0(1/theta)**2 | exact |
-| diffusion peak (step 3) | one Newton step on dD/di = 0 with central differences (h = 2e-5) of the continued-fraction D must move i_peak by less than 1e-6; D lower at i_peak +- 0.05 | truncation of the differences below 1e-8 |
+| diffusion peak (step 3) | one Newton step on dD/di = 0 with central differences (h = 2e-5) of the continued-fraction D must move i_peak by less than 1e-6; D lower at i_peak +- 0.05; d_peak against the continued-fraction D at the returned i_peak | truncation of the differences below 1e-8; d_peak relative 1e-9 |
 | noise temperature (step 4) | inside the range the voltage is generated at a known theta by the continued fraction (or the Bessel integral) and the returned theta must recover it. The endpoint rule is defined with the voltages of mean_voltage (step 1) at theta = 0.02 and 50, so the endpoint inputs (v_lo and v_hi themselves in case 2, the probes beyond them in case 3) are built from mean_voltage, which each case first checks against the continued fraction to its stated 1e-9 | relative 1e-7 + 2e-9 |kappa| (kappa the extended-precision sensitivity at the known theta): theta is defined through mean_voltage, whose relative error (below 1e-9) enters theta multiplied by |kappa|; probes 0.9e-11 (accepted) and 1.1e-11 (rejected) beyond the endpoint voltage (since the second round of version 12; before: relative 1e-7, see the version 12 note) |
 | thermometric sensitivity kappa (step 4) | central difference of ln v in ln theta with step 1e-15 theta, the continued fraction evaluated at 60 + 1.8 / theta digits, at the theta returned by the candidate (since the second round of version 12; before: at the known theta) | about 1e-15 relative; compared with relative tolerance 1e-6 |
-| array criterion (step 5) | one Newton step on V(J) = v_crit with V and dV/dJ from the continued fractions must move j_star by less than 1e-9 relative; r_diff and s_v compared with the continued-fraction sums; for one junction or identical junctions j_star is known from the Bessel-integral voltage | relative 1e-9 / 1e-8 |
+| array criterion (step 5) | one Newton step on V(J) = v_crit with V and dV/dJ from the continued fractions must move j_star by less than the stated relative tolerance; r_diff and s_v compared with the continued-fraction sums at the returned j_star; for one junction j_star is known from the Bessel-integral voltage | j_star relative 1e-9 + 2e-9 / s, s = d ln V / d ln J of the continued-fraction array voltage (since the second round of version 12; before: relative 1e-9, see the version 12 note); r_diff and s_v relative 1e-8 |
 | v and dv/di with capacitance (step 6, general) | Kramers equation in Hermite functions centred at the shifted velocity v0 = 0.6 i (N = 120, |p| <= 60), its own matrix continued fraction; dv/di by the fourth-order five-point central difference (h = 1e-3); beta_c = 0 against the overdamped continued fraction; in the general test also rcsj_voltage(i, theta, 0) against mean_voltage | against N = 220, |p| <= 110 with the same stencil on the 13 tested points: v within 5e-5 of its tolerance, dv/di within 1.7e-7 relative at the smallest tested voltage (rounding in the shifted basis) and within 1e-12 elsewhere; against the analytic dv/di of the reference within about 3e-7 at that voltage (stencil truncation 2.6e-7 plus rounding) and 1e-9 elsewhere (version 12; before version 12: N = 150, |p| <= 72 and a central difference h = 1e-4, see the version 12 note) |
 
 ## Version 3 changes
@@ -282,9 +294,10 @@ Second conformance pass, driven by the findings of an independent verifier on ve
 of this pass the model, the reference algorithms (solution.py and solution/step_*.py, apart from the step 4
 docstring and one comment), the domain and every stated tolerance were unchanged. A second round, after an
 independent verification of the first round (see "Second round" at the end of this section), corrected the
-first-round step 4 endpoint entry, changed the step 4 kappa algorithm of the reference and stated the
-propagated step 4 theta tolerance; the model, the domain and every other tolerance are unchanged.
-edit_label stays grading_fix.
+first-round step 4 endpoint entry, changed the step 4 kappa algorithm of the reference, stated the
+propagated tolerances of the step 4 theta and the step 5 j_star (the error of mean_voltage carried through
+the inversion) and made the accuracy needed to locate the step 3 maximum visible; the model, the domain
+and every other tolerance are unchanged. edit_label stays grading_fix.
 
 - Second solution shared the test targets' method (second_solution.py; rule: a genuinely different method).
   - Finding: for steps 1 to 5 the second solution solved, by Thomas elimination, the same truncated Fourier
@@ -435,3 +448,147 @@ modes, every case alone in a fresh process, single-threaded BLAS (OMP_NUM_THREAD
 - SHIFT +-1e-12: every step case passes, and both general cases pass with every evaluated function shifted.
 - Controls: all-None and all-zero stubs pass 0 cases in every step and in general.
 - SUMMARY ALL OK.
+
+### Second round (version 12, after an independent verification of the first round)
+
+The verifier found two blocking defects in the first round, both about the error budget of step 4: an
+endpoint input that relied on an accuracy of mean_voltage that is not stated, and a theta tolerance that did
+not include the voltage error of step 1 amplified by kappa. Its evidence also noted that the step 5 j_star
+tolerance had no margin left for the same reason. The related steps were fixed together (guide section 8).
+This round was interrupted by a container restart after part of the step 4 work had been saved; it was
+then completed, every check below was rerun on the final files, and the numbers quoted are from that
+rerun. The earlier-reference perturbations below wrap the reference function of step 1 or 2 so that its
+output is multiplied by the stated factor, and run each case of the later step alone in a fresh process.
+
+- Step 4 case 2 endpoint inputs (tests/step_4.py case 2).
+  - Finding: case 2 passed the exact continued-fraction voltages at theta = 0.02 and 50 as the endpoint
+    inputs. The endpoint rule is defined with v_lo = mean_voltage(i, 0.02)[0] and
+    v_hi = mean_voltage(i, 50)[0], so these inputs are valid only if mean_voltage is within a relative
+    1e-11 of the exact voltage, but step 1 promises only 1e-9 (and case 3 accepts 1e-9).
+  - Cause: the first-round change of the endpoint rule (entry "Step 4 endpoint rule" above) was applied to
+    the probes of case 3 only.
+  - Change: case 2 builds its two endpoint inputs as case 3 does, v = mean_voltage(0.9, 0.02)[0] and
+    v = mean_voltage(0.7, 50)[0], each first checked against the continued fraction to the stated 1e-9,
+    and expects theta = 0.02 and 50 within the stated theta tolerance and kappa against the
+    extended-precision difference at the returned theta. This also tests the inclusive endpoints v = v_lo
+    and v = v_hi exactly.
+  - Regression test: the finding was reproduced on the first-round files (tests/step_4.py and
+    solution/step_4.py of the first round, mean_voltage multiplied by 1 +- 5e-10): case 2 raised
+    "ValueError: no theta in [0.02, 50] reproduces this voltage" for both signs. With the current files
+    every step 4 case passes with mean_voltage multiplied by 1 +- 5e-10, 1 +- 9.9e-10,
+    1 + 9.9e-10 sin(7 ln theta + 3 i) and 1 - 9.9e-10 cos(5 ln theta).
+- Step 4 theta error budget (problem.yaml step 4 prompt, function header and contract; steps/step_4.py;
+  solution/step_4.py, solution.py and the step 4 and whole-task mutants' docstring; tests/step_4.py cases
+  0 to 3).
+  - Finding: theta is defined through mean_voltage, whose relative error may reach 1e-9, but was graded to
+    a relative 1e-7. The theta error is kappa times the relative voltage error, and kappa reaches about
+    500 to 2500 at tested points (510 at i = 1.5, theta = 0.04; 2501 at i = 0.7, theta = 50) and 2.4e7
+    over the domain. With mean_voltage multiplied by 1 +- 5e-10 the first-round reference missed theta at
+    (1.5, 0.04) by a relative 2.55e-7 (step 4 case 1, AssertionError, reproduced here for both signs).
+  - Cause: the error of step 1 was not propagated through the inversion (guide section 5, "Account for
+    error propagation through the full calculation"; rule G).
+  - Change (option (b) of the verifier): the prompt, the header and the contract state that theta is
+    graded against the noise strength at which the exact stationary voltage equals v with a relative error
+    below 1e-7 + 2e-9 |kappa|, i.e. the 1e-9 of mean_voltage, doubled as for a comparison of two computed
+    outputs, times |kappa|; the tests take kappa from the extended-precision difference at the known
+    theta. Option (a), theta to 1e-7 from an exact voltage, was not taken: where kappa is about 2.4e7 it
+    would need the voltage to a relative 4e-15, at the limit of double precision. kappa is now compared
+    with the extended-precision difference at the returned theta (before: at the known theta), as the
+    prompt states, because with the propagated theta tolerance the two can differ by more than 1e-6 where
+    kappa is large. The prompt and the header also state the range of kappa over the domain (about 0.01
+    to about 2e7; 0.0102 to 2.42e7 on the grid under "Consistency checks"). This is an error-budget
+    correction, not a tuning: where kappa is small (the Arrhenius regime) the tolerance stays 1e-7.
+  - Regression test: as for the previous entry; the step 4 mutants still fail (kramers_inversion 3/5,
+    inverted_sensitivity 4/5, arrhenius_sensitivity 4/5).
+- Step 4 kappa of the reference where kappa is large (solution/step_4.py, solution.py, the three step 4
+  mutants and the whole-task mutant; tests/step_4.py case 1).
+  - Finding: while checking the step 4 budget, the reference kappa was found to deviate from the
+    extended-precision difference by up to 2.2e-5 relative (at i = 10, theta = 0.02, kappa 2.4e7) and by
+    5.3e-6 at i = 8, theta = 0.04 (kappa 2.4e6), beyond the stated 1e-6. No test exposed it: the largest
+    tested kappa was 2501.
+  - Cause: d ln v / d ln theta was obtained by differentiating exp(E / theta) under the integral, a
+    difference of two nearly equal terms when d ln v / d ln theta is tiny (far above the critical current
+    at weak noise).
+  - Change: the theta-derivative is taken with the shift scaled as y = theta u, which turns it into the
+    integral of the Boltzmann factor times F = cos x - cos(x - y) + y sin(x - y) = O(y**2) (evaluated
+    without cancellation, with the series of y cos(y/2) - 2 sin(y/2) for y < 1) plus a boundary term in
+    exp(-2 pi i / theta) (solution_explanation). Case 1 adds the point (8.0, 0.04), where
+    d ln v / d ln theta is about 4e-7. The step 4 and whole-task mutants were rebuilt from the new
+    reference; each still differs from it by its one marked change only (checked with diff).
+  - Regression test: the new reference kappa agrees with the extended-precision difference to 1.9e-11 on
+    the 14 x 10 grid and to 1.0e-11 at (8.0, 0.04); the first-round solution/step_4.py run on the current
+    tests fails case 1 at that point (kappa off by a relative 5.3e-6, tolerance 1e-6) and passes cases 0,
+    2, 3 and 4. The second solution (analytic theta-derivative of the Bessel series) passes case 1.
+- Step 5 j_star error budget (problem.yaml step 5 prompt, function header and contract; steps/step_5.py,
+  solution/step_5.py, solution.py and the step 5 and whole-task mutants' docstring; tests/step_5.py
+  cases 0 to 4).
+  - Finding: the relative voltage error of mean_voltage enters j_star divided by s = d ln V / d ln J, which
+    is at least 1 and tends to 1 in linear response, so at the 1e-9 allowed for mean_voltage the j_star
+    error alone could reach the whole 1e-9 tolerance, leaving nothing for the candidate's own root finding.
+    The first round recorded this without changing it.
+  - Cause: the same missing propagation as in step 4.
+  - Change: j_star is graded against the criterion current of the exact array voltage with the stated
+    relative tolerance 1e-9 + 2e-9 / s, s the logarithmic slope of the exact array voltage at j_star
+    (the 1e-9 of mean_voltage, doubled, divided by s); where the voltage rises steeply the tolerance stays
+    close to 1e-9, and it is at most 3e-9 in linear response. The tests check
+    |V(j) - v_crit| / V'(j) < (1e-9 + 2e-9 V / (j V')) j with V and V' from the continued fractions at the
+    returned j, and case 0 compares j_star with the Bessel-integral bias 0.8 with the same tolerance. The
+    prompt and the header now also say that r_diff and s_v are evaluated at the returned j_star, which is
+    what the tests always did. The r_diff and s_v tolerances (1e-8) are unchanged: they are sums of
+    positive terms r_k r_d,k and 2 c_k r_k D_k evaluated at the returned j_star, so the errors of
+    mean_voltage (1e-8 for r_d) and effective_diffusion (1e-9) pass through without amplification.
+  - Regression test: every step 5 case passes with mean_voltage v and r_d and effective_diffusion
+    multiplied by (1 +- 9.9e-10, 1 +- 9.9e-9, 1 +- 9.9e-10) with equal signs and with mixed signs, and by
+    i-dependent factors (1 + 9.9e-10 sin 9i, 1 - 9.9e-9 cos 4i, 1 + 9.9e-10 sin 3i); the step 5 mutant
+    still fails 4/6 cases.
+- Step 3 accuracy needed to locate the flat maximum (problem.yaml step 3 prompt, function header and
+  contract; steps/step_3.py, solution/step_3.py, solution.py and the step 3 and whole-task mutants'
+  docstring). edit kind: clarification.
+  - Finding: found while auditing the related budgets. The header defined i_peak as the bias "at which
+    effective_diffusion(i, theta) is largest" to an absolute 1e-6, but the tests grade it against the
+    maximum of the exact (continued-fraction) D_eff, and the 1e-9 guaranteed by effective_diffusion does not
+    determine the flat maximum to 1e-6: a relative error bounded by 1e-9 that varies with i can move it by
+    4.3e-6 at theta = 0.02 up to 1.2e-4 at theta = 1 (curvatures under "Consistency checks"). The needed
+    accuracy was stated only in step_background and difficulty_explanation.
+  - Cause: the requirement followed from the error budget but was not in the agent-visible text.
+  - Change: the prompt, the header and the contract define i_peak as the maximum of the exact D_eff, and
+    the prompt states that an error of D_eff at the 1e-9 level that varies with i can move the apparent
+    maximum by several 1e-6 at weak noise and by about 1e-4 at the strong-noise end of the range, so
+    D_eff or d ln(D_eff) / di must be evaluated far more accurately and smoothly in i; d_peak is stated at
+    the returned i_peak (as tested). No test changed.
+  - Regression test: the reference (which locates the peak from its own d ln D / di) passes every step 3
+    case with effective_diffusion multiplied by 1 +- 9.9e-10, 1 + 9.9e-10 sin 40i,
+    1 + 9.9e-10 sin(1e5 i) and 1 + 9.9e-10 sign(sin 3000i). A plausible candidate that maximises
+    effective_diffusion itself by golden-section search (written for this check, not part of the task)
+    passes every case with the unperturbed reference context but fails case 1 (theta = 0.3, i_peak off by
+    1.1e-5) with the factor 1 + 9.9e-10 sin(1e5 i), which is inside the stated 1e-9 of step 2.
+- Step 6 with a perturbed mean_voltage: every step 6 case passes with mean_voltage v and r_d multiplied by
+  (1 +- 9.9e-10, 1 +- 9.9e-9) (beta_c = 0 uses mean_voltage); no change.
+- Records (problem.yaml verification_explanation; source.md): the step 4 and step 5 budgets, the kappa
+  grid (recomputed: 1.9e-11, previous reference 2.2e-5; an interim record of this round had 4.8e-11 and
+  4.4e-5 on a grid whose points were not recorded), the 25 x 50 grid of d ln v / d ln i (minimum
+  1.000000000016; the interim record had 1.0000000000000016) and the perturbation runs are described as
+  run; the step 5 target-table row no longer mentions identical junctions (no test uses them) and the
+  "no margin" sentence on step 5 is replaced by the propagated tolerance.
+
+Rerun (version 12, second round, on the final files): tools/crown_check.py, all modes, every case alone in
+a fresh process, single-threaded BLAS (OMP_NUM_THREADS = OPENBLAS_NUM_THREADS = MKL_NUM_THREADS = 1), -j 2:
+- FORMAT OK (no problem reported; repeated after the last documentation edits, which changed no test or
+  solution file, again OK).
+- REF: step 1 5/5, step 2 5/5, step 3 4/4, step 4 5/5, step 5 6/6, step 6 4/4, general 2/2 (solution.py
+  also passes every step file).
+- SECOND: 5/5, 5/5, 4/4, 5/5, 6/6, 4/4, general 2/2.
+- Mutants: forward_slips_only fails 4/5 (cases 0-3), kramers_rate 4/5 (0-3), einstein_relation 3/5 (1-3),
+  einstein_peak 3/4 (0-2), kramers_inversion 3/5 (0-2), inverted_sensitivity 4/5 (0-3),
+  arrhenius_sensitivity 4/5 (0-3), squared_voltage_scale 4/6 (1-4), no_inertia 3/4 (0-2),
+  velocity_noise_not_scaled 3/4 (0-2), missing_thermal_velocity 3/4 (0-2), whole-task
+  velocity_noise_not_scaled 2/2 general cases.
+- SHIFT +-1e-12: every step case passes, and both general cases pass with every evaluated function shifted.
+- Controls: all-None and all-zero stubs pass 0 cases in every step and in general.
+- SUMMARY ALL OK.
+- Also run: the earlier-reference perturbations listed in the entries above (steps 3 to 6, every case
+  passes for the reference); solution.py and second_solution.py each run twice in clean processes on 13
+  calls covering all six functions (identical outputs in each pair), and solution.py agrees bitwise with
+  the concatenated solution/step_*.py; every function header in problem.yaml matches the scaffold, the
+  per-step solution, solution.py and the mutants that define that function, and problem_io matches the
+  step 6 header.

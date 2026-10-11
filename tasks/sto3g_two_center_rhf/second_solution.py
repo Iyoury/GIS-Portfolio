@@ -261,8 +261,9 @@ def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
     # Other methods: the dissociation limit from one-centre integrals in momentum space (_k_atom),
     # V(R) sampled on Chebyshev nodes in ln R and interpolated up to the distance
     # where the cross integrals have died out, the exact Coulomb tail of the separated fragments
-    # beyond it, and the radial equation by the sinc DVR on uniform grids whose length is doubled and
-    # whose step is refined until the five levels stop changing (no shooting, no fixed outer wall).
+    # beyond it, and the radial equation by the sinc DVR on uniform grids whose length is doubled (up to
+    # 1000 bohr) and whose step is refined until the levels below the limit and their number stop changing
+    # (no shooting, no node counting); fewer than five eigenvalues below the limit raise ValueError.
     for z in (ZA, ZB):
         if not (np.isfinite(z) and 1.0 <= z <= 2.0):
             raise ValueError("nuclear charges must be finite and between 1 and 2")
@@ -305,36 +306,54 @@ def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
     kmax = np.sqrt(2.0 * mu * max(-v_min, 1e-4))
 
     def dvr(h, length):
-        # Colbert-Miller sinc DVR on R = r_lo + k h, k = 1 .. n (chi = 0 at r_lo and at r_lo + (n + 1) h)
-        n = int(length / h)
+        # Colbert-Miller sinc DVR on R = r_lo + k h, k = 1 .. n (chi = 0 at r_lo and at r_lo + (n + 1) h), with at
+        # least 40 points so that the five lowest eigenvalues always exist
+        n = max(int(length / h), 40)
         k = np.arange(1, n + 1)
         d = k[:, None] - k[None, :]
         T = np.where(d == 0, np.pi ** 2 / 3.0, 2.0 * (-1.0) ** d / np.where(d == 0, 1, d) ** 2) / (2.0 * mu * h * h)
         E = np.linalg.eigvalsh(T + np.diag(V(r_lo + k * h)))
         return E[:5]
 
-    def converged_in_length(h):
-        length = r_c - r_lo
-        cur = dvr(h, length)
-        while True:
+    def below_zero(h, length):
+        E = dvr(h, length)
+        return E[E < 0.0]
+
+    def bound_levels(h, length):
+        # the eigenvalues below 0 among the five lowest, with the box doubled until five of them have converged
+        # to 1e-4 cm^-1, and at most to l_max bohr. The Dirichlet walls only raise the eigenvalues, which fall
+        # towards the true levels as the box grows: an eigenvalue below 0 marks a bound level, and a level that
+        # is still missing in a box of 500-1000 bohr would be bound by less than about 1e-3 cm^-1 (its wave
+        # function reaching beyond the box). Without five bound levels the box grows to l_max and stops there.
+        cur = below_zero(h, length)
+        while 2.0 * length <= l_max:
             length *= 2.0
-            nxt = dvr(h, length)
-            if np.max(np.abs(nxt - cur)) * 219474.6313632 < 1e-4:
+            nxt = below_zero(h, length)
+            if nxt.size == 5 and cur.size == 5 and np.max(np.abs(nxt - cur)) * 219474.6313632 < 1e-4:
                 return nxt, length
             cur = nxt
+        return cur, length
 
+    l_max = 1000.0
     h = 0.6 * np.pi / kmax
-    cur, length = converged_in_length(h)
-    while True:
+    cur, length = bound_levels(h, r_c - r_lo)
+    for _ in range(40):
+        # refine the step until the number of levels below 0 and, with five of them, their values no longer
+        # change; with fewer than five levels the longest box is kept (only their number matters), otherwise
+        # the length is converged again at the new step
         h *= 0.8
-        nxt, length = converged_in_length(h)
-        if np.max(np.abs(nxt - cur)) * 219474.6313632 < 1e-4:
+        if cur.size < 5:
+            nxt = below_zero(h, length)
+        else:
+            nxt, length = bound_levels(h, r_c - r_lo)
+        if nxt.size == cur.size and (nxt.size < 5 or np.max(np.abs(nxt - cur)) * 219474.6313632 < 1e-4):
             break
         cur = nxt
-    bound = nxt[nxt < 0.0]
-    if bound.size < 5:
+    else:
+        raise RuntimeError("the sinc DVR did not converge in the grid step")
+    if nxt.size < 5:
         raise ValueError("fewer than five vibrational levels lie below the dissociation limit")
-    levels = bound[:5] * 219474.6313632
+    levels = nxt * 219474.6313632
     return levels
 
 
@@ -473,56 +492,103 @@ def _q_integrals(ZA, ZB, zA, zB, aA, aB, R):
     return S, H, G
 
 
+def _q_scf(S, H, G, X, c):
+    # Roothaan-Hall self-consistent field for the closed shell with the occupied orbital c (AO coefficients,
+    # c^T S c = 1): F = H + 2 J - K with J, K built from D = c c^T, the virtual space raised by a level shift
+    # of 1 hartree, F' C = S C eps solved in the canonically orthogonalized basis X, and the lowest orbital of
+    # the shifted F' occupied. The shift makes each iteration a damped step downhill, so the iteration
+    # settles on a local minimum of the energy near the guess (not on a saddle point) and can keep a
+    # non-aufbau orbital occupied. No DIIS: on stretched molecules with nearly degenerate orbitals the
+    # extrapolation was found to stall away from the minimum. Converged when the commutator
+    # F D S - S D F (orthonormal basis) is below 1e-11.
+    for _ in range(20000):
+        D = np.outer(c, c)
+        F = H + 2.0 * np.einsum("mnls,ls->mn", G, D) - np.einsum("mlns,ls->mn", G, D)
+        Sc = S @ c
+        Fc = F @ c
+        if np.max(np.abs(X.T @ (np.outer(Fc, Sc) - np.outer(Sc, Fc)) @ X)) < 1e-11:
+            return c, True
+        eps, Cp = np.linalg.eigh(X.T @ (F + 1.0 * (S - np.outer(Sc, Sc))) @ X)
+        c = X @ Cp[:, 0]
+        c = c * np.sign(c @ Sc)
+    return c, False
+
+
+def _q_direct_ci(h, g, start):
+    # Direct CI for the singlet: the spatial wave function sum_ij Y_ij chi_i(1) chi_j(2) with Y symmetric
+    # (exchange symmetry of the singlet), H acting as sigma(Y) = h Y + Y h + sum_kl (ik|jl) Y_kl in
+    # orthonormal orbitals; no Hamiltonian matrix is formed. Davidson iteration for the lowest root with the
+    # diagonal preconditioner h_ii + h_jj + (ii|jj), started from the RHF determinant and four random
+    # symmetric vectors (fixed seed; they have components in every symmetry block), until the residual norm
+    # is below 1e-10 (or the subspace spans all n (n + 1) / 2 symmetric Y, where the result is exact).
+    n = h.shape[0]
+
+    def sigma(Y):
+        return h @ Y + Y @ h + np.einsum("ikjl,kl->ij", g, Y)
+
+    diag = h.diagonal()[:, None] + h.diagonal()[None, :] + np.einsum("iijj->ij", g)
+    rng = np.random.default_rng(31)
+    vecs, sig = [], []
+    for Y in [start] + [A + A.T for A in rng.normal(size=(4, n, n))]:
+        for Vk in vecs:
+            Y = Y - np.sum(Vk * Y) * Vk
+        vecs.append(Y / np.linalg.norm(Y))
+        sig.append(sigma(vecs[-1]))
+    while True:
+        m = len(vecs)
+        Hs = np.array([[np.sum(a * b) for b in sig] for a in vecs])
+        th, sv = np.linalg.eigh(0.5 * (Hs + Hs.T))
+        Y = sum(a * Vk for a, Vk in zip(sv[:, 0], vecs))
+        Rv = sum(a * Wk for a, Wk in zip(sv[:, 0], sig)) - th[0] * Y
+        if np.linalg.norm(Rv) < 1e-10 or m >= n * (n + 1) // 2:
+            return float(th[0])
+        den = th[0] - diag
+        T = Rv / np.where(np.abs(den) < 1e-4, np.where(den < 0.0, -1e-4, 1e-4), den)
+        T = 0.5 * (T + T.T)
+        for _ in range(2):
+            for Vk in vecs:
+                T = T - np.sum(Vk * T) * Vk
+        if np.linalg.norm(T) < 1e-14:
+            return float(th[0])
+        vecs.append(T / np.linalg.norm(T))
+        sig.append(sigma(vecs[-1]))
+
+
 def polarized_energies(ZA, ZB, zetaA, zetaB, alphaA, alphaB, R):
     '''Full-CI and RHF energies of a two-electron diatomic in the STO-3G 1s + p-shell basis.'''
-    # Other routes: RHF by steepest descent along great circles with an exact line search from many
-    # starting orbitals; full CI in the whole 64-dimensional product space of the RHF orbitals with a
-    # spin penalty on the spatially antisymmetric (triplet) states.
+    # Other routes. RHF: level-shifted Roothaan-Hall SCF (_q_scf) from 64 fixed guess orbitals,
+    # every normalized basis function and every normalized sum and difference of two basis functions (no
+    # random starts, no core-Hamiltonian guess), the lowest converged energy kept. Full CI: direct CI with
+    # Davidson iteration (_q_direct_ci) in the canonical RHF orbitals (eigenvectors of the converged Fock
+    # matrix), restricted to symmetric coefficient matrices (singlets).
     S, H, G = _q_integrals(ZA, ZB, zetaA, zetaB, alphaA, alphaB, R)
     n = S.shape[0]
-    w, U = np.linalg.eigh(S)
-    X = U @ np.diag(w ** -0.5) @ U.T
-    h = X.T @ H @ X
-    g = np.einsum("pi,qj,rk,sl,pqrs->ijkl", X, X, X, X, G)
-
-    def energy(x):
-        return float(2.0 * (x @ h @ x) + np.einsum("i,j,k,l,ijkl->", x, x, x, x, g))
-
-    def grad(x):
-        r = 4.0 * (h + np.einsum("k,l,ijkl->ij", x, x, g)) @ x
-        return r - (r @ x) * x
-
-    rng = np.random.default_rng(77)
-    best, best_x = np.inf, None
-    for x in list(np.linalg.eigh(h)[1].T) + list(rng.normal(size=(40, n))):
-        x = x / np.linalg.norm(x)
-        for _ in range(3000):
-            d = -grad(x)
-            nd = np.linalg.norm(d)
-            if nd < 1e-10:
-                break
-            d /= nd
-            # great circle x cos(s) + d sin(s); exact line search with Brent's method
-            res = minimize_scalar(lambda s_: energy(np.cos(s_) * x + np.sin(s_) * d), bounds=(0.0, 0.5),
-                                  method="bounded", options={"xatol": 1e-14})
-            y = np.cos(res.x) * x + np.sin(res.x) * d
-            if energy(y) >= energy(x):
-                break
-            x = y / np.linalg.norm(y)
-        if energy(x) < best:
-            best, best_x = energy(x), x
+    s_val, U = np.linalg.eigh(S)
+    X = U / np.sqrt(s_val)                          # canonical orthogonalization, X^T S X = 1
+    guesses = []
+    for mu in range(n):
+        for nu in range(mu, n):
+            for sgn in ((1.0,) if nu == mu else (1.0, -1.0)):
+                c = np.zeros(n)
+                c[mu] += 1.0
+                c[nu] += sgn
+                guesses.append(c / np.sqrt(c @ S @ c))
+    best, best_c = np.inf, None
+    for c0 in guesses:
+        c, ok = _q_scf(S, H, G, X, c0)
+        if ok:
+            e = float(2.0 * (c @ H @ c) + np.einsum("i,j,k,l,ijkl->", c, c, c, c, G))
+            if e < best:
+                best, best_c = e, c
+    if best_c is None:
+        raise RuntimeError("no self-consistent field run converged")
     E_rhf = best + ZA * ZB / R
-    # full CI: orthonormal orbitals = the RHF orbital and an orthonormal complement (QR), product
-    # functions chi_i(1) chi_j(2) with <ij|H|kl> = h_ik d_jl + d_ik h_jl + (ik|jl), and the penalty
-    # lambda (1 - P12) / 2 (P12 exchanges the electrons, lambda = 20 hartree) that lifts every triplet
-    # above the singlets, so the lowest eigenvalue is the lowest singlet
-    Q = np.linalg.qr(np.column_stack([best_x, np.eye(n)]))[0][:, :n]
-    hm = Q.T @ h @ Q
-    gm = np.einsum("pi,qj,rk,sl,pqrs->ijkl", Q, Q, Q, Q, g)
-    I = np.eye(n)
-    Hp = (np.einsum("ik,jl->ijkl", hm, I) + np.einsum("ik,jl->ijkl", I, hm)
-          + np.einsum("ikjl->ijkl", gm)).reshape(n * n, n * n)
-    P12 = np.einsum("il,jk->ijkl", I, I).reshape(n * n, n * n)
-    E_fci = float(np.linalg.eigvalsh(Hp + 10.0 * (np.eye(n * n) - P12))[0]) + ZA * ZB / R
+    D = np.outer(best_c, best_c)
+    F = H + 2.0 * np.einsum("mnls,ls->mn", G, D) - np.einsum("mlns,ls->mn", G, D)
+    C = X @ np.linalg.eigh(X.T @ F @ X)[1]          # canonical RHF orbitals, C^T S C = 1
+    occ = int(np.argmax(np.abs(C.T @ (S @ best_c))))
+    h = C.T @ H @ C
+    g = np.einsum("pi,qj,rk,sl,pqrs->ijkl", C, C, C, C, G)
+    E_fci = _q_direct_ci(h, g, np.outer(np.eye(n)[occ], np.eye(n)[occ])) + ZA * ZB / R
     result = (float(E_fci), float(E_rhf))
     return result

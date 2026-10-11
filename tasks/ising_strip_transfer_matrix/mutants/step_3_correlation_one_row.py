@@ -24,8 +24,9 @@ def strip_magnetization(L, T):
     near = M[np.ix_(rep, rep)]
     far = M[np.ix_(rep, partner[rep])]
     # G(r) = sum_k <0|s_0|k>^2 (lam_k / lam_0)^r; the slowest term comes from the top odd state.
-    # Below Tc that state is degenerate with the top even state to machine precision, so the two
-    # are taken from the separate sector blocks rather than from one eigensolver call.
+    # Below Tc that state is nearly degenerate with the top even state (the gap closes exponentially
+    # with L; far below Tc at the larger widths it is at machine precision), so the two are taken
+    # from the separate sector blocks rather than from one eigensolver call.
     w_even, v_even = np.linalg.eigh(near + far)
     w_odd, v_odd = np.linalg.eigh(near - far)
     s0 = 1 - 2 * (rep & 1)                  # s_0 sends (|a> + |flip a>)/sqrt2 to s_0(a) (|a> - |flip a>)/sqrt2

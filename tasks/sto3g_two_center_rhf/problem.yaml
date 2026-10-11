@@ -409,9 +409,7 @@ sub_steps:
       about a hundred bohr, and further the closer it lies to the limit).
       Errors: raise ValueError if a charge is not finite or not in [1, 2], if a mass is not
       finite or not in [1, 10] u, or if fewer than five vibrational levels lie below E_inf
-      (for example when the only well lies above the dissociation limit). (With a charge
-      above 2 the separated fragments in this basis repel each other and no curve holds five
-      bound levels, so the step is limited to 1 <= Z <= 2.)
+      (for example when the only well lies above the dissociation limit).
     function_header: |-
       def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
           '''Lowest five vibrational levels (J = 0) on the full-CI potential curve, from the dissociation limit.

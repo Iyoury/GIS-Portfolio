@@ -356,7 +356,9 @@ def monitor_flux(lam, branching, sigma, capture_to, n0, t_irr, t_cool, k, activi
       ValueError for nuclide data as in step 3, for times, k, activity or flux bounds outside these
       ranges (NaN and infinite values included), if A(flux_lo) < lam[k] * max(1e-250 * sum(n0), 1e-300)
       (at flux_lo the measured nuclide must hold at least 1e-250 of the initial atoms and at least 1e-300
-      atoms), or if activity lies outside [A(flux_lo), A(flux_hi)] by more than a relative 1e-9.
+      atoms; for x[k](flux_lo) within a relative 1e-10 of this bound, the accuracy of step 3,
+      ValueError and a result are both correct), or if activity lies outside [A(flux_lo), A(flux_hi)]
+      by more than a relative 1e-9.
       An activity with |ln(activity / A(end))| <= 1e-9 for an end of the interval, on either side of
       it, gives that end (flux_lo is checked first); the end is returned as the given bound itself, equal
       to it to a relative 1e-11. A is known to a relative 1e-10 (the accuracy of step 3), so the

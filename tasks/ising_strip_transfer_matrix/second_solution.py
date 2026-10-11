@@ -104,7 +104,8 @@ def strip_magnetization(L, T):
            Absolute accuracy 1e-9.
     '''
     # Top two eigenvectors of the whole matrix, then rotated inside their two-dimensional span into
-    # states of definite spin-flip parity (below Tc the pair is degenerate to machine precision).
+    # states of definite spin-flip parity (below Tc the pair is nearly degenerate, to machine
+    # precision far below Tc at the larger widths, so the solver may return any mixture of the two).
     M = transfer_matrix(L, T)
     n = 2 ** L
     w, v = np.linalg.eigh(M)

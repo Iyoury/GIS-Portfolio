@@ -73,14 +73,22 @@ verification_explanation: >-
   1e-6; the endpoint rule is defined with the voltages of mean_voltage at theta = 0.02 and 50, so the
   endpoint inputs (v_lo and v_hi themselves and the probes 0.9e-11 and 1.1e-11 beyond them) are built from
   mean_voltage, which each case first checks against the continued fraction to its stated 1e-9. The
-  reference kappa agrees with the extended-precision difference to 5e-11 relative on a 14 x 10 grid of
-  (i, theta) over the domain (kappa from 0.01 to 2.4e7), and step 4 test case 1 includes a point with kappa
-  about 2.4e6. Steps 3 to 6 were also run case by case with the earlier reference functions they call
-  perturbed to just inside their stated accuracy (mean_voltage v by +-9.9e-10 and r_d by +-9.9e-9,
-  effective_diffusion by +-9.9e-10; for step 4 also v by +-5e-10): every case passes. For step 5 the
-  relative voltage error enters j_star divided by d ln V / d ln J, which is at least 1 (checked on a grid;
-  it tends to 1 in linear response), so the 1e-9 of mean_voltage uses up the 1e-9 j_star tolerance there
-  with no margin; this is recorded in source.md. For the RCSJ step the target is a Hermite expansion centred at the shifted
+  reference kappa agrees with the extended-precision difference to 1.9e-11 relative on a geometric 14 x 10
+  grid of (i, theta) over the domain (kappa from 0.0102 to 2.42e7), and step 4 test case 1 includes a point
+  with kappa about 2.4e6. Step 5 grades j_star in the same way, against the criterion current of the
+  continued-fraction array voltage with the stated propagated tolerance 1e-9 + 2e-9 / s, s = d ln V / d ln J
+  (a relative voltage error enters j_star divided by s, which is at least 1 on a 25 x 50 grid of the
+  domain and tends to 1 in linear response), and r_diff and s_v at the returned j_star to 1e-8. Step 3
+  grades i_peak against the maximum of the continued-fraction D_eff; its prompt states that the flat
+  maximum cannot be located to 1e-6 from the 1e-9 guaranteed by effective_diffusion alone (a relative error
+  of 1e-9 that varies with i can move it by 4e-6 to 1.2e-4), and the reference locates it from its own
+  d ln D / di. Steps 3 to 6 were also run case by case with the earlier reference functions they call
+  multiplied by factors inside their stated accuracy (step 3: effective_diffusion by 1 +- 9.9e-10 and by
+  smooth, rapidly oscillating and discontinuous i-dependent factors up to 1 +- 9.9e-10; step 4:
+  mean_voltage v by 1 +- 5e-10, 1 +- 9.9e-10 and two theta-dependent factors up to 1 +- 9.9e-10; step 5:
+  v by 1 +- 9.9e-10, r_d by 1 +- 9.9e-9 and effective_diffusion by 1 +- 9.9e-10 with equal and mixed
+  signs and as i-dependent factors; step 6: v by 1 +- 9.9e-10 together with r_d by 1 +- 9.9e-9): every
+  case passes for the reference. For the RCSJ step the target is a Hermite expansion centred at the shifted
   velocity 0.6 i with its own truncation (120 Hermite terms, |p| <= 60) and dv/di from a fourth-order
   five-point central difference (h = 1e-3); against 220 terms, |p| <= 110 its v is within 5e-5 of the v
   tolerance and its dv/di within 1e-12 relative except at the smallest tested voltage, where the stencil
@@ -303,15 +311,20 @@ sub_steps:
     solution: solution/step_3.py
     tests: tests/step_3.py
     step_description_prompt: |-
-      At fixed noise strength the effective diffusion coefficient D_eff(i, theta) of step 2 (use
-      effective_diffusion), as a function of the bias i > 0, has a single maximum (giant
-      diffusion near the critical current); for 0.02 <= theta <= 1 it lies in 0.5 < i < 3.
-      Find it.
+      At fixed noise strength the exact effective diffusion coefficient D_eff(i, theta) of
+      step 2 (use effective_diffusion), as a function of the bias i > 0, has a single maximum
+      (giant diffusion near the critical current); for 0.02 <= theta <= 1 it lies in
+      0.5 < i < 3. Find it.
 
       Input: theta (float, 0.02 <= theta <= 1). Return the tuple (i_peak, d_peak) of two
-      Python floats: i_peak is the bias of the maximum of D_eff with an absolute error below
-      1e-6, and d_peak = D_eff(i_peak, theta) / theta, the enhancement over free diffusion,
-      with a relative error below 1e-9.
+      Python floats: i_peak is the bias of the maximum of the exact D_eff with an absolute
+      error below 1e-6, and d_peak = D_eff(i_peak, theta) / theta at the returned i_peak, the
+      enhancement over free diffusion, with a relative error below 1e-9.
+      The maximum is flat, and the flatter the stronger the noise: an error of D_eff at the
+      1e-9 relative level guaranteed by effective_diffusion that varies with i can move the
+      apparent maximum by several 1e-6 at weak noise and by about 1e-4 at the strong-noise end
+      of the range, so i_peak has to be located with D_eff, or d ln(D_eff) / di, evaluated far
+      more accurately than that and smoothly in i.
       Errors: raise ValueError if theta is not finite or is outside [0.02, 1].
     function_header: |-
       def diffusion_peak(theta):
@@ -322,9 +335,12 @@ sub_steps:
 
           Output:
             (i_peak, d_peak): tuple of two Python floats.
-              i_peak: the bias i > 0 at which effective_diffusion(i, theta) is largest
-                      (absolute error below 1e-6).
-              d_peak: D_eff(i_peak, theta) / theta (relative error below 1e-9).
+              i_peak: the bias i > 0 at which the exact D_eff(i, theta) is largest, absolute
+                      error below 1e-6 (the maximum is flat: this needs D_eff, or
+                      d ln(D_eff) / di, far more accurately than the 1e-9 guaranteed by
+                      effective_diffusion).
+              d_peak: D_eff(i_peak, theta) / theta at the returned i_peak (relative error below
+                      1e-9).
 
           Raises:
             ValueError if theta is not finite or is outside [0.02, 1].
@@ -340,7 +356,7 @@ sub_steps:
     n_test_cases: 4
     contract:
       quantity: "Bias current of maximal phase diffusion and the diffusion enhancement there."
-      assumptions: "Same model as steps 1 and 2."
+      assumptions: "Same model as steps 1 and 2; i_peak is the maximum of the exact D_eff (absolute tolerance 1e-6), which needs D_eff or d ln(D_eff) / di far more accurately than the 1e-9 guaranteed by effective_diffusion because the maximum is flat; d_peak is D_eff / theta at the returned i_peak (relative tolerance 1e-9)."
       result_kind: exact
       valid_input_ranges: "0.02 <= theta <= 1."
       units: "i_peak in units of I_c; d_peak dimensionless."
@@ -457,10 +473,13 @@ sub_steps:
 
       Return the tuple (j_star, r_diff, s_v) of three Python floats:
         j_star: the bias J (units of I_0) at which the mean array voltage equals v_crit (units
-                of I_0 R_0), relative error below 1e-9;
-        r_diff: the differential resistance dV/dJ of the array at j_star (units of R_0),
-                relative error below 1e-8;
-        s_v: the zero-frequency voltage noise of the array at j_star, defined as
+                of I_0 R_0). It is graded against the bias at which the exact array voltage
+                equals v_crit, with a relative error below 1e-9 + 2e-9 / s, where
+                s = d ln(V) / d ln(J) of the exact array voltage at j_star: the relative error
+                of mean_voltage (below 1e-9) enters j_star divided by s;
+        r_diff: the differential resistance dV/dJ of the array at the returned j_star (units
+                of R_0), relative error below 1e-8;
+        s_v: the zero-frequency voltage noise of the array at the returned j_star, defined as
              lim_{t -> inf} Var(int_0^t V(t') dt') / t (the two-sided spectral density of the
              voltage at zero frequency), in units of (hbar / 2e) I_0 R_0, relative error below 1e-8.
       Use mean_voltage (step 1) and effective_diffusion (step 2). The mean array voltage rises
@@ -492,7 +511,10 @@ sub_steps:
               r_diff: differential resistance dV/dJ of the array at j_star (units of R_0).
               s_v: lim_{t->inf} Var(int_0^t V dt') / t at j_star, the zero-frequency (two-sided)
                    voltage noise, in units of (hbar / 2e) I_0 R_0.
-              Relative errors below 1e-9 (j_star) and 1e-8 (r_diff, s_v).
+              j_star is graded against the bias at which the exact array voltage equals v_crit,
+              relative error below 1e-9 + 2e-9 / s with s = d ln(V) / d ln(J) of the exact array
+              voltage at j_star (the relative error of mean_voltage, below 1e-9, enters j_star
+              divided by s); r_diff and s_v, at the returned j_star, relative errors below 1e-8.
 
           Raises:
             ValueError if ics and rs are not 1-D arrays of the same nonzero length, if an entry
@@ -511,7 +533,7 @@ sub_steps:
     n_test_cases: 6
     contract:
       quantity: "Voltage-criterion current, differential resistance and zero-frequency voltage noise of a series array of noisy overdamped Josephson junctions."
-      assumptions: "Independent junctions with independent Johnson noise at a common temperature; each junction obeys the model of steps 1-2."
+      assumptions: "Independent junctions with independent Johnson noise at a common temperature; each junction obeys the model of steps 1-2. j_star is graded against the exact criterion current with the relative tolerance 1e-9 + 2e-9 / s, s = d ln(V) / d ln(J) of the exact array voltage (the 1e-9 accuracy of mean_voltage divided by s); r_diff and s_v at the returned j_star, relative tolerance 1e-8."
       result_kind: exact
       valid_input_ranges: "Positive c_k with max/min <= 5, positive r_k, theta0 / c_k in [0.02, 50], 0 < v_crit <= 0.5 sum(c_k r_k)."
       units: "j_star in units of I_0, r_diff in units of R_0, s_v in units of (hbar / 2e) I_0 R_0."

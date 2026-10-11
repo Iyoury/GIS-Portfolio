@@ -22,12 +22,18 @@ affiliation: "Independent Researcher"
 
 difficulty_explanation: >-
   The strip steps fail with the first route a practitioner usually takes: the energy correlation
-  length is set by the second state of the spin-flip-even sector, whereas the second and third
-  eigenvalues of the whole matrix belong to the odd sector above Tc; below Tc the two leading states
-  are degenerate to machine precision, so the strip magnetization needs states of definite parity and
-  the zero-field susceptibility cannot come from a finite difference in h. The Yang-Lee edge needs a
+  length is set by the second state of the spin-flip-even sector, whereas the second eigenvalue of
+  the whole matrix is the top odd state at every temperature, and the third is the second even state
+  only below a width-dependent crossover temperature (2.05 at L = 3, 2.33 at L = 4, 2.41 to 2.43 for
+  L = 5 to 10, so at Tc and just above it for L >= 4) and an odd state above it. Below Tc the two
+  leading states are nearly degenerate, with a gap that closes exponentially with the width and
+  reaches the level of machine precision far below Tc at the larger widths (about 1e-14 relative or
+  less for T <= 0.6 at L = 10), so the strip magnetization needs states of definite parity and the
+  zero-field susceptibility cannot come from a finite difference in h. The Yang-Lee edge needs a
   non-Hermitian eigensolver on a complex symmetric matrix, a bracket that reaches edges down to about
-  5e-5 below Tc, and tracking of the leading pair only, since lower pairs leave the real axis first.
+  5e-5 below Tc, and tracking of the leading pair only, since at many points of the range, most of
+  them at or above Tc on the wider strips, a lower pair of eigenvalues leaves the real axis before
+  the leading pair meets.
   Step 6 combines four earlier functions into finite-size exponent and central-charge estimates at the
   exact Tc. The last step asks for f, m, chi = dm/dh and c = -T d2f/dT2 of the infinite lattice down
   to h = 0.005 near Tc, where no diagonalizable strip is close to the bulk limit, so an
@@ -246,7 +252,7 @@ sub_steps:
       step_dependencies: [1]
     mutants:
       - name: third_eigenvalue
-        description: "The reference with xi_energy taken from the third-largest eigenvalue of the whole matrix (both flip sectors pooled) instead of the second state of the even sector; above Tc that eigenvalue belongs to the odd sector."
+        description: "The reference with xi_energy taken from the third-largest eigenvalue of the whole matrix (both flip sectors pooled) instead of the second state of the even sector; that eigenvalue is an odd state above a width-dependent crossover temperature (2.05 at L = 3, 2.33 at L = 4, 2.41 to 2.43 for L = 5 to 10) and the second even state below it, so the mutant is wrong well above Tc but right at Tc and just above it for L >= 4."
         file: mutants/step_2_third_eigenvalue.py
 
   - step_number: 3
@@ -330,7 +336,7 @@ sub_steps:
     n_test_cases: 6
     contract:
       quantity: "Zero-field susceptibility per spin, -d2f/dh2 at h = 0, of an infinitely long periodic strip."
-      assumptions: "Field coupled as - h sum s_i. Below Tc the curvature of f(h) is confined to |h| of the order of the tiny gap between the two top eigenvalues, so the value must not depend on a finite step in h."
+      assumptions: "Field coupled as - h sum s_i. Below Tc the gap between the two top eigenvalues closes exponentially with L (1.4e-8 relative at L = 10, T = 1) and the curvature of f(h) is confined to |h| of the order of that gap, so the value must not depend on a finite step in h."
       result_kind: exact
       valid_input_ranges: "Integer L from 3 to 10; 1 <= T <= 10."
       units: "1/J."

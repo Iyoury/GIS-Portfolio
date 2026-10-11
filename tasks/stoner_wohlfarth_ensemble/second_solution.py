@@ -245,7 +245,8 @@ def switching_field_statistics(psi, a, f0, rate):
     # Other method: u = (f0 / rate) I(H_s), with I(h) = int_h^h_sw Gamma / f0, is an exponential
     # random variable with mean 1 (P = exp(-u)). With s = ln u the switching field is a monotone
     # function h(s), the field where (f0 / rate) I = e^s; its median is h(ln ln 2) and its mean
-    # int h(s) exp(s - e^s) ds (a Gumbel weight), plus the atom exp(-u_max) at -h_sw. One DOP853 run for
+    # int h(s) exp(s - e^s) ds (a Gumbel weight), plus the atom exp(-u_end) at -h_sw (u_end = (f0 / rate)
+    # I(-h_sw) when the run below reaches -h_sw). One DOP853 run for
     # I(h) (dense output, purely relative accuracy down to (f0 / rate) I ~ 1e-30) gives h(s) by
     # bisection on the dense output, all quadrature nodes at once. The s-integral runs from s = -40
     # (the weight below is e^-40) to ln u_end and is taken by tanh-sinh quadrature, its step halved until

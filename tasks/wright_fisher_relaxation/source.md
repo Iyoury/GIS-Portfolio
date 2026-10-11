@@ -579,3 +579,33 @@ crown_check results:
 - shift: every step output scaled by 1 + 1e-12 and by 1 - 1e-12, and the whole-task tests with every evaluated
   function so scaled: every case passes.
 - controls: all-None and all-zero stubs pass no case of any step or of the general tests.
+
+Re-verification of items 9 and 10 (second check of the two blocking findings, no change to code, tests or
+problem.yaml):
+- Item 9 confirmed against the pass-1 files (git history): the pass-1 solution/step_7.py accepts 0 < v < 1e-12 and,
+  at N = 400, s = -0.5, u = 0.1, returns mode[0] = 3.27e-176, 3.27e-177, 3.27e-264 and 3.27e-314 for v = 1e-12,
+  1e-13, 1e-100 and 1e-150, and at v = 1e-200 and 1e-300 mode[0] = -0, mode[1] = +8.164e-167, mode[400] = -0.90895
+  (every sign wrong). The current reference raises ValueError there; with its validation line disabled it returns
+  the same lambda_min (relative difference 0) and mode[1] = -8.164e-167, mode[400] = +0.90895 at all six v (signs set
+  by position). Scan of the second solution at N = 400, 11 values of s in [-0.5, 0.5], u, v in
+  {0, 1e-12, 1e-6, 1e-3, 0.1} (275 inputs): lambda_min from 1.357e-225 (s = -0.5, u = v = 0.1) to 9.603e-173
+  (s = 0, u = v = 0), largest span 175.49 decades and smallest entry off the absorbing states 3.27e-176 (both at
+  s = -0.5, u = 0.1, v = 1e-12); every mode with max |entry| = 1, + on the first transient state, strictly
+  alternating signs, |entry| <= 1e-250 on the absorbing states. The step-7 statements stay true.
+- Item 10 confirmed against the pass-1 problem.yaml (the step-5 prompt, function_header and contract named
+  N = 400, s = -0.5, u = 0.1, v = 1e-12). No copy of the visible text names it now (search of problem.yaml, steps/,
+  solution/, solution.py, second_solution.py, mutants/). Spot checks of the stated bounds, each with the other three
+  parameters at the extreme corner: t_up = 1.66e295 at N = 369, 9.94e295 at s = -0.4599, 7.78e294 at u = 0.0599 and
+  2.67e298 at v = 3.01e-3 (second solution; the reference agrees to 4e-13 at these four inputs), and 4.4e300 at
+  N = 376, 3.5e300 at s = -0.468, 1.0e300 at u = 0.068, 1.35e300 at v = 2.5e-3 (second solution), as in item 10.
+  400 new random inputs with N in [340, 400], s in [-0.5, -0.42], u in [0.05, 0.1], v log-uniform in
+  [1e-12, 10^-1.5] (seed 20261011): the 326 outside the stated box have t_up at most 1.1e283, and no t_down exceeds
+  2.2e8.
+- AST comparison of the docstrings: 31 files, 49 docstrings of the seven step functions, no mismatch with the
+  function_header docstrings; problem_io equals the step-7 header.
+- fastest_mode of solution.py and second_solution.py on six inputs (N = 1 to 400, absorbing and non-absorbing):
+  bit-identical outputs in three clean processes (one BLAS thread twice, two threads once).
+- tools/crown_check.py, all modes, every case alone in a fresh process (-j 2, one BLAS thread): SUMMARY ALL OK,
+  FORMAT OK, with exactly the results listed above (ref, solution.py on every step file, second, the failing-case
+  lists of every mutant, shift with every step output and every evaluated function in the whole-task tests scaled
+  by 1 +- 1e-12, and the all-None and all-zero controls passing no case).

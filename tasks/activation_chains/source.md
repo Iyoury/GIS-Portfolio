@@ -455,7 +455,8 @@ pass (last item before the rerun). edit_label stays grading_fix.
   - Finding: the relative 1e-10 rule of steps 1-3 applied to every exact entry of at least 1e-250 * S,
     and S has no lower bound. For S below about 2.2e-58 that threshold is a subnormal double, for S below
     about 2.5e-64 entries near it cannot be represented to a relative 1e-10 by any double (subnormals are
-    spaced 4.9e-324), and for S below about 5e-74 it underflows to 0. Example: chain_inventory([1], [1e-70],
+    spaced 4.9e-324), and for S below about 2.5e-74 it underflows to 0 (from there to about 7e-74 it rounds
+    to the smallest subnormal, 4.9e-324). Example: chain_inventory([1], [1e-70],
     570) has the exact value 2.83e-318 > 1e-250 S = 1e-320, and both solutions return it with a relative
     error of 1.7e-7 (the nearest subnormal). The step 4 domain rule x[k](flux_lo) >= 1e-250 sum(n0)
     admitted such amounts, so its promise of 1e-8 "for activities of any size within the domain" failed:
@@ -496,9 +497,14 @@ pass (last item before the rerun). edit_label stays grading_fix.
     same operations on absolute values) and raises the precision until 1e5 eps times that magnitude sum
     is below 1e-14 of every amount or of the floor F (a running error bound, which cancellation cannot
     fool). The method (generalized Bateman solution in extended precision) is unchanged.
-  - Regression tests: under the version-14 rule, the new entry n0 = 1e-70, lam t = 570 of step 1 (and
-    its counterparts in steps 2 and 3) asks for a relative 1e-10 of 2.83e-318, which reference and second
-    solution miss (1.66e-7); under the new rule it passes. A variant of the reference with the version-14
+  - Regression tests: under the version-14 rule the new entry n0 = 1e-70, lam t = 570 of step 1 (and
+    its counterparts in steps 2 and 3) promises a relative 1e-10 of the exact 2.832340e-318, which no
+    double meets: in 60-digit mpmath both solutions are 1.66e-7 away (the nearest subnormal), and for
+    n0 = 1e-80, lam t = 560 0.21 away; under the new rule it is an absolute-rule entry (within 1e-300) and
+    passes. (Corrected in the verifier round below: the test entry itself does not separate the two
+    rules, because its double target n0 exp(-570) rounds to the same subnormal as the output, so its
+    computed relative difference is 0; the impossibility was shown with the mpmath comparison, not by a
+    failing test case.) A variant of the reference with the version-14
     domain line (no floor) fails step 4 case 5 ("fewer than 1e-300 atoms of the measured nuclide at flux_lo
     must raise ValueError"). The second solution with the old precision control fails step 4 case 1
     (ValueError); with the running error bound it passes every case and agrees with the reference to
@@ -519,8 +525,55 @@ pass (last item before the rerun). edit_label stays grading_fix.
     figures) were updated; problem_description_main now says that the amounts are required with a small
     relative error down to the floor stated in each step (it said "every amount").
 
+- Independent verifier, round after pass 2 (blocking): accuracy contract unattainable for tiny
+  inventories, and the step 4 domain admitting a subnormal x[k].
+  - Finding: the verifier reported that the relative 1e-10 rule of steps 1-3 applied to every exact entry
+    of at least 1e-250 S with no lower bound on S (chain_inventory([1], [1e-70], 570): exact 2.832340e-318
+    above 1e-250 S = 1e-320, relative error 1.66e-7 in both solutions; 0.21 for n0 = 1e-80, t = 560), and
+    that the step 4 domain rule admitted lam = [0, 1e-3], sigma = [1, 0], capture_to = [1, -1],
+    n0 = [1e-70, 0], t_irr = 1e-225 s, t_cool = 0, activity 1e-320 Bq on [1, 1e4], where the reference
+    returned 99.998862 against the exact root 99.998887 (2.5e-7 > 1e-8) and the second solution raised
+    ValueError.
+  - Cause: the verifier read the files as they were before the item "Accuracy threshold and step 4 domain
+    below 1e-300 atoms" above was applied. That item makes exactly the change the verifier asks for
+    (F = max(1e-250 S, 1e-300) in the prompts and every docstring copy of steps 1-3, the step 4 domain rule
+    x[k](flux_lo) >= max(1e-250 sum(n0), 1e-300) evaluated in logarithms in the prompt, Errors list,
+    problem_io, function_header, contract, both solutions and both step 4 mutants, absolute-rule entries
+    with n0 = 1e-70 at lam t = 570 in steps 1-3, and the verifier's corner as a ValueError entry of step 4
+    case 5).
+  - Confirmation on the current files (rerun in this round): in 60-digit mpmath, n0 = 1e-70 at lam t = 570
+    and n0 = 1e-80 at 560 are below F = 1e-300 (absolute rule) and both solutions are within F; n0 = 1e-70
+    at 500 (7.1e-288, relative rule) has a relative error of 9e-17 in both. The verifier's corner raises
+    ValueError in both solutions (x[1](flux_lo) = 1e-319 < 1e-300). The reference with the version-14
+    domain line (no floor) reproduces the verifier's numbers (99.99886201 against the exact
+    99.99888672 = activity / (lam1 n0 sigma 1e-24 t_irr) in mpmath, valid since lam1 t_irr and the capture
+    rate times t_irr are below 1e-200; relative error 2.47e-7) and fails step 4 case 5 ("fewer than 1e-300
+    atoms of the measured nuclide at flux_lo must raise ValueError") while passing case 1. An AST
+    comparison shows that every docstring of chain_inventory, network_inventory, activation_inventory
+    and monitor_flux in steps/, solution/, solution.py, second_solution.py and mutants/ is identical to
+    problem.yaml (function_header, and problem_io for monitor_flux). The only remaining statements of the
+    old threshold 1e-250 S alone are in notes labelled historical.
+  - Two statements of the item above corrected (source.md only): the S below which 1e-250 S underflows to
+    0 is about 2.5e-74, not 5e-74 (from there to about 7e-74 it rounds to the smallest subnormal); and the
+    new tiny-inventory entries of steps 1-3 do not fail under the old rule, as that item said, because
+    their double target rounds to the same subnormal as the output (computed relative difference 0). The
+    impossibility of the old promise was shown with the mpmath comparison only. Checked by running case 0
+    of steps 1-3 with the reference under the old rule (it passes) and under the new rule (it passes).
+  - Related clarification, step 4 domain boundary. Finding: the domain rule compares x[k](flux_lo), which
+    step 3 gives only to a relative 1e-10, with max(1e-250 sum(n0), 1e-300), so two valid implementations
+    can decide differently for inputs within 1e-10 of the bound; the end rule already states such a band,
+    the domain rule did not. Cause: the band was written for the end rule only. Change: the prompt, the
+    Raises section of the docstring (problem_io, function_header, steps/step_4.py, solution/step_4.py,
+    solution.py, second_solution.py and both step 4 mutants) and the step 4 contract now say that
+    ValueError and a result are both correct when x[k](flux_lo) lies within a relative 1e-10 of
+    max(1e-250 sum(n0), 1e-300). Code and tests unchanged: no case lies in that band (the closest domain
+    inputs hold about 1e-294 atoms, 1e6 times the floor, and about 1e-319 atoms, 1e-19 of it; the cases at
+    1e-250 sum(n0) are about 5e-17 and 1e-80 of it). Regression: the docstring comparison above, each mutant
+    still differs from its reference in the named line only (diff), and crown_check below.
+
 Rerun: tools/crown_check.py, all modes, every case alone in a fresh process (single-threaded BLAS, -j 2),
-after the last item above (final state of version 14):
+after the last item above (final state of version 14; run again after the verifier round, with the same
+results):
 - FORMAT OK (zero problems; every general case calls monitor_flux).
 - REF: step 1 7/7, step 2 6/6, step 3 6/6, step 4 6/6, general 2/2; solution.py also passes every step
   file (7/7, 6/6, 6/6, 6/6).
@@ -533,9 +586,14 @@ after the last item above (final state of version 14):
 - Controls: all-None and all-zero stubs pass 0 cases in every step and in general.
 - SUMMARY ALL OK.
 - Error budget of step 4 (perturbed step-3 context) and the end-cutoff and root-returning variants: as
-  given in the last item above (rerun with the final tests).
+  given in the item "Accuracy threshold and step 4 domain below 1e-300 atoms" (rerun with the final tests
+  of that item; the verifier round changed docstrings and texts only, no executable code or test).
 - solution.py, the concatenated solution/step_*.py and second_solution.py were each run twice in clean
   processes with single-threaded BLAS (and solution.py once more with default threads) on the 238U series
   at 3e5 y, a random 12-nuclide network with production, the gold monitor at 1e14 and two flux
   inversions: identical outputs (bitwise) within each solution, and the reference and the concatenated
-  steps identical to each other.
+  steps identical to each other. In the verifier round, solution.py and second_solution.py were run twice
+  each in clean processes with single-threaded BLAS on a random 12-nuclide network with production, a
+  chain with two equal constants, the gold monitor at 1e14 and two flux inversions (gold at 1e12 and the
+  round trip with 1e-70 target atoms): identical outputs (bitwise) within each solution; solution.py was
+  also run alone on every case of tests/step_1.py to tests/step_4.py (7/7, 6/6, 6/6, 6/6).

@@ -63,12 +63,12 @@ current test points unless marked otherwise.
 | Step | Default route | Error on the test points | Correct alternatives that pass |
 |---|---|---|---|
 | 2 (rel 1e-6) | xi_energy from the second eigenvalue of M | 1.1 to 2.4e8 (every case: that eigenvalue is the top odd state) | flip-sector blocks (reference); momentum and flip sectors (second solution); free fermions |
-| 2 (rel 1e-6) | xi_energy from the third eigenvalue of M (mutant third_eigenvalue) | 0.22, 0.74, 0.83 at T = 3, 5, 10 (the third eigenvalue is odd above Tc); passes at (10, 1) and (8, Tc) | as above |
+| 2 (rel 1e-6) | xi_energy from the third eigenvalue of M (mutant third_eigenvalue) | 0.22, 0.74, 0.83 at (L, T) = (4, 3), (6, 5), (3, 10), where the third eigenvalue is an odd state; passes at (10, 1) and (8, Tc), where it is the second even state (it is the second even state below a width-dependent crossover temperature, 2.05 at L = 3, 2.33 at L = 4 and 2.41 to 2.43 for L = 5 to 10, so at Tc and just above it for L >= 4, and an odd state above it) | as above |
 | 3 (abs 1e-9) | matrix element between the two leading eigenvectors of one eigh call on M | 1.0 at (L, T) = (10, 0.5) and 1.8e-3 at (10, 0.6): the pair is degenerate to 9e-18 and 7e-15 relative and the solver returns an arbitrary mixture (an earlier entry of this table also recorded 3.3e-4 at (8, 0.5); the outcome there depends on the LAPACK build) | sector blocks; rotation of the pair into parity states |
 | 3 (abs 1e-9) | Yang's bulk magnetization | 0.08 at (6, 2.2), 0.51 at (7, 4.0), 0.64 at (3, 10) | |
 | 4 (rel 1e-6) | central second difference of f(h), step 1e-3 to 1e-7 | every step fails at least one case: at (10, 1.5) the error falls from 0.99 (step 1e-3) to 5.2e-5 (1e-7), at (10, 1.0) it stays 0.99 to 1.0, and at high T rounding dominates the small steps (3.3 at (4, 10) with step 1e-7); Richardson on 1e-4 and 5e-5 fails at (10, 1.0) (1.0), (10, 1.5) (0.72) and (4, 10) (1.0e-5) | spectral sum (reference); odd-sector linear solve (second solution) |
 | 4 (rel 1e-6) | correlation summed over r >= 0 only (mutant one_sided_correlation_sum) | 0.11 to 0.50 (every case) | |
-| 5 (rel 1e-8) | first field at which any eigenvalue becomes complex (mutant first_complex_eigenvalue) | 0.32 at (6, Tc), 0.99 at (8, 3.0): lower pairs leave the real axis first | root of the discriminant of the leading pair; bisection on the leading pair |
+| 5 (rel 1e-8) | first field at which any eigenvalue becomes complex (mutant first_complex_eigenvalue) | 0.32 at (6, Tc), 0.99 at (8, 3.0): at these two points a lower pair leaves the real axis first (at 0.68 and 0.01 of the edge); in the other four cases, at (7, 1.5), (4, 10), (5, 2.0) and (case 5) (3, 1.5), (3, 10), (8, 1.5), no eigenvalue becomes complex before the leading pair meets and the mutant passes | root of the discriminant of the leading pair; bisection on the leading pair |
 | 5 (rel 1e-8) | linear scan of H starting at 1e-3 | cannot bracket edges below its first grid point; the edges at (7, 1.5) and (8, 1.5) are 1.3e-4 and 4.8e-5 (version 9 recorded an error factor 6.6 at (7, 1.5)) | geometric bracketing |
 | 5 (rel 1e-8) | Hermitian eigensolver (eigvalsh) on the complex symmetric matrix | it diagonalizes a different, Hermitian matrix whose leading pair never meets: the smallest (a - b)**2 over 0 < H < 2 H_edge is 8.5 to 1.2e3 on the five test points checked, so no edge is found | general (non-Hermitian) eigensolver |
 | 7 (f abs 1e-10, m abs 1e-9, chi and c rel 1e-5) | widest diagonalizable strip, L = 10 | f off by 1.6e-8 to 3.5e-3 and m by 4.4e-7 to 0.38 on the eight points kept from version 9 (every point fails) | corner-transfer-matrix renormalization or VUMPS with the correct per-site partition function and converged derivatives |
@@ -341,6 +341,54 @@ reference solution are unchanged.
    functions each prompt names (step 7 restates the energy and calls none); prompts and docstrings state
    the domain, not test points; relevant_experience stays the placeholder for the author.
 
+10. Physics statements of the metadata limited to the part of the domain where they hold (found by
+    the independent verifier after the first version of this pass-2 note).
+    - Finding: three statements were written as general but hold only in part of the domain.
+      (a) difficulty_explanation said that "the second and third eigenvalues of the whole matrix belong
+      to the odd sector above Tc"; the description of the step 2 mutant third_eigenvalue ("above Tc that
+      eigenvalue belongs to the odd sector") and its default-route row ("the third eigenvalue is odd
+      above Tc") said the same. Just above Tc the third eigenvalue is the second even state, as at Tc.
+      (b) difficulty_explanation said that "below Tc the two leading states are degenerate to machine
+      precision"; the code comments of strip_magnetization in solution.py, solution/step_3.py,
+      second_solution.py, mutants/step_3_correlation_one_row.py and mutants/whole_task_field_not_scaled.py
+      said the same, and the step 4 contract called the gap "tiny" everywhere below Tc. (c)
+      difficulty_explanation said that the leading pair must be tracked "since lower pairs leave the real
+      axis first".
+    - Cause: each statement generalized what was seen at a few test points (T = 3, 5, 10 for step 2;
+      T = 0.5 and 0.6 at L = 10 for step 3; (6, Tc) and (8, 3.0) for step 5).
+    - Measurements (this version; reference transfer_matrix, flip-sector blocks, single-threaded BLAS):
+      (a) at 96 temperatures from 0.5 to 10 and every L from 3 to 10 the second eigenvalue of the whole
+      matrix is the top odd state; the third is the second even state below a crossover temperature
+      (brentq root of ln(odd_1) - ln(even_1)) of 2.045 at L = 3, 2.329 at L = 4 and 2.410, 2.431,
+      2.432, 2.425, 2.416, 2.406 for L = 5 to 10, and an odd state above it. The mutant's relative
+      error in xi_energy is 0 at (4, 2.3), (10, 2.4), (10, 1) and (8, Tc), 0.081 at (10, 2.5), and 0.22,
+      0.74, 0.83 at the failing test points (4, 3), (6, 5), (3, 10). (b) The relative gap
+      (lam_even0 - lam_odd0) / lam_even0 is 0 in double precision at (10, 0.5) (9e-18 at 50 digits from the step 3 target route, item 2),
+      7.7e-15 at (10, 0.6), 1.0e-12 at (10, 0.7), 1.4e-8 at (10, 1.0), 2.6e-14 at (8, 0.5), 5.2e-7 at
+      (8, 1.0), 2.0e-5 at (6, 1.0), 0.10 at (6, 2.2) and 1.2e-5 at (3, 0.5). (c) For L = 3 to 8 at
+      T = 1.5, 2, Tc, 2.5, 3, 5 and 10 (42 points), on the fields k H_edge / 200, k = 1 to 199, a lower
+      pair has an eigenvalue with |Im| > 1e-9 max |lambda| before the leading pair meets at 17 points:
+      (4, 3), (5, 3), L = 6 at Tc, 2.5, 3 and 5, L = 7 at Tc to 10 and L = 8 at 2 to 10 (16 of them at
+      or above Tc, 14 at L >= 6); at the other 25 points, among them every L = 3 point and every
+      T = 1.5 point, no eigenvalue becomes complex before the edge.
+    - Change: difficulty_explanation now says that the second eigenvalue of the whole matrix is the top
+      odd state at every temperature and the third is the second even state below a width-dependent
+      crossover (2.05 at L = 3, 2.33 at L = 4, 2.41 to 2.43 for L = 5 to 10; so at Tc and just above it
+      for L >= 4) and an odd state above it; that below Tc the two leading states are nearly degenerate,
+      with a gap that closes exponentially with the width and reaches the level of machine precision far
+      below Tc at the larger widths (about 1e-14 relative or less for T <= 0.6 at L = 10); and that the
+      leading pair must be tracked because at many points of the range, most of them at or above Tc on
+      the wider strips, a lower pair leaves the real axis before the leading pair meets. The
+      third_eigenvalue description and the default-route rows of third_eigenvalue and
+      first_complex_eigenvalue (the latter now names the cases in which the mutant passes) say the same.
+      The five code comments say "nearly degenerate ... to machine precision far below Tc at the larger
+      widths" (comments only: the code of both solutions and of the mutants is unchanged, and each
+      mutant still differs from the reference by its one mistake, checked by diff). The step 4 contract
+      says that the gap closes exponentially with L (1.4e-8 relative at L = 10, T = 1). The step 3
+      contract was already worded this way. No prompt, docstring, test, target or tolerance changed.
+    - Regression test: crown_check format (no problem) and, because comments of the solution and
+      mutant files changed, all modes again; results below.
+
 Rerun after all items: tools/crown_check.py, all modes, every case alone in a fresh process, -j 2,
 single-threaded BLAS; results are recorded below. solution.py and second_solution.py were each run twice
 in clean single-threaded processes on the inputs of every test case (step 1 matrices compared by a
@@ -355,3 +403,9 @@ specific_heat_without_T 8/8, free_spin_susceptibility 8/8, whole_task_field_not_
 cases; SHIFT +-1e-12 (real and complex outputs; every evaluated function in the general cases) all
 pass; the all-None and all-zero controls pass 0 cases in every step and in general; SUMMARY ALL OK
 (7 min 12 s wall time with -j 2).
+
+Rerun after item 10 (all modes, every case alone in a fresh process, -j 2, single-threaded BLAS):
+the same result in every line, FORMAT OK with no problem; REF and SECOND 5/5, 5/5, 6/6, 6/6, 6/6,
+3/3, 8/8 and 2/2 general; the mutants fail the same cases as above (first_complex_eigenvalue [0, 1],
+third_eigenvalue [0, 1, 4]); SHIFT +-1e-12 all pass; both controls pass 0 cases; SUMMARY ALL OK
+(7 min 30 s wall time). crown_check format was run once more after the last edit of this file.

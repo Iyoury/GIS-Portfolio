@@ -166,9 +166,12 @@ def diffusion_peak(theta):
 
     Output:
       (i_peak, d_peak): tuple of two Python floats.
-        i_peak: the bias i > 0 at which effective_diffusion(i, theta) is largest
-                (absolute error below 1e-6).
-        d_peak: D_eff(i_peak, theta) / theta (relative error below 1e-9).
+        i_peak: the bias i > 0 at which the exact D_eff(i, theta) is largest, absolute
+                error below 1e-6 (the maximum is flat: this needs D_eff, or
+                d ln(D_eff) / di, far more accurately than the 1e-9 guaranteed by
+                effective_diffusion).
+        d_peak: D_eff(i_peak, theta) / theta at the returned i_peak (relative error below
+                1e-9).
 
     Raises:
       ValueError if theta is not finite or is outside [0.02, 1].
@@ -325,7 +328,10 @@ def array_criterion(ics, rs, theta0, v_crit):
         r_diff: differential resistance dV/dJ of the array at j_star (units of R_0).
         s_v: lim_{t->inf} Var(int_0^t V dt') / t at j_star, the zero-frequency (two-sided)
              voltage noise, in units of (hbar / 2e) I_0 R_0.
-        Relative errors below 1e-9 (j_star) and 1e-8 (r_diff, s_v).
+        j_star is graded against the bias at which the exact array voltage equals v_crit,
+        relative error below 1e-9 + 2e-9 / s with s = d ln(V) / d ln(J) of the exact array
+        voltage at j_star (the relative error of mean_voltage, below 1e-9, enters j_star
+        divided by s); r_diff and s_v, at the returned j_star, relative errors below 1e-8.
 
     Raises:
       ValueError if ics and rs are not 1-D arrays of the same nonzero length, if an entry

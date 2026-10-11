@@ -411,7 +411,25 @@ def _levenberg_marquardt(B, gobs, h, lo, hi, reflect):
 
 
 def invert_basin_depths(x_edges, y_edges, gz_obs, drho0, lam):
-    xe, ye, go = np.asarray(x_edges, float), np.asarray(y_edges, float), np.asarray(gz_obs, float)
+    """Depths of a basin of columns (density contrast drho0 exp(-lam z)) from its gravity anomaly.
+
+    Inputs:
+      x_edges, y_edges: 1-D float arrays (nx + 1 and ny + 1 entries), strictly increasing, nx ny <= 100.
+      gz_obs: float array (nx, ny), the vertical attraction (m s^-2) of all columns at the cell centres on
+        the surface z = 0; it is that of a basin whose every depth satisfies 1e-3 w_min <= depth <= 3 w_min
+        (w_min the smallest cell width, in x or y), depth <= 5e4 m and lam depth <= 2.
+      drho0: float, nonzero density contrast at the surface (kg m^-3).
+      lam: float, 0 <= lam <= 1e-2 (per m).
+
+    Output:
+      depths: numpy array (nx, ny) in m, each with a relative error below 1e-8.
+
+    Raises:
+      ValueError for invalid edges, nx ny > 100, gz_obs of the wrong shape or non-finite, drho0 zero or
+      non-finite, lam outside [0, 1e-2], an observation without the sign of drho0, or (lam > 0) an
+      observation of at least 2 pi G |drho0| / lam.
+    """
+    xe, ye, go =np.asarray(x_edges, float), np.asarray(y_edges, float), np.asarray(gz_obs, float)
     if xe.ndim != 1 or ye.ndim != 1 or xe.size < 2 or ye.size < 2:
         raise ValueError("cell edges must be 1-D with at least two entries")
     if not (np.all(np.isfinite(xe)) and np.all(np.isfinite(ye))) or np.any(np.diff(xe) <= 0) or np.any(np.diff(ye) <= 0):
@@ -428,7 +446,8 @@ def invert_basin_depths(x_edges, y_edges, gz_obs, drho0, lam):
     B = _Basin(xe, ye, drho0, lam)
     gobs = go.ravel()
     wmin = min(float(np.min(np.diff(xe))), float(np.min(np.diff(ye))))
-    # admissible depths for the iteration: [1e-6 w_min, 1.5 times the largest depth of the stated domain]
+    # admissible depths for the iteration: [1e-6 w_min, 1.5 times the largest depth of the stated domain],
+    # a box that contains the stated domain [1e-3 w_min, min(3 w_min, 5e4, 2 / lam)] with margins
     lo = 1e-6 * wmin
     hi = 1.5 * min(5e4, 3.0 * wmin, 2.0 / lam if lam > 0 else math.inf)
     # start: the infinite-slab thickness under each station

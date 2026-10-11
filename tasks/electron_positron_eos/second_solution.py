@@ -4,12 +4,15 @@ from scipy.integrate import quad
 from scipy.optimize import brentq
 
 # Second solution, built on routes different from the reference:
-#   - quadrature: adaptive QUADPACK (scipy.integrate.quad) in the kinetic energy E (units m_e c^2), split at
-#     the Fermi edge and at +- 40 k T around it (where the edge lies above E = 0 the window is integrated in
-#     y = (E - E_F) / k T), instead of fixed composite Gauss-Legendre panels;
-#   - net electron density: for psi >= 1 the plain difference n_minus - n_plus (n_plus / n_minus <= e^{-2 psi},
-#     so the difference loses at most a factor 1.3), for psi < 1 the charge-susceptibility integral
-#     n_net(psi) = int_0^psi (d n_net / d psi') dpsi', whose integrand PREF int p^2 [f_-(1 - f_-) + f_+(1 - f_+)]
+#   - quadrature: adaptive QUADPACK (scipy.integrate.quad) instead of fixed composite Gauss-Legendre panels,
+#     on panels of the kinetic energy E (units m_e c^2) split at max(E_F, 0) = c, at c +- 40 k T (where
+#     positive) and ending at c + 80 k T; the first panel (from E = 0) and every panel of a non-degenerate gas
+#     (E_F <= 0) are integrated in the momentum p, the other panels in y = (E - E_F) / k T;
+#   - net electron density: for psi >= 1 the plain difference n_minus - n_plus (n_plus / n_minus >= e^{-2 psi},
+#     but below 0.163 over the domain, measured; pointwise f_+ / f_- <= 0.36), so the difference amplifies the
+#     relative quadrature error by at most 1.39 (rigorously at most 2.1); for psi < 1 the charge-susceptibility
+#     integral n_net(psi) = int_0^psi (d n_net / d psi') dpsi', whose integrand
+#     PREF int p^2 [f_-(1 - f_-) + f_+(1 - f_+)]
 #     is positive and analytic in psi' for |Im psi'| < pi (n_net(0) = 0 by charge-conjugation symmetry);
 #     Gauss-Legendre with 16 nodes in psi' on [0, psi];
 #   - pressure from the grand potential, P = k T PREF int p^2 [ln(1 + e^{-x_-}) + ln(1 + e^{-x_+})] dp

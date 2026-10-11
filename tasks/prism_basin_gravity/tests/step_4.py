@@ -137,3 +137,25 @@ _T_DRHO0, _T_LAM = -400.0, 0.0004
 _t_h = invert_basin_depths(np.array(_T_XE), np.array(_T_YE), np.array(_T_GZ), _T_DRHO0, _T_LAM)
 assert isinstance(_t_h, np.ndarray) and _t_h.shape == np.array(_T_DEPTH).shape, _t_h
 assert np.max(np.abs(_t_h / np.array(_T_DEPTH) - 1.0)) < 1e-8, (_t_h, _T_DEPTH)
+
+# --- test case 6 ---
+# a rough 5 x 4 basin of irregular cells 400 m to 500 m wide (w_min = 400 m): columns 0.4 m deep
+# (1e-3 w_min, the lower limit of the stated domain) beside columns 1200 m deep (3 w_min, the upper
+# limit), density contrast +250 kg m^-3 decaying with lam = 1.5e-3 per m (lam depth up to 1.8); data:
+# 30-digit tanh-sinh quadrature over depth for every station-column pair (two stations confirmed to 20
+# digits by a two-dimensional quadrature over depth and x of the closed-form y-integral of z / r^3)
+import numpy as np
+
+_T_XE = [2000.0, 2400.0, 2850.0, 3270.0, 3670.0, 4150.0]
+
+_T_YE = [-1500.0, -1000.0, -600.0, -140.0, 290.0]
+
+_T_DEPTH = [[1200.0, 0.4, 1200.0, 0.4], [0.4, 1200.0, 0.4, 1200.0], [1200.0, 1200.0, 0.4, 0.4], [0.4, 0.4, 1200.0, 1200.0], [1200.0, 0.4, 0.4, 1200.0]]
+
+_T_GZ = [[0.00002086189307524106779512506, 0.00001045685334037985681586276, 0.00002152476669743346745886114, 0.000007227863380770053176166642], [0.00001057393171663820535865276, 0.00002499864912272490727443652, 0.00001144956792915378301322292, 0.00002131860152184321601149419], [0.00002371243410539285288905095, 0.00002598599199380887332809088, 0.00001157022540097454903832281, 0.000009571877428533285053893701], [0.000009787668238823030491877412, 0.00001108333781924132217761505, 0.0000243289906701127084379262, 0.00002400002931095986203758554], [0.00002098451685078925655079508, 0.000007491131421709585444816538, 0.000008535446250182849879122188, 0.00002225379911971249354000723]]
+
+_T_DRHO0, _T_LAM = 250.0, 0.0015
+
+_t_h = invert_basin_depths(np.array(_T_XE), np.array(_T_YE), np.array(_T_GZ), _T_DRHO0, _T_LAM)
+assert isinstance(_t_h, np.ndarray) and _t_h.shape == np.array(_T_DEPTH).shape, _t_h
+assert np.max(np.abs(_t_h / np.array(_T_DEPTH) - 1.0)) < 1e-8, (_t_h, _T_DEPTH)

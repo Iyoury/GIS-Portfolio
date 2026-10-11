@@ -536,7 +536,8 @@ item gives the finding, its cause, the change, the regression test and what was 
      step 4 [2, 3], step 5 [], step 6 [1, 3].
    - relevant_experience keeps the placeholder for the author.
 
-Rerun for version 14 (after items 1-8):
+Rerun for version 14 (after items 1-8; historical, step 4 then had 5 cases and the single-window
+reference of version 13; the rerun after items 10-12 is at the end):
 - Reproducibility: solution.py and second_solution.py each run twice in clean processes (python3 -I) on
   21 inputs covering all six functions; the two runs of each gave byte-identical outputs.
 - tools/crown_check.py, all modes, every case alone in a fresh process (-j 2, single-threaded BLAS):
@@ -549,6 +550,133 @@ Rerun for version 14 (after items 1-8):
     doubled_energy [0, 1, 2, 3, 4] each; step 6 athermal_particles [0-6]; whole-task
     whole_task_barriers_from_global_minimum fails all 4 general cases.
   - SHIFT +1e-12 and -1e-12: every case of steps 1-6 passes (5/5, 5/5, 6/6, 5/5, 6/6, 8/8), and every
+    general case with every evaluated function shifted (4/4).
+  - CONTROLS: all-None and all-zero stubs pass 0 cases in every step and in general.
+  - SUMMARY ALL OK.
+
+Items 10-12 (announced at the top of this version) come from a second independent verification of
+version 14 after items 1-9. Item 10 is a reference bug and replaces the reference algorithm for the mean
+switching field of step 4; item 11 replaces the second solution's mean again; item 10 adds step 4 case 5
+(n_test_cases 5 -> 6). No existing target, test input or tolerance was changed.
+
+10. Reference mean switching field wrong when the switching field has two windows (step 4).
+   - Finding (second verification, confirmed by rerunning the version-13 code): switching_field_statistics
+     placed one composite Gauss-Legendre window around the median ([h_median - 12 / kappa,
+     h_median + 45 / kappa], extended downwards until (f0 / rate) I > 80) and took P = 1 between the window
+     and h_sw, on the code-comment claim that 1 - P < 1e-19 above h_median + 45 / kappa. The independent
+     mean of the verifier (E[H_s] = h_sw - int P dh from a cumulative trapezoid rule of Gamma / f0 on nodes
+     clustered at both ends) gave -0.1845868 at (psi, a, f0 / rate) = (1.3, 40, 1e9), -0.2783384 at
+     (1.35, 60, 1e11) and -0.2937792 at (1.45, 100, 1e11); the old reference gave -0.1955808, -0.2964061
+     and -0.3891920 (errors 1.1e-2, 1.8e-2 and 9.5e-2), and was also off by 3.9e-2 at (1.5, 100, 1e7),
+     4.1e-4 at (1.5, 250, 1e13) and 1.0e-4 at (1.3700292, 44.164, 1.725e5) (all rerun in this version).
+     Against the fixed reference (itself checked against the trapezoid rule, see the regression test
+     below) the old reference had a mean error above 1e-7 on 46 of the 225 inputs of the verifier's grid
+     (psi = 1.15, 1.20, ..., 1.55, a = 40, 60, 100, 150, 250, f0 / rate = 1e5, 1e7, ..., 1e13; up to
+     9.5e-2), on 9 of the 45 inputs of its crash grid (item 11) and on 6 of 63 inputs at psi = 0.8, 0.85,
+     ..., 1.1 (a = 40, 60, 100, f0 / rate = 1e5, 1e9, 1e13), down to psi = 0.9 (1.2e-3 at (1.1, 40, 1e13),
+     9.8e-6 at (1.0, 40, 1e13), 1.0e-7 at (0.9, 40, 1e13)). The median was always right (identical to the
+     fixed reference: Brent's method on the full escape integral).
+   - Cause: the window assumed a single switching window, i.e. a lower barrier that only shrinks as the
+     field comes down. For psi above pi/4 the lower barrier also has a local minimum at a positive field
+     (for small h > 0 it is 1/2 + (cos(psi) - sin(psi)) h, which falls with h for psi > pi/4, as a finite
+     difference of escape_barriers confirms; on a 40001-point field grid its minimum over [0, h_sw) is
+     0.4998 at h = 0.02 for psi = 0.8, 0.455 at h = 0.29 for psi = 1.0 and 0.416 at h = 0.39 for
+     psi = 1.08, against 1/2 at h = 0, and there is none for psi = 0.6, 0.7, 0.75 and pi/4; for psi = 1.45
+     and 1.54 the minimum is at +h_sw itself, where the other minimum forms next to the original one), so
+     the rate has a second peak there, a deep valley near h = 0 and its usual rise towards -h_sw; for
+     small a and large f0 / rate a fraction of the particles switches in the upper window. The step 4
+     tests (psi = 0, pi/4, 1.2 with a = 400, and pi/2) had no input with a second window, and every
+     crown_check mode passed.
+   - Change: E[H_s] = h_sw - int P dh is now integrated by adaptive composite 16-point Gauss-Legendre
+     quadrature in h (solution/step_4.py and solution.py, identical function bodies). Initial panel edges:
+     h = 0 (both barriers 1/2), the old window around the median, edges graded towards both ends
+     (+-h_sw (1 - 10^-k), k = 1 ... 15) and eight uniform panels. U = (f0 / rate) I is accumulated from h_sw
+     downwards with quad (relative tolerance 1e-12) at the edges and, inside a panel, from its upper edge by
+     a 16-point rule on each gap between nodes; a panel is halved (at most 40 times) until halving changes
+     its integral of P by at most 1e-12 and the gap rules reproduce the quad values at the edges to 1e-12
+     in units of P. A panel on which U changes by at most 1e-13 contributes its constant P, and nothing is
+     added below the field where U > 100 (P < 4e-44). An interval shorter than 1e-9 (next to +-h_sw) gets
+     one 16-point rule instead of quad. The step 4 mutant wrong_mean_formula and the solution.py copy
+     inside the whole-task mutant were rebuilt from the fixed reference (one change each, checked with
+     diff). Texts corrected: difficulty_explanation (the "sharply peaked" density replaced by the two-window
+     description), solution_explanation, the step 4 step_background and background.md (the lower barrier is
+     not monotonic along the sweep for psi above pi/4). The step 4 prompt is unchanged: it already asks for
+     the mean of the switching field without restricting its distribution.
+   - Regression test: new step 4 case 5, three particles with two switching windows, chosen where a
+     one-window mean is wrong by far more than the tolerance: psi = 1.31, a = 45, f0 / rate = 1e9 (median
+     in the lower window, 1.5 % switch next to +h_sw); psi = 1.08, a = 42, f0 / rate = 3e12 (second peak
+     inside (0, h_sw), near h = 0.39; 0.05 % switch there); psi = 1.54, a = 300, f0 / rate = 1e9 (median
+     next to +h_sw, 9 % left for the lower window). Median by one Newton step and mean from the ODE oracle
+     of cases 1-2 on the 20000-point grid barriers, with one change: the rate is held at its value at
+     h_sw - 1e-7 over the last 1e-7 below h_sw. There the grid no longer separates the two extrema that
+     merge at h_sw and the unmodified oracle sets the rate to 0; with the reference barriers the hold
+     changes (f0 / rate) I(-h_sw) by at most 5.5e-11 at these inputs. Independent check of the three
+     targets: a Richardson-extrapolated trapezoid rule for h_sw - int P dh in u (h = h_sw sin u, 2e5 and
+     4e5 nodes, cumulative escape integral on the same nodes, reference barriers): agreement to 9.4e-13,
+     6.8e-13 and 8.4e-12 (without the hold the oracle is off by 2.6e-9, 4.8e-12 and 6.7e-7). The old
+     reference fails case 5 (run alone: AssertionError at the first particle; its mean errors against the
+     trapezoid rule are 4.3e-3, 4.1e-5 and 2.7e-6); the fixed reference passes it (the
+     Newton steps move the medians by at most 1.6e-15). Scan of the fixed reference (425 inputs, see the
+     rerun below): on the 141 inputs where the trapezoid rule was run (45 of the crash grid, 57 of the
+     verifier's grid, 16 at psi = 0.8 ... 1.1, 8 corners, 15 random), the reference mean agrees with it to
+     2.5e-12 (the unextrapolated 2e5- and 4e5-node rules differ by up to 1.4e-9).
+11. Second solution of step 4 crashed between two switching windows.
+   - Finding (second verification, confirmed by rerunning the item-2 code): the s-ODE of item 2,
+     dh/ds = -e^s / ((f0 / rate) Gamma / f0), raised RuntimeError ("Required step size is less than spacing
+     between numbers") on 12 of 45 near-hard-axis inputs of the verifier's scan (psi = 1.15, 1.25, ...,
+     1.55, a = 40, 60, 100, f0 / rate = 1e5, 1e9, 1e13); rerun here at (1.35, 60, 1e11), (1.3, 60, 1e5),
+     (1.45, 100, 1e9) and (1.25, 100, 1e13), all four raise. It passed the tests only because no step 4
+     case had two windows; item 2 presented it as fixed and robust.
+   - Cause: in the valley of the rate between the two windows Gamma is tiny, so h(s) is practically a jump
+     and DOP853 cannot step across it.
+   - Change: the mean is now a quadrature in s, not an ODE: int h(s) exp(s - e^s) ds by tanh-sinh
+     quadrature from s = -40 to ln u_end (nodes t = k 2^-l on [-3.5, 3.5], l = 3, 4, ... until two levels
+     agree to 1e-12; RuntimeError if not by l = 9), with h(s) for all nodes at once from 64 bisection steps
+     on the dense output of the existing DOP853 run for I(h), the Gumbel weight below s = -40 put at h_sw,
+     the atom exp(-u_end) at -h_sw when that run reaches -h_sw, and the s-range split at the s of h = 0, so
+     that the near-jump at the valley (which lies near h = 0, where both barriers are 1/2) sits at the ends
+     of two tanh-sinh ranges, where the nodes cluster. This differs from the reference (quad and adaptive
+     composite Gauss-Legendre in h) and from the test oracle (one ODE run for I and int P dh together).
+   - Regression test: no exception on the 425 inputs of the scan below (the verifier's 225-point grid, its
+     45-input crash grid, 63 inputs at psi = 0.8 ... 1.1, 32 corners and 60 random draws); against the
+     fixed reference the median agrees to 1.0e-13 and the mean to 8.7e-13, and on the 141 inputs with
+     the trapezoid rule the second solution's mean agrees with it to 2.5e-12; crown_check SECOND step 4
+     6/6. The item-2 code, run alone on the new case 5, stops with the same RuntimeError.
+12. Stale description of the second solution's step 4 in "Checks used while building the task".
+   - Finding: the step 4 bullet said that h(s) was integrated as an ODE "from the median at
+     s = ln ln 2", while the code integrated upwards from s = -40 (item 2 itself says that integrating
+     downwards from the median diverged).
+   - Cause: the bullet was written for an earlier draft of item 2 and not checked against the code.
+   - Change: the bullet now describes the method of item 11; the version-14 cross-check line no longer
+     quotes the superseded 26-input numbers for step 4; verification_explanation quotes the scan of item 11
+     instead of the 26-input comparison; the comment in second_solution.py names the atom exp(-u_end)
+     (it said u_max, a name not used in the code).
+   - Regression test: the bullet, verification_explanation and the comments in second_solution.py were read
+     against the code (tanh-sinh nodes, split at the s of h = 0, 64 bisection steps, atom at -h_sw).
+
+Rerun for version 14 (after items 10-12):
+- Scan of step 4 (425 inputs; both solutions and the trapezoid rule run in the same scan script): the
+  verifier's grid (psi = 1.15, 1.20, ..., 1.55, a = 40, 60, 100, 150, 250, f0 / rate = 1e5, 1e7, ..., 1e13;
+  225 inputs), its crash grid (45), psi = 0.8, 0.85, ..., 1.1 with a = 40, 60, 100 and f0 / rate = 1e5,
+  1e9, 1e13 (63), 32 corners (psi = 0, 1e-9, 0.3, 0.7, pi/4, 1.2, pi/2 - 1e-9 and pi/2 with a = 40 and
+  1000, f0 / rate = 1e5 and 1e13) and 60 random draws (psi uniform or one of 0, 1e-9, pi/2 - 1e-9 and
+  pi/2, a log-uniform in [40, 1000], f0 / rate log-uniform in [1e5, 1e13]). Second solution: no
+  exception; median within 1.0e-13 and mean within 8.7e-13 of the reference (largest at
+  (1.25, 40, 1e11)). Trapezoid rule on 141 of the inputs: 2.5e-12 for both. Each call took at most 2.3 s
+  (reference) and 1.9 s (second solution) on a loaded machine.
+- Reproducibility: switching_field_statistics of solution.py and of second_solution.py run twice in clean
+  processes (python3 -I) on eight inputs (the three case 5 particles, (1.35, 60, 1e11), three corners and
+  pi/4): byte-identical outputs; the two solutions agree there to 1.1e-13.
+- tools/crown_check.py, all modes, every case alone in a fresh process (-j 2, single-threaded BLAS):
+  - FORMAT OK (no problems).
+  - REF steps 1-6: 5/5, 5/5, 6/6, 6/6, 6/6, 8/8; REF general (solution.py): 4/4.
+  - SECOND steps 1-6: 5/5, 5/5, 6/6, 6/6, 6/6, 8/8; SECOND general: 4/4.
+  - MUTANTS: step 1 global_minimum fails cases [0, 1, 2, 3], wrong_astroid_power [1]; step 2
+    barrier_from_global_minimum [0, 1, 2, 3]; step 3 lower_route_only [0, 1, 4]; step 4
+    wrong_mean_formula [0, 1, 2, 3, 5]; step 5 brown_asymptote, tau_from_slowest_mode, missing_half and
+    doubled_energy [0, 1, 2, 3, 4] each; step 6 athermal_particles [0-6]; whole-task
+    whole_task_barriers_from_global_minimum fails all 4 general cases.
+  - SHIFT +1e-12 and -1e-12: every case of steps 1-6 passes (5/5, 5/5, 6/6, 6/6, 6/6, 8/8), and every
     general case with every evaluated function shifted (4/4).
   - CONTROLS: all-None and all-zero stubs pass 0 cases in every step and in general.
   - SUMMARY ALL OK.

@@ -96,7 +96,13 @@ reference's strategies with other parameters, is described under Version 4 below
   25-digit mpmath quadrature of all 400 station-column pairs; three more basins (version 3) with 30-digit
   quadrature of every pair (a 6 x 4 basin with lam depth up to 2, a 5 x 4 basin of 80 m cells with
   lam = 1e-2, a rough 6 x 6 basin with 30 m columns beside 1500 m ones), and a 10 x 10 basin with lam = 0
-  whose anomaly is the sum of the 60-digit closed forms of its 100 prisms at each station.
+  whose anomaly is the sum of the 60-digit closed forms of its 100 prisms at each station. Version 5 adds
+  a rough 5 x 4 basin of irregular cells 400 m to 500 m wide (w_min = 400 m) with columns 0.4 m deep
+  (1e-3 w_min, the lower limit of the domain) beside columns 1200 m deep (3 w_min), drho0 = +250,
+  lam = 1.5e-3 (step 4 case 6): 30-digit tanh-sinh quadrature over depth of the lamina corner sum for all
+  400 station-column pairs (breakpoints h 2^-k, k = 0..30); two of its stations, (0, 1) and (2, 2), were
+  recomputed by a different formula, a 20-digit two-dimensional mpmath quadrature over depth and x of the
+  closed-form y-integral of z / r^3, z y / ((x^2 + z^2) sqrt(x^2 + y^2 + z^2)), and agree to all 20 digits.
 - **One-cell basin (tests/general.py case 1, version 4).** The vertical attraction at the centre of the
   top of the uniform prism 0..100 x 0..200 x 0..300 m (rho = -400) by my own 60-digit closed form,
   -1.1106331967251501474213766859e-5 m s^-2, confirmed to 30 digits by a 50-digit mpmath quadrature over
@@ -105,10 +111,11 @@ reference's strategies with other parameters, is described under Version 4 below
 - No HDF5 file: every target is stored inline in the test case that uses it, so there is no
   target_evidence record.
 
-Agreement with all stored targets (rechecked in version 4): the reference within 1.1e-3 of the U
-tolerance, 0.09 of the g tolerance and 1.7e-4 of the T tolerance, columns to 4.4e-16 relative, depths to
-8.9e-13; the second solution within 6.7e-5 (U), 8.9e-5 (g) and 8.0e-7 (T) of the tolerances, columns to
-3.3e-16, depths to 1.8e-12. (The figure "columns to 1.5e-13" of earlier versions predates version 3.)
+Agreement with all stored targets (rechecked in version 4; depths rechecked in version 5 with the new
+step 4 case 6): the reference within 1.1e-3 of the U tolerance, 0.09 of the g tolerance and 1.7e-4 of the
+T tolerance, columns to 4.4e-16 relative, depths to 2.0e-12 (8.9e-13 before case 6); the second solution
+within 6.7e-5 (U), 8.9e-5 (g) and 8.0e-7 (T) of the tolerances, columns to 3.3e-16, depths to 1.8e-12.
+(The figure "columns to 1.5e-13" of earlier versions predates version 3.)
 
 ## Version 2 (grading_fix: authoring-guide conformance)
 
@@ -231,22 +238,27 @@ each is fixed below.
      basins the same algorithm also stalls inside the new, restricted domain on rough basins (3 of 40).
    - Cause: the domain was stated without an analysis of the conditioning, and the Newton iteration was
      not globalized.
-   - Change: the domain is now every depth <= 3 w_min (w_min the smallest cell width in x or y),
-     <= 5e4 m and lam depth <= 2, stated in the prompt, the function header, problem_io, the contract and
-     the step background, with the remark that no smoothness of the basin is assumed. Over uniform,
-     irregular and anisotropic grids up to 10 x 10 and constant, random, chequered and bowl-shaped depths,
-     the amplification is at most 7.9e5 in that domain (a 10 x 10 basin 3 w_min deep everywhere with
-     lam depth = 2; 2.2e5 for lam = 0; the old test basin 4.1e3), so the rounding of the data contributes
-     at most 1e-10; allowing lam depth up to 5 would raise it to 8e6, and depths up to 3 w_min with
-     lam depth <= 2 keeps the old test basin (2.52 w_min, lam depth 1.01) inside the domain. The
-     reference inversion is now a trust-region reflective least-squares phase (scipy.optimize.least_squares,
-     bounded by 1.5 times the largest depth of the domain) followed by Newton's method to 1e-13;
-     `from scipy.optimize import least_squares` is declared in required_dependencies and the scaffolds.
-     Newton in the slab-equivalent thickness, Newton with step caps, Newton in log-depth,
-     Levenberg-Marquardt, continuation in the data scale and continuation in the horizontal scale were
-     tried first and each stalled on some rough basin (shallow columns beside deep ones): such a column
-     is overestimated by the slab start, Newton then overshoots a deep neighbour into a region where its
-     attraction hardly changes with depth, and the shallow column is pushed to zero depth.
+   - Change: the domain is now every depth <= 3 w_min (w_min the smallest cell width in x or y), <= 5e4 m
+     and lam depth <= 2, stated in the prompt, the function header, problem_io, the contract and the step
+     background, with the remark that no smoothness of the basin is assumed. Over uniform, irregular and
+     anisotropic grids up to 10 x 10 and constant, random, chequered and bowl-shaped depths, the
+     amplification is at most 7.9e5 in that domain (a 10 x 10 basin 3 w_min deep everywhere with lam depth =
+     2; 2.2e5 for lam = 0; the old test basin 4.1e3), so the rounding of the data contributes at most 1e-10;
+     allowing lam depth up to 5 would raise it to 8e6, and depths up to 3 w_min with lam depth <= 2 keeps
+     the old test basin (2.52 w_min, lam depth 1.01) inside the domain. [Corrected in version 5: the
+     version-3 domain had no lower limit on depth, and the 7.9e5 bound holds only for columns not far
+     shallower than the cells; a column of depth h amid 3 w_min deep ones amplifies data errors by a factor
+     proportional to w_min / h (4.0 w_min / h amid eight such neighbours, 34 w_min / h at the centre of a 10
+     x 10 basin; 2e9 at h = 2e-9 w_min), so the domain now also requires depth >= 1e-3 w_min, where the
+     amplification is still at most 7.9e5. See Version 5.] The reference inversion is now a trust-region
+     reflective least-squares phase (scipy.optimize.least_squares, bounded by 1.5 times the largest depth of
+     the domain) followed by Newton's method to 1e-13; `from scipy.optimize import least_squares` is
+     declared in required_dependencies and the scaffolds. Newton in the slab-equivalent thickness, Newton
+     with step caps, Newton in log-depth, Levenberg-Marquardt, continuation in the data scale and
+     continuation in the horizontal scale were tried first and each stalled on some rough basin (shallow
+     columns beside deep ones): such a column is overestimated by the slab start, Newton then overshoots a
+     deep neighbour into a region where its attraction hardly changes with depth, and the shallow column is
+     pushed to zero depth.
    - Regression test: step 4 cases 2-5 (below) and, outside the tests, the final reference on 200 random
      basins of the domain (1 to 100 cells, uniform and irregular grids, constant, random, rough and
      bimodal depths, lam from 0 to lam depth = 2, both signs of drho0; data from the reference forward
@@ -474,3 +486,86 @@ in every step and in general; SUMMARY ALL OK.
 Not changed: the physics, the reference solution (solution.py and solution/), every stored target of
 earlier versions, and every stated tolerance (U 1e-10, g 1e-10 |g| + 1e-14 G |rho| L, T 1e-9 ||T||,
 columns 1e-10, depths 1e-8); relevant_experience stays the placeholder for the author.
+
+## Version 5 (grading_fix: authoring-guide conformance, pass 2, second verification)
+
+The independent verification after version 4 reported one blocking finding. It was reproduced before any
+change and is fixed below.
+
+1. **Step 4: the stated domain had no lower limit on depth relative to the cell width.**
+   - Finding: the step-4 domain was 0 < depth <= 3 w_min, depth <= 5e4 m, lam depth <= 2. A column far
+     shallower than the cells beside deep ones is not determined to 1e-8 by data in double precision, so
+     the prompt's sentence "the depths are then determined by the anomaly to well within the required
+     accuracy" was false for such basins, as were "amplify relative data errors by up to about 1e6"
+     (difficulty_explanation) and "the amplification is at most 7.9e5 in that domain" (Version 3, item 1).
+     The second solution raised ValueError on in-domain basins with a column shallower than 1e-6 w_min,
+     the lower end of its iteration box.
+   - Reproduction (the verifier's script, 3 x 3 basins of 500 m cells, 1500 m columns around a centre
+     column of depth h_c, drho0 = -400, data from the reference forward model; amplification
+     ||diag(1/h) J^-1 diag(g)||_inf for lam = 0 / 4e-4): h_c = 30 m (0.06 w_min): 8.7e2 / 1.3e3, both
+     solutions within 2.3e-13; 0.5 m (1e-3 w_min): 4.0e3 / 3.3e3, both within 8.1e-13; 1e-2 m
+     (2e-5 w_min): 2.0e5 / 1.6e5, both within 5.1e-11; 1e-4 m: 2.0e7 / 1.6e7, reference 3.2e-9 / 7.9e-10,
+     second solution ValueError; 1e-6 m (2e-9 w_min): 2.0e9 / 1.6e9, reference 3.3e-7 / 3.4e-8 (above
+     1e-8), second solution ValueError.
+   - Cause: the version-3 conditioning analysis did not examine columns much shallower than the cells.
+     The row of J^-1 belonging to such a column grows like w_min / h: its own attraction is a vanishing
+     part of the anomaly at its station. Measured with the reference forward model, the amplification of
+     a centre column amid 3 w_min deep ones is 4.0 w_min / h in a 3 x 3 basin and 34 w_min / h in a
+     10 x 10 basin (lam = 0), from h = 1e-2 w_min down to 1e-6 w_min.
+   - Change: the domain now also requires depth >= 1e-3 w_min, stated in the step-4 prompt ("1e-3 w_min <=
+     depth <= 3 w_min, depth <= 5e4 and lam depth <= 2 (all inclusive)"), the function_header, problem_io,
+     the contract (valid_input_ranges) and the docstrings of steps/step_4.py, solution/step_4.py,
+     solution.py, second_solution.py (which now has the docstring of the header) and the three mutants that
+     contain invert_basin_depths; step_background says why very shallow columns beside deep ones are ill
+     determined; difficulty_explanation gives the measured amplifications; the Version 3 note carries a
+     bracketed correction. Amplification over the new domain, measured from the Jacobian of the reference
+     forward model: the maximum is still the 10 x 10 basin 3 w_min deep everywhere with lam depth = 2
+     (7.88e5); with columns at 1e-3 w_min: chequerboards 4.6e3 (lam = 0) and 1.3e4 (lam depth = 2), one
+     shallow column in the centre of a 10 x 10 deep basin 1.65e5 (lam = 0) / 5.97e5 (lam depth = 2) overall
+     and 3.4e4 in its own row; greedy searches flipping single columns of 10 x 10 basins 3 w_min deep (lam
+     depth = 2; square cells and cells of aspect 2 and 5) to 1e-3 w_min found no arrangement that raises the
+     maximum; random basins (1 to 100 cells, square, irregular and anisotropic cells, lam depth 0, 1 or 2 at
+     3 w_min, random fractions of columns at 1e-3 w_min): 300 at most 1.7e5 overall, 400 more at most 4.4e5
+     overall and 2.5e4 in the rows of the shallow columns; one to five shallow columns anywhere in 10 x 10
+     deep basins at most 3.4e4 in their rows. So rounding the data to double precision moves the depths by
+     at most about 9e-11, and the prompt's sentence is true again; "up to about 1e6" in
+     difficulty_explanation is replaced by the measured "up to about 8e5 ... up to about 3e4 for a column a
+     thousandth of a width deep amid deep ones". Neither solution's algorithm changed: the reference's
+     trust-region phase is bounded below by 0 and its Newton phase starts from max(h, 1e-6 w_min), and the
+     second solution's iteration box is [1e-6 w_min, 1.5 min(5e4, 3 w_min, 2 / lam)], all of which contain
+     the new domain. Every earlier test basin satisfies the new bound (the smallest ratio is 0.06 w_min,
+     step 4 case 5).
+   - Regression test: new step 4 case 6 (n_test_cases 7): a rough 5 x 4 basin of irregular cells 400 m to
+     500 m wide with columns 0.4 m deep (1e-3 w_min, exactly the lower limit) beside columns 1200 m deep (3
+     w_min, the upper limit), drho0 = +250 (the first positive density contrast with lam > 0 in the step-4
+     tests), lam = 1.5e-3 (lam depth up to 1.8); data: 30-digit mpmath tanh-sinh quadrature of every
+     station-column pair, two stations confirmed to 20 digits by a different formula (see Targets). Its
+     amplification is 3.3e3. The reference reproduces its depths to 2.0e-12 and the second solution to
+     2.3e-13; the slab_thickness mutant fails it (relative error 3.0e2); newton_step_halving passes it
+     (2.1e-13) and is still rejected by case 5. Outside the tests: 240 random basins of the new domain (1 to
+     100 cells; square, irregular and anisotropic cells of about 5 m to 5 km; lam = 0 for a third of them,
+     otherwise log-uniform up to 1e-2 or set to give lam depth = 2 at the upper limit; both signs of drho0;
+     shallow columns exactly at 1e-3 w_min or at 1 to 10 times it, deep columns at the upper limit or at 0.7
+     to 1 times it, in random, few-shallow, mostly-shallow, chequered and all-shallow arrangements), each
+     inverted by the reference from data of the second solution's forward model and by the second solution
+     from data of the reference's: no failure, worst depth error 2.9e-12 (reference) and 3.5e-12 (second
+     solution), at most 17 s (reference) and 28 s (second solution) per basin on a shared machine. Step 4
+     cases 5 and 6, run twice in clean processes and with one and two BLAS threads: identical outputs
+     (SHA-256) for both solutions.
+2. **Texts updated with the change.** verification_explanation names the new cross-check of case 6 and the
+   new random basins and states the measured amplification bound; source.md Targets describes the new
+   basin; the agreement figures now quote the reference's depth error on case 6 (2.0e-12; 8.9e-13 on the
+   earlier cases).
+
+Rerun: `OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 python3 tools/crown_check.py
+tasks/prism_basin_gravity -j 2` (all modes): FORMAT OK (no problem); REF steps 1-4 5/5, 5/5, 5/5, 7/7 and
+general 3/3; SECOND the same; mutants: closed_form_everywhere (step 1) fails cases 0, 2, 4, direct_log 1, 2,
+no_subdivision (step 1) 4, closed_form_everywhere (step 2) 0, 2, 4, no_subdivision (step 2) 4,
+uniform_gauss_legendre 0, 2, uniform_density 0, 2, 4, corner_sum_far 2, 4, slab_thickness 0, 2, 3, 4, 5, 6,
+newton_step_halving 5, whole_task_mgal general 0, 1, 2; SHIFT +-1e-12 all pass (steps and general, every
+evaluated function shifted); all-None and all-zero controls pass 0 cases in every step and in general;
+SUMMARY ALL OK.
+
+Not changed: the physics, the algorithms of both solutions, every stored target of earlier versions, and
+every stated tolerance (U 1e-10, g 1e-10 |g| + 1e-14 G |rho| L, T 1e-9 ||T||, columns 1e-10, depths 1e-8);
+relevant_experience stays the placeholder for the author.

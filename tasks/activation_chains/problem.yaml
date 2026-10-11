@@ -135,7 +135,9 @@ problem_io: |-
         ValueError for nuclide data as in step 3, for times, k, activity or flux bounds outside these
         ranges (NaN and infinite values included), if A(flux_lo) < lam[k] * max(1e-250 * sum(n0), 1e-300)
         (at flux_lo the measured nuclide must hold at least 1e-250 of the initial atoms and at least 1e-300
-        atoms), or if activity lies outside [A(flux_lo), A(flux_hi)] by more than a relative 1e-9.
+        atoms; for x[k](flux_lo) within a relative 1e-10 of this bound, the accuracy of step 3,
+        ValueError and a result are both correct), or if activity lies outside [A(flux_lo), A(flux_hi)]
+        by more than a relative 1e-9.
         An activity with |ln(activity / A(end))| <= 1e-9 for an end of the interval, on either side of
         it, gives that end (flux_lo is checked first); the end is returned as the given bound itself, equal
         to it to a relative 1e-11. A is known to a relative 1e-10 (the accuracy of step 3), so the
@@ -399,7 +401,9 @@ sub_steps:
       must hold at least 1e-250 of the initial atoms and at least 1e-300 atoms, i.e.
       A(flux_lo) >= lam[k] * max(1e-250 * sum(n0), 1e-300) (the range in which step 3 gives x[k] to a
       relative 1e-10); otherwise raise ValueError. This holds as well when lam[k] is so small that
-      lam[k] * max(1e-250 * sum(n0), 1e-300) is below the smallest positive double.
+      lam[k] * max(1e-250 * sum(n0), 1e-300) is below the smallest positive double. Since step 3 gives
+      x[k] only to a relative 1e-10, ValueError and a result are both correct when x[k](flux_lo) lies
+      within a relative 1e-10 of max(1e-250 * sum(n0), 1e-300).
       Inputs:
         lam, sigma, n0: 1-D, length n with 1 <= n <= 30; 0 <= lam <= 1e10 per s, sigma = 0 or 1e-6 <= sigma <= 1e7 b,
                         n0 >= 0 with sum(n0) <= 1e100; all finite.
@@ -448,7 +452,9 @@ sub_steps:
             ValueError for nuclide data as in step 3, for times, k, activity or flux bounds outside these
             ranges (NaN and infinite values included), if A(flux_lo) < lam[k] * max(1e-250 * sum(n0), 1e-300)
             (at flux_lo the measured nuclide must hold at least 1e-250 of the initial atoms and at least 1e-300
-            atoms), or if activity lies outside [A(flux_lo), A(flux_hi)] by more than a relative 1e-9.
+            atoms; for x[k](flux_lo) within a relative 1e-10 of this bound, the accuracy of step 3,
+            ValueError and a result are both correct), or if activity lies outside [A(flux_lo), A(flux_hi)]
+            by more than a relative 1e-9.
             An activity with |ln(activity / A(end))| <= 1e-9 for an end of the interval, on either side of
             it, gives that end (flux_lo is checked first); the end is returned as the given bound itself, equal
             to it to a relative 1e-11. A is known to a relative 1e-10 (the accuracy of step 3), so the
@@ -466,7 +472,7 @@ sub_steps:
       quantity: "Neutron flux that reproduces a measured activation activity after irradiation and cooling."
       assumptions: "Constant flux during the irradiation, none during cooling; A(phi) strictly increasing on the given interval."
       result_kind: exact
-      valid_input_ranges: "Nuclide data of step 3; 0 < t_irr <= 1e9 s; 0 <= t_cool <= 1e9 s; k an integer (not bool) with lam[k] > 0; activity > 0 and finite; 1e-2 <= flux_lo < flux_hi <= 1e18 with A strictly increasing on [flux_lo, flux_hi]; A(flux_lo) >= lam[k] * max(1e-250 * sum(n0), 1e-300)."
+      valid_input_ranges: "Nuclide data of step 3; 0 < t_irr <= 1e9 s; 0 <= t_cool <= 1e9 s; k an integer (not bool) with lam[k] > 0; activity > 0 and finite; 1e-2 <= flux_lo < flux_hi <= 1e18 with A strictly increasing on [flux_lo, flux_hi]; A(flux_lo) >= lam[k] * max(1e-250 * sum(n0), 1e-300), with ValueError and a result both correct when x[k](flux_lo) is within a relative 1e-10 of max(1e-250 * sum(n0), 1e-300)."
       units: "Neutrons / (cm^2 s)."
       output_shape: "One Python float."
       step_dependencies: [3]

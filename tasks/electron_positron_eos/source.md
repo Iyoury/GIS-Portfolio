@@ -32,15 +32,22 @@ values (k, N_A).
 
 ## Second solution (version 4)
 - **Quadrature.** Adaptive QUADPACK (scipy.integrate.quad, epsrel 1e-13) instead of fixed panels: in the
-  momentum p itself below the Fermi window (and for a non-degenerate gas), and in y = (E - E_F)/kT over
-  the window E_F +- 40 kT. quad is called with full_output=1, so QUADPACK's round-off notices are returned
-  instead of raised as warnings; no warning filter is set.
-- **Net electron density.** For psi >= 1 the plain difference n_minus - n_plus (n_plus/n_minus <= e^{-2 psi},
-  so the difference loses at most a factor 1.3). For psi < 1 the charge-susceptibility integral
+  momentum p itself on the first panel, from E = 0 up to E_F - 40 kT (up to E_F when 0 < E_F < 40 kT),
+  and on every panel of a non-degenerate gas (E_F <= 0); in y = (E - E_F)/kT on the panels above, split
+  at E_F and E_F + 40 kT. The integrals end at max(E_F, 0) + 80 kT, where the occupations are below
+  e^{-80}. quad is called with full_output=1, so QUADPACK's round-off notices are returned instead of
+  raised as warnings; no warning filter is set.
+- **Net electron density.** For psi >= 1 the plain difference n_minus - n_plus. Pointwise
+  f_+/f_- = (e^{b-psi} + 1)/(e^{b+psi} + 1) >= e^{-2 psi} (b = (E + 1)/theta >= 1/theta), so n_plus/n_minus
+  is at least e^{-2 psi}, not at most. Over the domain it stays below 0.163 (measured: largest at psi = 1,
+  T = 1e11 K; the pointwise bound at b = 1/theta_max = 0.059 gives f_+/f_- <= 0.358). The difference
+  therefore amplifies the relative quadrature error of n_minus and n_plus by (n_minus + n_plus)/(n_minus -
+  n_plus) <= 1.39 (measured; rigorously at most 2.1). For psi < 1 the charge-susceptibility integral
   n_net(psi) = int_0^psi chi(psi') dpsi', chi = d n_net/d psi = PREF int p^2 [f_-(1-f_-) + f_+(1-f_+)] dp > 0
   (n_net(0) = 0 by charge-conjugation symmetry), with 16-point Gauss-Legendre in psi'; chi is analytic
-  for |Im psi'| < pi, so on [0, 1] the rule is converged to rounding (8 nodes already agree with 24
-  within 1e-14). This replaces the sinh identity of the reference.
+  for |Im psi'| < pi, so on [0, 1] the rule is converged to rounding: 8 nodes already agree with 24
+  within 2e-14 (measured 1.7e-14; 16 nodes within 1.5e-14, the level of the QUADPACK error of the chi
+  values). This replaces the sinh identity of the reference.
 - **Pressure.** From the grand potential, P = kT PREF int p^2 [ln(1 + e^{-x_-}) + ln(1 + e^{-x_+})] dp, not
   from the p^4/eps moment.
 - **psi.** Brent's method on ln n_net(ln psi).
@@ -497,7 +504,35 @@ cause, the change, the regression test and what was rerun.
     structure.
   - Change: the Cause lines were added there, marked "(added in version 4)", and the metadata item was
     given the same structure; the content of the changes is as recorded in version 2.
-- Rerun after all changes:
+- 12. Wrong inequality in the description of the second solution's net density (round-2 verifier).
+  - Finding: the Second solution paragraph and the header comment of second_solution.py said that for
+    psi >= 1, n_plus/n_minus <= e^{-2 psi}, "so the difference loses at most a factor 1.3", and that 8
+    psi-nodes agree with 24 "within 1e-14". Confirmed. Pointwise, with b = (E + 1)/theta,
+    f_+/f_- = (e^{b-psi} + 1)/(e^{b+psi} + 1) >= e^{-2 psi} (equivalent to e^{2 psi} >= 1), so n_plus/n_minus
+    is at least e^{-2 psi}. Measured with the reference pair_densities at psi = 1: n_plus/n_minus = 0.1353
+    (1e7 and 1e8 K), 0.1356 (1e9 K), 0.1454 (3e9 K), 0.1596 (1e10 K), 0.1629 (1e11 K), and the error
+    amplification (n_minus + n_plus)/(n_minus - n_plus) = 1.313, 1.314, 1.340, 1.380, 1.389. On a 168-point
+    grid (21 temperatures from 1e7 to 1e11 K, psi from 1 to 10) the largest ratio is 0.1629 (psi = 1,
+    T = 1e11 K), amplification 1.389. The pointwise bound at b = 1/theta_max = 0.0593 (T = 1e11 K) and
+    psi = 1 gives f_+/f_- <= 0.358, hence a rigorous amplification bound of 2.11. For the psi-quadrature,
+    on a 252-point grid (21 temperatures from 1e7 to 1e11 K, twelve psi from 1e-20 to 0.999999), 8 nodes
+    agree with 24 within 1.70e-14 and 16 nodes within 1.44e-14 (both largest at T = 1e7 K), the level of
+    the QUADPACK error of the chi values; the Gauss-Legendre truncation is below it.
+  - Cause: the e^{-2 psi} limit of large b (the cool gas) was written as an upper bound, although it is
+    the lower limit of f_+/f_-; the node-comparison figure was given as 1e-14 instead of the value on a
+    stated grid.
+  - Change: the Second solution paragraph and the second_solution.py header comment now say
+    n_plus/n_minus >= e^{-2 psi}, below 0.163 over the domain (measured; pointwise f_+/f_- <= 0.36), so the
+    difference amplifies the quadrature error by at most 1.39 (rigorously at most 2.1), and "8 nodes
+    already agree with 24 within 2e-14". In the same review, the quadrature description in both places was
+    made exact (which panels are integrated in p and which in y, and the cut at max(E_F, 0) + 80 kT); the
+    code is unchanged. No test, target, tolerance or code statement changed.
+  - Effect on the tests: none. The n_net error of the second solution for psi >= 1 stays near 1.4 times
+    its QUADPACK error; every stored target is still met to 1.1e-13 (largest: n_plus at (rho, T, Ye) =
+    (1e8, 3e8, 0.43)).
+  - Regression test: the measurement scripts above (kept outside the task folder) and crown_check all
+    modes (results below, same as before this item: only comments and source.md changed).
+- Rerun after all changes (including item 12):
   - tools/crown_check.py, all modes, every case alone in a fresh process, one BLAS/OpenMP thread, -j 2:
     - FORMAT OK (no problem reported).
     - REF: steps 1-5 pass 5/5, 3/3, 3/3, 2/2 and 4/4, general passes 2/2; solution.py passes every step

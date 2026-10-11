@@ -21,7 +21,10 @@ def array_criterion(ics, rs, theta0, v_crit):
         r_diff: differential resistance dV/dJ of the array at j_star (units of R_0).
         s_v: lim_{t->inf} Var(int_0^t V dt') / t at j_star, the zero-frequency (two-sided)
              voltage noise, in units of (hbar / 2e) I_0 R_0.
-        Relative errors below 1e-9 (j_star) and 1e-8 (r_diff, s_v).
+        j_star is graded against the bias at which the exact array voltage equals v_crit,
+        relative error below 1e-9 + 2e-9 / s with s = d ln(V) / d ln(J) of the exact array
+        voltage at j_star (the relative error of mean_voltage, below 1e-9, enters j_star
+        divided by s); r_diff and s_v, at the returned j_star, relative errors below 1e-8.
 
     Raises:
       ValueError if ics and rs are not 1-D arrays of the same nonzero length, if an entry
