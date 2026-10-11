@@ -321,12 +321,13 @@ def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
 
     def bound_levels(h, length):
         # the eigenvalues below 0 among the five lowest, with the box doubled until five of them have converged
-        # to 1e-4 cm^-1, and at most to l_max bohr. The Dirichlet walls only raise the eigenvalues, which fall
-        # towards the true levels as the box grows: an eigenvalue below 0 marks a bound level, and a level that
-        # is still missing in a box of 500-1000 bohr would be bound by less than about 1e-3 cm^-1 (its wave
-        # function reaching beyond the box). Without five bound levels the box grows to l_max and stops there.
+        # to 1e-4 cm^-1. The Dirichlet walls only raise the eigenvalues, which fall towards the true levels as
+        # the box grows: an eigenvalue below 0 marks a bound level. With fewer than five, the box grows until
+        # it holds every bound level (l_hold, repulsive tail) or up to l_max bohr; a level still missing in a
+        # box of 500-1000 bohr would be bound by less than about 1e-3 cm^-1 (its wave function reaching beyond
+        # the box).
         cur = below_zero(h, length)
-        while 2.0 * length <= l_max:
+        while 2.0 * length <= l_max and not (cur.size < 5 and length >= l_hold):
             length *= 2.0
             nxt = below_zero(h, length)
             if nxt.size == 5 and cur.size == 5 and np.max(np.abs(nxt - cur)) * 219474.6313632 < 1e-4:
@@ -335,6 +336,18 @@ def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
         return cur, length
 
     l_max = 1000.0
+    # Box that holds every bound level when the tail is repulsive: beyond the last point where the tail is not
+    # positive, a state below the limit decays at least like exp(-int sqrt(2 mu V) dR), and where this integral
+    # reaches 20 its amplitude is negligible. For a neutral tail (V = 0 there) no such point exists.
+    rr = np.arange(r_c, r_lo + l_max, 0.02)
+    vt = tail(rr)
+    nonpos = np.where(vt <= 0.0)[0]
+    if nonpos.size:
+        rr, vt = rr[nonpos[-1] + 1:], vt[nonpos[-1] + 1:]
+    q = np.sqrt(2.0 * mu * vt)
+    att = np.concatenate([[0.0], np.cumsum(0.01 * (q[1:] + q[:-1]))])
+    beyond = np.where(att >= 20.0)[0]
+    l_hold = rr[beyond[0]] - r_lo if beyond.size else np.inf
     h = 0.6 * np.pi / kmax
     cur, length = bound_levels(h, r_c - r_lo)
     for _ in range(40):

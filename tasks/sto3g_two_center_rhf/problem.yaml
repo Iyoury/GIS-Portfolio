@@ -68,23 +68,34 @@ verification_explanation: >-
   integrals with F_m from Kummer's function, full CI as a generalized eigenproblem and RHF by BFGS from
   40 random starts; step 6 case 0 also requires the variational lowering below the same oracle
   restricted to the two 1s functions, and Szabo-Ostlund literature values serve as coarse bands.
-  second_solution.py uses a third method wherever the reference and the oracles differ: Gauss-Legendre
-  quadrature of the defining integral for F_n; momentum-space (Fourier) radial integrals for the
-  overlap, kinetic, attraction and repulsion integrals of steps 2-3 and the one-centre integrals of
-  step 5; for step 4 RHF from the exact trigonometric-polynomial form of the energy in the orbital angle
-  and the roots of its derivative, with full CI in the whole product space of the RHF orbitals and a
-  spin penalty on the triplet; a Chebyshev interpolant of the curve in ln R and a sinc DVR of doubled
-  length for the levels; and for step 6 Gaussian-transform (Rys-type) integrals done by Gauss-Hermite
-  and Gauss-Legendre quadrature, RHF by great-circle steepest descent and the same spin-penalty full
-  CI. At the ends of the stated ranges of steps 2-4 (R = 0.02 and 100 bohr for the integrals, R = 0.1
-  and 100 bohr for the energies, zeta = 0.5 and 3, Z = 3) the oracles and the reference were compared
-  with a 50-digit mpmath evaluation of the closed-form integrals, the singlet full CI and RHF, and step 4
-  with its oracle on a 432-point grid of its range (version 14); the version-15 second solution was
-  compared with the same kind of 50-digit evaluation at six integral points and seven energy points
-  (within 3.6e-15 and 3.5e-13 hartree). tools/crown_check.py ran every case alone in a fresh process:
-  the reference and the second solution pass all cases, each of the 13 step mutants and the whole-task
-  mutant fails at least one case, reference outputs scaled by 1 +- 1e-12 (for the general tests every
-  evaluated function scaled) still pass every case, and all-None and all-zero stubs pass no case.
+  second_solution.py uses, function by function, a method different from the reference and from the
+  oracles: Gauss-Legendre quadrature of the defining integral for F_n; momentum-space (Fourier) radial
+  integrals for the overlap, kinetic, attraction and repulsion integrals of steps 2-3 and the one-centre
+  integrals of step 5; for step 4 RHF from the exact trigonometric-polynomial form of the energy in the
+  orbital angle and the roots of its derivative, with full CI in the whole product space of the RHF
+  orbitals and a spin penalty on the triplet; a Chebyshev interpolant of the curve in ln R and a sinc DVR
+  of doubled length for the levels, with an explicit count of the eigenvalues below the limit (the box
+  grows until it holds every bound level, or to 1000 bohr for a neutral tail); and for step 6
+  Gaussian-transform (Rys-type) integrals done by Gauss-Hermite and Gauss-Legendre quadrature, RHF by
+  level-shifted Roothaan-Hall SCF from 64 fixed guess orbitals, and full CI by direct CI (sigma vectors,
+  no Hamiltonian matrix) with Davidson iteration in the canonical RHF orbitals. Full CI is the same
+  eigenvalue problem in every method, so for the full-CI energies the independence lies in the
+  integrals, orbitals and eigensolver. As a further check of the step 6 RHF global minimum, on 202
+  inputs (the 10 step 6 and general inputs, 32 range corners, 160 random points) a 400-start BFGS search
+  and a dense singlet full CI (generalized eigenproblem) on the second-solution integrals agree with
+  the second solution within 4.7e-14 and 1.8e-13 hartree, the minimum being reached from at least 29 of
+  the 64 guesses. On 30 further step 5 inputs near the five-level threshold the reference and the
+  second solution agree on which raise ValueError (16) and on the levels of the others (14) within
+  1.1e-6 cm^-1. At the ends of the stated ranges of steps 2-4 (R = 0.02 and 100 bohr for the
+  integrals, R = 0.1 and 100 bohr for the energies, zeta = 0.5 and 3, Z = 3) the oracles and the
+  reference were compared with a 50-digit mpmath evaluation of the closed-form integrals, the singlet
+  full CI and RHF, and step 4 with its oracle on a 432-point grid of its range (version 14); the
+  version-15 second solution of steps 2-4 was compared with the same kind of 50-digit evaluation at six
+  integral points and seven energy points (within 3.6e-15 and 3.5e-13 hartree). tools/crown_check.py
+  ran every case alone in a fresh process: the reference and the second solution pass all cases, each
+  of the 13 step mutants and the whole-task mutant fails at least one case, reference outputs scaled by
+  1 +- 1e-12 (for the general tests every evaluated function scaled) still pass every case, and
+  all-None and all-zero stubs pass no case.
 
 required_dependencies: |-
   import numpy as np

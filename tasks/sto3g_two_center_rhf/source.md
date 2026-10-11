@@ -51,10 +51,10 @@ analytic tail integrated outward with solve_ivp, with Sturm node counting and bi
 starts polished by a maximum-overlap SCF, and full CI in the symmetric product functions of Loewdin
 orbitals.
 
-The second solution (version 15) uses a third method wherever the reference and the test oracles
-differ: composite Gauss-Legendre quadrature of the defining integral for F_n (since version 13);
-momentum-space (Fourier) radial integrals for steps 2 and 3 (overlap and kinetic energy from the
-Fourier transforms of the two primitives and Parseval's theorem, attraction and repulsion from the
+The second solution (version 16) uses, function by function, a method different from the reference and
+from the test oracles: composite Gauss-Legendre quadrature of the defining integral for F_n (since
+version 13); momentum-space (Fourier) radial integrals for steps 2 and 3 (overlap and kinetic energy from
+the Fourier transforms of the two primitives and Parseval's theorem, attraction and repulsion from the
 Fourier transform of the Gaussian charge cloud and the Coulomb kernel 4 pi / k^2, the angular average
 giving j0(k d), the k integral by composite Gauss-Legendre; no erf, no Boys function); for step 4 RHF
 from the exact trigonometric-polynomial form of E(theta) (harmonics 0, 2, 4, coefficients from 8
@@ -62,12 +62,20 @@ samples) and the roots of its derivative (a quartic in exp(2 i theta)), and full
 4-dimensional product space of the RHF orbitals with a spin penalty 20 (1 - P12) / 2 hartree on the
 triplet; for step 5 the one-centre integrals of the limit from the same momentum-space integrals, its
 own fci_energy sampled on 200 Chebyshev nodes in ln R on [0.3 bohr, r_c] and interpolated, the exact
-separated-fragment tail beyond r_c, and a Colbert-Miller sinc DVR whose length is doubled and whose step
-is refined until the five levels change by less than 1e-4 cm^-1 (since version 12); for step 6
-Gaussian-transform (Rys-type) integrals, 1/r = (2/sqrt(pi)) int exp(-s^2 r^2) ds with the x, y, z
-factors done exactly by 3-point Gauss-Hermite rules and the transform variable by Gauss-Legendre, RHF
-by steepest descent along great circles with Brent line searches, and full CI in the 64-dimensional
-product space of the RHF orbitals with the same spin penalty.
+separated-fragment tail beyond r_c, and a Colbert-Miller sinc DVR (at least 40 points) whose length is
+doubled and whose step is refined until the five levels below the limit change by less than
+1e-4 cm^-1 (since version 12); with fewer than five eigenvalues below the limit the box is doubled until
+it holds every bound level (repulsive tail: the WKB attenuation integral of the tail beyond its last
+non-positive point reaches 20) or up to 1000 bohr (neutral tail), and ValueError is raised if fewer than
+five remain after a step refinement (version 16); for step 6 Gaussian-transform (Rys-type) integrals,
+1/r = (2/sqrt(pi)) int exp(-s^2 r^2) ds with the x, y, z factors done exactly by 3-point Gauss-Hermite
+rules and the transform variable by Gauss-Legendre, RHF by level-shifted Roothaan-Hall SCF (Fock
+F = H + 2J - K, shift 1 hartree on the virtual space, no DIIS) from 64 fixed guess orbitals (every basis
+function and every sum and difference of two), keeping the lowest converged energy, and full CI by
+direct CI (sigma vectors from the integrals, no Hamiltonian matrix) with Davidson iteration in the
+canonical RHF orbitals, restricted to symmetric coefficient matrices (version 16). Full CI is the same
+eigenvalue problem in every method (it does not depend on the orbitals), so for the full-CI energies the
+independence lies in the integrals, the orbitals and the eigensolver, not in the space.
 
 Superseded descriptions, kept for the record (earlier versions of this file): until version 14 the
 second solution reused the test-oracle code for the integrals of steps 2-3 (shell-theorem quadrature)
@@ -77,7 +85,11 @@ the step 5 reference was a sinc DVR on a widening fixed domain until version 11;
 then used Chebyshev spectral collocation for the levels, and direct orbital minimization against the
 self-consistent field that the step 4 reference used until version 9; the step 1 target was a
 400-point Gauss-Legendre quadrature of F0 until version 6, and the levels target was renormalized
-Numerov shooting until version 7. None of these is used now.
+Numerov shooting until version 7; in version 15 the second solution found the step 6 RHF by steepest
+descent along great circles from the eigenvectors of h and 40 random starts (the strategy of the
+reference with another step rule) and did the step 6 full CI in the 64-dimensional product space of its
+RHF orbitals with a spin penalty, and its sinc DVR had no explicit bound-state count. None of these is
+used now.
 
 ## How the test targets are obtained
 
@@ -193,6 +205,14 @@ Version 11 (content-check fixes):
   at ZA = 3, ZB = 1 with 10 u nuclei found none, so an endpoint Z = 3 case with five levels does
   not exist. The upper endpoint Z = 2 is exercised on both centres (HeH+ and its swap). Charges
   outside [1, 2] or not finite now raise ValueError, stated and tested.
+  (Version 16 note: the general claim "with a charge above 2 ... no curve holds five bound levels" was
+  found inaccurate; it had been checked only at ZA = 3, ZB = 1. With the reference and only the charge
+  cap raised, ZB = 1, zetaB = 1.24 and 10 u nuclei, five deep levels exist at ZA = 2.01, zetaA = 2.0925
+  (-48094.9 to -41013.1 cm^-1), ZA = 2.05 (-35366.5 to -28725.4), ZA = 2.1 (-20491.5 to -14523.9),
+  ZA = 2.1 with zetaA = 2.3 (-49656.0 to -41869.5) and ZA = 2.3 with zetaA = 2.5 (-9873.0 to
+  -2993.7); at ZA = 2.5 (zetaA = 2.0925) and ZA = 3 (zetaA = 2.7) there are fewer than five. The
+  domain limit 1 <= Z <= 2 is kept as a design choice; the false reason was removed from the step 5
+  prompt in version 16.)
 - Step 1 rejects an array with one bad element (NaN, negative or above 1e6).
 
 ## Version 12
@@ -429,6 +449,12 @@ descriptions were already fixed in version 14 (see above) and were rechecked her
       one-dimensional Gauss-Hermite quadratures. No Boys function, no Hermite expansion, no recursion.
     - Unchanged: Gauss-Legendre quadrature of the Boys integral (step 1), the Chebyshev interpolant
       in ln R and sinc DVR of step 5, and RHF by great-circle steepest descent in step 6.
+    - (Version 16 note: "different from both the reference and the oracles" did not hold for step 6.
+      The great-circle RHF used the reference's strategy, multi-start first-order descent on the unit
+      sphere from the eigenvectors of h and 40 random vectors, with only the step rule changed, and the
+      step 6 full CI built the reference's 64 x 64 product-space Hamiltonian, with a spin penalty instead
+      of the symmetric projection. The sinc DVR also passed the He2 2+ error case only through a numpy
+      broadcasting ValueError. All three are fixed in version 16.)
   - Regression tests and checks (single-threaded BLAS):
     - Integrals of steps 2-3 against the reference on 288 points (Z = (1,1), (3,3), (1,3), (2,1);
       zetaA = 0.5, 1.24, 3; zetaB = 0.5, 2, 3; R = 0.02 to 100 bohr): within 7.1e-15 (one-electron), and
@@ -518,3 +544,129 @@ descriptions were already fixed in version 14 (see above) and were rechecked her
   - Repeat runs: second_solution.py gives bitwise identical outputs of all six functions (range-end
     inputs of steps 2-4 and 6, one step 5 input) in two clean processes with one thread. Runs with more
     threads were not made here (shared CPU).
+
+## Version 16 (grading_fix: authoring-guide conformance, pass 2)
+
+Fixes for the three blocking findings of the independent verification of version 15. Only the step 5
+prompt, second_solution.py (vibrational_levels and polarized_energies), verification_explanation and
+this file changed. No reference algorithm, test, target, stated tolerance, input domain or mutant was
+changed. Each item gives the finding, its cause, the change, the regression test and what was rerun.
+
+- False reason in the step 5 prompt (rules B, C, F).
+  - Finding: the Errors paragraph of the step 5 prompt ended with "(With a charge above 2 the separated
+    fragments in this basis repel each other and no curve holds five bound levels, so the step is
+    limited to 1 <= Z <= 2.)". This is false just above 2. Reproduced here with solution.py, with only
+    the charge cap raised to 3 (ZB = 1, zetaB = 1.24, 10 u nuclei). Five deep levels exist at
+    ZA = 2.01, 2.05 and 2.1 (zetaA = 2.0925), at ZA = 2.1 with zetaA = 2.3 and at ZA = 2.3 with
+    zetaA = 2.5. ZA = 2.5 (zetaA = 2.0925) and ZA = 3 (zetaA = 2.7) raise ValueError. For a charge just
+    above 2 the lowest limit leaves the small fragment charge ZA - 2 on A, so the repulsive tail
+    (ZA - 2) ZB / R is weak, while the HeH+-like well is about 0.2 hartree deep.
+  - Cause: the version-11 note generalized a scan made only at ZA = 3, ZB = 1.
+  - Change: the parenthetical sentence is deleted. The prompt keeps the domain (inputs "1 <= Z <= 2")
+    and its stated error rule ("raise ValueError if a charge is not finite or not in [1, 2]"). The
+    range is a design choice and needs no physical reason. The version-11 note above is annotated with
+    these counterexamples.
+  - Regression test: step 5 case 7 still checks the ValueError for ZA = 2.5 and ZB = 0.9 (unchanged);
+    crown_check FORMAT and REF.
+- The step 5 second solution passed the error case by accident and did not terminate on another
+  in-domain input (rule D).
+  - Finding: reproduced here. For He2 2+, (2, 2, 2.0925, 2.0925, m_He, m_He), the first DVR had
+    n = int(7.7 / 2.2067) = 3 points. nxt - cur on arrays of 5 and 3 eigenvalues then raised a numpy
+    broadcasting ValueError, and case 7 counted it as the intended exception. For (2, 2, 3, 1.2, 10, 10),
+    where the reference raises ValueError in under a second, the box was doubled from 11.7 to
+    23962 bohr (n = 17163). Here the run was stopped by a MemoryError under a 3 GB limit after 112 s.
+  - Cause: the loop required all five lowest eigenvalues to converge in the box length. Box
+    (continuum) states above the limit never converge. The loop also had no minimum number of grid
+    points, no count of bound levels and no length cap.
+  - Change (second_solution.py, vibrational_levels only):
+    - The DVR always has at least 40 points.
+    - Only eigenvalues below 0 are compared. A box is accepted when five of them have converged to
+      1e-4 cm^-1 between its half length and its length. A Dirichlet wall only raises the eigenvalues,
+      so an eigenvalue below 0 marks a bound level.
+    - With fewer than five, the box is doubled until it holds every bound level, or at most to
+      1000 bohr. For a repulsive tail the box holds every bound level once it passes the point, beyond
+      the last non-positive tail value, where the attenuation integral int sqrt(2 mu V_tail) dR
+      reaches 20. A neutral tail has no such point and uses the cap.
+    - The step is then refined at that box length until the number of levels below 0 no longer
+      changes, and ValueError is raised.
+    - Limitation, stated in the code: a fifth level that needs a box longer than 500-1000 bohr would
+      be reported as missing. Such a level is bound by less than about 1e-3 cm^-1 with 1 u nuclei. No
+      test input comes near this.
+  - Regression tests (one BLAS thread):
+    - He2 2+ now raises the intended ValueError (no level below the limit) in 1.8 s, and
+      (2, 2, 3, 1.2, 10, 10) in 2.1 s.
+    - The levels of all ten step 5 test inputs are bitwise identical to version 15 (1.7-10 s per
+      call).
+    - 30 further in-domain inputs were chosen near the five-level threshold from a WKB scan of the
+      reference curve: Z from 1 to 2, zeta from 0.8 to 3, masses 1 and 10 u, 0.2 to 6.9 estimated
+      levels. The reference and the second solution both raise ValueError on the same 16. On the other
+      14 they give five levels (fifth level from -0.60 to -6650 cm^-1) that agree within
+      1.1e-6 cm^-1. The second solution takes 1.7 to 15 s per input.
+    - crown_check SECOND on step 5.
+- The step 6 second solution followed the reference's strategy for RHF and full CI (rule D).
+  - Finding: confirmed.
+    - The version-15 RHF minimized E(x) = 2 x.h.x + (xx|xx) by multi-start first-order descent on the
+      unit sphere in the Loewdin basis, from the 8 eigenvectors of h and 40 standard-normal vectors, as
+      the reference does (seed 12345 there, 77 here). Only the step rule differed: an exact Brent line
+      search along great circles instead of Armijo backtracking with a maximum-overlap SCF polish.
+    - The full CI built the reference's 64 x 64 product-space Hamiltonian and differed only in how the
+      triplet was excluded.
+    - verification_explanation and this file called this a third method.
+  - Cause: in version 15 only the step 6 integrals were rewritten.
+  - Change (second_solution.py, polarized_energies):
+    - RHF by Roothaan-Hall SCF in the AO basis: F(D) C = S C eps with F = H + 2J - K and D = c c^T,
+      canonical orthogonalization, and a level shift of 1 hartree on the virtual space. The lowest
+      orbital of the shifted Fock matrix is occupied. Each iteration is then a damped downhill step,
+      which can keep a non-aufbau orbital occupied and does not settle on a saddle point. A run has
+      converged when the commutator FDS - SDF is below 1e-11.
+    - The SCF starts from 64 fixed guess orbitals: every normalized basis function and every
+      normalized sum and difference of two of them. There are no random starts and no core-Hamiltonian
+      eigenvectors. The lowest converged energy is kept.
+    - Two variants were rejected. With DIIS, the extrapolation stalled on stretched molecules with
+      nearly degenerate orbitals (at one random point 1e-3 hartree above the minimum, commutator 7e-7
+      after 3000 iterations). A maximum-overlap SCF without level shift, started from the Fock
+      eigenvectors of atomic-function densities, missed the delocalized minimum of stretched H2
+      (R = 10 bohr) by 0.33 hartree.
+    - Full CI by direct CI for the singlet. The spatial wave function is sum Y_ij chi_i(1) chi_j(2)
+      with Y symmetric, and sigma(Y) = hY + Yh + sum_kl (ik|jl) Y_kl in the canonical RHF orbitals (the
+      eigenvectors of the converged Fock matrix). Davidson iteration with the diagonal preconditioner
+      starts from the RHF determinant and four random symmetric vectors (seed 31) and runs until the
+      residual is below 1e-10.
+    - No Hamiltonian matrix is formed, and no triplet enters, since sigma keeps Y symmetric. Full CI is
+      the same eigenvalue problem in every method, so for E_fci the independence lies in the
+      integrals, the orbitals and the eigensolver. verification_explanation now says so.
+  - Regression tests and checks (second-solution integrals, one thread):
+    - The check covered 202 inputs: the 10 step 6 and general test inputs; 32 corners of the range
+      (Z = 1 and 3 on each atom, zetaA = 0.5 or 3 with zetaB = 3.5 - zetaA, alphaA = 0.1 or 5 with
+      alphaB = 5.1 - alphaA, R = 0.3 and 10 bohr); and 160 random points (Z and zeta uniform, alpha and
+      R log-uniform).
+    - On every input, an independent 400-start BFGS minimization of the closed-shell energy agrees
+      with the new RHF within 4.7e-14 hartree. A dense singlet full CI (generalized eigenproblem in the
+      non-orthogonal symmetric product functions) agrees with the direct CI within 1.8e-13 hartree.
+    - Every SCF run converged, and at every point at least 29 of the 64 guesses reached the global
+      minimum.
+    - On the ten test inputs, polarized_energies agrees with this check within 1.8e-14 hartree. It
+      takes 1.9-2.6 s per call (was 4.5-27 s); the integrals dominate.
+    - crown_check SECOND on step 6 and general.
+- Texts: verification_explanation is rewritten. It drops "a third method wherever the reference and
+  the oracles differ", adds the full-CI caveat, the two checks above and the bound-level count of step
+  5. The second-solution paragraph near the top of this file is rewritten for version 16, the
+  superseded paragraph records the version-15 methods, and the version-15 bullet is annotated.
+- Rerun after all changes: tools/crown_check.py, all modes, every case alone in a fresh process, one
+  BLAS/OpenMP thread, -j 2.
+  - FORMAT OK.
+  - REF: steps 1-6 pass 5/5, 6/6, 5/5, 8/8, 8/8 and 4/4; general 3/3.
+  - SECOND: all cases of steps 1-6 and general pass.
+  - Mutants: each fails at least one case, with the same cases as in version 15:
+    - upward_recursion fails 3/5 (cases 0, 1, 3); zeta_not_squared 4/6 (0, 1, 3, 5);
+      wrong_boys_argument 4/5 (0, 1, 2, 4).
+    - full_exchange 8/8; orthonormal_atomic_basis 8/8; single_start_scf 1/8 (5);
+      lowest_product_eigenvalue 1/8 (6).
+    - limit_at_finite_distance 2/8 (2, 3); total_mass 7/8 (0-6); harmonic_levels 7/8 (0-6).
+    - kinetic_without_angular_momentum 4/4; sigma_p_only 4/4; aufbau_scf 1/4 (2).
+    - whole_task_missing_hermite_sign 3/3 general cases.
+  - SHIFT ±1e-12: every step case passes, and every general case with every evaluated function
+    shifted.
+  - All-None and all-zero controls pass 0 cases in every step and in general.
+  - Repeat runs: two clean processes with one thread give bitwise identical outputs of the new
+    second-solution polarized_energies (two inputs) and vibrational_levels (two inputs).
