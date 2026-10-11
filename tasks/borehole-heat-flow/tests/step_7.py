@@ -1,24 +1,29 @@
 # Tests for step 7: regional_deglaciation_inversion (regional maximum-likelihood inversion of several borehole logs
-# that share one glacial history: amplitude g and end of the glaciation t_end common to all holes, a steady
-# geotherm T0_h, q0_h and an unknown noise level sigma_h for each hole).
-# No expected value comes from the reference solution. Each case builds its boreholes forward with numpy and math
-# only (TVD by 64-point Gauss-Legendre integration of the great-circle tangent, R and S by exact layer sums) and
-# constructs the temperatures so that the maximum-likelihood solution is known exactly: on the used readings of
-# hole h, y_h = T + A S = T0_h + q0_h R_h + g P_h(t_end) + r_h, with r_h = b_h + c_h, b_h orthogonal to the four
-# Jacobian columns [1, R_h, P_h, g dP_h/dt_end] (seeded), c_h in the span of the projections of P_h and
-# g dP_h/dt_end off [1, R_h], and one hole's c_h solved in closed form so that the weighted score
-# sum_h (n_h / |r_h|^2) [P_h, g dP_h/dt_end]^T r_h vanishes while the unweighted (pooled least-squares) one does not.
-# With sigma_h^2 = |r_h|^2 / n_h every score of the log-likelihood is zero at the generating values; dense scans of
-# the oracle profile (source.md) show that they are the global maximum over the bounds of every case. P and
-# dP/dt_end come from an independent oracle, the branch-cut (real-axis) integral of the Laplace solution of each
-# layered column with Gauss-Legendre quadrature, or from erfc for a uniform column. The standard errors come from
-# the expected Fisher information of the oracle Jacobians at sigma_h, the chi-square quantile from math.erf, and
-# the interval ends are the oracle profile's nearest crossings (the maximum over g at fixed t_end bracketed between
-# the holes' own optima). Accuracy as stated: g and t_end relative 2e-3; q0 relative 5e-4; T0 2e-3 K; standard
-# errors relative 1e-2; interval ends relative 5e-4; noise_sd relative 3e-3; log_likelihood 0.1; n_used exact.
+# that share one glacial history: amplitude g and end of the glaciation t_end common to all holes, a steady geotherm
+# T0_h, q0_h and stationary AR(1) noise with lag-one correlation phi_h and innovation standard deviation s_h for each
+# hole, along its used readings ordered by increasing MD).
+# No expected value comes from the reference solution. Each case builds its boreholes forward with numpy and math only
+# (TVD by 64-point Gauss-Legendre integration of the great-circle tangent, R and S by exact layer sums) and constructs
+# the temperatures so that the exact maximum-likelihood solution is known: on the used readings of hole h (by MD),
+# y_h = T + A S = T0_h + q0_h R_h + g P_h(t_end) + r_h, and the residual is built in whitened space, u_h = L(phi_h) r_h
+# with L the Prais-Winsten transform (first row sqrt(1 - phi^2), then r_i - phi r_(i-1)): u_h = b_h + c_h, b_h
+# orthogonal to the four whitened Jacobian columns L[1, R_h, P_h, g dP_h/dt_end] with |b_h|^2 = n_h noise_h^2, c_h in
+# the span of the projections of L P_h and L g dP_h/dt_end off L[1, R_h] (one hole's c_h solved in closed form so that
+# the weighted shared score sum_h (n_h / |u_h|^2) [., .]^T u_h vanishes), and b_h turned on its sphere until the score
+# of phi_h vanishes. With s_h^2 = |u_h|^2 / n_h every score of the exact log-likelihood (first reading included) is zero
+# at the generating values; dense scans of the oracle profile (source.md) show that they are the global maximum over the
+# bounds. P and dP/dt_end come from an independent oracle, the branch-cut (real-axis) integral of the Laplace solution
+# of each layered column, or from erfc for a uniform column. The standard errors come from the expected Fisher
+# information of the oracle Jacobians with the AR(1) covariance at phi_h, s_h; the chi-square quantile from math.erf;
+# the interval ends are checked against the oracle profile log-likelihood (maximum over g by sign changes of its
+# derivative and bisection, over the phi_h by damped Newton steps): a threshold crossing lies within a relative 5e-4 of
+# each returned end and the profile stays above the threshold between the ends and t_end. Accuracy as stated: g and
+# t_end relative 2e-3; q0 relative 5e-4; T0 2e-3 K; standard errors relative 1e-2; interval ends relative 5e-4; phi
+# 2e-3 (absolute); innovation_sd relative 3e-3; log_likelihood 0.1; n_used exact.
 
 # --- test case 0 ---
-# three holes of different quality: every output against the exact maximum-likelihood solution
+# three holes with different noise levels and lag-one correlations: every output against the exact maximum-likelihood
+# solution
 import numpy as np
 
 
@@ -135,9 +140,9 @@ def _crown_case():
         return (0.5 * (lo + hi)) ** 2
 
     class _t7_Bore:
-        """One borehole built forward: TVD of the readings and the layer tops, the inclusive z_min cut, R and S by
-        exact layer sums, and the oracle step response of its own column (branch-cut form, or erfc for a uniform
-        column)."""
+        """One borehole built forward: TVD of the readings and the layer tops, the inclusive z_min cut, the used
+        readings in the order of increasing MD (the order of the AR(1) noise), R and S by exact layer sums, and the
+        oracle step response of its own column (branch-cut form, or erfc for a uniform column)."""
 
         def __init__(self, survey, layers, A, rc, z_min, log_step=None, log_top=None, log_md=None, uniform_k=None):
             self.md, self.inc, self.azi = (np.asarray(v, float) for v in survey)
@@ -149,10 +154,13 @@ def _crown_case():
             self.tops = np.array([_t7_g_tvd(self.md, self.inc, self.azi, m) for m in self.tops_md])
             self.z = np.array([_t7_g_tvd(self.md, self.inc, self.azi, m) for m in self.log_md])
             self.keep = self.z >= z_min
-            self.zk, self.n = self.z[self.keep], int(self.keep.sum())
+            used = np.nonzero(self.keep)[0]
+            self.idx = used[np.argsort(self.log_md[used], kind="stable")]      # used readings by increasing MD
+            self.zk, self.n = self.z[self.idx], int(self.idx.size)
+            self.cache = {}
             RS = np.array([_t7_g_RS(v, list(self.tops), list(self.k)) for v in self.zk])
             self.R, self.S = RS[:, 0], RS[:, 1]
-            self.Q2, _ = np.linalg.qr(np.column_stack([np.ones(self.n), self.R]))
+            self.X = np.column_stack([np.ones(self.n), self.R])
 
         def U(self, t, deriv=False):
             if self.uniform_k is None:
@@ -172,105 +180,196 @@ def _crown_case():
             self.Pfix, self.ds = Pf, sh[0] - sh[1]
 
         def P(self, t):
-            return self.Pfix + self.ds * self.U(t)
+            t = float(t)
+            if t not in self.cache:
+                self.cache[t] = self.Pfix + self.ds * self.U(t)
+            return self.cache[t]
 
         def dP(self, t):
             return self.ds * self.U(t, True)
 
-    class _t7_Region:
-        """Boreholes sharing one glacial history, with data whose maximum-likelihood solution is known exactly.
-        On the used readings of hole h, y_h = T + A S = T0_h + q0_h R_h + g P_h(t_end) + r_h with
-        r_h = b_h + c_h: b_h is orthogonal to the four columns [1, R_h, P_h, g dP_h/dt_end] (seeded, rms noise[h]),
-        c_h lies in the span of the projections p_h, d_h of P_h and g dP_h/dt_end off [1, R_h] (coefficients
-        kappa[h] in units of noise[h] for every hole but hole `solve`), and that hole's c_h is solved in closed form
-        so that sum_h (n_h / |r_h|^2) [p_h, d_h]^T r_h = 0. With sigma_h^2 = |r_h|^2 / n_h every score of the
-        log-likelihood vanishes at the generating values, while the unweighted sum sum_h [p_h, d_h]^T r_h does not."""
+    def _t7_white(v, phi):
+        """Prais-Winsten transform of the readings (axis 0, by increasing MD) for the stationary AR(1) model: first row
+        sqrt(1 - phi^2) v_1, then v_i - phi v_(i-1). For AR(1) errors the transformed errors are independent with
+        variance s^2."""
+        v = np.asarray(v, float)
+        out = np.empty_like(v)
+        out[0] = math.sqrt(1.0 - phi * phi) * v[0]
+        out[1:] = v[1:] - phi * v[:-1]
+        return out
 
-        def __init__(self, bores, T0, q0, g, t_end, shape, t_known, noise, kappa, seed, solve):
-            self.bores, self.g, self.t_end = bores, g, t_end
-            self.shape, self.t_known = np.asarray(shape, float), np.asarray(t_known, float)
+    def _t7_unwhite(u, phi):
+        """Inverse transform: r_1 = u_1 / sqrt(1 - phi^2), r_i = u_i + phi r_(i-1)."""
+        r = np.empty(u.size)
+        r[0] = u[0] / math.sqrt(1.0 - phi * phi)
+        for i in range(1, u.size):
+            r[i] = u[i] + phi * r[i - 1]
+        return r
+
+    def _t7_phi_score(u, phi):
+        """n times the derivative in phi of -(n/2) log |L(phi) r|^2 + (1/2) log(1 - phi^2), with r = L(phi*)^-1 u fixed,
+        at phi = phi* (multiplied by |u|^2 / n): n (sum_(i>=2) u_i r_(i-1) + phi r_1^2) - |u|^2 phi / (1 - phi^2)."""
+        r = _t7_unwhite(u, phi)
+        return u.size * (float(u[1:] @ r[:-1]) + phi * r[0] ** 2) - float(u @ u) * phi / (1.0 - phi * phi)
+
+    def _t7_unwhite_T(z, phi):
+        """Solve L(phi)^T x = z (the transpose of the Prais-Winsten transform), by back substitution."""
+        x = np.empty(z.size)
+        x[-1] = z[-1]
+        for i in range(z.size - 2, 0, -1):
+            x[i] = z[i] + phi * x[i + 1]
+        x[0] = (z[0] + phi * x[1]) / math.sqrt(1.0 - phi * phi) if z.size > 1 else z[0] / math.sqrt(1.0 - phi * phi)
+        return x
+
+    def _t7_phi_score_grad(u, phi):
+        """Gradient in u of _t7_phi_score (a quadratic form in u)."""
+        n = u.size
+        r = _t7_unwhite(u, phi)
+        su = np.zeros(n)
+        su[:-1] = u[1:]
+        sr = np.zeros(n)
+        sr[1:] = r[:-1]
+        e1 = np.zeros(n)
+        e1[0] = 1.0
+        return n * (sr + _t7_unwhite_T(su, phi) + 2.0 * phi * r[0] * _t7_unwhite_T(e1, phi)) - 2.0 * phi / (1.0 - phi * phi) * u
+
+    class _t7_Region:
+        """Boreholes sharing one glacial history, with data whose maximum-likelihood solution under stationary AR(1)
+        noise is known exactly. In hole h (used readings by increasing MD) the residual r_h = y_h - T0_h - q0_h R_h -
+        g P_h(t_end), y = T + A S, is built in whitened space, u_h = L(phi_h) r_h (L the Prais-Winsten transform):
+        u_h = b_h + c_h with b_h orthogonal to the four whitened columns L[1, R_h, P_h, g dP_h/dt_end], |b_h|^2 =
+        n_h noise_h^2, and c_h in the span of the projections p_h, d_h of L P_h and L g dP_h/dt_end off L[1, R_h]
+        (coefficients kappa[h] in units of noise_h for every hole but hole `solve`, whose c_h is solved in closed form
+        so that sum_h (n_h / |u_h|^2) [p_h, d_h]^T u_h = 0). b_h = rho_h (cos a b0 + sin a v) with b0, v orthonormal
+        (seeded) is rotated in its plane until the score of phi_h vanishes (|u_h| unchanged). With s_h^2 = |u_h|^2 / n_h
+        every score of the exact log-likelihood vanishes at the generating values."""
+
+        def __init__(self, bores, T0, q0, g, t_end, shape, t_known, noise, phi, kappa, seed, solve):
+            self.bores, self.g, self.t_end, self.phi = bores, g, t_end, list(phi)
             H = len(bores)
             rng = np.random.default_rng(seed)
-            B, Pp, Dd, Ps = [], [], [], []
+            B0, Q4s, Pp, Dd, Ps, Ds, Xw = [], [], [], [], [], [], []
             for h, bo in enumerate(bores):
                 bo.history(shape, t_known)
                 P0, D0 = bo.P(t_end), g * bo.dP(t_end)
-                J = np.column_stack([np.ones(bo.n), bo.R, P0, D0])
-                Q, _ = np.linalg.qr(J)
+                xw = _t7_white(bo.X, phi[h])
+                pw, dw = _t7_white(P0, phi[h]), _t7_white(D0, phi[h])
+                Q4, _ = np.linalg.qr(np.column_stack([xw, pw, dw]))
                 w = rng.standard_normal(bo.n)
-                b = w - Q @ (Q.T @ w)
-                b = b - Q @ (Q.T @ b)
-                b *= noise[h] / math.sqrt(np.mean(b * b))
-                Q2 = bo.Q2
-                p = P0 - Q2 @ (Q2.T @ P0)
-                d = D0 - Q2 @ (Q2.T @ D0)
-                B.append(b); Pp.append(p); Dd.append(d); Ps.append(P0)
+                for _ in range(2):
+                    w = w - Q4 @ (Q4.T @ w)
+                Q2, _ = np.linalg.qr(xw)
+                B0.append(w / np.linalg.norm(w)); Q4s.append(Q4); Xw.append(xw)
+                Pp.append(pw - Q2 @ (Q2.T @ pw)); Dd.append(dw - Q2 @ (Q2.T @ dw)); Ps.append(P0); Ds.append(D0)
+            rho = [noise[h] * math.sqrt(bo.n) for h, bo in enumerate(bores)]
             C = [None] * H
-            v = np.zeros(2)
+            vsum = np.zeros(2)
             for h in range(H):
                 if h == solve:
                     continue
                 e1 = Pp[h] / np.linalg.norm(Pp[h])
                 e2 = Dd[h] - (Dd[h] @ e1) * e1
                 e2 /= np.linalg.norm(e2)
-                c = noise[h] * (kappa[h][0] * e1 + kappa[h][1] * e2)
-                C[h] = c
-                rr = float(B[h] @ B[h] + c @ c)
-                v += bores[h].n / rr * np.array([Pp[h] @ c, Dd[h] @ c])
+                C[h] = noise[h] * (kappa[h][0] * e1 + kappa[h][1] * e2)
+                vsum += bores[h].n / (rho[h] ** 2 + float(C[h] @ C[h])) * np.array([Pp[h] @ C[h], Dd[h] @ C[h]])
             X = np.column_stack([Pp[solve], Dd[solve]])
-            G = X.T @ X
-            Gi_v = np.linalg.solve(G, v)
-            s = float(v @ Gi_v)
-            nH, bb = bores[solve].n, float(B[solve] @ B[solve])
-            lam = (nH - math.sqrt(nH * nH - 4.0 * s * bb)) / (2.0 * s)
+            Gi_v = np.linalg.solve(X.T @ X, vsum)
+            s = float(vsum @ Gi_v)
+            nS, bb = bores[solve].n, rho[solve] ** 2
+            lam = (nS - math.sqrt(nS * nS - 4.0 * s * bb)) / (2.0 * s) if s > 0 else 0.0
             C[solve] = X @ (-lam * Gi_v)
-            self.r = [B[h] + C[h] for h in range(H)]
-            self.holes = []
-            self.y = []
+            self.u, self.r, self.y, self.angle = [], [], [], []
             for h, bo in enumerate(bores):
-                y = T0[h] + q0[h] * bo.R + g * Ps[h] + self.r[h]
-                self.y.append(y)
+                # b_h = rho_h b with |b| = 1 orthogonal to the four whitened columns: starting from the seeded b0, move b on
+                # the great circle through b and the (projected) gradient of the phi score until the score vanishes (the
+                # root nearest to b on that circle; if the circle has none, b moves to its point of smallest |score|)
+                b = B0[h]
+                for it in range(30):
+                    w = _t7_phi_score_grad(rho[h] * b + C[h], phi[h])
+                    for _ in range(2):
+                        w = w - Q4s[h] @ (Q4s[h].T @ w)
+                        w = w - (b @ w) * b
+                    v = w / np.linalg.norm(w)
+                    f = lambda a: _t7_phi_score(rho[h] * (math.cos(a) * b + math.sin(a) * v) + C[h], phi[h])
+                    grid = np.linspace(-math.pi, math.pi, 1441)
+                    fv = [f(a) for a in grid]
+                    roots = []
+                    for i in range(grid.size - 1):
+                        if fv[i] == 0.0 or fv[i] * fv[i + 1] < 0:
+                            a0, a1, f0 = grid[i], grid[i + 1], fv[i]
+                            for _ in range(80):
+                                am = 0.5 * (a0 + a1)
+                                fm = f(am)
+                                if (fm < 0) == (f0 < 0):
+                                    a0, f0 = am, fm
+                                else:
+                                    a1 = am
+                            roots.append(0.5 * (a0 + a1))
+                    a = min(roots, key=abs) if roots else float(grid[int(np.argmin(np.abs(fv)))])
+                    b = math.cos(a) * b + math.sin(a) * v
+                    b /= np.linalg.norm(b)
+                    if roots:
+                        break
+                self.angle.append(float(b @ B0[h]))
+                u = rho[h] * b + C[h]
+                r = _t7_unwhite(u, phi[h])
+                self.u.append(u); self.r.append(r)
+                self.y.append(T0[h] + q0[h] * bo.R + g * Ps[h] + r)
+            self.holes = []
+            for h, bo in enumerate(bores):
                 T = np.empty(bo.z.size)
-                T[bo.keep] = y - bo.A * bo.S
+                T[bo.idx] = self.y[h] - bo.A * bo.S
                 nk = int((~bo.keep).sum())
                 T[~bo.keep] = T0[h] + 1.5 + 0.02 * bo.z[~bo.keep] + 0.3 * rng.standard_normal(nk)
                 self.holes.append({"survey_md": bo.md.copy(), "survey_inc": bo.inc.copy(), "survey_azi": bo.azi.copy(),
                                    "log_md": bo.log_md.copy(), "log_temp": T, "layer_top_md": bo.tops_md.copy(),
                                    "layer_k": bo.k.copy(), "heat_production": bo.A, "rho_c": bo.rc, "z_min": bo.z_min})
-            self.sd = [math.sqrt(float(self.r[h] @ self.r[h]) / bo.n) for h, bo in enumerate(bores)]
-            # expected Fisher information of (T0_1, q0_1, ..., T0_H, q0_H, g, t_end) at the generating values
+            self.sd = [float(np.linalg.norm(self.u[h])) / math.sqrt(bo.n) for h, bo in enumerate(bores)]
+            # expected Fisher information of (T0_1, q0_1, ..., T0_H, q0_H, g, t_end): sum_h J_h^T V_h^-1 J_h / s_h^2,
+            # V_h^-1 = L_h^T L_h, with the oracle Jacobians at the generating values
             npar = 2 * H + 2
-            I = np.zeros((npar, npar))
+            info = np.zeros((npar, npar))
             for h, bo in enumerate(bores):
                 Jf = np.zeros((bo.n, npar))
                 Jf[:, 2 * h] = 1.0
                 Jf[:, 2 * h + 1] = bo.R
                 Jf[:, -2] = Ps[h]
-                Jf[:, -1] = g * bo.dP(t_end)
-                I += Jf.T @ Jf / self.sd[h] ** 2
-            sc = 1.0 / np.sqrt(np.diag(I))
-            sig = np.sqrt(np.diag(np.linalg.inv(I * np.outer(sc, sc)))) * sc
-            self.lmax = sum(-0.5 * bo.n * (math.log(2.0 * math.pi * self.sd[h] ** 2) + 1.0) for h, bo in enumerate(bores))
-            self.star = {"g": g, "t_end": t_end, "sigma_g": sig[-2], "sigma_t_end": sig[-1], "log_likelihood": self.lmax,
-                         "holes": [{"T0": T0[h], "q0": q0[h], "sigma_T0": sig[2 * h], "sigma_q0": sig[2 * h + 1],
-                                    "noise_sd": self.sd[h], "n_used": bo.n} for h, bo in enumerate(bores)]}
+                Jf[:, -1] = Ds[h]
+                Jw = _t7_white(Jf, phi[h])
+                info += Jw.T @ Jw / self.sd[h] ** 2
+            sc = 1.0 / np.sqrt(np.diag(info))
+            sig = np.sqrt(np.diag(np.linalg.inv(info * np.outer(sc, sc)))) * sc
+            self.lmax = sum(-0.5 * bo.n * (math.log(2.0 * math.pi * self.sd[h] ** 2) + 1.0)
+                            + 0.5 * math.log(1.0 - phi[h] ** 2) for h, bo in enumerate(bores))
+            self.star = {"g": g, "t_end": t_end, "sigma_g": float(sig[-2]), "sigma_t_end": float(sig[-1]),
+                         "log_likelihood": self.lmax,
+                         "holes": [{"T0": T0[h], "q0": q0[h], "sigma_T0": float(sig[2 * h]), "sigma_q0": float(sig[2 * h + 1]),
+                                    "phi": phi[h], "innovation_sd": self.sd[h], "n_used": bo.n} for h, bo in enumerate(bores)]}
             self.thr = self.lmax - 0.5 * _t7_chi2_95()
-            self.yp = [y - bo.Q2 @ (bo.Q2.T @ y) for y, bo in zip(self.y, bores)]
+            # the generating geotherm removed from y (the profile is invariant to a shift in the span of [1, R])
+            self.yc = [self.y[h] - T0[h] - q0[h] * bo.R for h, bo in enumerate(bores)]
+            self.sol = {float(t_end): np.array(phi, float)}
 
-        def coeffs(self, t):
+        def coeffs(self, t, ph):
+            """(a_h, b_h, c_h, n_h) of every hole: Q_h(g) = a_h g^2 - 2 b_h g + c_h is the generalized least-squares
+            residual of hole h on [1, R_h] at t_end = t with lag-one correlation ph[h] (Prais-Winsten transform and QR)."""
             out = []
-            for bo, y in zip(self.bores, self.yp):
-                p = bo.P(t)
-                p = p - bo.Q2 @ (bo.Q2.T @ p)
-                out.append((float(p @ p), float(p @ y), float(y @ y), bo.n))
+            for h, bo in enumerate(self.bores):
+                xw = _t7_white(bo.X, ph[h])
+                Q, _ = np.linalg.qr(xw)
+                yw, pw = _t7_white(self.yc[h], ph[h]), _t7_white(bo.P(t), ph[h])
+                yw = yw - Q @ (Q.T @ yw)
+                pw = pw - Q @ (Q.T @ pw)
+                out.append((float(pw @ pw), float(pw @ yw), float(yw @ yw), bo.n))
             return out
 
-        def lp(self, t, with_g=False):
-            """Profile log-likelihood at t_end = t: the maximum over g of sum_h -(n_h/2)(log(2 pi Q_h(g)/n_h) + 1),
-            Q_h(g) = a_h g^2 - 2 b_h g + c_h the residual sum of squares of hole h after its T0_h and q0_h. Every
-            stationary point lies between the smallest and the largest b_h / a_h; they are bracketed by the sign
+        def Fphi(self, t, ph, with_g=False):
+            """Log-likelihood maximized over T0_h, q0_h, s_h and g at t_end = t with the lag-one correlations ph: every
+            stationary point in g lies between the smallest and the largest b_h / a_h; they are bracketed by the sign
             changes of the derivative on a 4001-point grid and located by bisection."""
-            co = self.coeffs(t)
+            if not all(abs(p) < 1.0 for p in ph):
+                return (-math.inf, None) if with_g else -math.inf
+            co = self.coeffs(t, ph)
             f = lambda g: sum(-0.5 * n * (math.log(2.0 * math.pi * (a * g * g - 2.0 * b * g + c) / n) + 1.0) for a, b, c, n in co)
             df = lambda g: -sum(n * (a * g - b) / (a * g * g - 2.0 * b * g + c) for a, b, c, n in co)
             gs = [b / a for a, b, c, n in co]
@@ -278,7 +377,8 @@ def _crown_case():
             cand = [lo, hi]
             if hi > lo:
                 grid = np.linspace(lo, hi, 4001)
-                dv = [df(x) for x in grid]
+                A = np.array([[a, b, c, n] for a, b, c, n in co])
+                dv = -np.sum(A[:, 3:4] * (A[:, 0:1] * grid - A[:, 1:2]) / (A[:, 0:1] * grid * grid - 2.0 * A[:, 1:2] * grid + A[:, 2:3]), axis=0)
                 for i in range(grid.size - 1):
                     if dv[i] > 0 >= dv[i + 1]:
                         x0, x1 = grid[i], grid[i + 1]
@@ -290,71 +390,103 @@ def _crown_case():
                                 x1 = xm
                         cand.append(0.5 * (x0 + x1))
             vals = [f(x) for x in cand]
-            i = int(np.argmax(vals))
-            return (vals[i], cand[i]) if with_g else vals[i]
+            k = int(np.argmax(vals))
+            v = vals[k] + sum(0.5 * math.log(1.0 - p * p) for p in ph)
+            return (v, cand[k] + 0.0) if with_g else v
 
-        def crossing(self, direction):
-            """Crossing of the profile with the threshold nearest to the generating t_end on one side: march outward
-            in small steps, then bisection with Illinois steps."""
-            ts, st = self.t_end, self.star["sigma_t_end"]
-            a, step = ts, 0.05 * st
-            while True:
-                b = a + direction * step
-                if self.lp(b) <= self.thr:
+        def lp(self, t, x0=None):
+            """Profile log-likelihood at t_end = t: Fphi maximized over the lag-one correlations by a damped Newton
+            ascent (central-difference derivatives, Levenberg damping), started from the correlations found at the
+            nearest t already evaluated (the generating values first)."""
+            t = float(t)
+            if t in self.sol:
+                return self.Fphi(t, self.sol[t])
+            if x0 is None:
+                x0 = self.sol[min(self.sol, key=lambda s: abs(math.log(s / t)))]
+            x = np.array(x0, float)
+            m, hs = x.size, 1e-4
+            fx = self.Fphi(t, x)
+            for _ in range(100):
+                grad = np.zeros(m)
+                hess = np.zeros((m, m))
+                for i in range(m):
+                    e = np.zeros(m); e[i] = hs
+                    fp, fm = self.Fphi(t, x + e), self.Fphi(t, x - e)
+                    grad[i] = (fp - fm) / (2 * hs)
+                    hess[i, i] = (fp - 2 * fx + fm) / hs ** 2
+                    for j in range(i):
+                        ej = np.zeros(m); ej[j] = hs
+                        hess[i, j] = hess[j, i] = (self.Fphi(t, x + e + ej) - self.Fphi(t, x + e - ej) - self.Fphi(t, x - e + ej)
+                                                   + self.Fphi(t, x - e - ej)) / (4 * hs * hs)
+                if not (np.all(np.isfinite(grad)) and np.all(np.isfinite(hess))):
                     break
-                a, step = b, min(step * 1.2, 0.3 * st)
-            fa, fb = self.lp(a) - self.thr, self.lp(b) - self.thr
-            for _ in range(200):
-                c = b - fb * (b - a) / (fb - fa)
-                if not (min(a, b) < c < max(a, b)):
-                    c = 0.5 * (a + b)
-                fc = self.lp(c) - self.thr
-                if fc * fb < 0:
-                    a, fa = b, fb
-                else:
-                    fa *= 0.5
-                b, fb = c, fc
-                if abs(b - a) < 1e-12 * abs(b):
+                mu = 0.0
+                moved = False
+                while mu < 1e12:
+                    Hd = hess - mu * np.diag(np.abs(np.diag(hess)) + 1.0)
+                    if np.max(np.linalg.eigvalsh(Hd)) < 0:
+                        step = -np.linalg.solve(Hd, grad)
+                        step *= min(1.0, 0.2 / max(1e-300, float(np.max(np.abs(step)))))
+                        xn = x + step
+                        fn = self.Fphi(t, xn)
+                        if fn >= fx:
+                            moved = True
+                            break
+                    mu = 1e-3 if mu == 0.0 else mu * 10.0
+                if not moved:
                     break
-            return b
+                done = float(np.max(np.abs(xn - x))) < 1e-9
+                x, fx = xn, fn
+                if done:
+                    break
+            self.sol[t] = x
+            return fx
 
-    def _t7_check(r, reg, label=""):
-        """Every output against the exact values, with the stated accuracies."""
+    def _t7_check(r, reg, label="", n_inner=5):
+        """Every output against the exact values with the stated accuracies; the interval ends against the oracle
+        profile: a crossing of the threshold l_max - chi2_0.95(1)/2 lies within a relative 5e-4 of each returned end
+        (the profile is above the threshold at the end moved 5e-4 towards t_end and below it at the end moved 5e-4
+        away), and the profile stays above the threshold at interior points between the ends and t_end."""
         ex = reg.star
-        lo_x, hi_x = reg.crossing(-1), reg.crossing(+1)
         assert isinstance(r, dict) and len(r["holes"]) == len(ex["holes"]), label
         for key, tol in (("g", 2e-3), ("t_end", 2e-3), ("sigma_g", 1e-2), ("sigma_t_end", 1e-2)):
             assert abs(float(r[key]) / ex[key] - 1.0) < tol, (label, key, r[key], ex[key])
-        assert abs(float(r["t_end_low"]) / lo_x - 1.0) < 5e-4, (label, "t_end_low", r["t_end_low"], lo_x)
-        assert abs(float(r["t_end_high"]) / hi_x - 1.0) < 5e-4, (label, "t_end_high", r["t_end_high"], hi_x)
         assert abs(float(r["log_likelihood"]) - ex["log_likelihood"]) < 0.1, (label, "log_likelihood", r["log_likelihood"], ex["log_likelihood"])
         for h, (rh, eh) in enumerate(zip(r["holes"], ex["holes"])):
             assert int(round(float(rh["n_used"]))) == eh["n_used"], (label, h, "n_used", rh["n_used"], eh["n_used"])
             assert abs(float(rh["T0"]) - eh["T0"]) < 2e-3, (label, h, "T0", rh["T0"], eh["T0"])
-            for key, tol in (("q0", 5e-4), ("sigma_T0", 1e-2), ("sigma_q0", 1e-2), ("noise_sd", 3e-3)):
+            assert abs(float(rh["phi"]) - eh["phi"]) < 2e-3, (label, h, "phi", rh["phi"], eh["phi"])
+            for key, tol in (("q0", 5e-4), ("sigma_T0", 1e-2), ("sigma_q0", 1e-2), ("innovation_sd", 3e-3)):
                 assert abs(float(rh[key]) / eh[key] - 1.0) < tol, (label, h, key, rh[key], eh[key])
-        return lo_x, hi_x
+        lo, hi, ts = float(r["t_end_low"]), float(r["t_end_high"]), reg.t_end
+        assert lo < ts < hi, (label, lo, hi)
+        assert reg.lp(lo * (1 + 5e-4)) > reg.thr > reg.lp(lo * (1 - 5e-4)), (label, "t_end_low", lo)
+        assert reg.lp(hi * (1 - 5e-4)) > reg.thr > reg.lp(hi * (1 + 5e-4)), (label, "t_end_high", hi)
+        for k in range(1, n_inner + 1):
+            for end in (lo, hi):
+                tk = ts + (end - ts) * k / (n_inner + 1.0)
+                assert reg.lp(tk) > reg.thr, (label, "profile below the threshold inside the interval", tk)
 
     def _t7_incl7(step):
         # inclined NQ hole, 1800 m MD (28 to 40 degrees), seven-layer Abitibi-type column, z_min 150 m
         return _t7_Bore(_t7_g_survey(1800, 25, 28, 40, 330, 350, 1.5, 2), ([0, 120, 350, 700, 820, 1210, 1500], [3.3, 2.7, 3.9, 2.5, 4.4, 3.0, 2.8]),
-                     0.9e-6, 2.4e6, 150.0, log_step=step, log_top=15.0)
+                        0.9e-6, 2.4e6, 150.0, log_step=step, log_top=15.0)
 
     def _t7_mid4():
         # 1200 m hole (5 to 12 degrees), four layers, higher heat production, z_min 100 m
         return _t7_Bore(_t7_g_survey(1200, 30, 5, 12, 80, 95, 1.0, 3), ([0, 260, 600, 950], [2.6, 3.4, 2.2, 3.0]), 1.6e-6, 2.2e6, 100.0,
-                     log_step=8.0, log_top=20.0)
+                        log_step=8.0, log_top=20.0)
 
     def _t7_short3():
         # 900 m hole (15 to 22 degrees), three layers, z_min 80 m
         return _t7_Bore(_t7_g_survey(900, 20, 15, 22, 200, 215, 0.5, 4), ([0, 90, 400], [3.8, 2.4, 3.1]), 0.5e-6, 2.5e6, 80.0,
-                     log_step=6.0, log_top=10.0)
+                        log_step=6.0, log_top=10.0)
 
-    # Three holes with 4, 12 and 25 mK of logging noise (163, 137 and 136 readings used), each with its own column, heat
-    # production, rho_c, z_min, T0 and q0; glacial history (0, -1, +0.25) with the glaciation from t_end to 100 ka.
-    # Pooled least squares (one common noise variance) would give t_end = 11.40 ka and g = 7.72 instead of 11.5 ka, 7.8.
-    reg = _t7_Region([_t7_incl7(10.0), _t7_mid4(), _t7_short3()], [4.1, 3.2, 5.0], [0.037, 0.048, 0.031], 7.8, 11500.0, [0.0, -1.0, 0.25],
-                  [1.0e5, 1.2e5], [0.004, 0.012, 0.025], [None, (2.0, -1.5), (-1.5, 2.0)], 5, 0)
+    # Three holes with innovation standard deviations of 4, 12 and 25 mK and lag-one correlations 0.35, 0.7 and 0.85 (163,
+    # 137 and 136 readings used), each with its own column, heat production, rho_c, z_min, T0 and q0; glacial history
+    # (0, -1, +0.25) with the glaciation from t_end to 100 ka.
+    reg = _t7_Region([_t7_incl7(10.0), _t7_mid4(), _t7_short3()], [4.1, 3.2, 5.0], [0.037, 0.048, 0.031], 7.8, 11500.0,
+                     [0.0, -1.0, 0.25], [1.0e5, 1.2e5], [0.004, 0.012, 0.025], [0.35, 0.7, 0.85], [None, (2.0, -1.5), (-1.5, 2.0)], 5, 0)
     r = regional_deglaciation_inversion(reg.holes, [1.0e5, 1.2e5], [0.0, -1.0, 0.25], (3000.0, 60000.0))
 
     keys = ["g", "t_end", "sigma_g", "sigma_t_end", "t_end_low", "t_end_high", "log_likelihood"]
@@ -364,7 +496,7 @@ def _crown_case():
     assert isinstance(r["holes"], list) and len(r["holes"]) == 3
     for rh in r["holes"]:
         assert isinstance(rh, dict)
-        for key in ("T0", "q0", "sigma_T0", "sigma_q0", "noise_sd"):
+        for key in ("T0", "q0", "sigma_T0", "sigma_q0", "phi", "innovation_sd"):
             assert type(rh[key]) is float, key
         assert type(rh["n_used"]) is int
     _t7_check(r, reg, "three holes")
@@ -373,7 +505,7 @@ def _crown_case():
 _crown_case()
 
 # --- test case 1 ---
-# a short precise log and a long noisy one: maximum-likelihood weighting of the two holes
+# a short precise log and a long noisy one, a negative lag-one correlation, and a log listed as two runs
 import numpy as np
 
 
@@ -490,9 +622,9 @@ def _crown_case():
         return (0.5 * (lo + hi)) ** 2
 
     class _t7_Bore:
-        """One borehole built forward: TVD of the readings and the layer tops, the inclusive z_min cut, R and S by
-        exact layer sums, and the oracle step response of its own column (branch-cut form, or erfc for a uniform
-        column)."""
+        """One borehole built forward: TVD of the readings and the layer tops, the inclusive z_min cut, the used
+        readings in the order of increasing MD (the order of the AR(1) noise), R and S by exact layer sums, and the
+        oracle step response of its own column (branch-cut form, or erfc for a uniform column)."""
 
         def __init__(self, survey, layers, A, rc, z_min, log_step=None, log_top=None, log_md=None, uniform_k=None):
             self.md, self.inc, self.azi = (np.asarray(v, float) for v in survey)
@@ -504,10 +636,13 @@ def _crown_case():
             self.tops = np.array([_t7_g_tvd(self.md, self.inc, self.azi, m) for m in self.tops_md])
             self.z = np.array([_t7_g_tvd(self.md, self.inc, self.azi, m) for m in self.log_md])
             self.keep = self.z >= z_min
-            self.zk, self.n = self.z[self.keep], int(self.keep.sum())
+            used = np.nonzero(self.keep)[0]
+            self.idx = used[np.argsort(self.log_md[used], kind="stable")]      # used readings by increasing MD
+            self.zk, self.n = self.z[self.idx], int(self.idx.size)
+            self.cache = {}
             RS = np.array([_t7_g_RS(v, list(self.tops), list(self.k)) for v in self.zk])
             self.R, self.S = RS[:, 0], RS[:, 1]
-            self.Q2, _ = np.linalg.qr(np.column_stack([np.ones(self.n), self.R]))
+            self.X = np.column_stack([np.ones(self.n), self.R])
 
         def U(self, t, deriv=False):
             if self.uniform_k is None:
@@ -527,105 +662,196 @@ def _crown_case():
             self.Pfix, self.ds = Pf, sh[0] - sh[1]
 
         def P(self, t):
-            return self.Pfix + self.ds * self.U(t)
+            t = float(t)
+            if t not in self.cache:
+                self.cache[t] = self.Pfix + self.ds * self.U(t)
+            return self.cache[t]
 
         def dP(self, t):
             return self.ds * self.U(t, True)
 
-    class _t7_Region:
-        """Boreholes sharing one glacial history, with data whose maximum-likelihood solution is known exactly.
-        On the used readings of hole h, y_h = T + A S = T0_h + q0_h R_h + g P_h(t_end) + r_h with
-        r_h = b_h + c_h: b_h is orthogonal to the four columns [1, R_h, P_h, g dP_h/dt_end] (seeded, rms noise[h]),
-        c_h lies in the span of the projections p_h, d_h of P_h and g dP_h/dt_end off [1, R_h] (coefficients
-        kappa[h] in units of noise[h] for every hole but hole `solve`), and that hole's c_h is solved in closed form
-        so that sum_h (n_h / |r_h|^2) [p_h, d_h]^T r_h = 0. With sigma_h^2 = |r_h|^2 / n_h every score of the
-        log-likelihood vanishes at the generating values, while the unweighted sum sum_h [p_h, d_h]^T r_h does not."""
+    def _t7_white(v, phi):
+        """Prais-Winsten transform of the readings (axis 0, by increasing MD) for the stationary AR(1) model: first row
+        sqrt(1 - phi^2) v_1, then v_i - phi v_(i-1). For AR(1) errors the transformed errors are independent with
+        variance s^2."""
+        v = np.asarray(v, float)
+        out = np.empty_like(v)
+        out[0] = math.sqrt(1.0 - phi * phi) * v[0]
+        out[1:] = v[1:] - phi * v[:-1]
+        return out
 
-        def __init__(self, bores, T0, q0, g, t_end, shape, t_known, noise, kappa, seed, solve):
-            self.bores, self.g, self.t_end = bores, g, t_end
-            self.shape, self.t_known = np.asarray(shape, float), np.asarray(t_known, float)
+    def _t7_unwhite(u, phi):
+        """Inverse transform: r_1 = u_1 / sqrt(1 - phi^2), r_i = u_i + phi r_(i-1)."""
+        r = np.empty(u.size)
+        r[0] = u[0] / math.sqrt(1.0 - phi * phi)
+        for i in range(1, u.size):
+            r[i] = u[i] + phi * r[i - 1]
+        return r
+
+    def _t7_phi_score(u, phi):
+        """n times the derivative in phi of -(n/2) log |L(phi) r|^2 + (1/2) log(1 - phi^2), with r = L(phi*)^-1 u fixed,
+        at phi = phi* (multiplied by |u|^2 / n): n (sum_(i>=2) u_i r_(i-1) + phi r_1^2) - |u|^2 phi / (1 - phi^2)."""
+        r = _t7_unwhite(u, phi)
+        return u.size * (float(u[1:] @ r[:-1]) + phi * r[0] ** 2) - float(u @ u) * phi / (1.0 - phi * phi)
+
+    def _t7_unwhite_T(z, phi):
+        """Solve L(phi)^T x = z (the transpose of the Prais-Winsten transform), by back substitution."""
+        x = np.empty(z.size)
+        x[-1] = z[-1]
+        for i in range(z.size - 2, 0, -1):
+            x[i] = z[i] + phi * x[i + 1]
+        x[0] = (z[0] + phi * x[1]) / math.sqrt(1.0 - phi * phi) if z.size > 1 else z[0] / math.sqrt(1.0 - phi * phi)
+        return x
+
+    def _t7_phi_score_grad(u, phi):
+        """Gradient in u of _t7_phi_score (a quadratic form in u)."""
+        n = u.size
+        r = _t7_unwhite(u, phi)
+        su = np.zeros(n)
+        su[:-1] = u[1:]
+        sr = np.zeros(n)
+        sr[1:] = r[:-1]
+        e1 = np.zeros(n)
+        e1[0] = 1.0
+        return n * (sr + _t7_unwhite_T(su, phi) + 2.0 * phi * r[0] * _t7_unwhite_T(e1, phi)) - 2.0 * phi / (1.0 - phi * phi) * u
+
+    class _t7_Region:
+        """Boreholes sharing one glacial history, with data whose maximum-likelihood solution under stationary AR(1)
+        noise is known exactly. In hole h (used readings by increasing MD) the residual r_h = y_h - T0_h - q0_h R_h -
+        g P_h(t_end), y = T + A S, is built in whitened space, u_h = L(phi_h) r_h (L the Prais-Winsten transform):
+        u_h = b_h + c_h with b_h orthogonal to the four whitened columns L[1, R_h, P_h, g dP_h/dt_end], |b_h|^2 =
+        n_h noise_h^2, and c_h in the span of the projections p_h, d_h of L P_h and L g dP_h/dt_end off L[1, R_h]
+        (coefficients kappa[h] in units of noise_h for every hole but hole `solve`, whose c_h is solved in closed form
+        so that sum_h (n_h / |u_h|^2) [p_h, d_h]^T u_h = 0). b_h = rho_h (cos a b0 + sin a v) with b0, v orthonormal
+        (seeded) is rotated in its plane until the score of phi_h vanishes (|u_h| unchanged). With s_h^2 = |u_h|^2 / n_h
+        every score of the exact log-likelihood vanishes at the generating values."""
+
+        def __init__(self, bores, T0, q0, g, t_end, shape, t_known, noise, phi, kappa, seed, solve):
+            self.bores, self.g, self.t_end, self.phi = bores, g, t_end, list(phi)
             H = len(bores)
             rng = np.random.default_rng(seed)
-            B, Pp, Dd, Ps = [], [], [], []
+            B0, Q4s, Pp, Dd, Ps, Ds, Xw = [], [], [], [], [], [], []
             for h, bo in enumerate(bores):
                 bo.history(shape, t_known)
                 P0, D0 = bo.P(t_end), g * bo.dP(t_end)
-                J = np.column_stack([np.ones(bo.n), bo.R, P0, D0])
-                Q, _ = np.linalg.qr(J)
+                xw = _t7_white(bo.X, phi[h])
+                pw, dw = _t7_white(P0, phi[h]), _t7_white(D0, phi[h])
+                Q4, _ = np.linalg.qr(np.column_stack([xw, pw, dw]))
                 w = rng.standard_normal(bo.n)
-                b = w - Q @ (Q.T @ w)
-                b = b - Q @ (Q.T @ b)
-                b *= noise[h] / math.sqrt(np.mean(b * b))
-                Q2 = bo.Q2
-                p = P0 - Q2 @ (Q2.T @ P0)
-                d = D0 - Q2 @ (Q2.T @ D0)
-                B.append(b); Pp.append(p); Dd.append(d); Ps.append(P0)
+                for _ in range(2):
+                    w = w - Q4 @ (Q4.T @ w)
+                Q2, _ = np.linalg.qr(xw)
+                B0.append(w / np.linalg.norm(w)); Q4s.append(Q4); Xw.append(xw)
+                Pp.append(pw - Q2 @ (Q2.T @ pw)); Dd.append(dw - Q2 @ (Q2.T @ dw)); Ps.append(P0); Ds.append(D0)
+            rho = [noise[h] * math.sqrt(bo.n) for h, bo in enumerate(bores)]
             C = [None] * H
-            v = np.zeros(2)
+            vsum = np.zeros(2)
             for h in range(H):
                 if h == solve:
                     continue
                 e1 = Pp[h] / np.linalg.norm(Pp[h])
                 e2 = Dd[h] - (Dd[h] @ e1) * e1
                 e2 /= np.linalg.norm(e2)
-                c = noise[h] * (kappa[h][0] * e1 + kappa[h][1] * e2)
-                C[h] = c
-                rr = float(B[h] @ B[h] + c @ c)
-                v += bores[h].n / rr * np.array([Pp[h] @ c, Dd[h] @ c])
+                C[h] = noise[h] * (kappa[h][0] * e1 + kappa[h][1] * e2)
+                vsum += bores[h].n / (rho[h] ** 2 + float(C[h] @ C[h])) * np.array([Pp[h] @ C[h], Dd[h] @ C[h]])
             X = np.column_stack([Pp[solve], Dd[solve]])
-            G = X.T @ X
-            Gi_v = np.linalg.solve(G, v)
-            s = float(v @ Gi_v)
-            nH, bb = bores[solve].n, float(B[solve] @ B[solve])
-            lam = (nH - math.sqrt(nH * nH - 4.0 * s * bb)) / (2.0 * s)
+            Gi_v = np.linalg.solve(X.T @ X, vsum)
+            s = float(vsum @ Gi_v)
+            nS, bb = bores[solve].n, rho[solve] ** 2
+            lam = (nS - math.sqrt(nS * nS - 4.0 * s * bb)) / (2.0 * s) if s > 0 else 0.0
             C[solve] = X @ (-lam * Gi_v)
-            self.r = [B[h] + C[h] for h in range(H)]
-            self.holes = []
-            self.y = []
+            self.u, self.r, self.y, self.angle = [], [], [], []
             for h, bo in enumerate(bores):
-                y = T0[h] + q0[h] * bo.R + g * Ps[h] + self.r[h]
-                self.y.append(y)
+                # b_h = rho_h b with |b| = 1 orthogonal to the four whitened columns: starting from the seeded b0, move b on
+                # the great circle through b and the (projected) gradient of the phi score until the score vanishes (the
+                # root nearest to b on that circle; if the circle has none, b moves to its point of smallest |score|)
+                b = B0[h]
+                for it in range(30):
+                    w = _t7_phi_score_grad(rho[h] * b + C[h], phi[h])
+                    for _ in range(2):
+                        w = w - Q4s[h] @ (Q4s[h].T @ w)
+                        w = w - (b @ w) * b
+                    v = w / np.linalg.norm(w)
+                    f = lambda a: _t7_phi_score(rho[h] * (math.cos(a) * b + math.sin(a) * v) + C[h], phi[h])
+                    grid = np.linspace(-math.pi, math.pi, 1441)
+                    fv = [f(a) for a in grid]
+                    roots = []
+                    for i in range(grid.size - 1):
+                        if fv[i] == 0.0 or fv[i] * fv[i + 1] < 0:
+                            a0, a1, f0 = grid[i], grid[i + 1], fv[i]
+                            for _ in range(80):
+                                am = 0.5 * (a0 + a1)
+                                fm = f(am)
+                                if (fm < 0) == (f0 < 0):
+                                    a0, f0 = am, fm
+                                else:
+                                    a1 = am
+                            roots.append(0.5 * (a0 + a1))
+                    a = min(roots, key=abs) if roots else float(grid[int(np.argmin(np.abs(fv)))])
+                    b = math.cos(a) * b + math.sin(a) * v
+                    b /= np.linalg.norm(b)
+                    if roots:
+                        break
+                self.angle.append(float(b @ B0[h]))
+                u = rho[h] * b + C[h]
+                r = _t7_unwhite(u, phi[h])
+                self.u.append(u); self.r.append(r)
+                self.y.append(T0[h] + q0[h] * bo.R + g * Ps[h] + r)
+            self.holes = []
+            for h, bo in enumerate(bores):
                 T = np.empty(bo.z.size)
-                T[bo.keep] = y - bo.A * bo.S
+                T[bo.idx] = self.y[h] - bo.A * bo.S
                 nk = int((~bo.keep).sum())
                 T[~bo.keep] = T0[h] + 1.5 + 0.02 * bo.z[~bo.keep] + 0.3 * rng.standard_normal(nk)
                 self.holes.append({"survey_md": bo.md.copy(), "survey_inc": bo.inc.copy(), "survey_azi": bo.azi.copy(),
                                    "log_md": bo.log_md.copy(), "log_temp": T, "layer_top_md": bo.tops_md.copy(),
                                    "layer_k": bo.k.copy(), "heat_production": bo.A, "rho_c": bo.rc, "z_min": bo.z_min})
-            self.sd = [math.sqrt(float(self.r[h] @ self.r[h]) / bo.n) for h, bo in enumerate(bores)]
-            # expected Fisher information of (T0_1, q0_1, ..., T0_H, q0_H, g, t_end) at the generating values
+            self.sd = [float(np.linalg.norm(self.u[h])) / math.sqrt(bo.n) for h, bo in enumerate(bores)]
+            # expected Fisher information of (T0_1, q0_1, ..., T0_H, q0_H, g, t_end): sum_h J_h^T V_h^-1 J_h / s_h^2,
+            # V_h^-1 = L_h^T L_h, with the oracle Jacobians at the generating values
             npar = 2 * H + 2
-            I = np.zeros((npar, npar))
+            info = np.zeros((npar, npar))
             for h, bo in enumerate(bores):
                 Jf = np.zeros((bo.n, npar))
                 Jf[:, 2 * h] = 1.0
                 Jf[:, 2 * h + 1] = bo.R
                 Jf[:, -2] = Ps[h]
-                Jf[:, -1] = g * bo.dP(t_end)
-                I += Jf.T @ Jf / self.sd[h] ** 2
-            sc = 1.0 / np.sqrt(np.diag(I))
-            sig = np.sqrt(np.diag(np.linalg.inv(I * np.outer(sc, sc)))) * sc
-            self.lmax = sum(-0.5 * bo.n * (math.log(2.0 * math.pi * self.sd[h] ** 2) + 1.0) for h, bo in enumerate(bores))
-            self.star = {"g": g, "t_end": t_end, "sigma_g": sig[-2], "sigma_t_end": sig[-1], "log_likelihood": self.lmax,
-                         "holes": [{"T0": T0[h], "q0": q0[h], "sigma_T0": sig[2 * h], "sigma_q0": sig[2 * h + 1],
-                                    "noise_sd": self.sd[h], "n_used": bo.n} for h, bo in enumerate(bores)]}
+                Jf[:, -1] = Ds[h]
+                Jw = _t7_white(Jf, phi[h])
+                info += Jw.T @ Jw / self.sd[h] ** 2
+            sc = 1.0 / np.sqrt(np.diag(info))
+            sig = np.sqrt(np.diag(np.linalg.inv(info * np.outer(sc, sc)))) * sc
+            self.lmax = sum(-0.5 * bo.n * (math.log(2.0 * math.pi * self.sd[h] ** 2) + 1.0)
+                            + 0.5 * math.log(1.0 - phi[h] ** 2) for h, bo in enumerate(bores))
+            self.star = {"g": g, "t_end": t_end, "sigma_g": float(sig[-2]), "sigma_t_end": float(sig[-1]),
+                         "log_likelihood": self.lmax,
+                         "holes": [{"T0": T0[h], "q0": q0[h], "sigma_T0": float(sig[2 * h]), "sigma_q0": float(sig[2 * h + 1]),
+                                    "phi": phi[h], "innovation_sd": self.sd[h], "n_used": bo.n} for h, bo in enumerate(bores)]}
             self.thr = self.lmax - 0.5 * _t7_chi2_95()
-            self.yp = [y - bo.Q2 @ (bo.Q2.T @ y) for y, bo in zip(self.y, bores)]
+            # the generating geotherm removed from y (the profile is invariant to a shift in the span of [1, R])
+            self.yc = [self.y[h] - T0[h] - q0[h] * bo.R for h, bo in enumerate(bores)]
+            self.sol = {float(t_end): np.array(phi, float)}
 
-        def coeffs(self, t):
+        def coeffs(self, t, ph):
+            """(a_h, b_h, c_h, n_h) of every hole: Q_h(g) = a_h g^2 - 2 b_h g + c_h is the generalized least-squares
+            residual of hole h on [1, R_h] at t_end = t with lag-one correlation ph[h] (Prais-Winsten transform and QR)."""
             out = []
-            for bo, y in zip(self.bores, self.yp):
-                p = bo.P(t)
-                p = p - bo.Q2 @ (bo.Q2.T @ p)
-                out.append((float(p @ p), float(p @ y), float(y @ y), bo.n))
+            for h, bo in enumerate(self.bores):
+                xw = _t7_white(bo.X, ph[h])
+                Q, _ = np.linalg.qr(xw)
+                yw, pw = _t7_white(self.yc[h], ph[h]), _t7_white(bo.P(t), ph[h])
+                yw = yw - Q @ (Q.T @ yw)
+                pw = pw - Q @ (Q.T @ pw)
+                out.append((float(pw @ pw), float(pw @ yw), float(yw @ yw), bo.n))
             return out
 
-        def lp(self, t, with_g=False):
-            """Profile log-likelihood at t_end = t: the maximum over g of sum_h -(n_h/2)(log(2 pi Q_h(g)/n_h) + 1),
-            Q_h(g) = a_h g^2 - 2 b_h g + c_h the residual sum of squares of hole h after its T0_h and q0_h. Every
-            stationary point lies between the smallest and the largest b_h / a_h; they are bracketed by the sign
+        def Fphi(self, t, ph, with_g=False):
+            """Log-likelihood maximized over T0_h, q0_h, s_h and g at t_end = t with the lag-one correlations ph: every
+            stationary point in g lies between the smallest and the largest b_h / a_h; they are bracketed by the sign
             changes of the derivative on a 4001-point grid and located by bisection."""
-            co = self.coeffs(t)
+            if not all(abs(p) < 1.0 for p in ph):
+                return (-math.inf, None) if with_g else -math.inf
+            co = self.coeffs(t, ph)
             f = lambda g: sum(-0.5 * n * (math.log(2.0 * math.pi * (a * g * g - 2.0 * b * g + c) / n) + 1.0) for a, b, c, n in co)
             df = lambda g: -sum(n * (a * g - b) / (a * g * g - 2.0 * b * g + c) for a, b, c, n in co)
             gs = [b / a for a, b, c, n in co]
@@ -633,7 +859,8 @@ def _crown_case():
             cand = [lo, hi]
             if hi > lo:
                 grid = np.linspace(lo, hi, 4001)
-                dv = [df(x) for x in grid]
+                A = np.array([[a, b, c, n] for a, b, c, n in co])
+                dv = -np.sum(A[:, 3:4] * (A[:, 0:1] * grid - A[:, 1:2]) / (A[:, 0:1] * grid * grid - 2.0 * A[:, 1:2] * grid + A[:, 2:3]), axis=0)
                 for i in range(grid.size - 1):
                     if dv[i] > 0 >= dv[i + 1]:
                         x0, x1 = grid[i], grid[i + 1]
@@ -645,67 +872,100 @@ def _crown_case():
                                 x1 = xm
                         cand.append(0.5 * (x0 + x1))
             vals = [f(x) for x in cand]
-            i = int(np.argmax(vals))
-            return (vals[i], cand[i]) if with_g else vals[i]
+            k = int(np.argmax(vals))
+            v = vals[k] + sum(0.5 * math.log(1.0 - p * p) for p in ph)
+            return (v, cand[k] + 0.0) if with_g else v
 
-        def crossing(self, direction):
-            """Crossing of the profile with the threshold nearest to the generating t_end on one side: march outward
-            in small steps, then bisection with Illinois steps."""
-            ts, st = self.t_end, self.star["sigma_t_end"]
-            a, step = ts, 0.05 * st
-            while True:
-                b = a + direction * step
-                if self.lp(b) <= self.thr:
+        def lp(self, t, x0=None):
+            """Profile log-likelihood at t_end = t: Fphi maximized over the lag-one correlations by a damped Newton
+            ascent (central-difference derivatives, Levenberg damping), started from the correlations found at the
+            nearest t already evaluated (the generating values first)."""
+            t = float(t)
+            if t in self.sol:
+                return self.Fphi(t, self.sol[t])
+            if x0 is None:
+                x0 = self.sol[min(self.sol, key=lambda s: abs(math.log(s / t)))]
+            x = np.array(x0, float)
+            m, hs = x.size, 1e-4
+            fx = self.Fphi(t, x)
+            for _ in range(100):
+                grad = np.zeros(m)
+                hess = np.zeros((m, m))
+                for i in range(m):
+                    e = np.zeros(m); e[i] = hs
+                    fp, fm = self.Fphi(t, x + e), self.Fphi(t, x - e)
+                    grad[i] = (fp - fm) / (2 * hs)
+                    hess[i, i] = (fp - 2 * fx + fm) / hs ** 2
+                    for j in range(i):
+                        ej = np.zeros(m); ej[j] = hs
+                        hess[i, j] = hess[j, i] = (self.Fphi(t, x + e + ej) - self.Fphi(t, x + e - ej) - self.Fphi(t, x - e + ej)
+                                                   + self.Fphi(t, x - e - ej)) / (4 * hs * hs)
+                if not (np.all(np.isfinite(grad)) and np.all(np.isfinite(hess))):
                     break
-                a, step = b, min(step * 1.2, 0.3 * st)
-            fa, fb = self.lp(a) - self.thr, self.lp(b) - self.thr
-            for _ in range(200):
-                c = b - fb * (b - a) / (fb - fa)
-                if not (min(a, b) < c < max(a, b)):
-                    c = 0.5 * (a + b)
-                fc = self.lp(c) - self.thr
-                if fc * fb < 0:
-                    a, fa = b, fb
-                else:
-                    fa *= 0.5
-                b, fb = c, fc
-                if abs(b - a) < 1e-12 * abs(b):
+                mu = 0.0
+                moved = False
+                while mu < 1e12:
+                    Hd = hess - mu * np.diag(np.abs(np.diag(hess)) + 1.0)
+                    if np.max(np.linalg.eigvalsh(Hd)) < 0:
+                        step = -np.linalg.solve(Hd, grad)
+                        step *= min(1.0, 0.2 / max(1e-300, float(np.max(np.abs(step)))))
+                        xn = x + step
+                        fn = self.Fphi(t, xn)
+                        if fn >= fx:
+                            moved = True
+                            break
+                    mu = 1e-3 if mu == 0.0 else mu * 10.0
+                if not moved:
                     break
-            return b
+                done = float(np.max(np.abs(xn - x))) < 1e-9
+                x, fx = xn, fn
+                if done:
+                    break
+            self.sol[t] = x
+            return fx
 
-    def _t7_check(r, reg, label=""):
-        """Every output against the exact values, with the stated accuracies."""
+    def _t7_check(r, reg, label="", n_inner=5):
+        """Every output against the exact values with the stated accuracies; the interval ends against the oracle
+        profile: a crossing of the threshold l_max - chi2_0.95(1)/2 lies within a relative 5e-4 of each returned end
+        (the profile is above the threshold at the end moved 5e-4 towards t_end and below it at the end moved 5e-4
+        away), and the profile stays above the threshold at interior points between the ends and t_end."""
         ex = reg.star
-        lo_x, hi_x = reg.crossing(-1), reg.crossing(+1)
         assert isinstance(r, dict) and len(r["holes"]) == len(ex["holes"]), label
         for key, tol in (("g", 2e-3), ("t_end", 2e-3), ("sigma_g", 1e-2), ("sigma_t_end", 1e-2)):
             assert abs(float(r[key]) / ex[key] - 1.0) < tol, (label, key, r[key], ex[key])
-        assert abs(float(r["t_end_low"]) / lo_x - 1.0) < 5e-4, (label, "t_end_low", r["t_end_low"], lo_x)
-        assert abs(float(r["t_end_high"]) / hi_x - 1.0) < 5e-4, (label, "t_end_high", r["t_end_high"], hi_x)
         assert abs(float(r["log_likelihood"]) - ex["log_likelihood"]) < 0.1, (label, "log_likelihood", r["log_likelihood"], ex["log_likelihood"])
         for h, (rh, eh) in enumerate(zip(r["holes"], ex["holes"])):
             assert int(round(float(rh["n_used"]))) == eh["n_used"], (label, h, "n_used", rh["n_used"], eh["n_used"])
             assert abs(float(rh["T0"]) - eh["T0"]) < 2e-3, (label, h, "T0", rh["T0"], eh["T0"])
-            for key, tol in (("q0", 5e-4), ("sigma_T0", 1e-2), ("sigma_q0", 1e-2), ("noise_sd", 3e-3)):
+            assert abs(float(rh["phi"]) - eh["phi"]) < 2e-3, (label, h, "phi", rh["phi"], eh["phi"])
+            for key, tol in (("q0", 5e-4), ("sigma_T0", 1e-2), ("sigma_q0", 1e-2), ("innovation_sd", 3e-3)):
                 assert abs(float(rh[key]) / eh[key] - 1.0) < tol, (label, h, key, rh[key], eh[key])
-        return lo_x, hi_x
+        lo, hi, ts = float(r["t_end_low"]), float(r["t_end_high"]), reg.t_end
+        assert lo < ts < hi, (label, lo, hi)
+        assert reg.lp(lo * (1 + 5e-4)) > reg.thr > reg.lp(lo * (1 - 5e-4)), (label, "t_end_low", lo)
+        assert reg.lp(hi * (1 - 5e-4)) > reg.thr > reg.lp(hi * (1 + 5e-4)), (label, "t_end_high", hi)
+        for k in range(1, n_inner + 1):
+            for end in (lo, hi):
+                tk = ts + (end - ts) * k / (n_inner + 1.0)
+                assert reg.lp(tk) > reg.thr, (label, "profile below the threshold inside the interval", tk)
 
     def _t7_contrast5():
         # 1000 m hole (45 to 62 degrees from the collar), five strongly contrasted layers, readings every 40 m, z_min 40 m
         return _t7_Bore((np.array([0.0, 300.0, 600.0, 1000.0]), np.array([0.0, 3.0, 7.0, 12.0]), np.array([45.0, 50.0, 58.0, 62.0])),
-                     ([0, 90, 210, 380, 470], [1.9, 5.2, 2.2, 4.8, 2.6]), 1.1e-6, 2.3e6, 40.0, log_step=40.0, log_top=10.0)
+                        ([0, 90, 210, 380, 470], [1.9, 5.2, 2.2, 4.8, 2.6]), 1.1e-6, 2.3e6, 40.0, log_step=40.0, log_top=10.0)
 
-    def _t7_deep5():
-        # 2400 m hole (8 to 15 degrees), five layers, readings every 10 m, z_min 200 m
+    def _t7_deep5(log_md=None):
+        # 2400 m hole (8 to 15 degrees), five layers, readings every 10 m from MD 30 m, z_min 200 m
         return _t7_Bore(_t7_g_survey(2400, 50, 8, 15, 90, 110, 1.0, 3), ([0, 260, 900, 1400, 2000], [3.6, 2.9, 3.2, 2.6, 3.5]),
-                     1.8e-6, 2.5e6, 200.0, log_step=10.0, log_top=30.0)
+                        1.8e-6, 2.5e6, 200.0, log_step=10.0, log_top=30.0, log_md=log_md)
 
-    # A 1000 m hole logged every 40 m with 2 mK noise (24 readings used) and a 2400 m hole logged every 10 m with 20 mK
-    # (220 used); four-interval history (post-glacial +0.4, glaciation -1, stadial -0.35, interglacial +0.15). The
-    # per-hole variances weight the precise short log heavily: pooled least squares would give t_end = 9.17 ka
-    # (4.4 standard errors from the estimate), and the variance RSS_h / (n_h - 2) of the short hole changes its weight by 9 %.
-    reg = _t7_Region([_t7_contrast5(), _t7_deep5()], [2.8, 3.6], [0.048, 0.052], 6.0, 9000.0, [0.4, -1.0, -0.35, 0.15],
-                  [3.0e4, 7.5e4, 1.3e5], [0.002, 0.02], [(1.0, 1.0), None], 11, 1)
+    # A 1000 m hole logged every 40 m (24 readings used, innovation sd 2.4 mK, lag-one correlation -0.3) and a 2400 m hole
+    # logged every 10 m (220 used, 20 mK, 0.6); four-interval history (post-glacial +0.4, glaciation -1, stadial -0.35,
+    # interglacial +0.15). The log of the deep hole is listed as two runs, the even readings going down and the odd ones
+    # coming up: the AR(1) sequence is the order of increasing MD, not the order of the arrays.
+    md = np.arange(30.0, 2400.0 + 1e-9, 10.0)
+    reg = _t7_Region([_t7_contrast5(), _t7_deep5(np.concatenate((md[::2], md[1::2][::-1])))], [2.8, 3.6], [0.048, 0.052], 6.0, 9000.0,
+                     [0.4, -1.0, -0.35, 0.15], [3.0e4, 7.5e4, 1.3e5], [0.002, 0.02], [-0.3, 0.6], [None, (0.3, 0.3)], 11, 0)
     r = regional_deglaciation_inversion(reg.holes, [3.0e4, 7.5e4, 1.3e5], [0.4, -1.0, -0.35, 0.15], (1500.0, 29900.0))
     _t7_check(r, reg, "short precise and long noisy hole")
 
@@ -830,9 +1090,9 @@ def _crown_case():
         return (0.5 * (lo + hi)) ** 2
 
     class _t7_Bore:
-        """One borehole built forward: TVD of the readings and the layer tops, the inclusive z_min cut, R and S by
-        exact layer sums, and the oracle step response of its own column (branch-cut form, or erfc for a uniform
-        column)."""
+        """One borehole built forward: TVD of the readings and the layer tops, the inclusive z_min cut, the used
+        readings in the order of increasing MD (the order of the AR(1) noise), R and S by exact layer sums, and the
+        oracle step response of its own column (branch-cut form, or erfc for a uniform column)."""
 
         def __init__(self, survey, layers, A, rc, z_min, log_step=None, log_top=None, log_md=None, uniform_k=None):
             self.md, self.inc, self.azi = (np.asarray(v, float) for v in survey)
@@ -844,10 +1104,13 @@ def _crown_case():
             self.tops = np.array([_t7_g_tvd(self.md, self.inc, self.azi, m) for m in self.tops_md])
             self.z = np.array([_t7_g_tvd(self.md, self.inc, self.azi, m) for m in self.log_md])
             self.keep = self.z >= z_min
-            self.zk, self.n = self.z[self.keep], int(self.keep.sum())
+            used = np.nonzero(self.keep)[0]
+            self.idx = used[np.argsort(self.log_md[used], kind="stable")]      # used readings by increasing MD
+            self.zk, self.n = self.z[self.idx], int(self.idx.size)
+            self.cache = {}
             RS = np.array([_t7_g_RS(v, list(self.tops), list(self.k)) for v in self.zk])
             self.R, self.S = RS[:, 0], RS[:, 1]
-            self.Q2, _ = np.linalg.qr(np.column_stack([np.ones(self.n), self.R]))
+            self.X = np.column_stack([np.ones(self.n), self.R])
 
         def U(self, t, deriv=False):
             if self.uniform_k is None:
@@ -867,105 +1130,196 @@ def _crown_case():
             self.Pfix, self.ds = Pf, sh[0] - sh[1]
 
         def P(self, t):
-            return self.Pfix + self.ds * self.U(t)
+            t = float(t)
+            if t not in self.cache:
+                self.cache[t] = self.Pfix + self.ds * self.U(t)
+            return self.cache[t]
 
         def dP(self, t):
             return self.ds * self.U(t, True)
 
-    class _t7_Region:
-        """Boreholes sharing one glacial history, with data whose maximum-likelihood solution is known exactly.
-        On the used readings of hole h, y_h = T + A S = T0_h + q0_h R_h + g P_h(t_end) + r_h with
-        r_h = b_h + c_h: b_h is orthogonal to the four columns [1, R_h, P_h, g dP_h/dt_end] (seeded, rms noise[h]),
-        c_h lies in the span of the projections p_h, d_h of P_h and g dP_h/dt_end off [1, R_h] (coefficients
-        kappa[h] in units of noise[h] for every hole but hole `solve`), and that hole's c_h is solved in closed form
-        so that sum_h (n_h / |r_h|^2) [p_h, d_h]^T r_h = 0. With sigma_h^2 = |r_h|^2 / n_h every score of the
-        log-likelihood vanishes at the generating values, while the unweighted sum sum_h [p_h, d_h]^T r_h does not."""
+    def _t7_white(v, phi):
+        """Prais-Winsten transform of the readings (axis 0, by increasing MD) for the stationary AR(1) model: first row
+        sqrt(1 - phi^2) v_1, then v_i - phi v_(i-1). For AR(1) errors the transformed errors are independent with
+        variance s^2."""
+        v = np.asarray(v, float)
+        out = np.empty_like(v)
+        out[0] = math.sqrt(1.0 - phi * phi) * v[0]
+        out[1:] = v[1:] - phi * v[:-1]
+        return out
 
-        def __init__(self, bores, T0, q0, g, t_end, shape, t_known, noise, kappa, seed, solve):
-            self.bores, self.g, self.t_end = bores, g, t_end
-            self.shape, self.t_known = np.asarray(shape, float), np.asarray(t_known, float)
+    def _t7_unwhite(u, phi):
+        """Inverse transform: r_1 = u_1 / sqrt(1 - phi^2), r_i = u_i + phi r_(i-1)."""
+        r = np.empty(u.size)
+        r[0] = u[0] / math.sqrt(1.0 - phi * phi)
+        for i in range(1, u.size):
+            r[i] = u[i] + phi * r[i - 1]
+        return r
+
+    def _t7_phi_score(u, phi):
+        """n times the derivative in phi of -(n/2) log |L(phi) r|^2 + (1/2) log(1 - phi^2), with r = L(phi*)^-1 u fixed,
+        at phi = phi* (multiplied by |u|^2 / n): n (sum_(i>=2) u_i r_(i-1) + phi r_1^2) - |u|^2 phi / (1 - phi^2)."""
+        r = _t7_unwhite(u, phi)
+        return u.size * (float(u[1:] @ r[:-1]) + phi * r[0] ** 2) - float(u @ u) * phi / (1.0 - phi * phi)
+
+    def _t7_unwhite_T(z, phi):
+        """Solve L(phi)^T x = z (the transpose of the Prais-Winsten transform), by back substitution."""
+        x = np.empty(z.size)
+        x[-1] = z[-1]
+        for i in range(z.size - 2, 0, -1):
+            x[i] = z[i] + phi * x[i + 1]
+        x[0] = (z[0] + phi * x[1]) / math.sqrt(1.0 - phi * phi) if z.size > 1 else z[0] / math.sqrt(1.0 - phi * phi)
+        return x
+
+    def _t7_phi_score_grad(u, phi):
+        """Gradient in u of _t7_phi_score (a quadratic form in u)."""
+        n = u.size
+        r = _t7_unwhite(u, phi)
+        su = np.zeros(n)
+        su[:-1] = u[1:]
+        sr = np.zeros(n)
+        sr[1:] = r[:-1]
+        e1 = np.zeros(n)
+        e1[0] = 1.0
+        return n * (sr + _t7_unwhite_T(su, phi) + 2.0 * phi * r[0] * _t7_unwhite_T(e1, phi)) - 2.0 * phi / (1.0 - phi * phi) * u
+
+    class _t7_Region:
+        """Boreholes sharing one glacial history, with data whose maximum-likelihood solution under stationary AR(1)
+        noise is known exactly. In hole h (used readings by increasing MD) the residual r_h = y_h - T0_h - q0_h R_h -
+        g P_h(t_end), y = T + A S, is built in whitened space, u_h = L(phi_h) r_h (L the Prais-Winsten transform):
+        u_h = b_h + c_h with b_h orthogonal to the four whitened columns L[1, R_h, P_h, g dP_h/dt_end], |b_h|^2 =
+        n_h noise_h^2, and c_h in the span of the projections p_h, d_h of L P_h and L g dP_h/dt_end off L[1, R_h]
+        (coefficients kappa[h] in units of noise_h for every hole but hole `solve`, whose c_h is solved in closed form
+        so that sum_h (n_h / |u_h|^2) [p_h, d_h]^T u_h = 0). b_h = rho_h (cos a b0 + sin a v) with b0, v orthonormal
+        (seeded) is rotated in its plane until the score of phi_h vanishes (|u_h| unchanged). With s_h^2 = |u_h|^2 / n_h
+        every score of the exact log-likelihood vanishes at the generating values."""
+
+        def __init__(self, bores, T0, q0, g, t_end, shape, t_known, noise, phi, kappa, seed, solve):
+            self.bores, self.g, self.t_end, self.phi = bores, g, t_end, list(phi)
             H = len(bores)
             rng = np.random.default_rng(seed)
-            B, Pp, Dd, Ps = [], [], [], []
+            B0, Q4s, Pp, Dd, Ps, Ds, Xw = [], [], [], [], [], [], []
             for h, bo in enumerate(bores):
                 bo.history(shape, t_known)
                 P0, D0 = bo.P(t_end), g * bo.dP(t_end)
-                J = np.column_stack([np.ones(bo.n), bo.R, P0, D0])
-                Q, _ = np.linalg.qr(J)
+                xw = _t7_white(bo.X, phi[h])
+                pw, dw = _t7_white(P0, phi[h]), _t7_white(D0, phi[h])
+                Q4, _ = np.linalg.qr(np.column_stack([xw, pw, dw]))
                 w = rng.standard_normal(bo.n)
-                b = w - Q @ (Q.T @ w)
-                b = b - Q @ (Q.T @ b)
-                b *= noise[h] / math.sqrt(np.mean(b * b))
-                Q2 = bo.Q2
-                p = P0 - Q2 @ (Q2.T @ P0)
-                d = D0 - Q2 @ (Q2.T @ D0)
-                B.append(b); Pp.append(p); Dd.append(d); Ps.append(P0)
+                for _ in range(2):
+                    w = w - Q4 @ (Q4.T @ w)
+                Q2, _ = np.linalg.qr(xw)
+                B0.append(w / np.linalg.norm(w)); Q4s.append(Q4); Xw.append(xw)
+                Pp.append(pw - Q2 @ (Q2.T @ pw)); Dd.append(dw - Q2 @ (Q2.T @ dw)); Ps.append(P0); Ds.append(D0)
+            rho = [noise[h] * math.sqrt(bo.n) for h, bo in enumerate(bores)]
             C = [None] * H
-            v = np.zeros(2)
+            vsum = np.zeros(2)
             for h in range(H):
                 if h == solve:
                     continue
                 e1 = Pp[h] / np.linalg.norm(Pp[h])
                 e2 = Dd[h] - (Dd[h] @ e1) * e1
                 e2 /= np.linalg.norm(e2)
-                c = noise[h] * (kappa[h][0] * e1 + kappa[h][1] * e2)
-                C[h] = c
-                rr = float(B[h] @ B[h] + c @ c)
-                v += bores[h].n / rr * np.array([Pp[h] @ c, Dd[h] @ c])
+                C[h] = noise[h] * (kappa[h][0] * e1 + kappa[h][1] * e2)
+                vsum += bores[h].n / (rho[h] ** 2 + float(C[h] @ C[h])) * np.array([Pp[h] @ C[h], Dd[h] @ C[h]])
             X = np.column_stack([Pp[solve], Dd[solve]])
-            G = X.T @ X
-            Gi_v = np.linalg.solve(G, v)
-            s = float(v @ Gi_v)
-            nH, bb = bores[solve].n, float(B[solve] @ B[solve])
-            lam = (nH - math.sqrt(nH * nH - 4.0 * s * bb)) / (2.0 * s)
+            Gi_v = np.linalg.solve(X.T @ X, vsum)
+            s = float(vsum @ Gi_v)
+            nS, bb = bores[solve].n, rho[solve] ** 2
+            lam = (nS - math.sqrt(nS * nS - 4.0 * s * bb)) / (2.0 * s) if s > 0 else 0.0
             C[solve] = X @ (-lam * Gi_v)
-            self.r = [B[h] + C[h] for h in range(H)]
-            self.holes = []
-            self.y = []
+            self.u, self.r, self.y, self.angle = [], [], [], []
             for h, bo in enumerate(bores):
-                y = T0[h] + q0[h] * bo.R + g * Ps[h] + self.r[h]
-                self.y.append(y)
+                # b_h = rho_h b with |b| = 1 orthogonal to the four whitened columns: starting from the seeded b0, move b on
+                # the great circle through b and the (projected) gradient of the phi score until the score vanishes (the
+                # root nearest to b on that circle; if the circle has none, b moves to its point of smallest |score|)
+                b = B0[h]
+                for it in range(30):
+                    w = _t7_phi_score_grad(rho[h] * b + C[h], phi[h])
+                    for _ in range(2):
+                        w = w - Q4s[h] @ (Q4s[h].T @ w)
+                        w = w - (b @ w) * b
+                    v = w / np.linalg.norm(w)
+                    f = lambda a: _t7_phi_score(rho[h] * (math.cos(a) * b + math.sin(a) * v) + C[h], phi[h])
+                    grid = np.linspace(-math.pi, math.pi, 1441)
+                    fv = [f(a) for a in grid]
+                    roots = []
+                    for i in range(grid.size - 1):
+                        if fv[i] == 0.0 or fv[i] * fv[i + 1] < 0:
+                            a0, a1, f0 = grid[i], grid[i + 1], fv[i]
+                            for _ in range(80):
+                                am = 0.5 * (a0 + a1)
+                                fm = f(am)
+                                if (fm < 0) == (f0 < 0):
+                                    a0, f0 = am, fm
+                                else:
+                                    a1 = am
+                            roots.append(0.5 * (a0 + a1))
+                    a = min(roots, key=abs) if roots else float(grid[int(np.argmin(np.abs(fv)))])
+                    b = math.cos(a) * b + math.sin(a) * v
+                    b /= np.linalg.norm(b)
+                    if roots:
+                        break
+                self.angle.append(float(b @ B0[h]))
+                u = rho[h] * b + C[h]
+                r = _t7_unwhite(u, phi[h])
+                self.u.append(u); self.r.append(r)
+                self.y.append(T0[h] + q0[h] * bo.R + g * Ps[h] + r)
+            self.holes = []
+            for h, bo in enumerate(bores):
                 T = np.empty(bo.z.size)
-                T[bo.keep] = y - bo.A * bo.S
+                T[bo.idx] = self.y[h] - bo.A * bo.S
                 nk = int((~bo.keep).sum())
                 T[~bo.keep] = T0[h] + 1.5 + 0.02 * bo.z[~bo.keep] + 0.3 * rng.standard_normal(nk)
                 self.holes.append({"survey_md": bo.md.copy(), "survey_inc": bo.inc.copy(), "survey_azi": bo.azi.copy(),
                                    "log_md": bo.log_md.copy(), "log_temp": T, "layer_top_md": bo.tops_md.copy(),
                                    "layer_k": bo.k.copy(), "heat_production": bo.A, "rho_c": bo.rc, "z_min": bo.z_min})
-            self.sd = [math.sqrt(float(self.r[h] @ self.r[h]) / bo.n) for h, bo in enumerate(bores)]
-            # expected Fisher information of (T0_1, q0_1, ..., T0_H, q0_H, g, t_end) at the generating values
+            self.sd = [float(np.linalg.norm(self.u[h])) / math.sqrt(bo.n) for h, bo in enumerate(bores)]
+            # expected Fisher information of (T0_1, q0_1, ..., T0_H, q0_H, g, t_end): sum_h J_h^T V_h^-1 J_h / s_h^2,
+            # V_h^-1 = L_h^T L_h, with the oracle Jacobians at the generating values
             npar = 2 * H + 2
-            I = np.zeros((npar, npar))
+            info = np.zeros((npar, npar))
             for h, bo in enumerate(bores):
                 Jf = np.zeros((bo.n, npar))
                 Jf[:, 2 * h] = 1.0
                 Jf[:, 2 * h + 1] = bo.R
                 Jf[:, -2] = Ps[h]
-                Jf[:, -1] = g * bo.dP(t_end)
-                I += Jf.T @ Jf / self.sd[h] ** 2
-            sc = 1.0 / np.sqrt(np.diag(I))
-            sig = np.sqrt(np.diag(np.linalg.inv(I * np.outer(sc, sc)))) * sc
-            self.lmax = sum(-0.5 * bo.n * (math.log(2.0 * math.pi * self.sd[h] ** 2) + 1.0) for h, bo in enumerate(bores))
-            self.star = {"g": g, "t_end": t_end, "sigma_g": sig[-2], "sigma_t_end": sig[-1], "log_likelihood": self.lmax,
-                         "holes": [{"T0": T0[h], "q0": q0[h], "sigma_T0": sig[2 * h], "sigma_q0": sig[2 * h + 1],
-                                    "noise_sd": self.sd[h], "n_used": bo.n} for h, bo in enumerate(bores)]}
+                Jf[:, -1] = Ds[h]
+                Jw = _t7_white(Jf, phi[h])
+                info += Jw.T @ Jw / self.sd[h] ** 2
+            sc = 1.0 / np.sqrt(np.diag(info))
+            sig = np.sqrt(np.diag(np.linalg.inv(info * np.outer(sc, sc)))) * sc
+            self.lmax = sum(-0.5 * bo.n * (math.log(2.0 * math.pi * self.sd[h] ** 2) + 1.0)
+                            + 0.5 * math.log(1.0 - phi[h] ** 2) for h, bo in enumerate(bores))
+            self.star = {"g": g, "t_end": t_end, "sigma_g": float(sig[-2]), "sigma_t_end": float(sig[-1]),
+                         "log_likelihood": self.lmax,
+                         "holes": [{"T0": T0[h], "q0": q0[h], "sigma_T0": float(sig[2 * h]), "sigma_q0": float(sig[2 * h + 1]),
+                                    "phi": phi[h], "innovation_sd": self.sd[h], "n_used": bo.n} for h, bo in enumerate(bores)]}
             self.thr = self.lmax - 0.5 * _t7_chi2_95()
-            self.yp = [y - bo.Q2 @ (bo.Q2.T @ y) for y, bo in zip(self.y, bores)]
+            # the generating geotherm removed from y (the profile is invariant to a shift in the span of [1, R])
+            self.yc = [self.y[h] - T0[h] - q0[h] * bo.R for h, bo in enumerate(bores)]
+            self.sol = {float(t_end): np.array(phi, float)}
 
-        def coeffs(self, t):
+        def coeffs(self, t, ph):
+            """(a_h, b_h, c_h, n_h) of every hole: Q_h(g) = a_h g^2 - 2 b_h g + c_h is the generalized least-squares
+            residual of hole h on [1, R_h] at t_end = t with lag-one correlation ph[h] (Prais-Winsten transform and QR)."""
             out = []
-            for bo, y in zip(self.bores, self.yp):
-                p = bo.P(t)
-                p = p - bo.Q2 @ (bo.Q2.T @ p)
-                out.append((float(p @ p), float(p @ y), float(y @ y), bo.n))
+            for h, bo in enumerate(self.bores):
+                xw = _t7_white(bo.X, ph[h])
+                Q, _ = np.linalg.qr(xw)
+                yw, pw = _t7_white(self.yc[h], ph[h]), _t7_white(bo.P(t), ph[h])
+                yw = yw - Q @ (Q.T @ yw)
+                pw = pw - Q @ (Q.T @ pw)
+                out.append((float(pw @ pw), float(pw @ yw), float(yw @ yw), bo.n))
             return out
 
-        def lp(self, t, with_g=False):
-            """Profile log-likelihood at t_end = t: the maximum over g of sum_h -(n_h/2)(log(2 pi Q_h(g)/n_h) + 1),
-            Q_h(g) = a_h g^2 - 2 b_h g + c_h the residual sum of squares of hole h after its T0_h and q0_h. Every
-            stationary point lies between the smallest and the largest b_h / a_h; they are bracketed by the sign
+        def Fphi(self, t, ph, with_g=False):
+            """Log-likelihood maximized over T0_h, q0_h, s_h and g at t_end = t with the lag-one correlations ph: every
+            stationary point in g lies between the smallest and the largest b_h / a_h; they are bracketed by the sign
             changes of the derivative on a 4001-point grid and located by bisection."""
-            co = self.coeffs(t)
+            if not all(abs(p) < 1.0 for p in ph):
+                return (-math.inf, None) if with_g else -math.inf
+            co = self.coeffs(t, ph)
             f = lambda g: sum(-0.5 * n * (math.log(2.0 * math.pi * (a * g * g - 2.0 * b * g + c) / n) + 1.0) for a, b, c, n in co)
             df = lambda g: -sum(n * (a * g - b) / (a * g * g - 2.0 * b * g + c) for a, b, c, n in co)
             gs = [b / a for a, b, c, n in co]
@@ -973,7 +1327,8 @@ def _crown_case():
             cand = [lo, hi]
             if hi > lo:
                 grid = np.linspace(lo, hi, 4001)
-                dv = [df(x) for x in grid]
+                A = np.array([[a, b, c, n] for a, b, c, n in co])
+                dv = -np.sum(A[:, 3:4] * (A[:, 0:1] * grid - A[:, 1:2]) / (A[:, 0:1] * grid * grid - 2.0 * A[:, 1:2] * grid + A[:, 2:3]), axis=0)
                 for i in range(grid.size - 1):
                     if dv[i] > 0 >= dv[i + 1]:
                         x0, x1 = grid[i], grid[i + 1]
@@ -985,65 +1340,97 @@ def _crown_case():
                                 x1 = xm
                         cand.append(0.5 * (x0 + x1))
             vals = [f(x) for x in cand]
-            i = int(np.argmax(vals))
-            return (vals[i], cand[i]) if with_g else vals[i]
+            k = int(np.argmax(vals))
+            v = vals[k] + sum(0.5 * math.log(1.0 - p * p) for p in ph)
+            return (v, cand[k] + 0.0) if with_g else v
 
-        def crossing(self, direction):
-            """Crossing of the profile with the threshold nearest to the generating t_end on one side: march outward
-            in small steps, then bisection with Illinois steps."""
-            ts, st = self.t_end, self.star["sigma_t_end"]
-            a, step = ts, 0.05 * st
-            while True:
-                b = a + direction * step
-                if self.lp(b) <= self.thr:
+        def lp(self, t, x0=None):
+            """Profile log-likelihood at t_end = t: Fphi maximized over the lag-one correlations by a damped Newton
+            ascent (central-difference derivatives, Levenberg damping), started from the correlations found at the
+            nearest t already evaluated (the generating values first)."""
+            t = float(t)
+            if t in self.sol:
+                return self.Fphi(t, self.sol[t])
+            if x0 is None:
+                x0 = self.sol[min(self.sol, key=lambda s: abs(math.log(s / t)))]
+            x = np.array(x0, float)
+            m, hs = x.size, 1e-4
+            fx = self.Fphi(t, x)
+            for _ in range(100):
+                grad = np.zeros(m)
+                hess = np.zeros((m, m))
+                for i in range(m):
+                    e = np.zeros(m); e[i] = hs
+                    fp, fm = self.Fphi(t, x + e), self.Fphi(t, x - e)
+                    grad[i] = (fp - fm) / (2 * hs)
+                    hess[i, i] = (fp - 2 * fx + fm) / hs ** 2
+                    for j in range(i):
+                        ej = np.zeros(m); ej[j] = hs
+                        hess[i, j] = hess[j, i] = (self.Fphi(t, x + e + ej) - self.Fphi(t, x + e - ej) - self.Fphi(t, x - e + ej)
+                                                   + self.Fphi(t, x - e - ej)) / (4 * hs * hs)
+                if not (np.all(np.isfinite(grad)) and np.all(np.isfinite(hess))):
                     break
-                a, step = b, min(step * 1.2, 0.3 * st)
-            fa, fb = self.lp(a) - self.thr, self.lp(b) - self.thr
-            for _ in range(200):
-                c = b - fb * (b - a) / (fb - fa)
-                if not (min(a, b) < c < max(a, b)):
-                    c = 0.5 * (a + b)
-                fc = self.lp(c) - self.thr
-                if fc * fb < 0:
-                    a, fa = b, fb
-                else:
-                    fa *= 0.5
-                b, fb = c, fc
-                if abs(b - a) < 1e-12 * abs(b):
+                mu = 0.0
+                moved = False
+                while mu < 1e12:
+                    Hd = hess - mu * np.diag(np.abs(np.diag(hess)) + 1.0)
+                    if np.max(np.linalg.eigvalsh(Hd)) < 0:
+                        step = -np.linalg.solve(Hd, grad)
+                        step *= min(1.0, 0.2 / max(1e-300, float(np.max(np.abs(step)))))
+                        xn = x + step
+                        fn = self.Fphi(t, xn)
+                        if fn >= fx:
+                            moved = True
+                            break
+                    mu = 1e-3 if mu == 0.0 else mu * 10.0
+                if not moved:
                     break
-            return b
+                done = float(np.max(np.abs(xn - x))) < 1e-9
+                x, fx = xn, fn
+                if done:
+                    break
+            self.sol[t] = x
+            return fx
 
-    def _t7_check(r, reg, label=""):
-        """Every output against the exact values, with the stated accuracies."""
+    def _t7_check(r, reg, label="", n_inner=5):
+        """Every output against the exact values with the stated accuracies; the interval ends against the oracle
+        profile: a crossing of the threshold l_max - chi2_0.95(1)/2 lies within a relative 5e-4 of each returned end
+        (the profile is above the threshold at the end moved 5e-4 towards t_end and below it at the end moved 5e-4
+        away), and the profile stays above the threshold at interior points between the ends and t_end."""
         ex = reg.star
-        lo_x, hi_x = reg.crossing(-1), reg.crossing(+1)
         assert isinstance(r, dict) and len(r["holes"]) == len(ex["holes"]), label
         for key, tol in (("g", 2e-3), ("t_end", 2e-3), ("sigma_g", 1e-2), ("sigma_t_end", 1e-2)):
             assert abs(float(r[key]) / ex[key] - 1.0) < tol, (label, key, r[key], ex[key])
-        assert abs(float(r["t_end_low"]) / lo_x - 1.0) < 5e-4, (label, "t_end_low", r["t_end_low"], lo_x)
-        assert abs(float(r["t_end_high"]) / hi_x - 1.0) < 5e-4, (label, "t_end_high", r["t_end_high"], hi_x)
         assert abs(float(r["log_likelihood"]) - ex["log_likelihood"]) < 0.1, (label, "log_likelihood", r["log_likelihood"], ex["log_likelihood"])
         for h, (rh, eh) in enumerate(zip(r["holes"], ex["holes"])):
             assert int(round(float(rh["n_used"]))) == eh["n_used"], (label, h, "n_used", rh["n_used"], eh["n_used"])
             assert abs(float(rh["T0"]) - eh["T0"]) < 2e-3, (label, h, "T0", rh["T0"], eh["T0"])
-            for key, tol in (("q0", 5e-4), ("sigma_T0", 1e-2), ("sigma_q0", 1e-2), ("noise_sd", 3e-3)):
+            assert abs(float(rh["phi"]) - eh["phi"]) < 2e-3, (label, h, "phi", rh["phi"], eh["phi"])
+            for key, tol in (("q0", 5e-4), ("sigma_T0", 1e-2), ("sigma_q0", 1e-2), ("innovation_sd", 3e-3)):
                 assert abs(float(rh[key]) / eh[key] - 1.0) < tol, (label, h, key, rh[key], eh[key])
-        return lo_x, hi_x
+        lo, hi, ts = float(r["t_end_low"]), float(r["t_end_high"]), reg.t_end
+        assert lo < ts < hi, (label, lo, hi)
+        assert reg.lp(lo * (1 + 5e-4)) > reg.thr > reg.lp(lo * (1 - 5e-4)), (label, "t_end_low", lo)
+        assert reg.lp(hi * (1 - 5e-4)) > reg.thr > reg.lp(hi * (1 + 5e-4)), (label, "t_end_high", hi)
+        for k in range(1, n_inner + 1):
+            for end in (lo, hi):
+                tk = ts + (end - ts) * k / (n_inner + 1.0)
+                assert reg.lp(tk) > reg.thr, (label, "profile below the threshold inside the interval", tk)
 
-    # Two vertical holes whose layers all have one conductivity (3.1 and 2.4 W m^-1 K^-1) and different rho_c: the
-    # layered perturbation is the erfc half-space of each hole's own diffusivity, and the oracle uses math.erfc and its
-    # closed-form time derivative. The collar reading (MD 0, TVD 0) of the first hole lies exactly at z_min = 0 and is
-    # used (121 readings); the second hole has 57 readings below 50 m. The log-likelihood profile is asymmetric.
-    _t7_bA = _t7_Bore((np.array([0.0, 600.0, 1200.0]), np.zeros(3), np.zeros(3)), ([0, 400, 900], [3.1, 3.1, 3.1]), 0.7e-6, 2.2e6, 0.0,
-               log_step=10.0, log_top=0.0, uniform_k=3.1)
-    _t7_bB = _t7_Bore((np.array([0.0, 900.0]), np.zeros(2), np.zeros(2)), ([0, 300], [2.4, 2.4]), 1.2e-6, 2.6e6, 50.0,
-               log_step=15.0, log_top=5.0, uniform_k=2.4)
-    reg = _t7_Region([_t7_bA, _t7_bB], [5.5, 2.9], [0.044, 0.061], 6.2, 10500.0, [0.0, -1.0, 0.3], [9.0e4, 1.15e5], [0.006, 0.015],
-                  [None, (-2.0, 1.5)], 99, 0)
-    assert _t7_bA.n == 121
+    # Two vertical holes whose layers all have one conductivity (3.1 and 2.4 W m^-1 K^-1) and different rho_c: the layered
+    # perturbation is the erfc half-space of each hole's own diffusivity, and the oracle uses math.erfc and its closed-form
+    # time derivative. The collar reading (MD 0, TVD 0) of the first hole lies exactly at z_min = 0 and is used (121
+    # readings, lag-one correlation 0.5); the second hole has 57 readings below 50 m (0.25).
+    bA = _t7_Bore((np.array([0.0, 600.0, 1200.0]), np.zeros(3), np.zeros(3)), ([0, 400, 900], [3.1, 3.1, 3.1]), 0.7e-6, 2.2e6, 0.0,
+                  log_step=10.0, log_top=0.0, uniform_k=3.1)
+    bB = _t7_Bore((np.array([0.0, 900.0]), np.zeros(2), np.zeros(2)), ([0, 300], [2.4, 2.4]), 1.2e-6, 2.6e6, 50.0,
+                  log_step=15.0, log_top=5.0, uniform_k=2.4)
+    reg = _t7_Region([bA, bB], [5.5, 2.9], [0.044, 0.061], 6.2, 10500.0, [0.0, -1.0, 0.3], [9.0e4, 1.15e5], [0.006, 0.015], [0.5, 0.25],
+                     [None, (-2.0, 1.5)], 99, 0)
+    assert bA.n == 121
     r = regional_deglaciation_inversion(reg.holes, [9.0e4, 1.15e5], [0.0, -1.0, 0.3], (2000.0, 80000.0))
-    lo_x, hi_x = _t7_check(r, reg, "uniform columns")
-    assert hi_x - reg.t_end > 1.2 * (reg.t_end - lo_x)          # oracle premise: asymmetric interval
+    _t7_check(r, reg, "uniform columns")
+    assert r["t_end_high"] - reg.t_end > 1.5 * (reg.t_end - r["t_end_low"])      # the interval is asymmetric
 
 
 _crown_case()
@@ -1166,9 +1553,9 @@ def _crown_case():
         return (0.5 * (lo + hi)) ** 2
 
     class _t7_Bore:
-        """One borehole built forward: TVD of the readings and the layer tops, the inclusive z_min cut, R and S by
-        exact layer sums, and the oracle step response of its own column (branch-cut form, or erfc for a uniform
-        column)."""
+        """One borehole built forward: TVD of the readings and the layer tops, the inclusive z_min cut, the used
+        readings in the order of increasing MD (the order of the AR(1) noise), R and S by exact layer sums, and the
+        oracle step response of its own column (branch-cut form, or erfc for a uniform column)."""
 
         def __init__(self, survey, layers, A, rc, z_min, log_step=None, log_top=None, log_md=None, uniform_k=None):
             self.md, self.inc, self.azi = (np.asarray(v, float) for v in survey)
@@ -1180,10 +1567,13 @@ def _crown_case():
             self.tops = np.array([_t7_g_tvd(self.md, self.inc, self.azi, m) for m in self.tops_md])
             self.z = np.array([_t7_g_tvd(self.md, self.inc, self.azi, m) for m in self.log_md])
             self.keep = self.z >= z_min
-            self.zk, self.n = self.z[self.keep], int(self.keep.sum())
+            used = np.nonzero(self.keep)[0]
+            self.idx = used[np.argsort(self.log_md[used], kind="stable")]      # used readings by increasing MD
+            self.zk, self.n = self.z[self.idx], int(self.idx.size)
+            self.cache = {}
             RS = np.array([_t7_g_RS(v, list(self.tops), list(self.k)) for v in self.zk])
             self.R, self.S = RS[:, 0], RS[:, 1]
-            self.Q2, _ = np.linalg.qr(np.column_stack([np.ones(self.n), self.R]))
+            self.X = np.column_stack([np.ones(self.n), self.R])
 
         def U(self, t, deriv=False):
             if self.uniform_k is None:
@@ -1203,105 +1593,196 @@ def _crown_case():
             self.Pfix, self.ds = Pf, sh[0] - sh[1]
 
         def P(self, t):
-            return self.Pfix + self.ds * self.U(t)
+            t = float(t)
+            if t not in self.cache:
+                self.cache[t] = self.Pfix + self.ds * self.U(t)
+            return self.cache[t]
 
         def dP(self, t):
             return self.ds * self.U(t, True)
 
-    class _t7_Region:
-        """Boreholes sharing one glacial history, with data whose maximum-likelihood solution is known exactly.
-        On the used readings of hole h, y_h = T + A S = T0_h + q0_h R_h + g P_h(t_end) + r_h with
-        r_h = b_h + c_h: b_h is orthogonal to the four columns [1, R_h, P_h, g dP_h/dt_end] (seeded, rms noise[h]),
-        c_h lies in the span of the projections p_h, d_h of P_h and g dP_h/dt_end off [1, R_h] (coefficients
-        kappa[h] in units of noise[h] for every hole but hole `solve`), and that hole's c_h is solved in closed form
-        so that sum_h (n_h / |r_h|^2) [p_h, d_h]^T r_h = 0. With sigma_h^2 = |r_h|^2 / n_h every score of the
-        log-likelihood vanishes at the generating values, while the unweighted sum sum_h [p_h, d_h]^T r_h does not."""
+    def _t7_white(v, phi):
+        """Prais-Winsten transform of the readings (axis 0, by increasing MD) for the stationary AR(1) model: first row
+        sqrt(1 - phi^2) v_1, then v_i - phi v_(i-1). For AR(1) errors the transformed errors are independent with
+        variance s^2."""
+        v = np.asarray(v, float)
+        out = np.empty_like(v)
+        out[0] = math.sqrt(1.0 - phi * phi) * v[0]
+        out[1:] = v[1:] - phi * v[:-1]
+        return out
 
-        def __init__(self, bores, T0, q0, g, t_end, shape, t_known, noise, kappa, seed, solve):
-            self.bores, self.g, self.t_end = bores, g, t_end
-            self.shape, self.t_known = np.asarray(shape, float), np.asarray(t_known, float)
+    def _t7_unwhite(u, phi):
+        """Inverse transform: r_1 = u_1 / sqrt(1 - phi^2), r_i = u_i + phi r_(i-1)."""
+        r = np.empty(u.size)
+        r[0] = u[0] / math.sqrt(1.0 - phi * phi)
+        for i in range(1, u.size):
+            r[i] = u[i] + phi * r[i - 1]
+        return r
+
+    def _t7_phi_score(u, phi):
+        """n times the derivative in phi of -(n/2) log |L(phi) r|^2 + (1/2) log(1 - phi^2), with r = L(phi*)^-1 u fixed,
+        at phi = phi* (multiplied by |u|^2 / n): n (sum_(i>=2) u_i r_(i-1) + phi r_1^2) - |u|^2 phi / (1 - phi^2)."""
+        r = _t7_unwhite(u, phi)
+        return u.size * (float(u[1:] @ r[:-1]) + phi * r[0] ** 2) - float(u @ u) * phi / (1.0 - phi * phi)
+
+    def _t7_unwhite_T(z, phi):
+        """Solve L(phi)^T x = z (the transpose of the Prais-Winsten transform), by back substitution."""
+        x = np.empty(z.size)
+        x[-1] = z[-1]
+        for i in range(z.size - 2, 0, -1):
+            x[i] = z[i] + phi * x[i + 1]
+        x[0] = (z[0] + phi * x[1]) / math.sqrt(1.0 - phi * phi) if z.size > 1 else z[0] / math.sqrt(1.0 - phi * phi)
+        return x
+
+    def _t7_phi_score_grad(u, phi):
+        """Gradient in u of _t7_phi_score (a quadratic form in u)."""
+        n = u.size
+        r = _t7_unwhite(u, phi)
+        su = np.zeros(n)
+        su[:-1] = u[1:]
+        sr = np.zeros(n)
+        sr[1:] = r[:-1]
+        e1 = np.zeros(n)
+        e1[0] = 1.0
+        return n * (sr + _t7_unwhite_T(su, phi) + 2.0 * phi * r[0] * _t7_unwhite_T(e1, phi)) - 2.0 * phi / (1.0 - phi * phi) * u
+
+    class _t7_Region:
+        """Boreholes sharing one glacial history, with data whose maximum-likelihood solution under stationary AR(1)
+        noise is known exactly. In hole h (used readings by increasing MD) the residual r_h = y_h - T0_h - q0_h R_h -
+        g P_h(t_end), y = T + A S, is built in whitened space, u_h = L(phi_h) r_h (L the Prais-Winsten transform):
+        u_h = b_h + c_h with b_h orthogonal to the four whitened columns L[1, R_h, P_h, g dP_h/dt_end], |b_h|^2 =
+        n_h noise_h^2, and c_h in the span of the projections p_h, d_h of L P_h and L g dP_h/dt_end off L[1, R_h]
+        (coefficients kappa[h] in units of noise_h for every hole but hole `solve`, whose c_h is solved in closed form
+        so that sum_h (n_h / |u_h|^2) [p_h, d_h]^T u_h = 0). b_h = rho_h (cos a b0 + sin a v) with b0, v orthonormal
+        (seeded) is rotated in its plane until the score of phi_h vanishes (|u_h| unchanged). With s_h^2 = |u_h|^2 / n_h
+        every score of the exact log-likelihood vanishes at the generating values."""
+
+        def __init__(self, bores, T0, q0, g, t_end, shape, t_known, noise, phi, kappa, seed, solve):
+            self.bores, self.g, self.t_end, self.phi = bores, g, t_end, list(phi)
             H = len(bores)
             rng = np.random.default_rng(seed)
-            B, Pp, Dd, Ps = [], [], [], []
+            B0, Q4s, Pp, Dd, Ps, Ds, Xw = [], [], [], [], [], [], []
             for h, bo in enumerate(bores):
                 bo.history(shape, t_known)
                 P0, D0 = bo.P(t_end), g * bo.dP(t_end)
-                J = np.column_stack([np.ones(bo.n), bo.R, P0, D0])
-                Q, _ = np.linalg.qr(J)
+                xw = _t7_white(bo.X, phi[h])
+                pw, dw = _t7_white(P0, phi[h]), _t7_white(D0, phi[h])
+                Q4, _ = np.linalg.qr(np.column_stack([xw, pw, dw]))
                 w = rng.standard_normal(bo.n)
-                b = w - Q @ (Q.T @ w)
-                b = b - Q @ (Q.T @ b)
-                b *= noise[h] / math.sqrt(np.mean(b * b))
-                Q2 = bo.Q2
-                p = P0 - Q2 @ (Q2.T @ P0)
-                d = D0 - Q2 @ (Q2.T @ D0)
-                B.append(b); Pp.append(p); Dd.append(d); Ps.append(P0)
+                for _ in range(2):
+                    w = w - Q4 @ (Q4.T @ w)
+                Q2, _ = np.linalg.qr(xw)
+                B0.append(w / np.linalg.norm(w)); Q4s.append(Q4); Xw.append(xw)
+                Pp.append(pw - Q2 @ (Q2.T @ pw)); Dd.append(dw - Q2 @ (Q2.T @ dw)); Ps.append(P0); Ds.append(D0)
+            rho = [noise[h] * math.sqrt(bo.n) for h, bo in enumerate(bores)]
             C = [None] * H
-            v = np.zeros(2)
+            vsum = np.zeros(2)
             for h in range(H):
                 if h == solve:
                     continue
                 e1 = Pp[h] / np.linalg.norm(Pp[h])
                 e2 = Dd[h] - (Dd[h] @ e1) * e1
                 e2 /= np.linalg.norm(e2)
-                c = noise[h] * (kappa[h][0] * e1 + kappa[h][1] * e2)
-                C[h] = c
-                rr = float(B[h] @ B[h] + c @ c)
-                v += bores[h].n / rr * np.array([Pp[h] @ c, Dd[h] @ c])
+                C[h] = noise[h] * (kappa[h][0] * e1 + kappa[h][1] * e2)
+                vsum += bores[h].n / (rho[h] ** 2 + float(C[h] @ C[h])) * np.array([Pp[h] @ C[h], Dd[h] @ C[h]])
             X = np.column_stack([Pp[solve], Dd[solve]])
-            G = X.T @ X
-            Gi_v = np.linalg.solve(G, v)
-            s = float(v @ Gi_v)
-            nH, bb = bores[solve].n, float(B[solve] @ B[solve])
-            lam = (nH - math.sqrt(nH * nH - 4.0 * s * bb)) / (2.0 * s)
+            Gi_v = np.linalg.solve(X.T @ X, vsum)
+            s = float(vsum @ Gi_v)
+            nS, bb = bores[solve].n, rho[solve] ** 2
+            lam = (nS - math.sqrt(nS * nS - 4.0 * s * bb)) / (2.0 * s) if s > 0 else 0.0
             C[solve] = X @ (-lam * Gi_v)
-            self.r = [B[h] + C[h] for h in range(H)]
-            self.holes = []
-            self.y = []
+            self.u, self.r, self.y, self.angle = [], [], [], []
             for h, bo in enumerate(bores):
-                y = T0[h] + q0[h] * bo.R + g * Ps[h] + self.r[h]
-                self.y.append(y)
+                # b_h = rho_h b with |b| = 1 orthogonal to the four whitened columns: starting from the seeded b0, move b on
+                # the great circle through b and the (projected) gradient of the phi score until the score vanishes (the
+                # root nearest to b on that circle; if the circle has none, b moves to its point of smallest |score|)
+                b = B0[h]
+                for it in range(30):
+                    w = _t7_phi_score_grad(rho[h] * b + C[h], phi[h])
+                    for _ in range(2):
+                        w = w - Q4s[h] @ (Q4s[h].T @ w)
+                        w = w - (b @ w) * b
+                    v = w / np.linalg.norm(w)
+                    f = lambda a: _t7_phi_score(rho[h] * (math.cos(a) * b + math.sin(a) * v) + C[h], phi[h])
+                    grid = np.linspace(-math.pi, math.pi, 1441)
+                    fv = [f(a) for a in grid]
+                    roots = []
+                    for i in range(grid.size - 1):
+                        if fv[i] == 0.0 or fv[i] * fv[i + 1] < 0:
+                            a0, a1, f0 = grid[i], grid[i + 1], fv[i]
+                            for _ in range(80):
+                                am = 0.5 * (a0 + a1)
+                                fm = f(am)
+                                if (fm < 0) == (f0 < 0):
+                                    a0, f0 = am, fm
+                                else:
+                                    a1 = am
+                            roots.append(0.5 * (a0 + a1))
+                    a = min(roots, key=abs) if roots else float(grid[int(np.argmin(np.abs(fv)))])
+                    b = math.cos(a) * b + math.sin(a) * v
+                    b /= np.linalg.norm(b)
+                    if roots:
+                        break
+                self.angle.append(float(b @ B0[h]))
+                u = rho[h] * b + C[h]
+                r = _t7_unwhite(u, phi[h])
+                self.u.append(u); self.r.append(r)
+                self.y.append(T0[h] + q0[h] * bo.R + g * Ps[h] + r)
+            self.holes = []
+            for h, bo in enumerate(bores):
                 T = np.empty(bo.z.size)
-                T[bo.keep] = y - bo.A * bo.S
+                T[bo.idx] = self.y[h] - bo.A * bo.S
                 nk = int((~bo.keep).sum())
                 T[~bo.keep] = T0[h] + 1.5 + 0.02 * bo.z[~bo.keep] + 0.3 * rng.standard_normal(nk)
                 self.holes.append({"survey_md": bo.md.copy(), "survey_inc": bo.inc.copy(), "survey_azi": bo.azi.copy(),
                                    "log_md": bo.log_md.copy(), "log_temp": T, "layer_top_md": bo.tops_md.copy(),
                                    "layer_k": bo.k.copy(), "heat_production": bo.A, "rho_c": bo.rc, "z_min": bo.z_min})
-            self.sd = [math.sqrt(float(self.r[h] @ self.r[h]) / bo.n) for h, bo in enumerate(bores)]
-            # expected Fisher information of (T0_1, q0_1, ..., T0_H, q0_H, g, t_end) at the generating values
+            self.sd = [float(np.linalg.norm(self.u[h])) / math.sqrt(bo.n) for h, bo in enumerate(bores)]
+            # expected Fisher information of (T0_1, q0_1, ..., T0_H, q0_H, g, t_end): sum_h J_h^T V_h^-1 J_h / s_h^2,
+            # V_h^-1 = L_h^T L_h, with the oracle Jacobians at the generating values
             npar = 2 * H + 2
-            I = np.zeros((npar, npar))
+            info = np.zeros((npar, npar))
             for h, bo in enumerate(bores):
                 Jf = np.zeros((bo.n, npar))
                 Jf[:, 2 * h] = 1.0
                 Jf[:, 2 * h + 1] = bo.R
                 Jf[:, -2] = Ps[h]
-                Jf[:, -1] = g * bo.dP(t_end)
-                I += Jf.T @ Jf / self.sd[h] ** 2
-            sc = 1.0 / np.sqrt(np.diag(I))
-            sig = np.sqrt(np.diag(np.linalg.inv(I * np.outer(sc, sc)))) * sc
-            self.lmax = sum(-0.5 * bo.n * (math.log(2.0 * math.pi * self.sd[h] ** 2) + 1.0) for h, bo in enumerate(bores))
-            self.star = {"g": g, "t_end": t_end, "sigma_g": sig[-2], "sigma_t_end": sig[-1], "log_likelihood": self.lmax,
-                         "holes": [{"T0": T0[h], "q0": q0[h], "sigma_T0": sig[2 * h], "sigma_q0": sig[2 * h + 1],
-                                    "noise_sd": self.sd[h], "n_used": bo.n} for h, bo in enumerate(bores)]}
+                Jf[:, -1] = Ds[h]
+                Jw = _t7_white(Jf, phi[h])
+                info += Jw.T @ Jw / self.sd[h] ** 2
+            sc = 1.0 / np.sqrt(np.diag(info))
+            sig = np.sqrt(np.diag(np.linalg.inv(info * np.outer(sc, sc)))) * sc
+            self.lmax = sum(-0.5 * bo.n * (math.log(2.0 * math.pi * self.sd[h] ** 2) + 1.0)
+                            + 0.5 * math.log(1.0 - phi[h] ** 2) for h, bo in enumerate(bores))
+            self.star = {"g": g, "t_end": t_end, "sigma_g": float(sig[-2]), "sigma_t_end": float(sig[-1]),
+                         "log_likelihood": self.lmax,
+                         "holes": [{"T0": T0[h], "q0": q0[h], "sigma_T0": float(sig[2 * h]), "sigma_q0": float(sig[2 * h + 1]),
+                                    "phi": phi[h], "innovation_sd": self.sd[h], "n_used": bo.n} for h, bo in enumerate(bores)]}
             self.thr = self.lmax - 0.5 * _t7_chi2_95()
-            self.yp = [y - bo.Q2 @ (bo.Q2.T @ y) for y, bo in zip(self.y, bores)]
+            # the generating geotherm removed from y (the profile is invariant to a shift in the span of [1, R])
+            self.yc = [self.y[h] - T0[h] - q0[h] * bo.R for h, bo in enumerate(bores)]
+            self.sol = {float(t_end): np.array(phi, float)}
 
-        def coeffs(self, t):
+        def coeffs(self, t, ph):
+            """(a_h, b_h, c_h, n_h) of every hole: Q_h(g) = a_h g^2 - 2 b_h g + c_h is the generalized least-squares
+            residual of hole h on [1, R_h] at t_end = t with lag-one correlation ph[h] (Prais-Winsten transform and QR)."""
             out = []
-            for bo, y in zip(self.bores, self.yp):
-                p = bo.P(t)
-                p = p - bo.Q2 @ (bo.Q2.T @ p)
-                out.append((float(p @ p), float(p @ y), float(y @ y), bo.n))
+            for h, bo in enumerate(self.bores):
+                xw = _t7_white(bo.X, ph[h])
+                Q, _ = np.linalg.qr(xw)
+                yw, pw = _t7_white(self.yc[h], ph[h]), _t7_white(bo.P(t), ph[h])
+                yw = yw - Q @ (Q.T @ yw)
+                pw = pw - Q @ (Q.T @ pw)
+                out.append((float(pw @ pw), float(pw @ yw), float(yw @ yw), bo.n))
             return out
 
-        def lp(self, t, with_g=False):
-            """Profile log-likelihood at t_end = t: the maximum over g of sum_h -(n_h/2)(log(2 pi Q_h(g)/n_h) + 1),
-            Q_h(g) = a_h g^2 - 2 b_h g + c_h the residual sum of squares of hole h after its T0_h and q0_h. Every
-            stationary point lies between the smallest and the largest b_h / a_h; they are bracketed by the sign
+        def Fphi(self, t, ph, with_g=False):
+            """Log-likelihood maximized over T0_h, q0_h, s_h and g at t_end = t with the lag-one correlations ph: every
+            stationary point in g lies between the smallest and the largest b_h / a_h; they are bracketed by the sign
             changes of the derivative on a 4001-point grid and located by bisection."""
-            co = self.coeffs(t)
+            if not all(abs(p) < 1.0 for p in ph):
+                return (-math.inf, None) if with_g else -math.inf
+            co = self.coeffs(t, ph)
             f = lambda g: sum(-0.5 * n * (math.log(2.0 * math.pi * (a * g * g - 2.0 * b * g + c) / n) + 1.0) for a, b, c, n in co)
             df = lambda g: -sum(n * (a * g - b) / (a * g * g - 2.0 * b * g + c) for a, b, c, n in co)
             gs = [b / a for a, b, c, n in co]
@@ -1309,7 +1790,8 @@ def _crown_case():
             cand = [lo, hi]
             if hi > lo:
                 grid = np.linspace(lo, hi, 4001)
-                dv = [df(x) for x in grid]
+                A = np.array([[a, b, c, n] for a, b, c, n in co])
+                dv = -np.sum(A[:, 3:4] * (A[:, 0:1] * grid - A[:, 1:2]) / (A[:, 0:1] * grid * grid - 2.0 * A[:, 1:2] * grid + A[:, 2:3]), axis=0)
                 for i in range(grid.size - 1):
                     if dv[i] > 0 >= dv[i + 1]:
                         x0, x1 = grid[i], grid[i + 1]
@@ -1321,82 +1803,113 @@ def _crown_case():
                                 x1 = xm
                         cand.append(0.5 * (x0 + x1))
             vals = [f(x) for x in cand]
-            i = int(np.argmax(vals))
-            return (vals[i], cand[i]) if with_g else vals[i]
+            k = int(np.argmax(vals))
+            v = vals[k] + sum(0.5 * math.log(1.0 - p * p) for p in ph)
+            return (v, cand[k] + 0.0) if with_g else v
 
-        def crossing(self, direction):
-            """Crossing of the profile with the threshold nearest to the generating t_end on one side: march outward
-            in small steps, then bisection with Illinois steps."""
-            ts, st = self.t_end, self.star["sigma_t_end"]
-            a, step = ts, 0.05 * st
-            while True:
-                b = a + direction * step
-                if self.lp(b) <= self.thr:
+        def lp(self, t, x0=None):
+            """Profile log-likelihood at t_end = t: Fphi maximized over the lag-one correlations by a damped Newton
+            ascent (central-difference derivatives, Levenberg damping), started from the correlations found at the
+            nearest t already evaluated (the generating values first)."""
+            t = float(t)
+            if t in self.sol:
+                return self.Fphi(t, self.sol[t])
+            if x0 is None:
+                x0 = self.sol[min(self.sol, key=lambda s: abs(math.log(s / t)))]
+            x = np.array(x0, float)
+            m, hs = x.size, 1e-4
+            fx = self.Fphi(t, x)
+            for _ in range(100):
+                grad = np.zeros(m)
+                hess = np.zeros((m, m))
+                for i in range(m):
+                    e = np.zeros(m); e[i] = hs
+                    fp, fm = self.Fphi(t, x + e), self.Fphi(t, x - e)
+                    grad[i] = (fp - fm) / (2 * hs)
+                    hess[i, i] = (fp - 2 * fx + fm) / hs ** 2
+                    for j in range(i):
+                        ej = np.zeros(m); ej[j] = hs
+                        hess[i, j] = hess[j, i] = (self.Fphi(t, x + e + ej) - self.Fphi(t, x + e - ej) - self.Fphi(t, x - e + ej)
+                                                   + self.Fphi(t, x - e - ej)) / (4 * hs * hs)
+                if not (np.all(np.isfinite(grad)) and np.all(np.isfinite(hess))):
                     break
-                a, step = b, min(step * 1.2, 0.3 * st)
-            fa, fb = self.lp(a) - self.thr, self.lp(b) - self.thr
-            for _ in range(200):
-                c = b - fb * (b - a) / (fb - fa)
-                if not (min(a, b) < c < max(a, b)):
-                    c = 0.5 * (a + b)
-                fc = self.lp(c) - self.thr
-                if fc * fb < 0:
-                    a, fa = b, fb
-                else:
-                    fa *= 0.5
-                b, fb = c, fc
-                if abs(b - a) < 1e-12 * abs(b):
+                mu = 0.0
+                moved = False
+                while mu < 1e12:
+                    Hd = hess - mu * np.diag(np.abs(np.diag(hess)) + 1.0)
+                    if np.max(np.linalg.eigvalsh(Hd)) < 0:
+                        step = -np.linalg.solve(Hd, grad)
+                        step *= min(1.0, 0.2 / max(1e-300, float(np.max(np.abs(step)))))
+                        xn = x + step
+                        fn = self.Fphi(t, xn)
+                        if fn >= fx:
+                            moved = True
+                            break
+                    mu = 1e-3 if mu == 0.0 else mu * 10.0
+                if not moved:
                     break
-            return b
+                done = float(np.max(np.abs(xn - x))) < 1e-9
+                x, fx = xn, fn
+                if done:
+                    break
+            self.sol[t] = x
+            return fx
 
-    def _t7_check(r, reg, label=""):
-        """Every output against the exact values, with the stated accuracies."""
+    def _t7_check(r, reg, label="", n_inner=5):
+        """Every output against the exact values with the stated accuracies; the interval ends against the oracle
+        profile: a crossing of the threshold l_max - chi2_0.95(1)/2 lies within a relative 5e-4 of each returned end
+        (the profile is above the threshold at the end moved 5e-4 towards t_end and below it at the end moved 5e-4
+        away), and the profile stays above the threshold at interior points between the ends and t_end."""
         ex = reg.star
-        lo_x, hi_x = reg.crossing(-1), reg.crossing(+1)
         assert isinstance(r, dict) and len(r["holes"]) == len(ex["holes"]), label
         for key, tol in (("g", 2e-3), ("t_end", 2e-3), ("sigma_g", 1e-2), ("sigma_t_end", 1e-2)):
             assert abs(float(r[key]) / ex[key] - 1.0) < tol, (label, key, r[key], ex[key])
-        assert abs(float(r["t_end_low"]) / lo_x - 1.0) < 5e-4, (label, "t_end_low", r["t_end_low"], lo_x)
-        assert abs(float(r["t_end_high"]) / hi_x - 1.0) < 5e-4, (label, "t_end_high", r["t_end_high"], hi_x)
         assert abs(float(r["log_likelihood"]) - ex["log_likelihood"]) < 0.1, (label, "log_likelihood", r["log_likelihood"], ex["log_likelihood"])
         for h, (rh, eh) in enumerate(zip(r["holes"], ex["holes"])):
             assert int(round(float(rh["n_used"]))) == eh["n_used"], (label, h, "n_used", rh["n_used"], eh["n_used"])
             assert abs(float(rh["T0"]) - eh["T0"]) < 2e-3, (label, h, "T0", rh["T0"], eh["T0"])
-            for key, tol in (("q0", 5e-4), ("sigma_T0", 1e-2), ("sigma_q0", 1e-2), ("noise_sd", 3e-3)):
+            assert abs(float(rh["phi"]) - eh["phi"]) < 2e-3, (label, h, "phi", rh["phi"], eh["phi"])
+            for key, tol in (("q0", 5e-4), ("sigma_T0", 1e-2), ("sigma_q0", 1e-2), ("innovation_sd", 3e-3)):
                 assert abs(float(rh[key]) / eh[key] - 1.0) < tol, (label, h, key, rh[key], eh[key])
-        return lo_x, hi_x
+        lo, hi, ts = float(r["t_end_low"]), float(r["t_end_high"]), reg.t_end
+        assert lo < ts < hi, (label, lo, hi)
+        assert reg.lp(lo * (1 + 5e-4)) > reg.thr > reg.lp(lo * (1 - 5e-4)), (label, "t_end_low", lo)
+        assert reg.lp(hi * (1 - 5e-4)) > reg.thr > reg.lp(hi * (1 + 5e-4)), (label, "t_end_high", hi)
+        for k in range(1, n_inner + 1):
+            for end in (lo, hi):
+                tk = ts + (end - ts) * k / (n_inner + 1.0)
+                assert reg.lp(tk) > reg.thr, (label, "profile below the threshold inside the interval", tk)
 
     def _t7_incl7(step):
         # inclined NQ hole, 1800 m MD (28 to 40 degrees), seven-layer Abitibi-type column, z_min 150 m
         return _t7_Bore(_t7_g_survey(1800, 25, 28, 40, 330, 350, 1.5, 2), ([0, 120, 350, 700, 820, 1210, 1500], [3.3, 2.7, 3.9, 2.5, 4.4, 3.0, 2.8]),
-                     0.9e-6, 2.4e6, 150.0, log_step=step, log_top=15.0)
+                        0.9e-6, 2.4e6, 150.0, log_step=step, log_top=15.0)
 
     def _t7_mid4():
         # 1200 m hole (5 to 12 degrees), four layers, higher heat production, z_min 100 m
         return _t7_Bore(_t7_g_survey(1200, 30, 5, 12, 80, 95, 1.0, 3), ([0, 260, 600, 950], [2.6, 3.4, 2.2, 3.0]), 1.6e-6, 2.2e6, 100.0,
-                     log_step=8.0, log_top=20.0)
+                        log_step=8.0, log_top=20.0)
 
     def _t7_short3():
         # 900 m hole (15 to 22 degrees), three layers, z_min 80 m
         return _t7_Bore(_t7_g_survey(900, 20, 15, 22, 200, 215, 0.5, 4), ([0, 90, 400], [3.8, 2.4, 3.1]), 0.5e-6, 2.5e6, 80.0,
-                     log_step=6.0, log_top=10.0)
+                        log_step=6.0, log_top=10.0)
 
-    # The glaciation lasts from t_end to 24 ka only. The amplitude-timing trade-off gives the profile log-likelihood a
-    # second local maximum near 17.98 ka, 9.96 below l_max, separated from the global maximum at 11.5 ka by a valley
-    # near 15.7 ka (20.5 below l_max); both lie inside the bounds 9000-23900 years. A local search over the bounds
-    # without a global scan ends in the second basin.
+    # The glaciation lasts from t_end to 24 ka only. The amplitude-timing trade-off gives the profile log-likelihood a second
+    # local maximum near 17.6 ka, about 8.3 below l_max, behind a valley near 15.7 ka (about 11.6 below l_max); both lie
+    # inside the bounds 9000-23900 years, and a local search over the bounds without a global scan ends in the second basin.
     reg = _t7_Region([_t7_incl7(5.0), _t7_mid4(), _t7_short3()], [4.1, 3.2, 5.0], [0.037, 0.048, 0.031], 7.8, 11500.0, [0.0, -1.0, 0.25],
-                  [2.4e4, 1.2e5], [0.005, 0.010, 0.020], [None, (1.5, -1.0), (-1.0, 1.5)], 21, 0)
-    assert reg.lp(17976.0) - reg.lp(15700.0) > 5.0 and reg.lp(17976.0) < reg.thr      # oracle premise: second basin
+                     [2.4e4, 1.2e5], [0.0025, 0.005, 0.010], [0.6, 0.45, 0.75], [None, (1.5, -1.0), (-1.0, 1.5)], 21, 0)
     r = regional_deglaciation_inversion(reg.holes, [2.4e4, 1.2e5], [0.0, -1.0, 0.25], (9000.0, 23900.0))
     _t7_check(r, reg, "short glaciation")
+    assert reg.lp(17640.0) - reg.lp(15730.0) > 2.0 and reg.lp(17640.0) < reg.thr      # oracle premise: second basin
 
 
 _crown_case()
 
 # --- test case 4 ---
-# maximum at an end point of [t_lo, t_hi] raises; narrow bounds around the estimate are valid; a maximum just
-# inside either bound (precise logs) is returned
+# maximum at an end point of [t_lo, t_hi] raises; bounds around the estimate are valid; a maximum just inside either
+# bound (precise logs) is returned
 import numpy as np
 
 
@@ -1513,9 +2026,9 @@ def _crown_case():
         return (0.5 * (lo + hi)) ** 2
 
     class _t7_Bore:
-        """One borehole built forward: TVD of the readings and the layer tops, the inclusive z_min cut, R and S by
-        exact layer sums, and the oracle step response of its own column (branch-cut form, or erfc for a uniform
-        column)."""
+        """One borehole built forward: TVD of the readings and the layer tops, the inclusive z_min cut, the used
+        readings in the order of increasing MD (the order of the AR(1) noise), R and S by exact layer sums, and the
+        oracle step response of its own column (branch-cut form, or erfc for a uniform column)."""
 
         def __init__(self, survey, layers, A, rc, z_min, log_step=None, log_top=None, log_md=None, uniform_k=None):
             self.md, self.inc, self.azi = (np.asarray(v, float) for v in survey)
@@ -1527,10 +2040,13 @@ def _crown_case():
             self.tops = np.array([_t7_g_tvd(self.md, self.inc, self.azi, m) for m in self.tops_md])
             self.z = np.array([_t7_g_tvd(self.md, self.inc, self.azi, m) for m in self.log_md])
             self.keep = self.z >= z_min
-            self.zk, self.n = self.z[self.keep], int(self.keep.sum())
+            used = np.nonzero(self.keep)[0]
+            self.idx = used[np.argsort(self.log_md[used], kind="stable")]      # used readings by increasing MD
+            self.zk, self.n = self.z[self.idx], int(self.idx.size)
+            self.cache = {}
             RS = np.array([_t7_g_RS(v, list(self.tops), list(self.k)) for v in self.zk])
             self.R, self.S = RS[:, 0], RS[:, 1]
-            self.Q2, _ = np.linalg.qr(np.column_stack([np.ones(self.n), self.R]))
+            self.X = np.column_stack([np.ones(self.n), self.R])
 
         def U(self, t, deriv=False):
             if self.uniform_k is None:
@@ -1550,105 +2066,196 @@ def _crown_case():
             self.Pfix, self.ds = Pf, sh[0] - sh[1]
 
         def P(self, t):
-            return self.Pfix + self.ds * self.U(t)
+            t = float(t)
+            if t not in self.cache:
+                self.cache[t] = self.Pfix + self.ds * self.U(t)
+            return self.cache[t]
 
         def dP(self, t):
             return self.ds * self.U(t, True)
 
-    class _t7_Region:
-        """Boreholes sharing one glacial history, with data whose maximum-likelihood solution is known exactly.
-        On the used readings of hole h, y_h = T + A S = T0_h + q0_h R_h + g P_h(t_end) + r_h with
-        r_h = b_h + c_h: b_h is orthogonal to the four columns [1, R_h, P_h, g dP_h/dt_end] (seeded, rms noise[h]),
-        c_h lies in the span of the projections p_h, d_h of P_h and g dP_h/dt_end off [1, R_h] (coefficients
-        kappa[h] in units of noise[h] for every hole but hole `solve`), and that hole's c_h is solved in closed form
-        so that sum_h (n_h / |r_h|^2) [p_h, d_h]^T r_h = 0. With sigma_h^2 = |r_h|^2 / n_h every score of the
-        log-likelihood vanishes at the generating values, while the unweighted sum sum_h [p_h, d_h]^T r_h does not."""
+    def _t7_white(v, phi):
+        """Prais-Winsten transform of the readings (axis 0, by increasing MD) for the stationary AR(1) model: first row
+        sqrt(1 - phi^2) v_1, then v_i - phi v_(i-1). For AR(1) errors the transformed errors are independent with
+        variance s^2."""
+        v = np.asarray(v, float)
+        out = np.empty_like(v)
+        out[0] = math.sqrt(1.0 - phi * phi) * v[0]
+        out[1:] = v[1:] - phi * v[:-1]
+        return out
 
-        def __init__(self, bores, T0, q0, g, t_end, shape, t_known, noise, kappa, seed, solve):
-            self.bores, self.g, self.t_end = bores, g, t_end
-            self.shape, self.t_known = np.asarray(shape, float), np.asarray(t_known, float)
+    def _t7_unwhite(u, phi):
+        """Inverse transform: r_1 = u_1 / sqrt(1 - phi^2), r_i = u_i + phi r_(i-1)."""
+        r = np.empty(u.size)
+        r[0] = u[0] / math.sqrt(1.0 - phi * phi)
+        for i in range(1, u.size):
+            r[i] = u[i] + phi * r[i - 1]
+        return r
+
+    def _t7_phi_score(u, phi):
+        """n times the derivative in phi of -(n/2) log |L(phi) r|^2 + (1/2) log(1 - phi^2), with r = L(phi*)^-1 u fixed,
+        at phi = phi* (multiplied by |u|^2 / n): n (sum_(i>=2) u_i r_(i-1) + phi r_1^2) - |u|^2 phi / (1 - phi^2)."""
+        r = _t7_unwhite(u, phi)
+        return u.size * (float(u[1:] @ r[:-1]) + phi * r[0] ** 2) - float(u @ u) * phi / (1.0 - phi * phi)
+
+    def _t7_unwhite_T(z, phi):
+        """Solve L(phi)^T x = z (the transpose of the Prais-Winsten transform), by back substitution."""
+        x = np.empty(z.size)
+        x[-1] = z[-1]
+        for i in range(z.size - 2, 0, -1):
+            x[i] = z[i] + phi * x[i + 1]
+        x[0] = (z[0] + phi * x[1]) / math.sqrt(1.0 - phi * phi) if z.size > 1 else z[0] / math.sqrt(1.0 - phi * phi)
+        return x
+
+    def _t7_phi_score_grad(u, phi):
+        """Gradient in u of _t7_phi_score (a quadratic form in u)."""
+        n = u.size
+        r = _t7_unwhite(u, phi)
+        su = np.zeros(n)
+        su[:-1] = u[1:]
+        sr = np.zeros(n)
+        sr[1:] = r[:-1]
+        e1 = np.zeros(n)
+        e1[0] = 1.0
+        return n * (sr + _t7_unwhite_T(su, phi) + 2.0 * phi * r[0] * _t7_unwhite_T(e1, phi)) - 2.0 * phi / (1.0 - phi * phi) * u
+
+    class _t7_Region:
+        """Boreholes sharing one glacial history, with data whose maximum-likelihood solution under stationary AR(1)
+        noise is known exactly. In hole h (used readings by increasing MD) the residual r_h = y_h - T0_h - q0_h R_h -
+        g P_h(t_end), y = T + A S, is built in whitened space, u_h = L(phi_h) r_h (L the Prais-Winsten transform):
+        u_h = b_h + c_h with b_h orthogonal to the four whitened columns L[1, R_h, P_h, g dP_h/dt_end], |b_h|^2 =
+        n_h noise_h^2, and c_h in the span of the projections p_h, d_h of L P_h and L g dP_h/dt_end off L[1, R_h]
+        (coefficients kappa[h] in units of noise_h for every hole but hole `solve`, whose c_h is solved in closed form
+        so that sum_h (n_h / |u_h|^2) [p_h, d_h]^T u_h = 0). b_h = rho_h (cos a b0 + sin a v) with b0, v orthonormal
+        (seeded) is rotated in its plane until the score of phi_h vanishes (|u_h| unchanged). With s_h^2 = |u_h|^2 / n_h
+        every score of the exact log-likelihood vanishes at the generating values."""
+
+        def __init__(self, bores, T0, q0, g, t_end, shape, t_known, noise, phi, kappa, seed, solve):
+            self.bores, self.g, self.t_end, self.phi = bores, g, t_end, list(phi)
             H = len(bores)
             rng = np.random.default_rng(seed)
-            B, Pp, Dd, Ps = [], [], [], []
+            B0, Q4s, Pp, Dd, Ps, Ds, Xw = [], [], [], [], [], [], []
             for h, bo in enumerate(bores):
                 bo.history(shape, t_known)
                 P0, D0 = bo.P(t_end), g * bo.dP(t_end)
-                J = np.column_stack([np.ones(bo.n), bo.R, P0, D0])
-                Q, _ = np.linalg.qr(J)
+                xw = _t7_white(bo.X, phi[h])
+                pw, dw = _t7_white(P0, phi[h]), _t7_white(D0, phi[h])
+                Q4, _ = np.linalg.qr(np.column_stack([xw, pw, dw]))
                 w = rng.standard_normal(bo.n)
-                b = w - Q @ (Q.T @ w)
-                b = b - Q @ (Q.T @ b)
-                b *= noise[h] / math.sqrt(np.mean(b * b))
-                Q2 = bo.Q2
-                p = P0 - Q2 @ (Q2.T @ P0)
-                d = D0 - Q2 @ (Q2.T @ D0)
-                B.append(b); Pp.append(p); Dd.append(d); Ps.append(P0)
+                for _ in range(2):
+                    w = w - Q4 @ (Q4.T @ w)
+                Q2, _ = np.linalg.qr(xw)
+                B0.append(w / np.linalg.norm(w)); Q4s.append(Q4); Xw.append(xw)
+                Pp.append(pw - Q2 @ (Q2.T @ pw)); Dd.append(dw - Q2 @ (Q2.T @ dw)); Ps.append(P0); Ds.append(D0)
+            rho = [noise[h] * math.sqrt(bo.n) for h, bo in enumerate(bores)]
             C = [None] * H
-            v = np.zeros(2)
+            vsum = np.zeros(2)
             for h in range(H):
                 if h == solve:
                     continue
                 e1 = Pp[h] / np.linalg.norm(Pp[h])
                 e2 = Dd[h] - (Dd[h] @ e1) * e1
                 e2 /= np.linalg.norm(e2)
-                c = noise[h] * (kappa[h][0] * e1 + kappa[h][1] * e2)
-                C[h] = c
-                rr = float(B[h] @ B[h] + c @ c)
-                v += bores[h].n / rr * np.array([Pp[h] @ c, Dd[h] @ c])
+                C[h] = noise[h] * (kappa[h][0] * e1 + kappa[h][1] * e2)
+                vsum += bores[h].n / (rho[h] ** 2 + float(C[h] @ C[h])) * np.array([Pp[h] @ C[h], Dd[h] @ C[h]])
             X = np.column_stack([Pp[solve], Dd[solve]])
-            G = X.T @ X
-            Gi_v = np.linalg.solve(G, v)
-            s = float(v @ Gi_v)
-            nH, bb = bores[solve].n, float(B[solve] @ B[solve])
-            lam = (nH - math.sqrt(nH * nH - 4.0 * s * bb)) / (2.0 * s)
+            Gi_v = np.linalg.solve(X.T @ X, vsum)
+            s = float(vsum @ Gi_v)
+            nS, bb = bores[solve].n, rho[solve] ** 2
+            lam = (nS - math.sqrt(nS * nS - 4.0 * s * bb)) / (2.0 * s) if s > 0 else 0.0
             C[solve] = X @ (-lam * Gi_v)
-            self.r = [B[h] + C[h] for h in range(H)]
-            self.holes = []
-            self.y = []
+            self.u, self.r, self.y, self.angle = [], [], [], []
             for h, bo in enumerate(bores):
-                y = T0[h] + q0[h] * bo.R + g * Ps[h] + self.r[h]
-                self.y.append(y)
+                # b_h = rho_h b with |b| = 1 orthogonal to the four whitened columns: starting from the seeded b0, move b on
+                # the great circle through b and the (projected) gradient of the phi score until the score vanishes (the
+                # root nearest to b on that circle; if the circle has none, b moves to its point of smallest |score|)
+                b = B0[h]
+                for it in range(30):
+                    w = _t7_phi_score_grad(rho[h] * b + C[h], phi[h])
+                    for _ in range(2):
+                        w = w - Q4s[h] @ (Q4s[h].T @ w)
+                        w = w - (b @ w) * b
+                    v = w / np.linalg.norm(w)
+                    f = lambda a: _t7_phi_score(rho[h] * (math.cos(a) * b + math.sin(a) * v) + C[h], phi[h])
+                    grid = np.linspace(-math.pi, math.pi, 1441)
+                    fv = [f(a) for a in grid]
+                    roots = []
+                    for i in range(grid.size - 1):
+                        if fv[i] == 0.0 or fv[i] * fv[i + 1] < 0:
+                            a0, a1, f0 = grid[i], grid[i + 1], fv[i]
+                            for _ in range(80):
+                                am = 0.5 * (a0 + a1)
+                                fm = f(am)
+                                if (fm < 0) == (f0 < 0):
+                                    a0, f0 = am, fm
+                                else:
+                                    a1 = am
+                            roots.append(0.5 * (a0 + a1))
+                    a = min(roots, key=abs) if roots else float(grid[int(np.argmin(np.abs(fv)))])
+                    b = math.cos(a) * b + math.sin(a) * v
+                    b /= np.linalg.norm(b)
+                    if roots:
+                        break
+                self.angle.append(float(b @ B0[h]))
+                u = rho[h] * b + C[h]
+                r = _t7_unwhite(u, phi[h])
+                self.u.append(u); self.r.append(r)
+                self.y.append(T0[h] + q0[h] * bo.R + g * Ps[h] + r)
+            self.holes = []
+            for h, bo in enumerate(bores):
                 T = np.empty(bo.z.size)
-                T[bo.keep] = y - bo.A * bo.S
+                T[bo.idx] = self.y[h] - bo.A * bo.S
                 nk = int((~bo.keep).sum())
                 T[~bo.keep] = T0[h] + 1.5 + 0.02 * bo.z[~bo.keep] + 0.3 * rng.standard_normal(nk)
                 self.holes.append({"survey_md": bo.md.copy(), "survey_inc": bo.inc.copy(), "survey_azi": bo.azi.copy(),
                                    "log_md": bo.log_md.copy(), "log_temp": T, "layer_top_md": bo.tops_md.copy(),
                                    "layer_k": bo.k.copy(), "heat_production": bo.A, "rho_c": bo.rc, "z_min": bo.z_min})
-            self.sd = [math.sqrt(float(self.r[h] @ self.r[h]) / bo.n) for h, bo in enumerate(bores)]
-            # expected Fisher information of (T0_1, q0_1, ..., T0_H, q0_H, g, t_end) at the generating values
+            self.sd = [float(np.linalg.norm(self.u[h])) / math.sqrt(bo.n) for h, bo in enumerate(bores)]
+            # expected Fisher information of (T0_1, q0_1, ..., T0_H, q0_H, g, t_end): sum_h J_h^T V_h^-1 J_h / s_h^2,
+            # V_h^-1 = L_h^T L_h, with the oracle Jacobians at the generating values
             npar = 2 * H + 2
-            I = np.zeros((npar, npar))
+            info = np.zeros((npar, npar))
             for h, bo in enumerate(bores):
                 Jf = np.zeros((bo.n, npar))
                 Jf[:, 2 * h] = 1.0
                 Jf[:, 2 * h + 1] = bo.R
                 Jf[:, -2] = Ps[h]
-                Jf[:, -1] = g * bo.dP(t_end)
-                I += Jf.T @ Jf / self.sd[h] ** 2
-            sc = 1.0 / np.sqrt(np.diag(I))
-            sig = np.sqrt(np.diag(np.linalg.inv(I * np.outer(sc, sc)))) * sc
-            self.lmax = sum(-0.5 * bo.n * (math.log(2.0 * math.pi * self.sd[h] ** 2) + 1.0) for h, bo in enumerate(bores))
-            self.star = {"g": g, "t_end": t_end, "sigma_g": sig[-2], "sigma_t_end": sig[-1], "log_likelihood": self.lmax,
-                         "holes": [{"T0": T0[h], "q0": q0[h], "sigma_T0": sig[2 * h], "sigma_q0": sig[2 * h + 1],
-                                    "noise_sd": self.sd[h], "n_used": bo.n} for h, bo in enumerate(bores)]}
+                Jf[:, -1] = Ds[h]
+                Jw = _t7_white(Jf, phi[h])
+                info += Jw.T @ Jw / self.sd[h] ** 2
+            sc = 1.0 / np.sqrt(np.diag(info))
+            sig = np.sqrt(np.diag(np.linalg.inv(info * np.outer(sc, sc)))) * sc
+            self.lmax = sum(-0.5 * bo.n * (math.log(2.0 * math.pi * self.sd[h] ** 2) + 1.0)
+                            + 0.5 * math.log(1.0 - phi[h] ** 2) for h, bo in enumerate(bores))
+            self.star = {"g": g, "t_end": t_end, "sigma_g": float(sig[-2]), "sigma_t_end": float(sig[-1]),
+                         "log_likelihood": self.lmax,
+                         "holes": [{"T0": T0[h], "q0": q0[h], "sigma_T0": float(sig[2 * h]), "sigma_q0": float(sig[2 * h + 1]),
+                                    "phi": phi[h], "innovation_sd": self.sd[h], "n_used": bo.n} for h, bo in enumerate(bores)]}
             self.thr = self.lmax - 0.5 * _t7_chi2_95()
-            self.yp = [y - bo.Q2 @ (bo.Q2.T @ y) for y, bo in zip(self.y, bores)]
+            # the generating geotherm removed from y (the profile is invariant to a shift in the span of [1, R])
+            self.yc = [self.y[h] - T0[h] - q0[h] * bo.R for h, bo in enumerate(bores)]
+            self.sol = {float(t_end): np.array(phi, float)}
 
-        def coeffs(self, t):
+        def coeffs(self, t, ph):
+            """(a_h, b_h, c_h, n_h) of every hole: Q_h(g) = a_h g^2 - 2 b_h g + c_h is the generalized least-squares
+            residual of hole h on [1, R_h] at t_end = t with lag-one correlation ph[h] (Prais-Winsten transform and QR)."""
             out = []
-            for bo, y in zip(self.bores, self.yp):
-                p = bo.P(t)
-                p = p - bo.Q2 @ (bo.Q2.T @ p)
-                out.append((float(p @ p), float(p @ y), float(y @ y), bo.n))
+            for h, bo in enumerate(self.bores):
+                xw = _t7_white(bo.X, ph[h])
+                Q, _ = np.linalg.qr(xw)
+                yw, pw = _t7_white(self.yc[h], ph[h]), _t7_white(bo.P(t), ph[h])
+                yw = yw - Q @ (Q.T @ yw)
+                pw = pw - Q @ (Q.T @ pw)
+                out.append((float(pw @ pw), float(pw @ yw), float(yw @ yw), bo.n))
             return out
 
-        def lp(self, t, with_g=False):
-            """Profile log-likelihood at t_end = t: the maximum over g of sum_h -(n_h/2)(log(2 pi Q_h(g)/n_h) + 1),
-            Q_h(g) = a_h g^2 - 2 b_h g + c_h the residual sum of squares of hole h after its T0_h and q0_h. Every
-            stationary point lies between the smallest and the largest b_h / a_h; they are bracketed by the sign
+        def Fphi(self, t, ph, with_g=False):
+            """Log-likelihood maximized over T0_h, q0_h, s_h and g at t_end = t with the lag-one correlations ph: every
+            stationary point in g lies between the smallest and the largest b_h / a_h; they are bracketed by the sign
             changes of the derivative on a 4001-point grid and located by bisection."""
-            co = self.coeffs(t)
+            if not all(abs(p) < 1.0 for p in ph):
+                return (-math.inf, None) if with_g else -math.inf
+            co = self.coeffs(t, ph)
             f = lambda g: sum(-0.5 * n * (math.log(2.0 * math.pi * (a * g * g - 2.0 * b * g + c) / n) + 1.0) for a, b, c, n in co)
             df = lambda g: -sum(n * (a * g - b) / (a * g * g - 2.0 * b * g + c) for a, b, c, n in co)
             gs = [b / a for a, b, c, n in co]
@@ -1656,7 +2263,8 @@ def _crown_case():
             cand = [lo, hi]
             if hi > lo:
                 grid = np.linspace(lo, hi, 4001)
-                dv = [df(x) for x in grid]
+                A = np.array([[a, b, c, n] for a, b, c, n in co])
+                dv = -np.sum(A[:, 3:4] * (A[:, 0:1] * grid - A[:, 1:2]) / (A[:, 0:1] * grid * grid - 2.0 * A[:, 1:2] * grid + A[:, 2:3]), axis=0)
                 for i in range(grid.size - 1):
                     if dv[i] > 0 >= dv[i + 1]:
                         x0, x1 = grid[i], grid[i + 1]
@@ -1668,89 +2276,120 @@ def _crown_case():
                                 x1 = xm
                         cand.append(0.5 * (x0 + x1))
             vals = [f(x) for x in cand]
-            i = int(np.argmax(vals))
-            return (vals[i], cand[i]) if with_g else vals[i]
+            k = int(np.argmax(vals))
+            v = vals[k] + sum(0.5 * math.log(1.0 - p * p) for p in ph)
+            return (v, cand[k] + 0.0) if with_g else v
 
-        def crossing(self, direction):
-            """Crossing of the profile with the threshold nearest to the generating t_end on one side: march outward
-            in small steps, then bisection with Illinois steps."""
-            ts, st = self.t_end, self.star["sigma_t_end"]
-            a, step = ts, 0.05 * st
-            while True:
-                b = a + direction * step
-                if self.lp(b) <= self.thr:
+        def lp(self, t, x0=None):
+            """Profile log-likelihood at t_end = t: Fphi maximized over the lag-one correlations by a damped Newton
+            ascent (central-difference derivatives, Levenberg damping), started from the correlations found at the
+            nearest t already evaluated (the generating values first)."""
+            t = float(t)
+            if t in self.sol:
+                return self.Fphi(t, self.sol[t])
+            if x0 is None:
+                x0 = self.sol[min(self.sol, key=lambda s: abs(math.log(s / t)))]
+            x = np.array(x0, float)
+            m, hs = x.size, 1e-4
+            fx = self.Fphi(t, x)
+            for _ in range(100):
+                grad = np.zeros(m)
+                hess = np.zeros((m, m))
+                for i in range(m):
+                    e = np.zeros(m); e[i] = hs
+                    fp, fm = self.Fphi(t, x + e), self.Fphi(t, x - e)
+                    grad[i] = (fp - fm) / (2 * hs)
+                    hess[i, i] = (fp - 2 * fx + fm) / hs ** 2
+                    for j in range(i):
+                        ej = np.zeros(m); ej[j] = hs
+                        hess[i, j] = hess[j, i] = (self.Fphi(t, x + e + ej) - self.Fphi(t, x + e - ej) - self.Fphi(t, x - e + ej)
+                                                   + self.Fphi(t, x - e - ej)) / (4 * hs * hs)
+                if not (np.all(np.isfinite(grad)) and np.all(np.isfinite(hess))):
                     break
-                a, step = b, min(step * 1.2, 0.3 * st)
-            fa, fb = self.lp(a) - self.thr, self.lp(b) - self.thr
-            for _ in range(200):
-                c = b - fb * (b - a) / (fb - fa)
-                if not (min(a, b) < c < max(a, b)):
-                    c = 0.5 * (a + b)
-                fc = self.lp(c) - self.thr
-                if fc * fb < 0:
-                    a, fa = b, fb
-                else:
-                    fa *= 0.5
-                b, fb = c, fc
-                if abs(b - a) < 1e-12 * abs(b):
+                mu = 0.0
+                moved = False
+                while mu < 1e12:
+                    Hd = hess - mu * np.diag(np.abs(np.diag(hess)) + 1.0)
+                    if np.max(np.linalg.eigvalsh(Hd)) < 0:
+                        step = -np.linalg.solve(Hd, grad)
+                        step *= min(1.0, 0.2 / max(1e-300, float(np.max(np.abs(step)))))
+                        xn = x + step
+                        fn = self.Fphi(t, xn)
+                        if fn >= fx:
+                            moved = True
+                            break
+                    mu = 1e-3 if mu == 0.0 else mu * 10.0
+                if not moved:
                     break
-            return b
+                done = float(np.max(np.abs(xn - x))) < 1e-9
+                x, fx = xn, fn
+                if done:
+                    break
+            self.sol[t] = x
+            return fx
 
-    def _t7_check(r, reg, label=""):
-        """Every output against the exact values, with the stated accuracies."""
+    def _t7_check(r, reg, label="", n_inner=5):
+        """Every output against the exact values with the stated accuracies; the interval ends against the oracle
+        profile: a crossing of the threshold l_max - chi2_0.95(1)/2 lies within a relative 5e-4 of each returned end
+        (the profile is above the threshold at the end moved 5e-4 towards t_end and below it at the end moved 5e-4
+        away), and the profile stays above the threshold at interior points between the ends and t_end."""
         ex = reg.star
-        lo_x, hi_x = reg.crossing(-1), reg.crossing(+1)
         assert isinstance(r, dict) and len(r["holes"]) == len(ex["holes"]), label
         for key, tol in (("g", 2e-3), ("t_end", 2e-3), ("sigma_g", 1e-2), ("sigma_t_end", 1e-2)):
             assert abs(float(r[key]) / ex[key] - 1.0) < tol, (label, key, r[key], ex[key])
-        assert abs(float(r["t_end_low"]) / lo_x - 1.0) < 5e-4, (label, "t_end_low", r["t_end_low"], lo_x)
-        assert abs(float(r["t_end_high"]) / hi_x - 1.0) < 5e-4, (label, "t_end_high", r["t_end_high"], hi_x)
         assert abs(float(r["log_likelihood"]) - ex["log_likelihood"]) < 0.1, (label, "log_likelihood", r["log_likelihood"], ex["log_likelihood"])
         for h, (rh, eh) in enumerate(zip(r["holes"], ex["holes"])):
             assert int(round(float(rh["n_used"]))) == eh["n_used"], (label, h, "n_used", rh["n_used"], eh["n_used"])
             assert abs(float(rh["T0"]) - eh["T0"]) < 2e-3, (label, h, "T0", rh["T0"], eh["T0"])
-            for key, tol in (("q0", 5e-4), ("sigma_T0", 1e-2), ("sigma_q0", 1e-2), ("noise_sd", 3e-3)):
+            assert abs(float(rh["phi"]) - eh["phi"]) < 2e-3, (label, h, "phi", rh["phi"], eh["phi"])
+            for key, tol in (("q0", 5e-4), ("sigma_T0", 1e-2), ("sigma_q0", 1e-2), ("innovation_sd", 3e-3)):
                 assert abs(float(rh[key]) / eh[key] - 1.0) < tol, (label, h, key, rh[key], eh[key])
-        return lo_x, hi_x
+        lo, hi, ts = float(r["t_end_low"]), float(r["t_end_high"]), reg.t_end
+        assert lo < ts < hi, (label, lo, hi)
+        assert reg.lp(lo * (1 + 5e-4)) > reg.thr > reg.lp(lo * (1 - 5e-4)), (label, "t_end_low", lo)
+        assert reg.lp(hi * (1 - 5e-4)) > reg.thr > reg.lp(hi * (1 + 5e-4)), (label, "t_end_high", hi)
+        for k in range(1, n_inner + 1):
+            for end in (lo, hi):
+                tk = ts + (end - ts) * k / (n_inner + 1.0)
+                assert reg.lp(tk) > reg.thr, (label, "profile below the threshold inside the interval", tk)
 
     def _t7_incl7(step):
         # inclined NQ hole, 1800 m MD (28 to 40 degrees), seven-layer Abitibi-type column, z_min 150 m
         return _t7_Bore(_t7_g_survey(1800, 25, 28, 40, 330, 350, 1.5, 2), ([0, 120, 350, 700, 820, 1210, 1500], [3.3, 2.7, 3.9, 2.5, 4.4, 3.0, 2.8]),
-                     0.9e-6, 2.4e6, 150.0, log_step=step, log_top=15.0)
+                        0.9e-6, 2.4e6, 150.0, log_step=step, log_top=15.0)
 
     def _t7_mid4():
         # 1200 m hole (5 to 12 degrees), four layers, higher heat production, z_min 100 m
         return _t7_Bore(_t7_g_survey(1200, 30, 5, 12, 80, 95, 1.0, 3), ([0, 260, 600, 950], [2.6, 3.4, 2.2, 3.0]), 1.6e-6, 2.2e6, 100.0,
-                     log_step=8.0, log_top=20.0)
+                        log_step=8.0, log_top=20.0)
 
     def _t7_short3():
         # 900 m hole (15 to 22 degrees), three layers, z_min 80 m
         return _t7_Bore(_t7_g_survey(900, 20, 15, 22, 200, 215, 0.5, 4), ([0, 90, 400], [3.8, 2.4, 3.1]), 0.5e-6, 2.5e6, 80.0,
-                     log_step=6.0, log_top=10.0)
+                        log_step=6.0, log_top=10.0)
 
-    reg = _t7_Region([_t7_incl7(10.0), _t7_mid4(), _t7_short3()], [4.1, 3.2, 5.0], [0.037, 0.048, 0.031], 7.8, 11500.0, [0.0, -1.0, 0.25],
-                  [1.0e5, 1.2e5], [0.004, 0.012, 0.025], [None, (2.0, -1.5), (-1.5, 2.0)], 5, 0)
-    # the 95 % interval of this region is 11147.9-11871.7 years: bounds 11000-12000 contain it
-    r = regional_deglaciation_inversion(reg.holes, [1.0e5, 1.2e5], [0.0, -1.0, 0.25], (11000.0, 12000.0))
-    _t7_check(r, reg, "bounds 11000-12000")
-    # the profile has a single maximum at 11500 years: it increases towards t_hi = 11000 in the first pair of bounds
-    # and decreases from t_lo = 12000 in the second, so the maximum over the closed interval is an end point
-    for bounds in ((3000.0, 11000.0), (12000.0, 60000.0)):
+    reg = _t7_Region([_t7_incl7(10.0), _t7_mid4(), _t7_short3()], [4.1, 3.2, 5.0], [0.037, 0.048, 0.031], 7.8, 11500.0,
+                     [0.0, -1.0, 0.25], [1.0e5, 1.2e5], [0.004, 0.012, 0.025], [0.35, 0.7, 0.85], [None, (2.0, -1.5), (-1.5, 2.0)], 5, 0)
+    # the 95 % interval of this region is about 10866-12178 years: bounds 10700-12400 contain it
+    r = regional_deglaciation_inversion(reg.holes, [1.0e5, 1.2e5], [0.0, -1.0, 0.25], (10700.0, 12400.0))
+    _t7_check(r, reg, "bounds 10700-12400")
+    # the profile has a single maximum at 11500 years: it increases towards t_hi = 10700 in the first pair of bounds and
+    # decreases from t_lo = 12400 in the second, so the maximum over the closed interval is an end point
+    for bounds in ((3000.0, 10700.0), (12400.0, 60000.0)):
         try:
             regional_deglaciation_inversion(reg.holes, [1.0e5, 1.2e5], [0.0, -1.0, 0.25], bounds)
         except ValueError:
             pass
         else:
             raise AssertionError("ValueError expected for bounds %r" % (bounds,))
-
-    # near-boundary valid controls of the end-point rule: precise logs (0.4, 1.2 and 2.5 mK) in the same three holes give
-    # a profile with a single maximum at 11500 years (dense scans over both bound pairs, source.md) and the interval
-    # 11463.8-11536.2 years. With t_lo = 11445 (l_p(t_lo) = l_max - 4.39) or t_hi = 11555 (l_p(t_hi) = l_max - 4.40) the
-    # maximum over the closed interval is still interior, 55 years from the bound, and both crossings lie inside the
-    # bounds: no ValueError
-    regp = _t7_Region(reg.bores, [4.1, 3.2, 5.0], [0.037, 0.048, 0.031], 7.8, 11500.0, [0.0, -1.0, 0.25], [1.0e5, 1.2e5],
-                   [0.0004, 0.0012, 0.0025], [None, (2.0, -1.5), (-1.5, 2.0)], 5, 0)
-    for bounds in ((11445.0, 60000.0), (3000.0, 11555.0)):
+    # near-boundary valid controls of the end-point rule: precise logs (innovation sd 1 mK, lag-one correlations 0.1, 0.2
+    # and 0.3; 326, 137 and 136 readings) give a profile with a single maximum at 11500 years (dense scans over both pairs
+    # of bounds, source.md) and an interval of about 11445-11559 years. With t_lo = 11423 or t_hi = 11577 the maximum over the
+    # closed interval is still interior, 77 years from the bound, the profile at the bound lies about 4.4 below l_max and
+    # both crossings lie inside the bounds: no ValueError
+    regp = _t7_Region([_t7_incl7(5.0), _t7_mid4(), _t7_short3()], [4.1, 3.2, 5.0], [0.037, 0.048, 0.031], 7.8, 11500.0,
+                      [0.0, -1.0, 0.25], [1.0e5, 1.2e5], [0.001, 0.001, 0.001], [0.1, 0.2, 0.3], [None, (2.0, -1.5), (-1.5, 2.0)], 5, 0)
+    for bounds in ((11423.0, 99000.0), (1700.0, 11577.0)):
         r = regional_deglaciation_inversion(regp.holes, [1.0e5, 1.2e5], [0.0, -1.0, 0.25], bounds)
         _t7_check(r, regp, "precise logs, bounds %r" % (bounds,))
 
@@ -1875,9 +2514,9 @@ def _crown_case():
         return (0.5 * (lo + hi)) ** 2
 
     class _t7_Bore:
-        """One borehole built forward: TVD of the readings and the layer tops, the inclusive z_min cut, R and S by
-        exact layer sums, and the oracle step response of its own column (branch-cut form, or erfc for a uniform
-        column)."""
+        """One borehole built forward: TVD of the readings and the layer tops, the inclusive z_min cut, the used
+        readings in the order of increasing MD (the order of the AR(1) noise), R and S by exact layer sums, and the
+        oracle step response of its own column (branch-cut form, or erfc for a uniform column)."""
 
         def __init__(self, survey, layers, A, rc, z_min, log_step=None, log_top=None, log_md=None, uniform_k=None):
             self.md, self.inc, self.azi = (np.asarray(v, float) for v in survey)
@@ -1889,10 +2528,13 @@ def _crown_case():
             self.tops = np.array([_t7_g_tvd(self.md, self.inc, self.azi, m) for m in self.tops_md])
             self.z = np.array([_t7_g_tvd(self.md, self.inc, self.azi, m) for m in self.log_md])
             self.keep = self.z >= z_min
-            self.zk, self.n = self.z[self.keep], int(self.keep.sum())
+            used = np.nonzero(self.keep)[0]
+            self.idx = used[np.argsort(self.log_md[used], kind="stable")]      # used readings by increasing MD
+            self.zk, self.n = self.z[self.idx], int(self.idx.size)
+            self.cache = {}
             RS = np.array([_t7_g_RS(v, list(self.tops), list(self.k)) for v in self.zk])
             self.R, self.S = RS[:, 0], RS[:, 1]
-            self.Q2, _ = np.linalg.qr(np.column_stack([np.ones(self.n), self.R]))
+            self.X = np.column_stack([np.ones(self.n), self.R])
 
         def U(self, t, deriv=False):
             if self.uniform_k is None:
@@ -1912,105 +2554,196 @@ def _crown_case():
             self.Pfix, self.ds = Pf, sh[0] - sh[1]
 
         def P(self, t):
-            return self.Pfix + self.ds * self.U(t)
+            t = float(t)
+            if t not in self.cache:
+                self.cache[t] = self.Pfix + self.ds * self.U(t)
+            return self.cache[t]
 
         def dP(self, t):
             return self.ds * self.U(t, True)
 
-    class _t7_Region:
-        """Boreholes sharing one glacial history, with data whose maximum-likelihood solution is known exactly.
-        On the used readings of hole h, y_h = T + A S = T0_h + q0_h R_h + g P_h(t_end) + r_h with
-        r_h = b_h + c_h: b_h is orthogonal to the four columns [1, R_h, P_h, g dP_h/dt_end] (seeded, rms noise[h]),
-        c_h lies in the span of the projections p_h, d_h of P_h and g dP_h/dt_end off [1, R_h] (coefficients
-        kappa[h] in units of noise[h] for every hole but hole `solve`), and that hole's c_h is solved in closed form
-        so that sum_h (n_h / |r_h|^2) [p_h, d_h]^T r_h = 0. With sigma_h^2 = |r_h|^2 / n_h every score of the
-        log-likelihood vanishes at the generating values, while the unweighted sum sum_h [p_h, d_h]^T r_h does not."""
+    def _t7_white(v, phi):
+        """Prais-Winsten transform of the readings (axis 0, by increasing MD) for the stationary AR(1) model: first row
+        sqrt(1 - phi^2) v_1, then v_i - phi v_(i-1). For AR(1) errors the transformed errors are independent with
+        variance s^2."""
+        v = np.asarray(v, float)
+        out = np.empty_like(v)
+        out[0] = math.sqrt(1.0 - phi * phi) * v[0]
+        out[1:] = v[1:] - phi * v[:-1]
+        return out
 
-        def __init__(self, bores, T0, q0, g, t_end, shape, t_known, noise, kappa, seed, solve):
-            self.bores, self.g, self.t_end = bores, g, t_end
-            self.shape, self.t_known = np.asarray(shape, float), np.asarray(t_known, float)
+    def _t7_unwhite(u, phi):
+        """Inverse transform: r_1 = u_1 / sqrt(1 - phi^2), r_i = u_i + phi r_(i-1)."""
+        r = np.empty(u.size)
+        r[0] = u[0] / math.sqrt(1.0 - phi * phi)
+        for i in range(1, u.size):
+            r[i] = u[i] + phi * r[i - 1]
+        return r
+
+    def _t7_phi_score(u, phi):
+        """n times the derivative in phi of -(n/2) log |L(phi) r|^2 + (1/2) log(1 - phi^2), with r = L(phi*)^-1 u fixed,
+        at phi = phi* (multiplied by |u|^2 / n): n (sum_(i>=2) u_i r_(i-1) + phi r_1^2) - |u|^2 phi / (1 - phi^2)."""
+        r = _t7_unwhite(u, phi)
+        return u.size * (float(u[1:] @ r[:-1]) + phi * r[0] ** 2) - float(u @ u) * phi / (1.0 - phi * phi)
+
+    def _t7_unwhite_T(z, phi):
+        """Solve L(phi)^T x = z (the transpose of the Prais-Winsten transform), by back substitution."""
+        x = np.empty(z.size)
+        x[-1] = z[-1]
+        for i in range(z.size - 2, 0, -1):
+            x[i] = z[i] + phi * x[i + 1]
+        x[0] = (z[0] + phi * x[1]) / math.sqrt(1.0 - phi * phi) if z.size > 1 else z[0] / math.sqrt(1.0 - phi * phi)
+        return x
+
+    def _t7_phi_score_grad(u, phi):
+        """Gradient in u of _t7_phi_score (a quadratic form in u)."""
+        n = u.size
+        r = _t7_unwhite(u, phi)
+        su = np.zeros(n)
+        su[:-1] = u[1:]
+        sr = np.zeros(n)
+        sr[1:] = r[:-1]
+        e1 = np.zeros(n)
+        e1[0] = 1.0
+        return n * (sr + _t7_unwhite_T(su, phi) + 2.0 * phi * r[0] * _t7_unwhite_T(e1, phi)) - 2.0 * phi / (1.0 - phi * phi) * u
+
+    class _t7_Region:
+        """Boreholes sharing one glacial history, with data whose maximum-likelihood solution under stationary AR(1)
+        noise is known exactly. In hole h (used readings by increasing MD) the residual r_h = y_h - T0_h - q0_h R_h -
+        g P_h(t_end), y = T + A S, is built in whitened space, u_h = L(phi_h) r_h (L the Prais-Winsten transform):
+        u_h = b_h + c_h with b_h orthogonal to the four whitened columns L[1, R_h, P_h, g dP_h/dt_end], |b_h|^2 =
+        n_h noise_h^2, and c_h in the span of the projections p_h, d_h of L P_h and L g dP_h/dt_end off L[1, R_h]
+        (coefficients kappa[h] in units of noise_h for every hole but hole `solve`, whose c_h is solved in closed form
+        so that sum_h (n_h / |u_h|^2) [p_h, d_h]^T u_h = 0). b_h = rho_h (cos a b0 + sin a v) with b0, v orthonormal
+        (seeded) is rotated in its plane until the score of phi_h vanishes (|u_h| unchanged). With s_h^2 = |u_h|^2 / n_h
+        every score of the exact log-likelihood vanishes at the generating values."""
+
+        def __init__(self, bores, T0, q0, g, t_end, shape, t_known, noise, phi, kappa, seed, solve):
+            self.bores, self.g, self.t_end, self.phi = bores, g, t_end, list(phi)
             H = len(bores)
             rng = np.random.default_rng(seed)
-            B, Pp, Dd, Ps = [], [], [], []
+            B0, Q4s, Pp, Dd, Ps, Ds, Xw = [], [], [], [], [], [], []
             for h, bo in enumerate(bores):
                 bo.history(shape, t_known)
                 P0, D0 = bo.P(t_end), g * bo.dP(t_end)
-                J = np.column_stack([np.ones(bo.n), bo.R, P0, D0])
-                Q, _ = np.linalg.qr(J)
+                xw = _t7_white(bo.X, phi[h])
+                pw, dw = _t7_white(P0, phi[h]), _t7_white(D0, phi[h])
+                Q4, _ = np.linalg.qr(np.column_stack([xw, pw, dw]))
                 w = rng.standard_normal(bo.n)
-                b = w - Q @ (Q.T @ w)
-                b = b - Q @ (Q.T @ b)
-                b *= noise[h] / math.sqrt(np.mean(b * b))
-                Q2 = bo.Q2
-                p = P0 - Q2 @ (Q2.T @ P0)
-                d = D0 - Q2 @ (Q2.T @ D0)
-                B.append(b); Pp.append(p); Dd.append(d); Ps.append(P0)
+                for _ in range(2):
+                    w = w - Q4 @ (Q4.T @ w)
+                Q2, _ = np.linalg.qr(xw)
+                B0.append(w / np.linalg.norm(w)); Q4s.append(Q4); Xw.append(xw)
+                Pp.append(pw - Q2 @ (Q2.T @ pw)); Dd.append(dw - Q2 @ (Q2.T @ dw)); Ps.append(P0); Ds.append(D0)
+            rho = [noise[h] * math.sqrt(bo.n) for h, bo in enumerate(bores)]
             C = [None] * H
-            v = np.zeros(2)
+            vsum = np.zeros(2)
             for h in range(H):
                 if h == solve:
                     continue
                 e1 = Pp[h] / np.linalg.norm(Pp[h])
                 e2 = Dd[h] - (Dd[h] @ e1) * e1
                 e2 /= np.linalg.norm(e2)
-                c = noise[h] * (kappa[h][0] * e1 + kappa[h][1] * e2)
-                C[h] = c
-                rr = float(B[h] @ B[h] + c @ c)
-                v += bores[h].n / rr * np.array([Pp[h] @ c, Dd[h] @ c])
+                C[h] = noise[h] * (kappa[h][0] * e1 + kappa[h][1] * e2)
+                vsum += bores[h].n / (rho[h] ** 2 + float(C[h] @ C[h])) * np.array([Pp[h] @ C[h], Dd[h] @ C[h]])
             X = np.column_stack([Pp[solve], Dd[solve]])
-            G = X.T @ X
-            Gi_v = np.linalg.solve(G, v)
-            s = float(v @ Gi_v)
-            nH, bb = bores[solve].n, float(B[solve] @ B[solve])
-            lam = (nH - math.sqrt(nH * nH - 4.0 * s * bb)) / (2.0 * s)
+            Gi_v = np.linalg.solve(X.T @ X, vsum)
+            s = float(vsum @ Gi_v)
+            nS, bb = bores[solve].n, rho[solve] ** 2
+            lam = (nS - math.sqrt(nS * nS - 4.0 * s * bb)) / (2.0 * s) if s > 0 else 0.0
             C[solve] = X @ (-lam * Gi_v)
-            self.r = [B[h] + C[h] for h in range(H)]
-            self.holes = []
-            self.y = []
+            self.u, self.r, self.y, self.angle = [], [], [], []
             for h, bo in enumerate(bores):
-                y = T0[h] + q0[h] * bo.R + g * Ps[h] + self.r[h]
-                self.y.append(y)
+                # b_h = rho_h b with |b| = 1 orthogonal to the four whitened columns: starting from the seeded b0, move b on
+                # the great circle through b and the (projected) gradient of the phi score until the score vanishes (the
+                # root nearest to b on that circle; if the circle has none, b moves to its point of smallest |score|)
+                b = B0[h]
+                for it in range(30):
+                    w = _t7_phi_score_grad(rho[h] * b + C[h], phi[h])
+                    for _ in range(2):
+                        w = w - Q4s[h] @ (Q4s[h].T @ w)
+                        w = w - (b @ w) * b
+                    v = w / np.linalg.norm(w)
+                    f = lambda a: _t7_phi_score(rho[h] * (math.cos(a) * b + math.sin(a) * v) + C[h], phi[h])
+                    grid = np.linspace(-math.pi, math.pi, 1441)
+                    fv = [f(a) for a in grid]
+                    roots = []
+                    for i in range(grid.size - 1):
+                        if fv[i] == 0.0 or fv[i] * fv[i + 1] < 0:
+                            a0, a1, f0 = grid[i], grid[i + 1], fv[i]
+                            for _ in range(80):
+                                am = 0.5 * (a0 + a1)
+                                fm = f(am)
+                                if (fm < 0) == (f0 < 0):
+                                    a0, f0 = am, fm
+                                else:
+                                    a1 = am
+                            roots.append(0.5 * (a0 + a1))
+                    a = min(roots, key=abs) if roots else float(grid[int(np.argmin(np.abs(fv)))])
+                    b = math.cos(a) * b + math.sin(a) * v
+                    b /= np.linalg.norm(b)
+                    if roots:
+                        break
+                self.angle.append(float(b @ B0[h]))
+                u = rho[h] * b + C[h]
+                r = _t7_unwhite(u, phi[h])
+                self.u.append(u); self.r.append(r)
+                self.y.append(T0[h] + q0[h] * bo.R + g * Ps[h] + r)
+            self.holes = []
+            for h, bo in enumerate(bores):
                 T = np.empty(bo.z.size)
-                T[bo.keep] = y - bo.A * bo.S
+                T[bo.idx] = self.y[h] - bo.A * bo.S
                 nk = int((~bo.keep).sum())
                 T[~bo.keep] = T0[h] + 1.5 + 0.02 * bo.z[~bo.keep] + 0.3 * rng.standard_normal(nk)
                 self.holes.append({"survey_md": bo.md.copy(), "survey_inc": bo.inc.copy(), "survey_azi": bo.azi.copy(),
                                    "log_md": bo.log_md.copy(), "log_temp": T, "layer_top_md": bo.tops_md.copy(),
                                    "layer_k": bo.k.copy(), "heat_production": bo.A, "rho_c": bo.rc, "z_min": bo.z_min})
-            self.sd = [math.sqrt(float(self.r[h] @ self.r[h]) / bo.n) for h, bo in enumerate(bores)]
-            # expected Fisher information of (T0_1, q0_1, ..., T0_H, q0_H, g, t_end) at the generating values
+            self.sd = [float(np.linalg.norm(self.u[h])) / math.sqrt(bo.n) for h, bo in enumerate(bores)]
+            # expected Fisher information of (T0_1, q0_1, ..., T0_H, q0_H, g, t_end): sum_h J_h^T V_h^-1 J_h / s_h^2,
+            # V_h^-1 = L_h^T L_h, with the oracle Jacobians at the generating values
             npar = 2 * H + 2
-            I = np.zeros((npar, npar))
+            info = np.zeros((npar, npar))
             for h, bo in enumerate(bores):
                 Jf = np.zeros((bo.n, npar))
                 Jf[:, 2 * h] = 1.0
                 Jf[:, 2 * h + 1] = bo.R
                 Jf[:, -2] = Ps[h]
-                Jf[:, -1] = g * bo.dP(t_end)
-                I += Jf.T @ Jf / self.sd[h] ** 2
-            sc = 1.0 / np.sqrt(np.diag(I))
-            sig = np.sqrt(np.diag(np.linalg.inv(I * np.outer(sc, sc)))) * sc
-            self.lmax = sum(-0.5 * bo.n * (math.log(2.0 * math.pi * self.sd[h] ** 2) + 1.0) for h, bo in enumerate(bores))
-            self.star = {"g": g, "t_end": t_end, "sigma_g": sig[-2], "sigma_t_end": sig[-1], "log_likelihood": self.lmax,
-                         "holes": [{"T0": T0[h], "q0": q0[h], "sigma_T0": sig[2 * h], "sigma_q0": sig[2 * h + 1],
-                                    "noise_sd": self.sd[h], "n_used": bo.n} for h, bo in enumerate(bores)]}
+                Jf[:, -1] = Ds[h]
+                Jw = _t7_white(Jf, phi[h])
+                info += Jw.T @ Jw / self.sd[h] ** 2
+            sc = 1.0 / np.sqrt(np.diag(info))
+            sig = np.sqrt(np.diag(np.linalg.inv(info * np.outer(sc, sc)))) * sc
+            self.lmax = sum(-0.5 * bo.n * (math.log(2.0 * math.pi * self.sd[h] ** 2) + 1.0)
+                            + 0.5 * math.log(1.0 - phi[h] ** 2) for h, bo in enumerate(bores))
+            self.star = {"g": g, "t_end": t_end, "sigma_g": float(sig[-2]), "sigma_t_end": float(sig[-1]),
+                         "log_likelihood": self.lmax,
+                         "holes": [{"T0": T0[h], "q0": q0[h], "sigma_T0": float(sig[2 * h]), "sigma_q0": float(sig[2 * h + 1]),
+                                    "phi": phi[h], "innovation_sd": self.sd[h], "n_used": bo.n} for h, bo in enumerate(bores)]}
             self.thr = self.lmax - 0.5 * _t7_chi2_95()
-            self.yp = [y - bo.Q2 @ (bo.Q2.T @ y) for y, bo in zip(self.y, bores)]
+            # the generating geotherm removed from y (the profile is invariant to a shift in the span of [1, R])
+            self.yc = [self.y[h] - T0[h] - q0[h] * bo.R for h, bo in enumerate(bores)]
+            self.sol = {float(t_end): np.array(phi, float)}
 
-        def coeffs(self, t):
+        def coeffs(self, t, ph):
+            """(a_h, b_h, c_h, n_h) of every hole: Q_h(g) = a_h g^2 - 2 b_h g + c_h is the generalized least-squares
+            residual of hole h on [1, R_h] at t_end = t with lag-one correlation ph[h] (Prais-Winsten transform and QR)."""
             out = []
-            for bo, y in zip(self.bores, self.yp):
-                p = bo.P(t)
-                p = p - bo.Q2 @ (bo.Q2.T @ p)
-                out.append((float(p @ p), float(p @ y), float(y @ y), bo.n))
+            for h, bo in enumerate(self.bores):
+                xw = _t7_white(bo.X, ph[h])
+                Q, _ = np.linalg.qr(xw)
+                yw, pw = _t7_white(self.yc[h], ph[h]), _t7_white(bo.P(t), ph[h])
+                yw = yw - Q @ (Q.T @ yw)
+                pw = pw - Q @ (Q.T @ pw)
+                out.append((float(pw @ pw), float(pw @ yw), float(yw @ yw), bo.n))
             return out
 
-        def lp(self, t, with_g=False):
-            """Profile log-likelihood at t_end = t: the maximum over g of sum_h -(n_h/2)(log(2 pi Q_h(g)/n_h) + 1),
-            Q_h(g) = a_h g^2 - 2 b_h g + c_h the residual sum of squares of hole h after its T0_h and q0_h. Every
-            stationary point lies between the smallest and the largest b_h / a_h; they are bracketed by the sign
+        def Fphi(self, t, ph, with_g=False):
+            """Log-likelihood maximized over T0_h, q0_h, s_h and g at t_end = t with the lag-one correlations ph: every
+            stationary point in g lies between the smallest and the largest b_h / a_h; they are bracketed by the sign
             changes of the derivative on a 4001-point grid and located by bisection."""
-            co = self.coeffs(t)
+            if not all(abs(p) < 1.0 for p in ph):
+                return (-math.inf, None) if with_g else -math.inf
+            co = self.coeffs(t, ph)
             f = lambda g: sum(-0.5 * n * (math.log(2.0 * math.pi * (a * g * g - 2.0 * b * g + c) / n) + 1.0) for a, b, c, n in co)
             df = lambda g: -sum(n * (a * g - b) / (a * g * g - 2.0 * b * g + c) for a, b, c, n in co)
             gs = [b / a for a, b, c, n in co]
@@ -2018,7 +2751,8 @@ def _crown_case():
             cand = [lo, hi]
             if hi > lo:
                 grid = np.linspace(lo, hi, 4001)
-                dv = [df(x) for x in grid]
+                A = np.array([[a, b, c, n] for a, b, c, n in co])
+                dv = -np.sum(A[:, 3:4] * (A[:, 0:1] * grid - A[:, 1:2]) / (A[:, 0:1] * grid * grid - 2.0 * A[:, 1:2] * grid + A[:, 2:3]), axis=0)
                 for i in range(grid.size - 1):
                     if dv[i] > 0 >= dv[i + 1]:
                         x0, x1 = grid[i], grid[i + 1]
@@ -2030,69 +2764,102 @@ def _crown_case():
                                 x1 = xm
                         cand.append(0.5 * (x0 + x1))
             vals = [f(x) for x in cand]
-            i = int(np.argmax(vals))
-            return (vals[i], cand[i]) if with_g else vals[i]
+            k = int(np.argmax(vals))
+            v = vals[k] + sum(0.5 * math.log(1.0 - p * p) for p in ph)
+            return (v, cand[k] + 0.0) if with_g else v
 
-        def crossing(self, direction):
-            """Crossing of the profile with the threshold nearest to the generating t_end on one side: march outward
-            in small steps, then bisection with Illinois steps."""
-            ts, st = self.t_end, self.star["sigma_t_end"]
-            a, step = ts, 0.05 * st
-            while True:
-                b = a + direction * step
-                if self.lp(b) <= self.thr:
+        def lp(self, t, x0=None):
+            """Profile log-likelihood at t_end = t: Fphi maximized over the lag-one correlations by a damped Newton
+            ascent (central-difference derivatives, Levenberg damping), started from the correlations found at the
+            nearest t already evaluated (the generating values first)."""
+            t = float(t)
+            if t in self.sol:
+                return self.Fphi(t, self.sol[t])
+            if x0 is None:
+                x0 = self.sol[min(self.sol, key=lambda s: abs(math.log(s / t)))]
+            x = np.array(x0, float)
+            m, hs = x.size, 1e-4
+            fx = self.Fphi(t, x)
+            for _ in range(100):
+                grad = np.zeros(m)
+                hess = np.zeros((m, m))
+                for i in range(m):
+                    e = np.zeros(m); e[i] = hs
+                    fp, fm = self.Fphi(t, x + e), self.Fphi(t, x - e)
+                    grad[i] = (fp - fm) / (2 * hs)
+                    hess[i, i] = (fp - 2 * fx + fm) / hs ** 2
+                    for j in range(i):
+                        ej = np.zeros(m); ej[j] = hs
+                        hess[i, j] = hess[j, i] = (self.Fphi(t, x + e + ej) - self.Fphi(t, x + e - ej) - self.Fphi(t, x - e + ej)
+                                                   + self.Fphi(t, x - e - ej)) / (4 * hs * hs)
+                if not (np.all(np.isfinite(grad)) and np.all(np.isfinite(hess))):
                     break
-                a, step = b, min(step * 1.2, 0.3 * st)
-            fa, fb = self.lp(a) - self.thr, self.lp(b) - self.thr
-            for _ in range(200):
-                c = b - fb * (b - a) / (fb - fa)
-                if not (min(a, b) < c < max(a, b)):
-                    c = 0.5 * (a + b)
-                fc = self.lp(c) - self.thr
-                if fc * fb < 0:
-                    a, fa = b, fb
-                else:
-                    fa *= 0.5
-                b, fb = c, fc
-                if abs(b - a) < 1e-12 * abs(b):
+                mu = 0.0
+                moved = False
+                while mu < 1e12:
+                    Hd = hess - mu * np.diag(np.abs(np.diag(hess)) + 1.0)
+                    if np.max(np.linalg.eigvalsh(Hd)) < 0:
+                        step = -np.linalg.solve(Hd, grad)
+                        step *= min(1.0, 0.2 / max(1e-300, float(np.max(np.abs(step)))))
+                        xn = x + step
+                        fn = self.Fphi(t, xn)
+                        if fn >= fx:
+                            moved = True
+                            break
+                    mu = 1e-3 if mu == 0.0 else mu * 10.0
+                if not moved:
                     break
-            return b
+                done = float(np.max(np.abs(xn - x))) < 1e-9
+                x, fx = xn, fn
+                if done:
+                    break
+            self.sol[t] = x
+            return fx
 
-    def _t7_check(r, reg, label=""):
-        """Every output against the exact values, with the stated accuracies."""
+    def _t7_check(r, reg, label="", n_inner=5):
+        """Every output against the exact values with the stated accuracies; the interval ends against the oracle
+        profile: a crossing of the threshold l_max - chi2_0.95(1)/2 lies within a relative 5e-4 of each returned end
+        (the profile is above the threshold at the end moved 5e-4 towards t_end and below it at the end moved 5e-4
+        away), and the profile stays above the threshold at interior points between the ends and t_end."""
         ex = reg.star
-        lo_x, hi_x = reg.crossing(-1), reg.crossing(+1)
         assert isinstance(r, dict) and len(r["holes"]) == len(ex["holes"]), label
         for key, tol in (("g", 2e-3), ("t_end", 2e-3), ("sigma_g", 1e-2), ("sigma_t_end", 1e-2)):
             assert abs(float(r[key]) / ex[key] - 1.0) < tol, (label, key, r[key], ex[key])
-        assert abs(float(r["t_end_low"]) / lo_x - 1.0) < 5e-4, (label, "t_end_low", r["t_end_low"], lo_x)
-        assert abs(float(r["t_end_high"]) / hi_x - 1.0) < 5e-4, (label, "t_end_high", r["t_end_high"], hi_x)
         assert abs(float(r["log_likelihood"]) - ex["log_likelihood"]) < 0.1, (label, "log_likelihood", r["log_likelihood"], ex["log_likelihood"])
         for h, (rh, eh) in enumerate(zip(r["holes"], ex["holes"])):
             assert int(round(float(rh["n_used"]))) == eh["n_used"], (label, h, "n_used", rh["n_used"], eh["n_used"])
             assert abs(float(rh["T0"]) - eh["T0"]) < 2e-3, (label, h, "T0", rh["T0"], eh["T0"])
-            for key, tol in (("q0", 5e-4), ("sigma_T0", 1e-2), ("sigma_q0", 1e-2), ("noise_sd", 3e-3)):
+            assert abs(float(rh["phi"]) - eh["phi"]) < 2e-3, (label, h, "phi", rh["phi"], eh["phi"])
+            for key, tol in (("q0", 5e-4), ("sigma_T0", 1e-2), ("sigma_q0", 1e-2), ("innovation_sd", 3e-3)):
                 assert abs(float(rh[key]) / eh[key] - 1.0) < tol, (label, h, key, rh[key], eh[key])
-        return lo_x, hi_x
+        lo, hi, ts = float(r["t_end_low"]), float(r["t_end_high"]), reg.t_end
+        assert lo < ts < hi, (label, lo, hi)
+        assert reg.lp(lo * (1 + 5e-4)) > reg.thr > reg.lp(lo * (1 - 5e-4)), (label, "t_end_low", lo)
+        assert reg.lp(hi * (1 - 5e-4)) > reg.thr > reg.lp(hi * (1 + 5e-4)), (label, "t_end_high", hi)
+        for k in range(1, n_inner + 1):
+            for end in (lo, hi):
+                tk = ts + (end - ts) * k / (n_inner + 1.0)
+                assert reg.lp(tk) > reg.thr, (label, "profile below the threshold inside the interval", tk)
 
     def _t7_contrast5():
         # 1000 m hole (45 to 62 degrees from the collar), five strongly contrasted layers, readings every 40 m, z_min 40 m
         return _t7_Bore((np.array([0.0, 300.0, 600.0, 1000.0]), np.array([0.0, 3.0, 7.0, 12.0]), np.array([45.0, 50.0, 58.0, 62.0])),
-                     ([0, 90, 210, 380, 470], [1.9, 5.2, 2.2, 4.8, 2.6]), 1.1e-6, 2.3e6, 40.0, log_step=40.0, log_top=10.0)
+                        ([0, 90, 210, 380, 470], [1.9, 5.2, 2.2, 4.8, 2.6]), 1.1e-6, 2.3e6, 40.0, log_step=40.0, log_top=10.0)
 
-    def _t7_deep5():
-        # 2400 m hole (8 to 15 degrees), five layers, readings every 10 m, z_min 200 m
+    def _t7_deep5(log_md=None):
+        # 2400 m hole (8 to 15 degrees), five layers, readings every 10 m from MD 30 m, z_min 200 m
         return _t7_Bore(_t7_g_survey(2400, 50, 8, 15, 90, 110, 1.0, 3), ([0, 260, 900, 1400, 2000], [3.6, 2.9, 3.2, 2.6, 3.5]),
-                     1.8e-6, 2.5e6, 200.0, log_step=10.0, log_top=30.0)
+                        1.8e-6, 2.5e6, 200.0, log_step=10.0, log_top=30.0, log_md=log_md)
 
-    reg = _t7_Region([_t7_contrast5(), _t7_deep5()], [2.8, 3.6], [0.048, 0.052], 6.0, 9000.0, [0.4, -1.0, -0.35, 0.15],
-                  [3.0e4, 7.5e4, 1.3e5], [0.002, 0.02], [(1.0, 1.0), None], 11, 1)
+    md = np.arange(30.0, 2400.0 + 1e-9, 10.0)
+    reg = _t7_Region([_t7_contrast5(), _t7_deep5(np.concatenate((md[::2], md[1::2][::-1])))], [2.8, 3.6], [0.048, 0.052], 6.0, 9000.0,
+                     [0.4, -1.0, -0.35, 0.15], [3.0e4, 7.5e4, 1.3e5], [0.002, 0.02], [-0.3, 0.6], [None, (0.3, 0.3)], 11, 0)
     _t7_T_K, _t7_SHAPE = [3.0e4, 7.5e4, 1.3e5], [0.4, -1.0, -0.35, 0.15]
-    # the nearest crossings lie near 8925 and 9080 years: bounds 8900-9100 contain both
-    r = regional_deglaciation_inversion(reg.holes, _t7_T_K, _t7_SHAPE, (8900.0, 9100.0))
-    _t7_check(r, reg, "bounds 8900-9100")
-    # with t_lo = 8950 (maximum still interior) the lower crossing is outside the bounds, with t_hi = 9050 the upper one
-    for bounds in ((8950.0, 29900.0), (1500.0, 9050.0)):
+    # the nearest crossings lie near 8862 and 9135 years: bounds 8800-9200 contain both
+    r = regional_deglaciation_inversion(reg.holes, _t7_T_K, _t7_SHAPE, (8800.0, 9200.0))
+    _t7_check(r, reg, "bounds 8800-9200")
+    # with t_lo = 8900 (maximum still interior) the lower crossing is outside the bounds, with t_hi = 9100 the upper one
+    for bounds in ((8900.0, 29900.0), (1500.0, 9100.0)):
         try:
             regional_deglaciation_inversion(reg.holes, _t7_T_K, _t7_SHAPE, bounds)
         except ValueError:
@@ -2104,7 +2871,7 @@ def _crown_case():
 _crown_case()
 
 # --- test case 6 ---
-# six readings in a hole is the smallest valid hole; invalid inputs raise
+# eight readings in a hole is the smallest valid hole; invalid inputs raise
 import numpy as np
 
 
@@ -2221,9 +2988,9 @@ def _crown_case():
         return (0.5 * (lo + hi)) ** 2
 
     class _t7_Bore:
-        """One borehole built forward: TVD of the readings and the layer tops, the inclusive z_min cut, R and S by
-        exact layer sums, and the oracle step response of its own column (branch-cut form, or erfc for a uniform
-        column)."""
+        """One borehole built forward: TVD of the readings and the layer tops, the inclusive z_min cut, the used
+        readings in the order of increasing MD (the order of the AR(1) noise), R and S by exact layer sums, and the
+        oracle step response of its own column (branch-cut form, or erfc for a uniform column)."""
 
         def __init__(self, survey, layers, A, rc, z_min, log_step=None, log_top=None, log_md=None, uniform_k=None):
             self.md, self.inc, self.azi = (np.asarray(v, float) for v in survey)
@@ -2235,10 +3002,13 @@ def _crown_case():
             self.tops = np.array([_t7_g_tvd(self.md, self.inc, self.azi, m) for m in self.tops_md])
             self.z = np.array([_t7_g_tvd(self.md, self.inc, self.azi, m) for m in self.log_md])
             self.keep = self.z >= z_min
-            self.zk, self.n = self.z[self.keep], int(self.keep.sum())
+            used = np.nonzero(self.keep)[0]
+            self.idx = used[np.argsort(self.log_md[used], kind="stable")]      # used readings by increasing MD
+            self.zk, self.n = self.z[self.idx], int(self.idx.size)
+            self.cache = {}
             RS = np.array([_t7_g_RS(v, list(self.tops), list(self.k)) for v in self.zk])
             self.R, self.S = RS[:, 0], RS[:, 1]
-            self.Q2, _ = np.linalg.qr(np.column_stack([np.ones(self.n), self.R]))
+            self.X = np.column_stack([np.ones(self.n), self.R])
 
         def U(self, t, deriv=False):
             if self.uniform_k is None:
@@ -2258,105 +3028,196 @@ def _crown_case():
             self.Pfix, self.ds = Pf, sh[0] - sh[1]
 
         def P(self, t):
-            return self.Pfix + self.ds * self.U(t)
+            t = float(t)
+            if t not in self.cache:
+                self.cache[t] = self.Pfix + self.ds * self.U(t)
+            return self.cache[t]
 
         def dP(self, t):
             return self.ds * self.U(t, True)
 
-    class _t7_Region:
-        """Boreholes sharing one glacial history, with data whose maximum-likelihood solution is known exactly.
-        On the used readings of hole h, y_h = T + A S = T0_h + q0_h R_h + g P_h(t_end) + r_h with
-        r_h = b_h + c_h: b_h is orthogonal to the four columns [1, R_h, P_h, g dP_h/dt_end] (seeded, rms noise[h]),
-        c_h lies in the span of the projections p_h, d_h of P_h and g dP_h/dt_end off [1, R_h] (coefficients
-        kappa[h] in units of noise[h] for every hole but hole `solve`), and that hole's c_h is solved in closed form
-        so that sum_h (n_h / |r_h|^2) [p_h, d_h]^T r_h = 0. With sigma_h^2 = |r_h|^2 / n_h every score of the
-        log-likelihood vanishes at the generating values, while the unweighted sum sum_h [p_h, d_h]^T r_h does not."""
+    def _t7_white(v, phi):
+        """Prais-Winsten transform of the readings (axis 0, by increasing MD) for the stationary AR(1) model: first row
+        sqrt(1 - phi^2) v_1, then v_i - phi v_(i-1). For AR(1) errors the transformed errors are independent with
+        variance s^2."""
+        v = np.asarray(v, float)
+        out = np.empty_like(v)
+        out[0] = math.sqrt(1.0 - phi * phi) * v[0]
+        out[1:] = v[1:] - phi * v[:-1]
+        return out
 
-        def __init__(self, bores, T0, q0, g, t_end, shape, t_known, noise, kappa, seed, solve):
-            self.bores, self.g, self.t_end = bores, g, t_end
-            self.shape, self.t_known = np.asarray(shape, float), np.asarray(t_known, float)
+    def _t7_unwhite(u, phi):
+        """Inverse transform: r_1 = u_1 / sqrt(1 - phi^2), r_i = u_i + phi r_(i-1)."""
+        r = np.empty(u.size)
+        r[0] = u[0] / math.sqrt(1.0 - phi * phi)
+        for i in range(1, u.size):
+            r[i] = u[i] + phi * r[i - 1]
+        return r
+
+    def _t7_phi_score(u, phi):
+        """n times the derivative in phi of -(n/2) log |L(phi) r|^2 + (1/2) log(1 - phi^2), with r = L(phi*)^-1 u fixed,
+        at phi = phi* (multiplied by |u|^2 / n): n (sum_(i>=2) u_i r_(i-1) + phi r_1^2) - |u|^2 phi / (1 - phi^2)."""
+        r = _t7_unwhite(u, phi)
+        return u.size * (float(u[1:] @ r[:-1]) + phi * r[0] ** 2) - float(u @ u) * phi / (1.0 - phi * phi)
+
+    def _t7_unwhite_T(z, phi):
+        """Solve L(phi)^T x = z (the transpose of the Prais-Winsten transform), by back substitution."""
+        x = np.empty(z.size)
+        x[-1] = z[-1]
+        for i in range(z.size - 2, 0, -1):
+            x[i] = z[i] + phi * x[i + 1]
+        x[0] = (z[0] + phi * x[1]) / math.sqrt(1.0 - phi * phi) if z.size > 1 else z[0] / math.sqrt(1.0 - phi * phi)
+        return x
+
+    def _t7_phi_score_grad(u, phi):
+        """Gradient in u of _t7_phi_score (a quadratic form in u)."""
+        n = u.size
+        r = _t7_unwhite(u, phi)
+        su = np.zeros(n)
+        su[:-1] = u[1:]
+        sr = np.zeros(n)
+        sr[1:] = r[:-1]
+        e1 = np.zeros(n)
+        e1[0] = 1.0
+        return n * (sr + _t7_unwhite_T(su, phi) + 2.0 * phi * r[0] * _t7_unwhite_T(e1, phi)) - 2.0 * phi / (1.0 - phi * phi) * u
+
+    class _t7_Region:
+        """Boreholes sharing one glacial history, with data whose maximum-likelihood solution under stationary AR(1)
+        noise is known exactly. In hole h (used readings by increasing MD) the residual r_h = y_h - T0_h - q0_h R_h -
+        g P_h(t_end), y = T + A S, is built in whitened space, u_h = L(phi_h) r_h (L the Prais-Winsten transform):
+        u_h = b_h + c_h with b_h orthogonal to the four whitened columns L[1, R_h, P_h, g dP_h/dt_end], |b_h|^2 =
+        n_h noise_h^2, and c_h in the span of the projections p_h, d_h of L P_h and L g dP_h/dt_end off L[1, R_h]
+        (coefficients kappa[h] in units of noise_h for every hole but hole `solve`, whose c_h is solved in closed form
+        so that sum_h (n_h / |u_h|^2) [p_h, d_h]^T u_h = 0). b_h = rho_h (cos a b0 + sin a v) with b0, v orthonormal
+        (seeded) is rotated in its plane until the score of phi_h vanishes (|u_h| unchanged). With s_h^2 = |u_h|^2 / n_h
+        every score of the exact log-likelihood vanishes at the generating values."""
+
+        def __init__(self, bores, T0, q0, g, t_end, shape, t_known, noise, phi, kappa, seed, solve):
+            self.bores, self.g, self.t_end, self.phi = bores, g, t_end, list(phi)
             H = len(bores)
             rng = np.random.default_rng(seed)
-            B, Pp, Dd, Ps = [], [], [], []
+            B0, Q4s, Pp, Dd, Ps, Ds, Xw = [], [], [], [], [], [], []
             for h, bo in enumerate(bores):
                 bo.history(shape, t_known)
                 P0, D0 = bo.P(t_end), g * bo.dP(t_end)
-                J = np.column_stack([np.ones(bo.n), bo.R, P0, D0])
-                Q, _ = np.linalg.qr(J)
+                xw = _t7_white(bo.X, phi[h])
+                pw, dw = _t7_white(P0, phi[h]), _t7_white(D0, phi[h])
+                Q4, _ = np.linalg.qr(np.column_stack([xw, pw, dw]))
                 w = rng.standard_normal(bo.n)
-                b = w - Q @ (Q.T @ w)
-                b = b - Q @ (Q.T @ b)
-                b *= noise[h] / math.sqrt(np.mean(b * b))
-                Q2 = bo.Q2
-                p = P0 - Q2 @ (Q2.T @ P0)
-                d = D0 - Q2 @ (Q2.T @ D0)
-                B.append(b); Pp.append(p); Dd.append(d); Ps.append(P0)
+                for _ in range(2):
+                    w = w - Q4 @ (Q4.T @ w)
+                Q2, _ = np.linalg.qr(xw)
+                B0.append(w / np.linalg.norm(w)); Q4s.append(Q4); Xw.append(xw)
+                Pp.append(pw - Q2 @ (Q2.T @ pw)); Dd.append(dw - Q2 @ (Q2.T @ dw)); Ps.append(P0); Ds.append(D0)
+            rho = [noise[h] * math.sqrt(bo.n) for h, bo in enumerate(bores)]
             C = [None] * H
-            v = np.zeros(2)
+            vsum = np.zeros(2)
             for h in range(H):
                 if h == solve:
                     continue
                 e1 = Pp[h] / np.linalg.norm(Pp[h])
                 e2 = Dd[h] - (Dd[h] @ e1) * e1
                 e2 /= np.linalg.norm(e2)
-                c = noise[h] * (kappa[h][0] * e1 + kappa[h][1] * e2)
-                C[h] = c
-                rr = float(B[h] @ B[h] + c @ c)
-                v += bores[h].n / rr * np.array([Pp[h] @ c, Dd[h] @ c])
+                C[h] = noise[h] * (kappa[h][0] * e1 + kappa[h][1] * e2)
+                vsum += bores[h].n / (rho[h] ** 2 + float(C[h] @ C[h])) * np.array([Pp[h] @ C[h], Dd[h] @ C[h]])
             X = np.column_stack([Pp[solve], Dd[solve]])
-            G = X.T @ X
-            Gi_v = np.linalg.solve(G, v)
-            s = float(v @ Gi_v)
-            nH, bb = bores[solve].n, float(B[solve] @ B[solve])
-            lam = (nH - math.sqrt(nH * nH - 4.0 * s * bb)) / (2.0 * s)
+            Gi_v = np.linalg.solve(X.T @ X, vsum)
+            s = float(vsum @ Gi_v)
+            nS, bb = bores[solve].n, rho[solve] ** 2
+            lam = (nS - math.sqrt(nS * nS - 4.0 * s * bb)) / (2.0 * s) if s > 0 else 0.0
             C[solve] = X @ (-lam * Gi_v)
-            self.r = [B[h] + C[h] for h in range(H)]
-            self.holes = []
-            self.y = []
+            self.u, self.r, self.y, self.angle = [], [], [], []
             for h, bo in enumerate(bores):
-                y = T0[h] + q0[h] * bo.R + g * Ps[h] + self.r[h]
-                self.y.append(y)
+                # b_h = rho_h b with |b| = 1 orthogonal to the four whitened columns: starting from the seeded b0, move b on
+                # the great circle through b and the (projected) gradient of the phi score until the score vanishes (the
+                # root nearest to b on that circle; if the circle has none, b moves to its point of smallest |score|)
+                b = B0[h]
+                for it in range(30):
+                    w = _t7_phi_score_grad(rho[h] * b + C[h], phi[h])
+                    for _ in range(2):
+                        w = w - Q4s[h] @ (Q4s[h].T @ w)
+                        w = w - (b @ w) * b
+                    v = w / np.linalg.norm(w)
+                    f = lambda a: _t7_phi_score(rho[h] * (math.cos(a) * b + math.sin(a) * v) + C[h], phi[h])
+                    grid = np.linspace(-math.pi, math.pi, 1441)
+                    fv = [f(a) for a in grid]
+                    roots = []
+                    for i in range(grid.size - 1):
+                        if fv[i] == 0.0 or fv[i] * fv[i + 1] < 0:
+                            a0, a1, f0 = grid[i], grid[i + 1], fv[i]
+                            for _ in range(80):
+                                am = 0.5 * (a0 + a1)
+                                fm = f(am)
+                                if (fm < 0) == (f0 < 0):
+                                    a0, f0 = am, fm
+                                else:
+                                    a1 = am
+                            roots.append(0.5 * (a0 + a1))
+                    a = min(roots, key=abs) if roots else float(grid[int(np.argmin(np.abs(fv)))])
+                    b = math.cos(a) * b + math.sin(a) * v
+                    b /= np.linalg.norm(b)
+                    if roots:
+                        break
+                self.angle.append(float(b @ B0[h]))
+                u = rho[h] * b + C[h]
+                r = _t7_unwhite(u, phi[h])
+                self.u.append(u); self.r.append(r)
+                self.y.append(T0[h] + q0[h] * bo.R + g * Ps[h] + r)
+            self.holes = []
+            for h, bo in enumerate(bores):
                 T = np.empty(bo.z.size)
-                T[bo.keep] = y - bo.A * bo.S
+                T[bo.idx] = self.y[h] - bo.A * bo.S
                 nk = int((~bo.keep).sum())
                 T[~bo.keep] = T0[h] + 1.5 + 0.02 * bo.z[~bo.keep] + 0.3 * rng.standard_normal(nk)
                 self.holes.append({"survey_md": bo.md.copy(), "survey_inc": bo.inc.copy(), "survey_azi": bo.azi.copy(),
                                    "log_md": bo.log_md.copy(), "log_temp": T, "layer_top_md": bo.tops_md.copy(),
                                    "layer_k": bo.k.copy(), "heat_production": bo.A, "rho_c": bo.rc, "z_min": bo.z_min})
-            self.sd = [math.sqrt(float(self.r[h] @ self.r[h]) / bo.n) for h, bo in enumerate(bores)]
-            # expected Fisher information of (T0_1, q0_1, ..., T0_H, q0_H, g, t_end) at the generating values
+            self.sd = [float(np.linalg.norm(self.u[h])) / math.sqrt(bo.n) for h, bo in enumerate(bores)]
+            # expected Fisher information of (T0_1, q0_1, ..., T0_H, q0_H, g, t_end): sum_h J_h^T V_h^-1 J_h / s_h^2,
+            # V_h^-1 = L_h^T L_h, with the oracle Jacobians at the generating values
             npar = 2 * H + 2
-            I = np.zeros((npar, npar))
+            info = np.zeros((npar, npar))
             for h, bo in enumerate(bores):
                 Jf = np.zeros((bo.n, npar))
                 Jf[:, 2 * h] = 1.0
                 Jf[:, 2 * h + 1] = bo.R
                 Jf[:, -2] = Ps[h]
-                Jf[:, -1] = g * bo.dP(t_end)
-                I += Jf.T @ Jf / self.sd[h] ** 2
-            sc = 1.0 / np.sqrt(np.diag(I))
-            sig = np.sqrt(np.diag(np.linalg.inv(I * np.outer(sc, sc)))) * sc
-            self.lmax = sum(-0.5 * bo.n * (math.log(2.0 * math.pi * self.sd[h] ** 2) + 1.0) for h, bo in enumerate(bores))
-            self.star = {"g": g, "t_end": t_end, "sigma_g": sig[-2], "sigma_t_end": sig[-1], "log_likelihood": self.lmax,
-                         "holes": [{"T0": T0[h], "q0": q0[h], "sigma_T0": sig[2 * h], "sigma_q0": sig[2 * h + 1],
-                                    "noise_sd": self.sd[h], "n_used": bo.n} for h, bo in enumerate(bores)]}
+                Jf[:, -1] = Ds[h]
+                Jw = _t7_white(Jf, phi[h])
+                info += Jw.T @ Jw / self.sd[h] ** 2
+            sc = 1.0 / np.sqrt(np.diag(info))
+            sig = np.sqrt(np.diag(np.linalg.inv(info * np.outer(sc, sc)))) * sc
+            self.lmax = sum(-0.5 * bo.n * (math.log(2.0 * math.pi * self.sd[h] ** 2) + 1.0)
+                            + 0.5 * math.log(1.0 - phi[h] ** 2) for h, bo in enumerate(bores))
+            self.star = {"g": g, "t_end": t_end, "sigma_g": float(sig[-2]), "sigma_t_end": float(sig[-1]),
+                         "log_likelihood": self.lmax,
+                         "holes": [{"T0": T0[h], "q0": q0[h], "sigma_T0": float(sig[2 * h]), "sigma_q0": float(sig[2 * h + 1]),
+                                    "phi": phi[h], "innovation_sd": self.sd[h], "n_used": bo.n} for h, bo in enumerate(bores)]}
             self.thr = self.lmax - 0.5 * _t7_chi2_95()
-            self.yp = [y - bo.Q2 @ (bo.Q2.T @ y) for y, bo in zip(self.y, bores)]
+            # the generating geotherm removed from y (the profile is invariant to a shift in the span of [1, R])
+            self.yc = [self.y[h] - T0[h] - q0[h] * bo.R for h, bo in enumerate(bores)]
+            self.sol = {float(t_end): np.array(phi, float)}
 
-        def coeffs(self, t):
+        def coeffs(self, t, ph):
+            """(a_h, b_h, c_h, n_h) of every hole: Q_h(g) = a_h g^2 - 2 b_h g + c_h is the generalized least-squares
+            residual of hole h on [1, R_h] at t_end = t with lag-one correlation ph[h] (Prais-Winsten transform and QR)."""
             out = []
-            for bo, y in zip(self.bores, self.yp):
-                p = bo.P(t)
-                p = p - bo.Q2 @ (bo.Q2.T @ p)
-                out.append((float(p @ p), float(p @ y), float(y @ y), bo.n))
+            for h, bo in enumerate(self.bores):
+                xw = _t7_white(bo.X, ph[h])
+                Q, _ = np.linalg.qr(xw)
+                yw, pw = _t7_white(self.yc[h], ph[h]), _t7_white(bo.P(t), ph[h])
+                yw = yw - Q @ (Q.T @ yw)
+                pw = pw - Q @ (Q.T @ pw)
+                out.append((float(pw @ pw), float(pw @ yw), float(yw @ yw), bo.n))
             return out
 
-        def lp(self, t, with_g=False):
-            """Profile log-likelihood at t_end = t: the maximum over g of sum_h -(n_h/2)(log(2 pi Q_h(g)/n_h) + 1),
-            Q_h(g) = a_h g^2 - 2 b_h g + c_h the residual sum of squares of hole h after its T0_h and q0_h. Every
-            stationary point lies between the smallest and the largest b_h / a_h; they are bracketed by the sign
+        def Fphi(self, t, ph, with_g=False):
+            """Log-likelihood maximized over T0_h, q0_h, s_h and g at t_end = t with the lag-one correlations ph: every
+            stationary point in g lies between the smallest and the largest b_h / a_h; they are bracketed by the sign
             changes of the derivative on a 4001-point grid and located by bisection."""
-            co = self.coeffs(t)
+            if not all(abs(p) < 1.0 for p in ph):
+                return (-math.inf, None) if with_g else -math.inf
+            co = self.coeffs(t, ph)
             f = lambda g: sum(-0.5 * n * (math.log(2.0 * math.pi * (a * g * g - 2.0 * b * g + c) / n) + 1.0) for a, b, c, n in co)
             df = lambda g: -sum(n * (a * g - b) / (a * g * g - 2.0 * b * g + c) for a, b, c, n in co)
             gs = [b / a for a, b, c, n in co]
@@ -2364,7 +3225,8 @@ def _crown_case():
             cand = [lo, hi]
             if hi > lo:
                 grid = np.linspace(lo, hi, 4001)
-                dv = [df(x) for x in grid]
+                A = np.array([[a, b, c, n] for a, b, c, n in co])
+                dv = -np.sum(A[:, 3:4] * (A[:, 0:1] * grid - A[:, 1:2]) / (A[:, 0:1] * grid * grid - 2.0 * A[:, 1:2] * grid + A[:, 2:3]), axis=0)
                 for i in range(grid.size - 1):
                     if dv[i] > 0 >= dv[i + 1]:
                         x0, x1 = grid[i], grid[i + 1]
@@ -2376,65 +3238,98 @@ def _crown_case():
                                 x1 = xm
                         cand.append(0.5 * (x0 + x1))
             vals = [f(x) for x in cand]
-            i = int(np.argmax(vals))
-            return (vals[i], cand[i]) if with_g else vals[i]
+            k = int(np.argmax(vals))
+            v = vals[k] + sum(0.5 * math.log(1.0 - p * p) for p in ph)
+            return (v, cand[k] + 0.0) if with_g else v
 
-        def crossing(self, direction):
-            """Crossing of the profile with the threshold nearest to the generating t_end on one side: march outward
-            in small steps, then bisection with Illinois steps."""
-            ts, st = self.t_end, self.star["sigma_t_end"]
-            a, step = ts, 0.05 * st
-            while True:
-                b = a + direction * step
-                if self.lp(b) <= self.thr:
+        def lp(self, t, x0=None):
+            """Profile log-likelihood at t_end = t: Fphi maximized over the lag-one correlations by a damped Newton
+            ascent (central-difference derivatives, Levenberg damping), started from the correlations found at the
+            nearest t already evaluated (the generating values first)."""
+            t = float(t)
+            if t in self.sol:
+                return self.Fphi(t, self.sol[t])
+            if x0 is None:
+                x0 = self.sol[min(self.sol, key=lambda s: abs(math.log(s / t)))]
+            x = np.array(x0, float)
+            m, hs = x.size, 1e-4
+            fx = self.Fphi(t, x)
+            for _ in range(100):
+                grad = np.zeros(m)
+                hess = np.zeros((m, m))
+                for i in range(m):
+                    e = np.zeros(m); e[i] = hs
+                    fp, fm = self.Fphi(t, x + e), self.Fphi(t, x - e)
+                    grad[i] = (fp - fm) / (2 * hs)
+                    hess[i, i] = (fp - 2 * fx + fm) / hs ** 2
+                    for j in range(i):
+                        ej = np.zeros(m); ej[j] = hs
+                        hess[i, j] = hess[j, i] = (self.Fphi(t, x + e + ej) - self.Fphi(t, x + e - ej) - self.Fphi(t, x - e + ej)
+                                                   + self.Fphi(t, x - e - ej)) / (4 * hs * hs)
+                if not (np.all(np.isfinite(grad)) and np.all(np.isfinite(hess))):
                     break
-                a, step = b, min(step * 1.2, 0.3 * st)
-            fa, fb = self.lp(a) - self.thr, self.lp(b) - self.thr
-            for _ in range(200):
-                c = b - fb * (b - a) / (fb - fa)
-                if not (min(a, b) < c < max(a, b)):
-                    c = 0.5 * (a + b)
-                fc = self.lp(c) - self.thr
-                if fc * fb < 0:
-                    a, fa = b, fb
-                else:
-                    fa *= 0.5
-                b, fb = c, fc
-                if abs(b - a) < 1e-12 * abs(b):
+                mu = 0.0
+                moved = False
+                while mu < 1e12:
+                    Hd = hess - mu * np.diag(np.abs(np.diag(hess)) + 1.0)
+                    if np.max(np.linalg.eigvalsh(Hd)) < 0:
+                        step = -np.linalg.solve(Hd, grad)
+                        step *= min(1.0, 0.2 / max(1e-300, float(np.max(np.abs(step)))))
+                        xn = x + step
+                        fn = self.Fphi(t, xn)
+                        if fn >= fx:
+                            moved = True
+                            break
+                    mu = 1e-3 if mu == 0.0 else mu * 10.0
+                if not moved:
                     break
-            return b
+                done = float(np.max(np.abs(xn - x))) < 1e-9
+                x, fx = xn, fn
+                if done:
+                    break
+            self.sol[t] = x
+            return fx
 
-    def _t7_check(r, reg, label=""):
-        """Every output against the exact values, with the stated accuracies."""
+    def _t7_check(r, reg, label="", n_inner=5):
+        """Every output against the exact values with the stated accuracies; the interval ends against the oracle
+        profile: a crossing of the threshold l_max - chi2_0.95(1)/2 lies within a relative 5e-4 of each returned end
+        (the profile is above the threshold at the end moved 5e-4 towards t_end and below it at the end moved 5e-4
+        away), and the profile stays above the threshold at interior points between the ends and t_end."""
         ex = reg.star
-        lo_x, hi_x = reg.crossing(-1), reg.crossing(+1)
         assert isinstance(r, dict) and len(r["holes"]) == len(ex["holes"]), label
         for key, tol in (("g", 2e-3), ("t_end", 2e-3), ("sigma_g", 1e-2), ("sigma_t_end", 1e-2)):
             assert abs(float(r[key]) / ex[key] - 1.0) < tol, (label, key, r[key], ex[key])
-        assert abs(float(r["t_end_low"]) / lo_x - 1.0) < 5e-4, (label, "t_end_low", r["t_end_low"], lo_x)
-        assert abs(float(r["t_end_high"]) / hi_x - 1.0) < 5e-4, (label, "t_end_high", r["t_end_high"], hi_x)
         assert abs(float(r["log_likelihood"]) - ex["log_likelihood"]) < 0.1, (label, "log_likelihood", r["log_likelihood"], ex["log_likelihood"])
         for h, (rh, eh) in enumerate(zip(r["holes"], ex["holes"])):
             assert int(round(float(rh["n_used"]))) == eh["n_used"], (label, h, "n_used", rh["n_used"], eh["n_used"])
             assert abs(float(rh["T0"]) - eh["T0"]) < 2e-3, (label, h, "T0", rh["T0"], eh["T0"])
-            for key, tol in (("q0", 5e-4), ("sigma_T0", 1e-2), ("sigma_q0", 1e-2), ("noise_sd", 3e-3)):
+            assert abs(float(rh["phi"]) - eh["phi"]) < 2e-3, (label, h, "phi", rh["phi"], eh["phi"])
+            for key, tol in (("q0", 5e-4), ("sigma_T0", 1e-2), ("sigma_q0", 1e-2), ("innovation_sd", 3e-3)):
                 assert abs(float(rh[key]) / eh[key] - 1.0) < tol, (label, h, key, rh[key], eh[key])
-        return lo_x, hi_x
+        lo, hi, ts = float(r["t_end_low"]), float(r["t_end_high"]), reg.t_end
+        assert lo < ts < hi, (label, lo, hi)
+        assert reg.lp(lo * (1 + 5e-4)) > reg.thr > reg.lp(lo * (1 - 5e-4)), (label, "t_end_low", lo)
+        assert reg.lp(hi * (1 - 5e-4)) > reg.thr > reg.lp(hi * (1 + 5e-4)), (label, "t_end_high", hi)
+        for k in range(1, n_inner + 1):
+            for end in (lo, hi):
+                tk = ts + (end - ts) * k / (n_inner + 1.0)
+                assert reg.lp(tk) > reg.thr, (label, "profile below the threshold inside the interval", tk)
 
     def _t7_mid4():
+        # 1200 m hole (5 to 12 degrees), four layers, higher heat production, z_min 100 m
         return _t7_Bore(_t7_g_survey(1200, 30, 5, 12, 80, 95, 1.0, 3), ([0, 260, 600, 950], [2.6, 3.4, 2.2, 3.0]), 1.6e-6, 2.2e6, 100.0,
-                     log_step=8.0, log_top=20.0)
+                        log_step=8.0, log_top=20.0)
 
-    # a vertical hole with eight readings, of which z_min = 200 m keeps exactly six (z_min = 400 m keeps five), and the
+    # a vertical hole with ten readings, of which z_min = 200 m keeps exactly eight (z_min = 300 m keeps seven), and the
     # four-layer hole of 137 readings
-    _t7_bA = _t7_Bore((np.array([0.0, 1300.0]), np.zeros(2), np.zeros(2)), ([0, 350, 700], [2.6, 3.8, 3.0]), 0.8e-6, 2.3e6, 200.0,
-               log_md=np.array([60.0, 180.0, 330.0, 520.0, 760.0, 1000.0, 1150.0, 1280.0]))
-    reg = _t7_Region([_t7_bA, _t7_mid4()], [6.0, 3.2], [0.045, 0.048], 7.0, 10000.0, [0.0, -1.0, 0.25], [9.0e4, 1.2e5], [0.004, 0.008],
-                  [(1.0, -1.0), None], 5, 1)
-    assert _t7_bA.n == 6
+    bA = _t7_Bore((np.array([0.0, 1300.0]), np.zeros(2), np.zeros(2)), ([0, 350, 700], [2.6, 3.8, 3.0]), 0.8e-6, 2.3e6, 200.0,
+                  log_md=np.array([60.0, 150.0, 240.0, 330.0, 470.0, 610.0, 760.0, 900.0, 1180.0, 1280.0]))
+    reg = _t7_Region([bA, _t7_mid4()], [6.0, 3.2], [0.045, 0.048], 7.0, 10000.0, [0.0, -1.0, 0.25], [9.0e4, 1.2e5], [0.004, 0.008],
+                     [0.0, 0.5], [None, (0.3, -0.3)], 5, 0)
+    assert bA.n == 8
     _t7_T_K, _t7_SHAPE, _t7_B = [9.0e4, 1.2e5], [0.0, -1.0, 0.25], (3000.0, 60000.0)
     r = regional_deglaciation_inversion(reg.holes, _t7_T_K, _t7_SHAPE, _t7_B)
-    _t7_check(r, reg, "six readings")
+    _t7_check(r, reg, "eight readings")
 
     def _t7_bad(name):
         holes = [{k: (v.copy() if isinstance(v, np.ndarray) else v) for k, v in h.items()} for h in reg.holes]
@@ -2450,8 +3345,8 @@ def _crown_case():
             del b["rho_c"]
         elif name == "extra_key":
             b["noise_sd"] = 0.01
-        elif name == "five_readings":
-            a["z_min"] = 400.0
+        elif name == "seven_readings":
+            a["z_min"] = 300.0
         elif name == "log_len":
             b["log_temp"] = b["log_temp"][:-1]
         elif name == "log_two_d":
@@ -2471,11 +3366,11 @@ def _crown_case():
         elif name == "top_beyond_hole":
             a["layer_top_md"] = np.array([0.0, 350.0, 1400.0])
         elif name == "log_beyond_hole":
-            a["log_md"] = np.array([60.0, 180.0, 330.0, 520.0, 760.0, 1000.0, 1150.0, 1320.0])
+            a["log_md"] = np.array([60.0, 150.0, 240.0, 330.0, 470.0, 610.0, 760.0, 900.0, 1180.0, 1320.0])
         elif name == "survey_start":
             a["survey_md"] = np.array([5.0, 1300.0])
         elif name == "one_depth":
-            a["log_md"] = np.full(8, 760.0)          # every reading at one depth: T0 and q0 of the hole not resolvable
+            a["log_md"] = np.full(10, 760.0)        # every reading at one depth: T0 and q0 of the hole not resolvable
         elif name == "one_interval":
             shape, t_k = np.array([-1.0]), np.array([], float)
         elif name == "times_count":
@@ -2510,7 +3405,7 @@ def _crown_case():
             bounds = (3000.0, 30000.0, 60000.0)
         return holes, t_k, shape, bounds
 
-    for name in ["one_hole", "holes_not_a_list", "hole_not_a_dict", "missing_key", "extra_key", "five_readings", "log_len",
+    for name in ["one_hole", "holes_not_a_list", "hole_not_a_dict", "missing_key", "extra_key", "seven_readings", "log_len",
                  "log_two_d", "temp_nan", "A_negative", "A_nan", "rho_c_zero", "k_zero", "k_count", "top_beyond_hole",
                  "log_beyond_hole", "survey_start", "one_depth", "one_interval", "times_count", "times_not_increasing",
                  "times_nan", "shape_nan", "times_nonpositive", "equal_first_shapes", "shape_two_d", "times_two_d",
@@ -2527,7 +3422,7 @@ def _crown_case():
 _crown_case()
 
 # --- test case 7 ---
-# a disturbed hole: the log-likelihood is bimodal in g at the estimate, and its global maximum is the estimate
+# a strongly correlated log (lag-one correlation 0.9): the exact likelihood with the first reading
 import numpy as np
 
 
@@ -2644,9 +3539,9 @@ def _crown_case():
         return (0.5 * (lo + hi)) ** 2
 
     class _t7_Bore:
-        """One borehole built forward: TVD of the readings and the layer tops, the inclusive z_min cut, R and S by
-        exact layer sums, and the oracle step response of its own column (branch-cut form, or erfc for a uniform
-        column)."""
+        """One borehole built forward: TVD of the readings and the layer tops, the inclusive z_min cut, the used
+        readings in the order of increasing MD (the order of the AR(1) noise), R and S by exact layer sums, and the
+        oracle step response of its own column (branch-cut form, or erfc for a uniform column)."""
 
         def __init__(self, survey, layers, A, rc, z_min, log_step=None, log_top=None, log_md=None, uniform_k=None):
             self.md, self.inc, self.azi = (np.asarray(v, float) for v in survey)
@@ -2658,10 +3553,13 @@ def _crown_case():
             self.tops = np.array([_t7_g_tvd(self.md, self.inc, self.azi, m) for m in self.tops_md])
             self.z = np.array([_t7_g_tvd(self.md, self.inc, self.azi, m) for m in self.log_md])
             self.keep = self.z >= z_min
-            self.zk, self.n = self.z[self.keep], int(self.keep.sum())
+            used = np.nonzero(self.keep)[0]
+            self.idx = used[np.argsort(self.log_md[used], kind="stable")]      # used readings by increasing MD
+            self.zk, self.n = self.z[self.idx], int(self.idx.size)
+            self.cache = {}
             RS = np.array([_t7_g_RS(v, list(self.tops), list(self.k)) for v in self.zk])
             self.R, self.S = RS[:, 0], RS[:, 1]
-            self.Q2, _ = np.linalg.qr(np.column_stack([np.ones(self.n), self.R]))
+            self.X = np.column_stack([np.ones(self.n), self.R])
 
         def U(self, t, deriv=False):
             if self.uniform_k is None:
@@ -2681,105 +3579,196 @@ def _crown_case():
             self.Pfix, self.ds = Pf, sh[0] - sh[1]
 
         def P(self, t):
-            return self.Pfix + self.ds * self.U(t)
+            t = float(t)
+            if t not in self.cache:
+                self.cache[t] = self.Pfix + self.ds * self.U(t)
+            return self.cache[t]
 
         def dP(self, t):
             return self.ds * self.U(t, True)
 
-    class _t7_Region:
-        """Boreholes sharing one glacial history, with data whose maximum-likelihood solution is known exactly.
-        On the used readings of hole h, y_h = T + A S = T0_h + q0_h R_h + g P_h(t_end) + r_h with
-        r_h = b_h + c_h: b_h is orthogonal to the four columns [1, R_h, P_h, g dP_h/dt_end] (seeded, rms noise[h]),
-        c_h lies in the span of the projections p_h, d_h of P_h and g dP_h/dt_end off [1, R_h] (coefficients
-        kappa[h] in units of noise[h] for every hole but hole `solve`), and that hole's c_h is solved in closed form
-        so that sum_h (n_h / |r_h|^2) [p_h, d_h]^T r_h = 0. With sigma_h^2 = |r_h|^2 / n_h every score of the
-        log-likelihood vanishes at the generating values, while the unweighted sum sum_h [p_h, d_h]^T r_h does not."""
+    def _t7_white(v, phi):
+        """Prais-Winsten transform of the readings (axis 0, by increasing MD) for the stationary AR(1) model: first row
+        sqrt(1 - phi^2) v_1, then v_i - phi v_(i-1). For AR(1) errors the transformed errors are independent with
+        variance s^2."""
+        v = np.asarray(v, float)
+        out = np.empty_like(v)
+        out[0] = math.sqrt(1.0 - phi * phi) * v[0]
+        out[1:] = v[1:] - phi * v[:-1]
+        return out
 
-        def __init__(self, bores, T0, q0, g, t_end, shape, t_known, noise, kappa, seed, solve):
-            self.bores, self.g, self.t_end = bores, g, t_end
-            self.shape, self.t_known = np.asarray(shape, float), np.asarray(t_known, float)
+    def _t7_unwhite(u, phi):
+        """Inverse transform: r_1 = u_1 / sqrt(1 - phi^2), r_i = u_i + phi r_(i-1)."""
+        r = np.empty(u.size)
+        r[0] = u[0] / math.sqrt(1.0 - phi * phi)
+        for i in range(1, u.size):
+            r[i] = u[i] + phi * r[i - 1]
+        return r
+
+    def _t7_phi_score(u, phi):
+        """n times the derivative in phi of -(n/2) log |L(phi) r|^2 + (1/2) log(1 - phi^2), with r = L(phi*)^-1 u fixed,
+        at phi = phi* (multiplied by |u|^2 / n): n (sum_(i>=2) u_i r_(i-1) + phi r_1^2) - |u|^2 phi / (1 - phi^2)."""
+        r = _t7_unwhite(u, phi)
+        return u.size * (float(u[1:] @ r[:-1]) + phi * r[0] ** 2) - float(u @ u) * phi / (1.0 - phi * phi)
+
+    def _t7_unwhite_T(z, phi):
+        """Solve L(phi)^T x = z (the transpose of the Prais-Winsten transform), by back substitution."""
+        x = np.empty(z.size)
+        x[-1] = z[-1]
+        for i in range(z.size - 2, 0, -1):
+            x[i] = z[i] + phi * x[i + 1]
+        x[0] = (z[0] + phi * x[1]) / math.sqrt(1.0 - phi * phi) if z.size > 1 else z[0] / math.sqrt(1.0 - phi * phi)
+        return x
+
+    def _t7_phi_score_grad(u, phi):
+        """Gradient in u of _t7_phi_score (a quadratic form in u)."""
+        n = u.size
+        r = _t7_unwhite(u, phi)
+        su = np.zeros(n)
+        su[:-1] = u[1:]
+        sr = np.zeros(n)
+        sr[1:] = r[:-1]
+        e1 = np.zeros(n)
+        e1[0] = 1.0
+        return n * (sr + _t7_unwhite_T(su, phi) + 2.0 * phi * r[0] * _t7_unwhite_T(e1, phi)) - 2.0 * phi / (1.0 - phi * phi) * u
+
+    class _t7_Region:
+        """Boreholes sharing one glacial history, with data whose maximum-likelihood solution under stationary AR(1)
+        noise is known exactly. In hole h (used readings by increasing MD) the residual r_h = y_h - T0_h - q0_h R_h -
+        g P_h(t_end), y = T + A S, is built in whitened space, u_h = L(phi_h) r_h (L the Prais-Winsten transform):
+        u_h = b_h + c_h with b_h orthogonal to the four whitened columns L[1, R_h, P_h, g dP_h/dt_end], |b_h|^2 =
+        n_h noise_h^2, and c_h in the span of the projections p_h, d_h of L P_h and L g dP_h/dt_end off L[1, R_h]
+        (coefficients kappa[h] in units of noise_h for every hole but hole `solve`, whose c_h is solved in closed form
+        so that sum_h (n_h / |u_h|^2) [p_h, d_h]^T u_h = 0). b_h = rho_h (cos a b0 + sin a v) with b0, v orthonormal
+        (seeded) is rotated in its plane until the score of phi_h vanishes (|u_h| unchanged). With s_h^2 = |u_h|^2 / n_h
+        every score of the exact log-likelihood vanishes at the generating values."""
+
+        def __init__(self, bores, T0, q0, g, t_end, shape, t_known, noise, phi, kappa, seed, solve):
+            self.bores, self.g, self.t_end, self.phi = bores, g, t_end, list(phi)
             H = len(bores)
             rng = np.random.default_rng(seed)
-            B, Pp, Dd, Ps = [], [], [], []
+            B0, Q4s, Pp, Dd, Ps, Ds, Xw = [], [], [], [], [], [], []
             for h, bo in enumerate(bores):
                 bo.history(shape, t_known)
                 P0, D0 = bo.P(t_end), g * bo.dP(t_end)
-                J = np.column_stack([np.ones(bo.n), bo.R, P0, D0])
-                Q, _ = np.linalg.qr(J)
+                xw = _t7_white(bo.X, phi[h])
+                pw, dw = _t7_white(P0, phi[h]), _t7_white(D0, phi[h])
+                Q4, _ = np.linalg.qr(np.column_stack([xw, pw, dw]))
                 w = rng.standard_normal(bo.n)
-                b = w - Q @ (Q.T @ w)
-                b = b - Q @ (Q.T @ b)
-                b *= noise[h] / math.sqrt(np.mean(b * b))
-                Q2 = bo.Q2
-                p = P0 - Q2 @ (Q2.T @ P0)
-                d = D0 - Q2 @ (Q2.T @ D0)
-                B.append(b); Pp.append(p); Dd.append(d); Ps.append(P0)
+                for _ in range(2):
+                    w = w - Q4 @ (Q4.T @ w)
+                Q2, _ = np.linalg.qr(xw)
+                B0.append(w / np.linalg.norm(w)); Q4s.append(Q4); Xw.append(xw)
+                Pp.append(pw - Q2 @ (Q2.T @ pw)); Dd.append(dw - Q2 @ (Q2.T @ dw)); Ps.append(P0); Ds.append(D0)
+            rho = [noise[h] * math.sqrt(bo.n) for h, bo in enumerate(bores)]
             C = [None] * H
-            v = np.zeros(2)
+            vsum = np.zeros(2)
             for h in range(H):
                 if h == solve:
                     continue
                 e1 = Pp[h] / np.linalg.norm(Pp[h])
                 e2 = Dd[h] - (Dd[h] @ e1) * e1
                 e2 /= np.linalg.norm(e2)
-                c = noise[h] * (kappa[h][0] * e1 + kappa[h][1] * e2)
-                C[h] = c
-                rr = float(B[h] @ B[h] + c @ c)
-                v += bores[h].n / rr * np.array([Pp[h] @ c, Dd[h] @ c])
+                C[h] = noise[h] * (kappa[h][0] * e1 + kappa[h][1] * e2)
+                vsum += bores[h].n / (rho[h] ** 2 + float(C[h] @ C[h])) * np.array([Pp[h] @ C[h], Dd[h] @ C[h]])
             X = np.column_stack([Pp[solve], Dd[solve]])
-            G = X.T @ X
-            Gi_v = np.linalg.solve(G, v)
-            s = float(v @ Gi_v)
-            nH, bb = bores[solve].n, float(B[solve] @ B[solve])
-            lam = (nH - math.sqrt(nH * nH - 4.0 * s * bb)) / (2.0 * s)
+            Gi_v = np.linalg.solve(X.T @ X, vsum)
+            s = float(vsum @ Gi_v)
+            nS, bb = bores[solve].n, rho[solve] ** 2
+            lam = (nS - math.sqrt(nS * nS - 4.0 * s * bb)) / (2.0 * s) if s > 0 else 0.0
             C[solve] = X @ (-lam * Gi_v)
-            self.r = [B[h] + C[h] for h in range(H)]
-            self.holes = []
-            self.y = []
+            self.u, self.r, self.y, self.angle = [], [], [], []
             for h, bo in enumerate(bores):
-                y = T0[h] + q0[h] * bo.R + g * Ps[h] + self.r[h]
-                self.y.append(y)
+                # b_h = rho_h b with |b| = 1 orthogonal to the four whitened columns: starting from the seeded b0, move b on
+                # the great circle through b and the (projected) gradient of the phi score until the score vanishes (the
+                # root nearest to b on that circle; if the circle has none, b moves to its point of smallest |score|)
+                b = B0[h]
+                for it in range(30):
+                    w = _t7_phi_score_grad(rho[h] * b + C[h], phi[h])
+                    for _ in range(2):
+                        w = w - Q4s[h] @ (Q4s[h].T @ w)
+                        w = w - (b @ w) * b
+                    v = w / np.linalg.norm(w)
+                    f = lambda a: _t7_phi_score(rho[h] * (math.cos(a) * b + math.sin(a) * v) + C[h], phi[h])
+                    grid = np.linspace(-math.pi, math.pi, 1441)
+                    fv = [f(a) for a in grid]
+                    roots = []
+                    for i in range(grid.size - 1):
+                        if fv[i] == 0.0 or fv[i] * fv[i + 1] < 0:
+                            a0, a1, f0 = grid[i], grid[i + 1], fv[i]
+                            for _ in range(80):
+                                am = 0.5 * (a0 + a1)
+                                fm = f(am)
+                                if (fm < 0) == (f0 < 0):
+                                    a0, f0 = am, fm
+                                else:
+                                    a1 = am
+                            roots.append(0.5 * (a0 + a1))
+                    a = min(roots, key=abs) if roots else float(grid[int(np.argmin(np.abs(fv)))])
+                    b = math.cos(a) * b + math.sin(a) * v
+                    b /= np.linalg.norm(b)
+                    if roots:
+                        break
+                self.angle.append(float(b @ B0[h]))
+                u = rho[h] * b + C[h]
+                r = _t7_unwhite(u, phi[h])
+                self.u.append(u); self.r.append(r)
+                self.y.append(T0[h] + q0[h] * bo.R + g * Ps[h] + r)
+            self.holes = []
+            for h, bo in enumerate(bores):
                 T = np.empty(bo.z.size)
-                T[bo.keep] = y - bo.A * bo.S
+                T[bo.idx] = self.y[h] - bo.A * bo.S
                 nk = int((~bo.keep).sum())
                 T[~bo.keep] = T0[h] + 1.5 + 0.02 * bo.z[~bo.keep] + 0.3 * rng.standard_normal(nk)
                 self.holes.append({"survey_md": bo.md.copy(), "survey_inc": bo.inc.copy(), "survey_azi": bo.azi.copy(),
                                    "log_md": bo.log_md.copy(), "log_temp": T, "layer_top_md": bo.tops_md.copy(),
                                    "layer_k": bo.k.copy(), "heat_production": bo.A, "rho_c": bo.rc, "z_min": bo.z_min})
-            self.sd = [math.sqrt(float(self.r[h] @ self.r[h]) / bo.n) for h, bo in enumerate(bores)]
-            # expected Fisher information of (T0_1, q0_1, ..., T0_H, q0_H, g, t_end) at the generating values
+            self.sd = [float(np.linalg.norm(self.u[h])) / math.sqrt(bo.n) for h, bo in enumerate(bores)]
+            # expected Fisher information of (T0_1, q0_1, ..., T0_H, q0_H, g, t_end): sum_h J_h^T V_h^-1 J_h / s_h^2,
+            # V_h^-1 = L_h^T L_h, with the oracle Jacobians at the generating values
             npar = 2 * H + 2
-            I = np.zeros((npar, npar))
+            info = np.zeros((npar, npar))
             for h, bo in enumerate(bores):
                 Jf = np.zeros((bo.n, npar))
                 Jf[:, 2 * h] = 1.0
                 Jf[:, 2 * h + 1] = bo.R
                 Jf[:, -2] = Ps[h]
-                Jf[:, -1] = g * bo.dP(t_end)
-                I += Jf.T @ Jf / self.sd[h] ** 2
-            sc = 1.0 / np.sqrt(np.diag(I))
-            sig = np.sqrt(np.diag(np.linalg.inv(I * np.outer(sc, sc)))) * sc
-            self.lmax = sum(-0.5 * bo.n * (math.log(2.0 * math.pi * self.sd[h] ** 2) + 1.0) for h, bo in enumerate(bores))
-            self.star = {"g": g, "t_end": t_end, "sigma_g": sig[-2], "sigma_t_end": sig[-1], "log_likelihood": self.lmax,
-                         "holes": [{"T0": T0[h], "q0": q0[h], "sigma_T0": sig[2 * h], "sigma_q0": sig[2 * h + 1],
-                                    "noise_sd": self.sd[h], "n_used": bo.n} for h, bo in enumerate(bores)]}
+                Jf[:, -1] = Ds[h]
+                Jw = _t7_white(Jf, phi[h])
+                info += Jw.T @ Jw / self.sd[h] ** 2
+            sc = 1.0 / np.sqrt(np.diag(info))
+            sig = np.sqrt(np.diag(np.linalg.inv(info * np.outer(sc, sc)))) * sc
+            self.lmax = sum(-0.5 * bo.n * (math.log(2.0 * math.pi * self.sd[h] ** 2) + 1.0)
+                            + 0.5 * math.log(1.0 - phi[h] ** 2) for h, bo in enumerate(bores))
+            self.star = {"g": g, "t_end": t_end, "sigma_g": float(sig[-2]), "sigma_t_end": float(sig[-1]),
+                         "log_likelihood": self.lmax,
+                         "holes": [{"T0": T0[h], "q0": q0[h], "sigma_T0": float(sig[2 * h]), "sigma_q0": float(sig[2 * h + 1]),
+                                    "phi": phi[h], "innovation_sd": self.sd[h], "n_used": bo.n} for h, bo in enumerate(bores)]}
             self.thr = self.lmax - 0.5 * _t7_chi2_95()
-            self.yp = [y - bo.Q2 @ (bo.Q2.T @ y) for y, bo in zip(self.y, bores)]
+            # the generating geotherm removed from y (the profile is invariant to a shift in the span of [1, R])
+            self.yc = [self.y[h] - T0[h] - q0[h] * bo.R for h, bo in enumerate(bores)]
+            self.sol = {float(t_end): np.array(phi, float)}
 
-        def coeffs(self, t):
+        def coeffs(self, t, ph):
+            """(a_h, b_h, c_h, n_h) of every hole: Q_h(g) = a_h g^2 - 2 b_h g + c_h is the generalized least-squares
+            residual of hole h on [1, R_h] at t_end = t with lag-one correlation ph[h] (Prais-Winsten transform and QR)."""
             out = []
-            for bo, y in zip(self.bores, self.yp):
-                p = bo.P(t)
-                p = p - bo.Q2 @ (bo.Q2.T @ p)
-                out.append((float(p @ p), float(p @ y), float(y @ y), bo.n))
+            for h, bo in enumerate(self.bores):
+                xw = _t7_white(bo.X, ph[h])
+                Q, _ = np.linalg.qr(xw)
+                yw, pw = _t7_white(self.yc[h], ph[h]), _t7_white(bo.P(t), ph[h])
+                yw = yw - Q @ (Q.T @ yw)
+                pw = pw - Q @ (Q.T @ pw)
+                out.append((float(pw @ pw), float(pw @ yw), float(yw @ yw), bo.n))
             return out
 
-        def lp(self, t, with_g=False):
-            """Profile log-likelihood at t_end = t: the maximum over g of sum_h -(n_h/2)(log(2 pi Q_h(g)/n_h) + 1),
-            Q_h(g) = a_h g^2 - 2 b_h g + c_h the residual sum of squares of hole h after its T0_h and q0_h. Every
-            stationary point lies between the smallest and the largest b_h / a_h; they are bracketed by the sign
+        def Fphi(self, t, ph, with_g=False):
+            """Log-likelihood maximized over T0_h, q0_h, s_h and g at t_end = t with the lag-one correlations ph: every
+            stationary point in g lies between the smallest and the largest b_h / a_h; they are bracketed by the sign
             changes of the derivative on a 4001-point grid and located by bisection."""
-            co = self.coeffs(t)
+            if not all(abs(p) < 1.0 for p in ph):
+                return (-math.inf, None) if with_g else -math.inf
+            co = self.coeffs(t, ph)
             f = lambda g: sum(-0.5 * n * (math.log(2.0 * math.pi * (a * g * g - 2.0 * b * g + c) / n) + 1.0) for a, b, c, n in co)
             df = lambda g: -sum(n * (a * g - b) / (a * g * g - 2.0 * b * g + c) for a, b, c, n in co)
             gs = [b / a for a, b, c, n in co]
@@ -2787,7 +3776,8 @@ def _crown_case():
             cand = [lo, hi]
             if hi > lo:
                 grid = np.linspace(lo, hi, 4001)
-                dv = [df(x) for x in grid]
+                A = np.array([[a, b, c, n] for a, b, c, n in co])
+                dv = -np.sum(A[:, 3:4] * (A[:, 0:1] * grid - A[:, 1:2]) / (A[:, 0:1] * grid * grid - 2.0 * A[:, 1:2] * grid + A[:, 2:3]), axis=0)
                 for i in range(grid.size - 1):
                     if dv[i] > 0 >= dv[i + 1]:
                         x0, x1 = grid[i], grid[i + 1]
@@ -2799,77 +3789,100 @@ def _crown_case():
                                 x1 = xm
                         cand.append(0.5 * (x0 + x1))
             vals = [f(x) for x in cand]
-            i = int(np.argmax(vals))
-            return (vals[i], cand[i]) if with_g else vals[i]
+            k = int(np.argmax(vals))
+            v = vals[k] + sum(0.5 * math.log(1.0 - p * p) for p in ph)
+            return (v, cand[k] + 0.0) if with_g else v
 
-        def crossing(self, direction):
-            """Crossing of the profile with the threshold nearest to the generating t_end on one side: march outward
-            in small steps, then bisection with Illinois steps."""
-            ts, st = self.t_end, self.star["sigma_t_end"]
-            a, step = ts, 0.05 * st
-            while True:
-                b = a + direction * step
-                if self.lp(b) <= self.thr:
+        def lp(self, t, x0=None):
+            """Profile log-likelihood at t_end = t: Fphi maximized over the lag-one correlations by a damped Newton
+            ascent (central-difference derivatives, Levenberg damping), started from the correlations found at the
+            nearest t already evaluated (the generating values first)."""
+            t = float(t)
+            if t in self.sol:
+                return self.Fphi(t, self.sol[t])
+            if x0 is None:
+                x0 = self.sol[min(self.sol, key=lambda s: abs(math.log(s / t)))]
+            x = np.array(x0, float)
+            m, hs = x.size, 1e-4
+            fx = self.Fphi(t, x)
+            for _ in range(100):
+                grad = np.zeros(m)
+                hess = np.zeros((m, m))
+                for i in range(m):
+                    e = np.zeros(m); e[i] = hs
+                    fp, fm = self.Fphi(t, x + e), self.Fphi(t, x - e)
+                    grad[i] = (fp - fm) / (2 * hs)
+                    hess[i, i] = (fp - 2 * fx + fm) / hs ** 2
+                    for j in range(i):
+                        ej = np.zeros(m); ej[j] = hs
+                        hess[i, j] = hess[j, i] = (self.Fphi(t, x + e + ej) - self.Fphi(t, x + e - ej) - self.Fphi(t, x - e + ej)
+                                                   + self.Fphi(t, x - e - ej)) / (4 * hs * hs)
+                if not (np.all(np.isfinite(grad)) and np.all(np.isfinite(hess))):
                     break
-                a, step = b, min(step * 1.2, 0.3 * st)
-            fa, fb = self.lp(a) - self.thr, self.lp(b) - self.thr
-            for _ in range(200):
-                c = b - fb * (b - a) / (fb - fa)
-                if not (min(a, b) < c < max(a, b)):
-                    c = 0.5 * (a + b)
-                fc = self.lp(c) - self.thr
-                if fc * fb < 0:
-                    a, fa = b, fb
-                else:
-                    fa *= 0.5
-                b, fb = c, fc
-                if abs(b - a) < 1e-12 * abs(b):
+                mu = 0.0
+                moved = False
+                while mu < 1e12:
+                    Hd = hess - mu * np.diag(np.abs(np.diag(hess)) + 1.0)
+                    if np.max(np.linalg.eigvalsh(Hd)) < 0:
+                        step = -np.linalg.solve(Hd, grad)
+                        step *= min(1.0, 0.2 / max(1e-300, float(np.max(np.abs(step)))))
+                        xn = x + step
+                        fn = self.Fphi(t, xn)
+                        if fn >= fx:
+                            moved = True
+                            break
+                    mu = 1e-3 if mu == 0.0 else mu * 10.0
+                if not moved:
                     break
-            return b
+                done = float(np.max(np.abs(xn - x))) < 1e-9
+                x, fx = xn, fn
+                if done:
+                    break
+            self.sol[t] = x
+            return fx
 
-    def _t7_check(r, reg, label=""):
-        """Every output against the exact values, with the stated accuracies."""
+    def _t7_check(r, reg, label="", n_inner=5):
+        """Every output against the exact values with the stated accuracies; the interval ends against the oracle
+        profile: a crossing of the threshold l_max - chi2_0.95(1)/2 lies within a relative 5e-4 of each returned end
+        (the profile is above the threshold at the end moved 5e-4 towards t_end and below it at the end moved 5e-4
+        away), and the profile stays above the threshold at interior points between the ends and t_end."""
         ex = reg.star
-        lo_x, hi_x = reg.crossing(-1), reg.crossing(+1)
         assert isinstance(r, dict) and len(r["holes"]) == len(ex["holes"]), label
         for key, tol in (("g", 2e-3), ("t_end", 2e-3), ("sigma_g", 1e-2), ("sigma_t_end", 1e-2)):
             assert abs(float(r[key]) / ex[key] - 1.0) < tol, (label, key, r[key], ex[key])
-        assert abs(float(r["t_end_low"]) / lo_x - 1.0) < 5e-4, (label, "t_end_low", r["t_end_low"], lo_x)
-        assert abs(float(r["t_end_high"]) / hi_x - 1.0) < 5e-4, (label, "t_end_high", r["t_end_high"], hi_x)
         assert abs(float(r["log_likelihood"]) - ex["log_likelihood"]) < 0.1, (label, "log_likelihood", r["log_likelihood"], ex["log_likelihood"])
         for h, (rh, eh) in enumerate(zip(r["holes"], ex["holes"])):
             assert int(round(float(rh["n_used"]))) == eh["n_used"], (label, h, "n_used", rh["n_used"], eh["n_used"])
             assert abs(float(rh["T0"]) - eh["T0"]) < 2e-3, (label, h, "T0", rh["T0"], eh["T0"])
-            for key, tol in (("q0", 5e-4), ("sigma_T0", 1e-2), ("sigma_q0", 1e-2), ("noise_sd", 3e-3)):
+            assert abs(float(rh["phi"]) - eh["phi"]) < 2e-3, (label, h, "phi", rh["phi"], eh["phi"])
+            for key, tol in (("q0", 5e-4), ("sigma_T0", 1e-2), ("sigma_q0", 1e-2), ("innovation_sd", 3e-3)):
                 assert abs(float(rh[key]) / eh[key] - 1.0) < tol, (label, h, key, rh[key], eh[key])
-        return lo_x, hi_x
+        lo, hi, ts = float(r["t_end_low"]), float(r["t_end_high"]), reg.t_end
+        assert lo < ts < hi, (label, lo, hi)
+        assert reg.lp(lo * (1 + 5e-4)) > reg.thr > reg.lp(lo * (1 - 5e-4)), (label, "t_end_low", lo)
+        assert reg.lp(hi * (1 - 5e-4)) > reg.thr > reg.lp(hi * (1 + 5e-4)), (label, "t_end_high", hi)
+        for k in range(1, n_inner + 1):
+            for end in (lo, hi):
+                tk = ts + (end - ts) * k / (n_inner + 1.0)
+                assert reg.lp(tk) > reg.thr, (label, "profile below the threshold inside the interval", tk)
 
-    def _t7_incl7(step):
-        # inclined NQ hole, 1800 m MD (28 to 40 degrees), seven-layer Abitibi-type column, z_min 150 m
-        return _t7_Bore(_t7_g_survey(1800, 25, 28, 40, 330, 350, 1.5, 2), ([0, 120, 350, 700, 820, 1210, 1500], [3.3, 2.7, 3.9, 2.5, 4.4, 3.0, 2.8]),
-                     0.9e-6, 2.4e6, 150.0, log_step=step, log_top=15.0)
+    def _t7_short3():
+        # 900 m hole (15 to 22 degrees), three layers, z_min 80 m
+        return _t7_Bore(_t7_g_survey(900, 20, 15, 22, 200, 215, 0.5, 4), ([0, 90, 400], [3.8, 2.4, 3.1]), 0.5e-6, 2.5e6, 80.0,
+                        log_step=6.0, log_top=10.0)
 
-    def _t7_mid4():
-        # 1200 m hole (5 to 12 degrees), four layers, higher heat production, z_min 100 m
-        return _t7_Bore(_t7_g_survey(1200, 30, 5, 12, 80, 95, 1.0, 3), ([0, 260, 600, 950], [2.6, 3.4, 2.2, 3.0]), 1.6e-6, 2.2e6, 100.0,
-                     log_step=8.0, log_top=20.0)
-
-    def _t7_deep5():
-        # 2400 m hole (8 to 15 degrees), five layers, readings every 10 m, z_min 200 m
-        return _t7_Bore(_t7_g_survey(2400, 50, 8, 15, 90, 110, 1.0, 3), ([0, 260, 900, 1400, 2000], [3.6, 2.9, 3.2, 2.6, 3.5]),
-                     1.8e-6, 2.5e6, 200.0, log_step=10.0, log_top=30.0)
-
-    # Three holes: a precise log (0.3 mK, 163 readings used), an ordinary one (8 mK, 137 readings) and a deep hole (220
-    # readings) whose log carries a smooth disturbance along the glacial signature, so that alone it would give g = 7.553 K
-    # (the other two 7.801 and 7.820) and its maximum-likelihood noise level is 18.2 mK. At t_end = 11500 years the
-    # log-likelihood as a function of g (all other parameters maximized) has two maxima: the global one at the generating
-    # g = 7.8 and a second one at g = 7.559, 137.7 lower; the pooled least-squares amplitude 7.588 lies on the side of the
-    # second one (the minimum between them is at 7.687), and following that maximum gives g = 7.49 and t_end = 11090 years.
-    # Dense scans of the oracle profile over the bounds (source.md) find a single maximum, at the generating values.
-    reg = _t7_Region([_t7_incl7(10.0), _t7_mid4(), _t7_deep5()], [4.1, 3.2, 3.6], [0.037, 0.048, 0.052], 7.8, 11500.0,
-                     [0.0, -1.0, 0.25], [1.0e5, 1.2e5], [0.0003, 0.008, 0.003], [None, (0.5, -0.5), (-89.0, 0.0)], 21, 0)
+    # A 1200 m hole logged every 30 m (37 readings used below 100 m TVD) whose noise has a lag-one correlation of 0.9
+    # (innovation sd 3 mK, marginal sd 6.9 mK), and the 900 m hole with 10 mK and 0.4. With so strong a correlation the
+    # first reading carries a large part of the information on the level of the log: its density, with the variance
+    # s^2 / (1 - phi^2), is part of the exact likelihood, and the estimates differ measurably from those of a likelihood
+    # conditional on it.
+    bS = _t7_Bore(_t7_g_survey(1200, 30, 5, 12, 80, 95, 1.0, 3), ([0, 260, 600, 950], [2.6, 3.4, 2.2, 3.0]), 1.6e-6, 2.2e6, 100.0,
+                  log_step=30.0, log_top=20.0)
+    reg = _t7_Region([bS, _t7_short3()], [3.2, 5.0], [0.048, 0.031], 7.5, 11000.0, [0.0, -1.0, 0.25], [1.0e5, 1.2e5], [0.003, 0.010],
+                     [0.9, 0.4], [None, (0.3, -0.3)], 31, 0)
+    assert bS.n == 37
     r = regional_deglaciation_inversion(reg.holes, [1.0e5, 1.2e5], [0.0, -1.0, 0.25], (3000.0, 60000.0))
-    _t7_check(r, reg, "disturbed hole, bimodal amplitude likelihood")
+    _t7_check(r, reg, "strongly correlated log")
 
 
 _crown_case()
