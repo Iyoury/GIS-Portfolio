@@ -1,9 +1,8 @@
+# --- test case 0 ---
 # Independent targets: the exact neutral spectrum, the Wright-Fisher matrix built in extended precision
 # (mpmath binomials) with its eigenvalues from mpmath eig and the eigenvector by inverse iteration with a
 # plain LU, and for N = 400 inverse iteration with a plain LU in mpmath at 400 digits (run once); no use
 # of the Vandermonde structure.
-
-# --- test case 0 ---
 # one individual: the 2 x 2 matrix has the eigenvalues 1 and 1 - u - v with the right
 # eigenvector (v, -u) (sign fixed by the normalisation); with u = 0 or v = 0 one state is absorbing and the
 # mode vanishes there; with small u + v the two eigenvalues are close to each other (ratio 1 - u - v)

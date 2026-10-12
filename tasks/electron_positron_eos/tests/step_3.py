@@ -1,11 +1,10 @@
+# --- test case 0 ---
 # Independent targets: closed forms of the classical (Maxwell-Juettner) gas with modified Bessel
 # functions, and values computed once with mpmath at 40 digits by tanh-sinh quadrature of the defining
 # integrals in the momentum (breakpoints every k T over the Fermi edge), the chemical potential by a
 # root search on those integrals and the specific heat by a centred difference of the energy at constant
 # net electron density (T +- 1e-7 T), all in mpmath; positron densities of a classical positron gas
 # (eps/kT + psi >= 40) from the Maxwell-Juettner formula.
-
-# --- test case 0 ---
 # classical gas without pairs: n_net = n_- = theta K2(1/theta) e^psi / (pi^2 lambda^3)
 # (positrons below 2e-19 of the electrons, shifting psi by less than 1e-20 relative; Fermi corrections
 # below 1e-11), so psi follows in closed form

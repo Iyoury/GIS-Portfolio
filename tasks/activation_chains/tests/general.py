@@ -1,7 +1,6 @@
+# --- test case 0 ---
 # Independent targets: closed forms, the Bateman sum evaluated in 600-digit arithmetic (it only
 # cancels in floating point), and matrix exponentials by mpmath at 300 digits.
-
-# --- test case 0 ---
 # the 238U series as a linear chain and as a branching network (with 0.02 % of 214Bi
 # decaying to 210Tl, 1.30 min, which feeds 210Pb) after 3e5 years, against the Bateman sum (chain) and
 # mpmath's matrix exponential at 300 digits (network); then this aged ore is irradiated: 238U captures

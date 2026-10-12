@@ -1,7 +1,6 @@
+# --- test case 0 ---
 # Independent targets: closed forms and the Bateman sum evaluated in 600-digit arithmetic (it only
 # cancels in floating point).
-
-# --- test case 0 ---
 # one nuclide: n0 exp(-lam t), down to about 1e-239, exp(-575) (about 8e-250), exp(-575.64) (1.01e-250,
 # just above 1e-250 S: relative rule) and exp(-600) (about 3e-261, below
 # 1e-250 S, so within 1e-250 S of the exact value); a stable nuclide stays; and a tiny inventory, where the

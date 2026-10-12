@@ -1,7 +1,6 @@
+# --- test case 0 ---
 # Independent targets: closed forms, the Bateman sum evaluated in 600-digit arithmetic (it only
 # cancels in floating point), and matrix exponentials by mpmath at 300 digits.
-
-# --- test case 0 ---
 # one nuclide with constant production: n0 exp(-lam t) + q (1 - exp(-lam t)) / lam,
 # also when lam t is far below rounding (then about n0 + q t), when production dominates, and pure decay
 # down to exp(-550), about 1e-239, exp(-575), about 8e-250, exp(-575.64), 1.01e-250 just above 1e-250 S (relative rule), and exp(-600), about 3e-261 (below 1e-250 S: absolute rule);

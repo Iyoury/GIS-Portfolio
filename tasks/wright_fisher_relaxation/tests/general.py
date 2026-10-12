@@ -1,7 +1,6 @@
+# --- test case 0 ---
 # Independent targets: the Wright-Fisher matrix in extended precision (mpmath binomials) and
 # plain LU solves at high precision; no elimination ordering, no subtraction-free tricks.
-
-# --- test case 0 ---
 # the whole chain for N = 20, s = 0.3, u = v = 1e-12: transition matrix, relaxation
 # rate, the two waiting times and the fastest mode against extended precision; with rare mutations the slow
 # mode is the switching between the two fixed states, so gap = 1 / t_up + 1 / t_down to about 2e-10; the

@@ -1,8 +1,7 @@
+# --- test case 0 ---
 # Independent targets: the activity from mpmath's matrix exponential of every period at 300 digits (the
 # flux is the input of the round trip), the end tolerance located with 60-digit logarithms, and closed forms
 # for the domain rule.
-
-# --- test case 0 ---
 # gold monitor, activity of 198Au after 5 days of irradiation and 1 day of cooling,
 # for fluxes from 1e8 to 5e13 n / (cm^2 s) (the activity increases up to about 1.6e15)
 import numpy as np

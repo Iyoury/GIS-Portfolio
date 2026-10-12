@@ -1,9 +1,8 @@
+# --- test case 0 ---
 # Independent target: F_n(t) = Gamma(n + 1/2) P(n + 1/2, t) / (2 t**(n + 1/2)) with the
 # regularized lower incomplete gamma function P evaluated by mpmath at 40 digits
 # (no series, no recursion, no erf); F_n(0) = 1 / (2n + 1) exactly.
 # Every test case below is self-contained: it repeats its own imports, helpers and setup.
-
-# --- test case 0 ---
 # t = 0 (F_n = 1/(2n+1)) and tiny t, all orders up to 16
 import numpy as np
 

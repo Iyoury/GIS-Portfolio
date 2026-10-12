@@ -143,6 +143,8 @@ def mode_format(t):
         if s.get("n_test_cases") != nall:
             probs.append(f"step {k}: n_test_cases={s.get('n_test_cases')} but {nall} cases")
         pre, _ = cases_of(t.p(s["tests"]))
+        if pre.strip():
+            probs.append(f"step {k}: text before the first test case (the platform parser then miscounts n_test_cases)")
         if re.search(r"^\s*(import|from|def|class|[A-Za-z_]\w*\s*=)", pre, re.M):
             probs.append(f"step {k}: code before the first test case (cases must be self-contained)")
     for rel in [s["tests"] for s in t.steps] + [y.get("general_tests", "tests/general.py")]:

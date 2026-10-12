@@ -1,3 +1,4 @@
+# --- test case 0 ---
 # Independent targets for the energy curve and the vibrational levels.
 # - integrals: closed-form s-Gaussian formulas re-implemented here, vectorized over many R
 #   (F0 from erf with its small-argument series), cross-checked against steps 2 and 3 tests;
@@ -8,8 +9,6 @@
 #   Gaussian expansion (no closed forms);
 # - levels: finite differences on three fine grids, extrapolated twice by Richardson.
 # Every test case below is self-contained: it repeats its own imports, helpers and setup.
-
-# --- test case 0 ---
 # H2 (zeta = 1.24); neutral fragments H + H, levels from the full-CI curve
 import numpy as np
 

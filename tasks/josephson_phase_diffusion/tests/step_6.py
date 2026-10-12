@@ -1,3 +1,4 @@
+# --- test case 0 ---
 # Independent targets: no Stratonovich / Reimann double integral. The stationary
 # Fokker-Planck density p(x) = sum_n c_n exp(i n x) of dphi/dtau = i - sin(phi) + xi obeys
 # c_{n+1} + a_n c_n - c_{n-1} = 0 with a_n = 2 theta n + 2 j i (j = imaginary unit);
@@ -21,8 +22,6 @@
 # stencil truncation (about 2.6e-7) and the rounding in the shifted basis (v is about 1e-7 of v0)
 # leave an error of about 3e-7 relative (about 3 per cent of the 1e-5 tolerance).
 # Every test case below is self-contained (its own imports and helper functions).
-
-# --- test case 0 ---
 # strong inertia and weak noise (beta_c = 2, theta = 0.1): locked, mixed and
 # running regimes, where the noiseless junction would be hysteretic
 import numpy as np

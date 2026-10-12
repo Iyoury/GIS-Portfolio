@@ -1,3 +1,4 @@
+# --- test case 0 ---
 # Independent targets: no closed-form Gaussian integrals. Every integral is reduced to a
 # one-dimensional radial integral with the shell theorem (averages over spheres) and
 # done with composite Gauss-Legendre quadrature.
@@ -7,8 +8,6 @@
 # symmetric (singlet) combinations of the non-orthogonal products phi_i(1) phi_j(2) (generalized eigenproblem with overlap
 # S (x) S), with the quadrature integrals of each case (no orbitals, no configuration functions).
 # Every test case below is self-contained: it repeats its own imports, helpers and setup.
-
-# --- test case 0 ---
 # H2 at R = 1.4, zeta = 1.24 (Szabo and Ostlund: RHF -1.1167, full CI -1.1373)
 import numpy as np
 

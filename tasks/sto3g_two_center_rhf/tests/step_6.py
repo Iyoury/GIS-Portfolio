@@ -1,9 +1,8 @@
+# --- test case 0 ---
 # Independent integrals for s and p Cartesian Gaussians: Obara-Saika recursions (overlap,
 # nuclear attraction, electron repulsion), kinetic energy as (1/2) sum_i <d_i a | d_i b>,
 # and the Boys function from Kummer's function: F_m(T) = 1F1(m + 1/2; m + 3/2; -T) / (2m + 1).
 # Every test case below is self-contained: it repeats its own imports, helpers and setup.
-
-# --- test case 0 ---
 # H2 at 1.4 bohr with p shells (alpha = 1.1). Variational principle: adding the p shells lowers both
 # energies below the 1s-only (STO-3G) values, computed here with the same oracle restricted to the two
 # 1s functions (which reproduces the Szabo and Ostlund values, full CI -1.1373 and RHF -1.1167 hartree);

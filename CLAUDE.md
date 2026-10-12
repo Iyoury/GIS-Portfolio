@@ -65,6 +65,17 @@ A too-easy report now explains, step by step, why the step gave way and suggests
 The team says the goal is deeper scientific reasoning, not extra steps or tighter tolerances; the suggestions are
 starting points, use judgement and flag what does not fit. Update prompt, reference and tests together.
 
+## Upload checks seen (2026-10-12)
+
+- Accepted domains: physics, biology, materials, math, chemistry (earth refused: geophysics tasks use physics).
+- Size limit 800 KB as the platform measures it (about 1.12 x the raw folder size): keep raw <= 650 KB.
+- Metadata must be a `metadata:` block with author_name, author_email, author_organization, author_profile,
+  conflicts_of_interest, relevant_experience, subfield, tags, expert_time_estimate_hours, difficulty_explanation,
+  solution_explanation, verification_explanation (tools/metadata_block.py).
+- Note "n_test_cases_mismatch" appeared on every step while markers matched n_test_cases; the files had a
+  comment preamble before "# --- test case 0 ---" -> no text at all before the first marker (crown_check flags it).
+- Warning "tasks/_id_mapping.json is absent; falling back to delivered ids" is harmless (the version still maps).
+
 ## Validation before every zip
 
 1. Reference: each case of tests/step_k.py run alone in a fresh process with solution/step_1..k; each case

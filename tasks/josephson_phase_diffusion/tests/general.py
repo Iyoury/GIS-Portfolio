@@ -1,3 +1,4 @@
+# --- test case 0 ---
 # Independent target for the junction with capacitance: the same Kramers equation expanded
 # in Hermite functions CENTRED AT A DIFFERENT VELOCITY v0 = 0.6 i (another basis, so another
 # truncated system), with a larger truncation than the reference (N = 120 Hermite functions,
@@ -11,8 +12,6 @@
 # stencil truncation (about 2.6e-7) and the rounding in the shifted basis (v is about 1e-7 of v0)
 # leave an error of about 3e-7 relative (about 3 per cent of the 1e-5 tolerance).
 # Every test case below is self-contained (its own imports and helper functions).
-
-# --- test case 0 ---
 # intermediate inertia and noise, positive and negative bias
 import numpy as np
 

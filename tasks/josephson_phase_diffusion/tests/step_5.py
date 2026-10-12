@@ -1,3 +1,4 @@
+# --- test case 0 ---
 # Independent targets: no Stratonovich / Reimann double integral. The stationary
 # Fokker-Planck density p(x) = sum_n c_n exp(i n x) of dphi/dtau = i - sin(phi) + xi obeys
 # c_{n+1} + a_n c_n - c_{n-1} = 0 with a_n = 2 theta n + 2 j i (j = imaginary unit);
@@ -8,8 +9,6 @@
 # g_{n+1} + b_n g_n - g_{n-1} = 0 (n >= 2), b_n = 2 j i - 2 theta n, g_1 (b_1 + g_2/g_1) = 1.
 # All in extended precision, so exponentially small results keep their relative accuracy.
 # Every test case below is self-contained (its own imports and helper functions).
-
-# --- test case 0 ---
 # one junction: j_star is the bias whose (Bessel-integral) voltage is v_crit
 import numpy as np
 

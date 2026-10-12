@@ -1,11 +1,10 @@
+# --- test case 0 ---
 # Independent targets: closed forms of the classical (Maxwell-Juettner) gas with modified Bessel
 # functions, and values computed once with mpmath at 40 digits by tanh-sinh quadrature of the defining
 # integrals in the momentum (breakpoints every k T over the Fermi edge), the chemical potential by a
 # root search on those integrals and the specific heat by a centred difference of the energy at constant
 # net electron density (T +- 1e-7 T), all in mpmath; positron densities of a classical positron gas
 # (eps/kT + psi >= 40) from the Maxwell-Juettner formula.
-
-# --- test case 0 ---
 # from strongly degenerate gases (c_V about 8e-10 of u / T at rho_Ye = 1e13, T = 1e7 K) to
 # pair plasmas, against centred differences of the 40-digit energy at constant net density; includes
 # two degenerate, non-relativistic gases near T = 1e7 K (rho_Ye = 1e5 g cm^-3 at 1e7 K and 4e5 g cm^-3

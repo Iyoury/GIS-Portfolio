@@ -1,11 +1,10 @@
+# --- test case 0 ---
 # Independent targets: closed forms of the classical (Maxwell-Juettner) gas with modified Bessel
 # functions, and values computed once with mpmath at 40 digits by tanh-sinh quadrature of the defining
 # integrals in the momentum (breakpoints every k T over the Fermi edge), the chemical potential by a
 # root search on those integrals and the specific heat by a centred difference of the energy at constant
 # net electron density (T +- 1e-7 T), all in mpmath; positron densities of a classical positron gas
 # (eps/kT + psi >= 40) from the Maxwell-Juettner formula.
-
-# --- test case 0 ---
 # a white-dwarf-like, a hot pair plasma, a helium-burning and a degenerate core state,
 # against 40-digit targets
 import numpy as np

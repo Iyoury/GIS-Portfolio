@@ -1,10 +1,9 @@
+# --- test case 0 ---
 # Independent targets: the closed forms of the prism potential, attraction and gradients (Nagy, Papp and
 # Benedek 2000) evaluated in 60- or 90-digit arithmetic with mpmath (no cancellation at any distance), the
 # vertical attraction of the columns by mpmath tanh-sinh quadrature of the lamina term over depth at 30 to
 # 70 digits, and gravity data of basins computed with that quadrature (25 or 30 digits) or, for lam = 0,
 # as sums of 60-digit prism closed forms; all computed once and stored below.
-
-# --- test case 0 ---
 # a 5 x 4 basin (cells 1200 m x 1000 m, depths 1.6 to 2.6 km, density contrast -450 kg m^-3
 # at the surface decaying with lam = 4e-4 per m): the depths from the anomaly
 import numpy as np

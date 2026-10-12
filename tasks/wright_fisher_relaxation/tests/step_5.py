@@ -1,7 +1,6 @@
+# --- test case 0 ---
 # Independent targets: the Wright-Fisher matrix in extended precision (mpmath binomials) and
 # plain LU solves at high precision; no elimination ordering, no subtraction-free tricks.
-
-# --- test case 0 ---
 # one individual: geometric waiting times 1 / v and 1 / u
 import numpy as np
 

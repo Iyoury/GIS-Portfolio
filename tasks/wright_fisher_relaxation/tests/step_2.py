@@ -1,7 +1,6 @@
+# --- test case 0 ---
 # Independent targets: the Wright-Fisher matrix in extended precision (mpmath binomials) and
 # plain LU solves at high precision; no elimination ordering, no subtraction-free tricks.
-
-# --- test case 0 ---
 # neutral drift: p_fix = i0 / N exactly, also when p_loss is the small one, and N = 2
 import numpy as np
 

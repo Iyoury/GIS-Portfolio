@@ -1,7 +1,6 @@
+# --- test case 0 ---
 # Independent targets: closed forms, the Bateman sum of a capture chain evaluated in 600-digit
 # arithmetic (it only cancels in floating point), and matrix exponentials by mpmath at 300 digits.
-
-# --- test case 0 ---
 # burnup of a stable target: n0 exp(-sigma phi t), down to exp(-550), about 1e-239, exp(-575),
 # about 8e-250, exp(-575.64), 1.01e-250 just above 1e-250 S (relative rule), and exp(-600), about 3e-261 (below 1e-250 S: absolute rule);
 # and a tiny inventory, where the threshold F = max(1e-250 S, 1e-300) is set by 1e-300

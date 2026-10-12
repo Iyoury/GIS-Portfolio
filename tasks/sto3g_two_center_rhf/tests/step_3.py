@@ -1,9 +1,8 @@
+# --- test case 0 ---
 # Independent targets: no closed-form Gaussian integrals. Every integral is reduced to a
 # one-dimensional radial integral with the shell theorem (averages over spheres) and
 # done with composite Gauss-Legendre quadrature.
 # Every test case below is self-contained: it repeats its own imports, helpers and setup.
-
-# --- test case 0 ---
 # H2, zeta = 1.24, R = 1.4 (Szabo and Ostlund, Section 3.5.2)
 import numpy as np
 

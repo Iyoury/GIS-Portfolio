@@ -1,3 +1,4 @@
+# --- test case 0 ---
 # Independent targets: no Stratonovich / Reimann double integral. The stationary
 # Fokker-Planck density p(x) = sum_n c_n exp(i n x) of dphi/dtau = i - sin(phi) + xi obeys
 # c_{n+1} + a_n c_n - c_{n-1} = 0 with a_n = 2 theta n + 2 j i (j = imaginary unit);
@@ -15,8 +16,6 @@
 # derivative at the returned theta to 1e-6. The endpoint rule is defined with the voltages of
 # mean_voltage at theta = 0.02 and 50, so the endpoint probes are built from mean_voltage.
 # Every test case below is self-contained (its own imports and helper functions).
-
-# --- test case 0 ---
 # thermally activated phase slips below the critical current
 import numpy as np
 

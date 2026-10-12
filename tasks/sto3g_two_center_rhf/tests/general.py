@@ -1,9 +1,8 @@
+# --- test case 0 ---
 # Independent integrals for s and p Cartesian Gaussians: Obara-Saika recursions (overlap,
 # nuclear attraction, electron repulsion), kinetic energy as (1/2) sum_i <d_i a | d_i b>,
 # and the Boys function from Kummer's function: F_m(T) = 1F1(m + 1/2; m + 3/2; -T) / (2m + 1).
 # Every test case below is self-contained: it repeats its own imports, helpers and setup.
-
-# --- test case 0 ---
 # stretched H2 with polarization functions on both atoms; integrated link with step 4: the 8-function
 # basis contains the two 1s functions of steps 2-4, so by the variational principle both energies lie at
 # or below those of fci_energy at the same geometry (two computed outputs, each within 1e-9: slack 2e-9),
