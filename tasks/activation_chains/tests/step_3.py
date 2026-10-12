@@ -15,14 +15,17 @@ def _crown_case():
         return abs(a - b) / abs(b)
 
     def _t_check(x, target, scale):
-        x = np.asarray(x)
-        assert x.shape == (len(target),), x.shape
+        x = np.asarray(x, dtype=float).reshape(len(target))
         for a, b in zip(x, target):
             if b >= max(1e-250 * scale, 1e-300):
                 assert _t_rel(a, b) < 1e-10, (a, b)
             else:
                 assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)
 
+    # output contract: one nuclide gives a numpy array of shape (1,), not a scalar
+    x = activation_inventory(np.array([0.0]), np.zeros((1, 1)), np.array([100.0]), np.array([-1]), np.array([3.0]),
+                             [(1e5, 1e13)])
+    assert isinstance(x, np.ndarray) and x.shape == (1,), (type(x), np.shape(x))
     for _t_flux, _t_t in ((1e13, 1e5), (1e17, 2e7), (2e17, 1e10), (1e18, 5.5e6), (1e18, 5.75e6), (1e18, 5756363.229176583), (1e18, 6e6)):
         x = activation_inventory(np.array([0.0]), np.zeros((1, 1)), np.array([100.0]), np.array([-1]), np.array([3.0]),
                                  [(_t_t, _t_flux)])
@@ -66,8 +69,7 @@ def _crown_case():
             return [v[i] for i in range(m)]
 
     def _t_check(x, target, scale):
-        x = np.asarray(x)
-        assert x.shape == (len(target),), x.shape
+        x = np.asarray(x, dtype=float).reshape(len(target))
         for a, b in zip(x, target):
             if b >= max(1e-250 * scale, 1e-300):
                 assert _t_rel(a, b) < 1e-10, (a, b)
@@ -133,8 +135,7 @@ def _crown_case():
             return [v[i] for i in range(m)]
 
     def _t_check(x, target, scale):
-        x = np.asarray(x)
-        assert x.shape == (len(target),), x.shape
+        x = np.asarray(x, dtype=float).reshape(len(target))
         for a, b in zip(x, target):
             if b >= max(1e-250 * scale, 1e-300):
                 assert _t_rel(a, b) < 1e-10, (a, b)
@@ -183,8 +184,7 @@ def _crown_case():
 
     def _t_check_pair(x, y, scale):
         # two computed outputs, each within the stated tolerance of the exact amounts: twice that tolerance
-        x, y = np.asarray(x), np.asarray(y)
-        assert x.shape == y.shape, (x.shape, y.shape)
+        x, y = np.asarray(x, dtype=float).reshape(3), np.asarray(y, dtype=float).reshape(3)
         for a, b in zip(x, y):
             if b >= max(1e-250 * scale, 1e-300):
                 assert _t_rel(a, b) < 2e-10, (a, b)
@@ -202,7 +202,6 @@ def _crown_case():
 
     a = activation_inventory(_T_LAM, _T_B, _T_SIG, _T_CAP, _T_N0, [(4e5, 3e12), (1e5, 0.0)])
     b = activation_inventory(_T_LAM, _T_B, _T_SIG, _T_CAP, _T_N0, [(2e5, 3e12), (0.0, 1e15), (2e5, 3e12), (1e5, 0.0)])
-    assert np.asarray(a).shape == (3,), np.asarray(a).shape
     _t_check_pair(a, b, 1e18)
 
 
@@ -234,8 +233,7 @@ def _crown_case():
             return [v[i] for i in range(m)]
 
     def _t_check(x, target, scale):
-        x = np.asarray(x)
-        assert x.shape == (len(target),), x.shape
+        x = np.asarray(x, dtype=float).reshape(len(target))
         for a, b in zip(x, target):
             if b >= max(1e-250 * scale, 1e-300):
                 assert _t_rel(a, b) < 1e-10, (a, b)
@@ -337,11 +335,11 @@ def _crown_case():
 _crown_case()
 
 # --- test case 5 ---
-# a capture loop, capture onto itself or out of range, sigma above 1e7 b or positive below 1e-6 b, branching with a column
-# sum of 1.2 or a nonzero diagonal (even with an empty history), a malformed shape (scalar sigma, branching not n x n, n0 too long, capture_to too short), a history that is not a list or tuple (None, a set, a generator) or has a non-numeric entry,
-# a capture loop with positive cross sections (even with an empty history), sum(n0) above 1e100, lam above 1e10, 31 nuclides, a NaN cross section, a bad history entry,
-# an infinite, negative or too long duration, a too large flux, a too large combined rate, or a negative decay constant,
-# cross section or initial amount raise ValueError
+# each stated error rule once: a cycle through a decay and a capture edge (with an empty history), capture
+# onto itself, out of range or from a non-integer array, a positive cross section below 1e-6 b, a combined
+# rate above 1e10 per s, a branching column sum of 1.2 (with an empty history), a history given as a set or
+# with an entry that is not a pair, a duration above 1e12 s, 31 nuclides, sum(n0) above 1e100 and a
+# negative decay constant raise ValueError
 import numpy as np
 
 
@@ -349,44 +347,185 @@ def _crown_case():
     import numpy as np
     _t_loop = np.zeros((2, 2))
     _t_loop[0, 1] = 1.0
-    for _t_bad in ((np.array([0.0, 1.0]), _t_loop, np.array([5.0, 0.0]), np.array([1, -1]), np.ones(2), [(1.0, 1e10)]),
+    for _t_bad in ((np.array([0.0, 1.0]), _t_loop, np.array([5.0, 0.0]), np.array([1, -1]), np.ones(2), []),
                    (np.array([0.0, 1.0]), np.zeros((2, 2)), np.array([5.0, 0.0]), np.array([0, -1]), np.ones(2), [(1.0, 1e10)]),
-                   (np.array([0.0, 1.0]), np.zeros((2, 2)), np.array([5.0, 0.0]), np.array([1, -1]), np.ones(2), [(1.0,)]),
-                   (np.array([0.0, 1.0]), np.zeros((2, 2)), np.array([5.0, 0.0]), np.array([1, -1]), np.ones(2), [(1.0, -1e10)]),
-                   (np.array([0.0, 1.0]), np.zeros((2, 2)), np.array([5.0, 0.0]), np.array([1.0, -1.0]), np.ones(2), [(1.0, 1e10)]),
-                   (np.array([1e10, 1.0]), np.zeros((2, 2)), np.array([1e7, 0.0]), np.array([1, -1]), np.ones(2), [(1.0, 1e18)]),
-                   (np.array([0.0, 1.0]), np.zeros((2, 2)), np.array([2e7, 0.0]), np.array([1, -1]), np.ones(2), [(1.0, 1.0)]),
-                   (np.array([0.0, 1.0]), np.zeros((2, 2)), np.array([5.0, 0.0]), np.array([-2, -1]), np.ones(2), [(1.0, 1e10)]),
                    (np.array([0.0, 1.0]), np.zeros((2, 2)), np.array([5.0, 0.0]), np.array([2, -1]), np.ones(2), [(1.0, 1e10)]),
-                   (np.array([1.0, 1.0]), np.array([[0.0, 0.0], [1.2, 0.0]]), np.zeros(2), np.array([-1, -1]), np.ones(2), []),
-                   (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), [(2e12, 0.0)]),
-                   (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), [(1.0, 2e18)]),
-                   (np.array([2e10, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), []),
-                   (np.full(31, 1e-3), np.zeros((31, 31)), np.zeros(31), np.full(31, -1), np.ones(31), []),
-                   (np.array([0.0, 1.0]), np.zeros((2, 2)), np.array([np.nan, 0.0]), np.array([1, -1]), np.ones(2), [(1.0, 1e10)]),
-                   (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), [(np.inf, 0.0)]),
-                   (np.array([1.0, 1.0]), np.array([[0.5, 0.0], [0.5, 0.0]]), np.zeros(2), np.array([-1, -1]), np.ones(2), []),
-                   (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), None),
-                   (np.array([0.0, 1.0]), np.zeros((2, 2)), np.array(5.0), np.array([-1, -1]), np.ones(2), []),
-                   (np.array([0.0, 1.0]), np.zeros((3, 3)), np.zeros(2), np.array([-1, -1]), np.ones(2), []),
-                   (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(3), []),
-                   (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), [(1.0, "bad")]),
-                   (np.array([0.0, 0.0]), np.zeros((2, 2)), np.array([5.0, 2.0]), np.array([1, 0]), np.ones(2), []),
+                   (np.array([0.0, 1.0]), np.zeros((2, 2)), np.array([5.0, 0.0]), np.array([1.0, -1.0]), np.ones(2), [(1.0, 1e10)]),
                    (np.array([0.0, 1.0]), np.zeros((2, 2)), np.array([1e-7, 0.0]), np.array([1, -1]), np.ones(2), [(1.0, 1e10)]),
-                   (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.array([1e100, 1e99]), []),
+                   (np.array([1e10, 1.0]), np.zeros((2, 2)), np.array([1e7, 0.0]), np.array([1, -1]), np.ones(2), [(1.0, 1e18)]),
+                   (np.array([1.0, 1.0]), np.array([[0.0, 0.0], [1.2, 0.0]]), np.zeros(2), np.array([-1, -1]), np.ones(2), []),
                    (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), {(1.0, 0.0), (2.0, 0.0)}),
-                   (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), ((1.0, 0.0) for _ in range(2))),
-                   (np.array([0.0, 1.0]), np.zeros((2, 2)), np.array([5.0, 0.0]), np.array([1]), np.ones(2), [(1.0, 1e10)]),
-                   (np.array([-1e-3, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), [(1.0, 0.0)]),
-                   (np.array([0.0, 1.0]), np.zeros((2, 2)), np.array([-5.0, 0.0]), np.array([1, -1]), np.ones(2), [(1.0, 1e10)]),
-                   (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.array([1.0, -1.0]), [(1.0, 0.0)]),
-                   (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), [(-1.0, 0.0)])):
+                   (np.array([0.0, 1.0]), np.zeros((2, 2)), np.array([5.0, 0.0]), np.array([1, -1]), np.ones(2), [(1.0,)]),
+                   (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), [(1.0001e12, 0.0)]),
+                   (np.full(31, 1e-3), np.zeros((31, 31)), np.zeros(31), np.full(31, -1), np.ones(31), []),
+                   (np.array([0.0, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.array([1e100, 1e99]), []),
+                   (np.array([-1e-3, 1.0]), np.zeros((2, 2)), np.zeros(2), np.array([-1, -1]), np.ones(2), [(1.0, 0.0)])):
         try:
             activation_inventory(*_t_bad)
         except ValueError:
             pass
         else:
             raise AssertionError("activation_inventory must raise ValueError for %r" % (_t_bad,))
+
+
+_crown_case()
+
+# --- test case 6 ---
+# single-capture activation with burnup of target and product, in closed form: a stable target (removal
+# rate c = sigma_t 1e-24 phi) feeds a product removed at r = lam_p + sigma_p 1e-24 phi, so after an
+# irradiation of length t the product holds n0 c (exp(-c t) - exp(-r t)) / (r - c) (n0 c t exp(-c t) when
+# r = c), then it decays during the cooling; 50-digit arithmetic. Cobalt (59Co 37.18 b -> 60Co 5.2714 y,
+# 2.0 b) from a negligible to a dominant burnup (sigma phi t = 111 at 1e17), a product removed at the same
+# rate as the target, and the saturation activity of 198Au, which equals the production rate n0 c
+import numpy as np
+
+
+def _crown_case():
+    import mpmath as _t_mp
+
+    def _t_rel(a, b):
+        return abs(a - b) / abs(b)
+
+    def _t_check(x, target, scale):
+        x = np.asarray(x, dtype=float).reshape(len(target))
+        for a, b in zip(x, target):
+            if b >= max(1e-250 * scale, 1e-300):
+                assert _t_rel(a, b) < 1e-10, (a, b)
+            else:
+                assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)
+
+    def _t_two_member(n0, sig_t, lam_p, sig_p, flux, t_irr, t_cool):
+        with _t_mp.workdps(50):
+            c = _t_mp.mpf(float(sig_t)) * _t_mp.mpf("1e-24") * _t_mp.mpf(float(flux))
+            r = _t_mp.mpf(float(lam_p)) + _t_mp.mpf(float(sig_p)) * _t_mp.mpf("1e-24") * _t_mp.mpf(float(flux))
+            T, N = _t_mp.mpf(float(t_irr)), _t_mp.mpf(float(n0))
+            if r == c:
+                xp = N * c * T * _t_mp.exp(-c * T)
+            else:
+                xp = N * c * (_t_mp.exp(-c * T) - _t_mp.exp(-r * T)) / (r - c)
+            xp = xp * _t_mp.exp(-_t_mp.mpf(float(lam_p)) * _t_mp.mpf(float(t_cool)))
+            return [float(N * _t_mp.exp(-c * T)), float(xp)]
+
+    _t_lco = np.log(2.0) / (5.2714 * 3.15576e7)
+    for _t_flux in (1e9, 1e13, 1e15, 1e17):
+        x = activation_inventory(np.array([0.0, _t_lco]), np.zeros((2, 2)), np.array([37.18, 2.0]), np.array([1, -1]),
+                                 np.array([4e22, 0.0]), [(3e7, _t_flux), (1e7, 0.0)])
+        _t_check(x, _t_two_member(4e22, 37.18, _t_lco, 2.0, _t_flux, 3e7, 1e7), 4e22)
+    # product removed at the target's rate: lam_p = 1e-9 per s with sigma_t = 100 b at 1e13 (c = 1e-9 per s up to
+    # rounding), where the textbook two-member formula divides by zero
+    x = activation_inventory(np.array([0.0, 1e-9]), np.zeros((2, 2)), np.array([100.0, 0.0]), np.array([1, -1]),
+                             np.array([1e20, 0.0]), [(2e9, 1e13)])
+    _t_check(x, _t_two_member(1e20, 100.0, 1e-9, 0.0, 1e13, 2e9, 0.0), 1e20)
+    # saturation: 197Au (98.65 b) at 100 n / (cm^2 s) for 1e8 s, so that lam t = 298 for 198Au (2.6941 d, 25100 b)
+    # while sigma phi t = 1e-12: the 198Au activity equals the production rate n0 sigma 1e-24 phi to about 1e-12
+    _t_lau = np.log(2.0) / (2.6941 * 86400.0)
+    x = activation_inventory(np.array([0.0, _t_lau]), np.zeros((2, 2)), np.array([98.65, 25100.0]), np.array([1, -1]),
+                             np.array([1e18, 0.0]), [(1e8, 100.0)])
+    assert _t_rel(_t_lau * float(np.asarray(x, dtype=float).reshape(2)[1]), 1e18 * 98.65e-24 * 100.0) < 1e-10, x
+
+
+_crown_case()
+
+# --- test case 7 ---
+# decay competing with capture, with decay branching: nuclide A (stored at index 2, lam = 1e-4 per s,
+# sigma = 5000 b) decays to B (index 0, 30 %) and C (index 3, 70 %) and captures into D (index 1); B, C, D
+# are stable. At flux phi A is removed at r = lam + c (c = sigma 1e-24 phi) and its losses are shared in the
+# ratios 0.3 lam : 0.7 lam : c, so the daughters hold n0 (1 - exp(-r t)) times these shares over r; in the
+# cooling that follows A decays at lam alone. Closed forms in 50 digits, at 1e14 and 1e16 n / (cm^2 s), and
+# with the column of A summing to 1 + 1e-12 (divided by its sum); no atom leaves, so the total is conserved
+import numpy as np
+
+
+def _crown_case():
+    import mpmath as _t_mp
+
+    def _t_rel(a, b):
+        return abs(a - b) / abs(b)
+
+    def _t_check(x, target, scale):
+        x = np.asarray(x, dtype=float).reshape(len(target))
+        for a, b in zip(x, target):
+            if b >= max(1e-250 * scale, 1e-300):
+                assert _t_rel(a, b) < 1e-10, (a, b)
+            else:
+                assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)
+
+    lam = np.array([0.0, 0.0, 1e-4, 0.0])
+    sig = np.array([0.0, 0.0, 5000.0, 0.0])
+    cap = np.array([-1, -1, 1, -1])
+    n0 = np.array([0.0, 0.0, 3e15, 0.0])
+    for _t_fb, _t_fc in ((0.3, 0.7), (0.3, 0.7 + 1e-12)):
+        B = np.zeros((4, 4))
+        B[0, 2], B[3, 2] = _t_fb, _t_fc
+        for _t_flux in (1e14, 1e16):
+            x = activation_inventory(lam, B, sig, cap, n0, [(2e4, _t_flux), (5e3, 0.0)])
+            with _t_mp.workdps(50):
+                L, N = _t_mp.mpf("1e-4"), _t_mp.mpf("3e15")
+                s = _t_mp.mpf(_t_fb) + _t_mp.mpf(_t_fc)
+                fb, fc = _t_mp.mpf(_t_fb) / max(s, 1), _t_mp.mpf(_t_fc) / max(s, 1)
+                c = _t_mp.mpf(5000) * _t_mp.mpf("1e-24") * _t_mp.mpf(_t_flux)
+                r = L + c
+                a1 = N * _t_mp.exp(-r * _t_mp.mpf(2e4))
+                gone = N - a1
+                a2 = a1 * _t_mp.exp(-L * _t_mp.mpf(5e3))
+                dec2 = a1 - a2
+                target = [float(fb * (L / r * gone + dec2)), float(c / r * gone), float(a2), float(fc * (L / r * gone + dec2))]
+            _t_check(x, target, 3e15)
+            # no atom leaves the network: the four nuclides hold the initial 3e15 atoms
+            assert _t_rel(float(np.sum(x)), 3e15) < 1e-10, float(np.sum(x))
+
+
+_crown_case()
+
+# --- test case 8 ---
+# the history is applied in its order: a stable target (sigma = 50 b) and its product (lam = 2e-6 per s, no
+# capture), irradiated at 1e14 for 4e5 s and cooled for 3e5 s, against the reverse order (cooling first,
+# nothing to decay yet); the product then holds the two-member closed form times exp(-lam 3e5), or the
+# closed form itself; and a history of two irradiations at different fluxes with a cooling between them,
+# propagated period by period with the closed-form two-member solution in 50 digits
+import numpy as np
+
+
+def _crown_case():
+    import mpmath as _t_mp
+
+    def _t_rel(a, b):
+        return abs(a - b) / abs(b)
+
+    def _t_check(x, target, scale):
+        x = np.asarray(x, dtype=float).reshape(len(target))
+        for a, b in zip(x, target):
+            if b >= max(1e-250 * scale, 1e-300):
+                assert _t_rel(a, b) < 1e-10, (a, b)
+            else:
+                assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)
+
+    def _t_periods(n0, history, sig=50.0, lam_p=2e-6):
+        # target T (stable, capture into P) and product P (decay out of the network): per period with
+        # c = sig 1e-24 flux, T -> T exp(-c t), P -> P exp(-lam t) + T c (exp(-c t) - exp(-lam t)) / (lam - c)
+        with _t_mp.workdps(50):
+            T, P = _t_mp.mpf(float(n0[0])), _t_mp.mpf(float(n0[1]))
+            L = _t_mp.mpf(float(lam_p))
+            for dur, flux in history:
+                c = _t_mp.mpf(float(sig)) * _t_mp.mpf("1e-24") * _t_mp.mpf(float(flux))
+                d = _t_mp.mpf(float(dur))
+                P = P * _t_mp.exp(-L * d) + T * c * (_t_mp.exp(-c * d) - _t_mp.exp(-L * d)) / (L - c)
+                T = T * _t_mp.exp(-c * d)
+            return [float(T), float(P)]
+
+    data = (np.array([0.0, 2e-6]), np.zeros((2, 2)), np.array([50.0, 0.0]), np.array([1, -1]))
+    n0 = np.array([2e21, 0.0])
+    h1 = [(4e5, 1e14), (3e5, 0.0)]
+    h2 = [(3e5, 0.0), (4e5, 1e14)]
+    x1 = activation_inventory(*data, n0, h1)
+    x2 = activation_inventory(*data, n0, h2)
+    _t_check(x1, _t_periods(n0, h1), 2e21)
+    _t_check(x2, _t_periods(n0, h2), 2e21)
+    # the cooling after the irradiation multiplies the product by exp(-lam 3e5) (two computed outputs: 2e-10)
+    assert _t_rel(float(np.asarray(x1, dtype=float).reshape(2)[1]) / float(np.asarray(x2, dtype=float).reshape(2)[1]),
+                  float(_t_mp.exp(-_t_mp.mpf("0.6")))) < 2e-10, (x1, x2)
+    h3 = ((1e5, 3e15), (2e5, 0.0), (5e4, 1e13), (1e4, 0.0))
+    _t_check(activation_inventory(*data, n0, h3), _t_periods(n0, h3), 2e21)
 
 
 _crown_case()

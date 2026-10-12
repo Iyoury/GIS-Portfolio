@@ -12,17 +12,17 @@ def prism_gravity(points, bounds, rho):
         z positive down.
       bounds: (x1, x2, y1, y2, z1, z2), the prism x1 <= x <= x2, y1 <= y <= y2, z1 <= z <= z2 (m), its
         longest edge at most 1000 times its shortest.
-      rho: float, density (kg m^-3).
+      rho: float, nonzero density (kg m^-3).
 
     Output:
       (U, g): U = G rho int dV / |Q - P| (m^2 s^-2) and g = grad U (m s^-2, toward the mass for rho > 0,
         z component positive down). Python float and array (3,) for one point, arrays (n,) and (n, 3)
-        otherwise. U with a relative error below 1e-10; each component of g within
-        1e-10 |g| + 1e-14 G |rho| L (L the longest edge), at every point, inside, on the surface or
-        outside at any distance up to a million times the diagonal of the prism.
+        for points of shape (n, 3), n = 1 included. U with a relative error below 1e-10; each
+        component of g within 1e-10 |g| + 1e-14 G |rho| L (L the longest edge), at every point, inside,
+        on the surface or outside at any distance up to a million times the diagonal of the prism.
 
     Raises:
-      ValueError for invalid bounds (not six finite numbers with x1 < x2, y1 < y2, z1 < z2), a
-      non-finite rho, or points of the wrong shape or with a non-finite value.
+      ValueError for invalid bounds (not six numbers with x1 < x2, y1 < y2, z1 < z2), rho = 0, or
+      points of the wrong shape.
     """
     raise NotImplementedError

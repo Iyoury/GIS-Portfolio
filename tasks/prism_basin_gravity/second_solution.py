@@ -24,8 +24,8 @@ def _bounds(bounds, rho):
     b = [float(v) for v in np.asarray(bounds, float).ravel()]
     if len(b) != 6 or not all(math.isfinite(v) for v in b) or not (b[0] < b[1] and b[2] < b[3] and b[4] < b[5]):
         raise ValueError("invalid bounds")
-    if not math.isfinite(float(rho)):
-        raise ValueError("rho must be finite")
+    if not math.isfinite(float(rho)) or float(rho) == 0.0:
+        raise ValueError("rho must be finite and nonzero")
     return b, float(rho)
 
 
@@ -305,6 +305,8 @@ def column_gz(stations, x1, x2, y1, y2, depth, drho0, lam):
     vals = [x1, x2, y1, y2, depth, drho0, lam]
     if not all(math.isfinite(float(v)) for v in vals):
         raise ValueError("column parameters must be finite")
+    if float(drho0) == 0.0:
+        raise ValueError("drho0 must be nonzero")
     if not (x1 < x2 and y1 < y2) or not 0.0 < depth <= 5e4 or not 0.0 <= lam <= 1e-2:
         raise ValueError("invalid column")
     if np.any(st[:, 2] > 0.0):
@@ -422,12 +424,12 @@ def invert_basin_depths(x_edges, y_edges, gz_obs, drho0, lam):
       lam: float, 0 <= lam <= 1e-2 (per m).
 
     Output:
-      depths: numpy array (nx, ny) in m, each with a relative error below 1e-8.
+      depths: numpy array (nx, ny) in m (also when nx or ny is 1), each with a relative error below 1e-8.
 
     Raises:
-      ValueError for invalid edges, nx ny > 100, gz_obs of the wrong shape or non-finite, drho0 zero or
-      non-finite, lam outside [0, 1e-2], an observation without the sign of drho0, or (lam > 0) an
-      observation of at least 2 pi G |drho0| / lam.
+      ValueError for invalid edges, nx ny > 100, gz_obs of the wrong shape, drho0 = 0, lam outside
+      [0, 1e-2], an observation without the sign of drho0, or (lam > 0) an observation of at least
+      2 pi G |drho0| / lam.
     """
     xe, ye, go =np.asarray(x_edges, float), np.asarray(y_edges, float), np.asarray(gz_obs, float)
     if xe.ndim != 1 or ye.ndim != 1 or xe.size < 2 or ye.size < 2:

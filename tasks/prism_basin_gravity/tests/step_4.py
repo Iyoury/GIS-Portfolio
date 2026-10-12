@@ -23,14 +23,14 @@ def _crown_case():
     _T_DRHO0, _T_LAM = -450.0, 0.0004
 
     _t_h = invert_basin_depths(np.array(_T_XE), np.array(_T_YE), np.array(_T_GZ), _T_DRHO0, _T_LAM)
-    assert isinstance(_t_h, np.ndarray) and _t_h.shape == (5, 4), _t_h
     assert np.max(np.abs(_t_h / np.array(_T_DEPTH) - 1.0)) < 1e-8, (_t_h, _T_DEPTH)
 
 
 _crown_case()
 
 # --- test case 1 ---
-# invalid input, an anomaly with the wrong sign or beyond the infinite slab raises ValueError
+# each stated error rule once: x edges not increasing, 121 cells, gz_obs of the wrong shape, drho0 = 0,
+# lam < 0, an observation of the wrong sign, an observation equal to the attraction of the infinite slab
 import numpy as np
 
 
@@ -53,17 +53,11 @@ def _crown_case():
     _t_big[0, 0] = -2 * math.pi * _T_G * 450.0 / 4e-4          # the infinite-slab value itself
     _t_sign = _t_gz.copy()
     _t_sign[1, 1] = 1e-6
-    _t_nan = _t_gz.copy()
-    _t_nan[2, 3] = float("nan")
-    _t_inf_x = _t_xe.copy()
-    _t_inf_x[-1] = float("inf")
-    for _t_args in ((_t_xe[::-1], _t_ye, _t_gz, _T_DRHO0, _T_LAM), (_t_xe, _t_ye, _t_gz[:, :3], _T_DRHO0, _T_LAM),
-                    (_t_xe, _t_ye, _t_gz, 0.0, _T_LAM), (_t_xe, _t_ye, _t_gz, _T_DRHO0, -1e-3), (_t_xe, _t_ye, _t_gz, _T_DRHO0, 0.05),
-                    (_t_xe, _t_ye, _t_big, _T_DRHO0, _T_LAM), (_t_xe, _t_ye, _t_sign, _T_DRHO0, _T_LAM),
+    for _t_args in ((_t_xe[::-1], _t_ye, _t_gz, _T_DRHO0, _T_LAM),
                     (np.linspace(0, 1, 12), np.linspace(0, 1, 12), np.ones((11, 11)), 1.0, 0.0),
-                    (_t_xe[None, :], _t_ye, _t_gz, _T_DRHO0, _T_LAM), (_t_xe[:1], _t_ye, _t_gz[:0], _T_DRHO0, _T_LAM),
-                    (_t_inf_x, _t_ye, _t_gz, _T_DRHO0, _T_LAM), (_t_xe, _t_ye, _t_nan, _T_DRHO0, _T_LAM),
-                    (_t_xe, _t_ye, _t_gz, float("-inf"), _T_LAM)):
+                    (_t_xe, _t_ye, _t_gz[:, :3], _T_DRHO0, _T_LAM), (_t_xe, _t_ye, _t_gz, 0.0, _T_LAM),
+                    (_t_xe, _t_ye, _t_gz, _T_DRHO0, -1e-4), (_t_xe, _t_ye, _t_sign, _T_DRHO0, _T_LAM),
+                    (_t_xe, _t_ye, _t_big, _T_DRHO0, _T_LAM)):
         try:
             invert_basin_depths(*_t_args)
         except ValueError:
@@ -95,7 +89,6 @@ def _crown_case():
     _T_DRHO0, _T_LAM = 300.0, 0.0
 
     _t_h = invert_basin_depths(np.array(_T_XE), np.array(_T_YE), np.array(_T_GZ), _T_DRHO0, _T_LAM)
-    assert isinstance(_t_h, np.ndarray) and _t_h.shape == np.array(_T_DEPTH).shape, _t_h
     assert np.max(np.abs(_t_h / np.array(_T_DEPTH) - 1.0)) < 1e-8, (_t_h, _T_DEPTH)
 
 
@@ -121,7 +114,6 @@ def _crown_case():
     _T_DRHO0, _T_LAM = -450.0, 0.001
 
     _t_h = invert_basin_depths(np.array(_T_XE), np.array(_T_YE), np.array(_T_GZ), _T_DRHO0, _T_LAM)
-    assert isinstance(_t_h, np.ndarray) and _t_h.shape == np.array(_T_DEPTH).shape, _t_h
     assert np.max(np.abs(_t_h / np.array(_T_DEPTH) - 1.0)) < 1e-8, (_t_h, _T_DEPTH)
 
 
@@ -147,7 +139,6 @@ def _crown_case():
     _T_DRHO0, _T_LAM = -300.0, 0.01
 
     _t_h = invert_basin_depths(np.array(_T_XE), np.array(_T_YE), np.array(_T_GZ), _T_DRHO0, _T_LAM)
-    assert isinstance(_t_h, np.ndarray) and _t_h.shape == np.array(_T_DEPTH).shape, _t_h
     assert np.max(np.abs(_t_h / np.array(_T_DEPTH) - 1.0)) < 1e-8, (_t_h, _T_DEPTH)
 
 
@@ -173,7 +164,6 @@ def _crown_case():
     _T_DRHO0, _T_LAM = -400.0, 0.0004
 
     _t_h = invert_basin_depths(np.array(_T_XE), np.array(_T_YE), np.array(_T_GZ), _T_DRHO0, _T_LAM)
-    assert isinstance(_t_h, np.ndarray) and _t_h.shape == np.array(_T_DEPTH).shape, _t_h
     assert np.max(np.abs(_t_h / np.array(_T_DEPTH) - 1.0)) < 1e-8, (_t_h, _T_DEPTH)
 
 
@@ -202,8 +192,90 @@ def _crown_case():
     _T_DRHO0, _T_LAM = 250.0, 0.0015
 
     _t_h = invert_basin_depths(np.array(_T_XE), np.array(_T_YE), np.array(_T_GZ), _T_DRHO0, _T_LAM)
-    assert isinstance(_t_h, np.ndarray) and _t_h.shape == np.array(_T_DEPTH).shape, _t_h
     assert np.max(np.abs(_t_h / np.array(_T_DEPTH) - 1.0)) < 1e-8, (_t_h, _T_DEPTH)
+
+
+_crown_case()
+
+# --- test case 7 ---
+# the inclusive depth limit 5e4 m: a one-cell basin 20 km x 25 km (w_min = 20 km) exactly 5e4 m deep
+# (2.5 w_min), drho0 = -380 kg m^-3, with lam = 2e-5 per m (lam depth = 1) and with lam = 0; data: the
+# attraction at the centre of the top of the column, by 40-digit tanh-sinh quadrature of the lamina term
+# over depth (confirmed to 2e-17 by Gauss-Legendre quadrature on uniform panels) and, for lam = 0, by the
+# 60-digit closed form of the prism (confirmed to 1e-40 by the quadrature); the depth amplifies relative
+# data errors by 16 (lam = 2e-5) and 7 (lam = 0) here
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+
+    _t_xe, _t_ye = np.array([-10000.0, 10000.0]), np.array([0.0, 25000.0])
+    for _t_lam, _t_gz in ((2e-5, -0.001416642663755939106441859), (0.0, -0.001742444386281940718336059)):
+        _t_h = invert_basin_depths(_t_xe, _t_ye, np.array([[_t_gz]]), -380.0, _t_lam)
+        assert abs(_t_h[0, 0] / 5e4 - 1.0) < 1e-8, (_t_lam, _t_h)
+
+
+_crown_case()
+
+# --- test case 8 ---
+# the output contract for one-row and one-column grids: a 1 x 3 basin (cells 800 m x 600 m to 700 m, depths
+# 400 m to 1500 m, drho0 = -350 kg m^-3, lam = 5e-4 per m) gives an array of shape (1, 3), a 3 x 1 basin
+# (cells 500 m to 650 m x 900 m, depths 300 m to 1400 m, drho0 = +280 kg m^-3, lam = 0) an array of shape
+# (3, 1); data: 30-digit tanh-sinh quadrature over depth (confirmed to 1e-25 by Gauss-Legendre quadrature
+# on other panels) and sums of 60-digit prism closed forms (confirmed to 1.2e-30 by quadrature)
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+
+    _T_GZ_ROW = [[-0.00004908233804464197499904483, -0.00005328695464879845595116872, -0.00004161921873043325053688939]]
+
+    _T_GZ_COL = [[0.0000351864516657895434827989], [0.00004937949946391972675041836], [0.00004467781369331422716550936]]
+
+    _t_h1 = invert_basin_depths(np.array([0.0, 800.0]), np.array([0.0, 600.0, 1300.0, 2000.0]), np.array(_T_GZ_ROW), -350.0, 5e-4)
+    _t_h2 = invert_basin_depths(np.array([100.0, 600.0, 1250.0, 1800.0]), np.array([-450.0, 450.0]), np.array(_T_GZ_COL), 280.0, 0.0)
+    assert (isinstance(_t_h1, np.ndarray) and _t_h1.shape == (1, 3) and isinstance(_t_h2, np.ndarray)
+            and _t_h2.shape == (3, 1)), (_t_h1, _t_h2)
+    assert np.max(np.abs(_t_h1 / np.array([[900.0, 1500.0, 400.0]]) - 1.0)) < 1e-8, _t_h1
+    assert np.max(np.abs(_t_h2 / np.array([[300.0], [1400.0], [700.0]]) - 1.0)) < 1e-8, _t_h2
+
+
+_crown_case()
+
+# --- test case 9 ---
+# exact identities applied to the basin of case 0 (5 x 4 cells of 1200 m x 1000 m, drho0 = -450 kg m^-3,
+# lam = 4e-4 per m, data from 25-digit quadrature): (a) all lengths doubled and lam halved double the
+# anomaly (gz is G drho0 times a length) and the depths (cells 2400 m x 2000 m, depths 3.0 km to 5.0 km,
+# lam depth unchanged); (b) exchanging x and y (edges swapped, gz_obs transposed) transposes the depths;
+# (c) gz is linear in drho0: the anomaly and drho0 both multiplied by -1 (a positive density contrast and
+# a positive anomaly) or by 1/2 give the same depths; (d) the grid translated to survey coordinates
+# (x + 5e5 m, y + 5.3e6 m, like UTM eastings and northings) gives the same depths
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+
+    _T_XE = [0.0, 1200.0, 2400.0, 3600.0, 4800.0, 6000.0]
+
+    _T_YE = [0.0, 1000.0, 2000.0, 3000.0, 4000.0]
+
+    _T_DEPTH = [[1515.03, 1557.02, 1557.02, 1515.03], [1630.331, 1994.432, 1994.432, 1630.331], [1767.756, 2515.778, 2515.778, 1767.756], [1630.331, 1994.432, 1994.432, 1630.331], [1515.03, 1557.02, 1557.02, 1515.03]]
+
+    _T_GZ = [[-0.00012420138486717827, -0.00014328431458916966, -0.00014328431458916966, -0.00012420138486717827], [-0.0001445401883644231, -0.0001696612698796593, -0.0001696612698796593, -0.0001445401883644231], [-0.0001491855838652856, -0.00017577528549926713, -0.00017577528549926713, -0.0001491855838652856], [-0.0001445401883644231, -0.0001696612698796593, -0.0001696612698796593, -0.0001445401883644231], [-0.00012420138486717827, -0.00014328431458916966, -0.00014328431458916966, -0.00012420138486717827]]
+
+    _t_xe, _t_ye, _t_gz, _t_d = np.array(_T_XE), np.array(_T_YE), np.array(_T_GZ), np.array(_T_DEPTH)
+    _t_h = invert_basin_depths(2.0 * _t_xe, 2.0 * _t_ye, 2.0 * _t_gz, -450.0, 2e-4)
+    assert np.max(np.abs(_t_h / (2.0 * _t_d) - 1.0)) < 1e-8, (_t_h, 2.0 * _t_d)
+    _t_h = invert_basin_depths(_t_ye, _t_xe, _t_gz.T, -450.0, 4e-4)
+    assert np.max(np.abs(_t_h / _t_d.T - 1.0)) < 1e-8, (_t_h, _t_d.T)
+    for _t_c in (-1.0, 0.5):
+        _t_h = invert_basin_depths(_t_xe, _t_ye, _t_c * _t_gz, _t_c * -450.0, 4e-4)
+        assert np.max(np.abs(_t_h / _t_d - 1.0)) < 1e-8, (_t_c, _t_h)
+    _t_h = invert_basin_depths(_t_xe + 5e5, _t_ye + 5.3e6, _t_gz, -450.0, 4e-4)
+    assert np.max(np.abs(_t_h / _t_d - 1.0)) < 1e-8, _t_h
 
 
 _crown_case()

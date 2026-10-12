@@ -44,7 +44,7 @@ def _crown_case():
 
     for _t_q, _t_c, _t_g in _T_COL[:-3]:
         _t_got = column_gz(np.array(_t_q, float), *_t_c)
-        assert type(_t_got) is float and _t_rel(_t_got, _t_g) < 1e-10, (_t_q, _t_c, _t_got, _t_g)
+        assert _t_rel(_t_got, _t_g) < 1e-10, (_t_q, _t_c, _t_got, _t_g)
 
 
 _crown_case()
@@ -94,8 +94,8 @@ def _crown_case():
 _crown_case()
 
 # --- test case 2 ---
-# several stations at once give an array of shape (n,) with the same accuracy: 5 stations, and
-# 1000 stations (the 14 stored stations of the first column, near and far, repeated)
+# several stations in one call keep the stated accuracy: 5 stations, and 1000 stations (the 14 stored
+# stations of the first column, near and far, repeated)
 import numpy as np
 
 
@@ -134,7 +134,6 @@ def _crown_case():
     _t_c = _T_COL[0][1]
     _t_sts = np.array([r[0] for r in _T_COL[:5]], float)
     _t_got = column_gz(_t_sts, *_t_c)
-    assert isinstance(_t_got, np.ndarray) and _t_got.shape == (5,)
     for _t_k in range(5):
         assert _t_rel(_t_got[_t_k], _T_COL[_t_k][2]) < 1e-10
 
@@ -148,7 +147,6 @@ def _crown_case():
 
     _t_rows = ((_T_COL[:10] + _T_FAR4) * 72)[:1000]
     _t_got = column_gz(np.array([r[0] for r in _t_rows], float), *_t_c)
-    assert isinstance(_t_got, np.ndarray) and _t_got.shape == (1000,)
     for _t_k, (_t_q, _t_cc, _t_g) in enumerate(_t_rows):
         assert _t_rel(_t_got[_t_k], _t_g) < 1e-10, (_t_q, _t_got[_t_k], _t_g)
 
@@ -156,20 +154,18 @@ def _crown_case():
 _crown_case()
 
 # --- test case 3 ---
-# invalid stations or parameters raise ValueError
+# each stated error rule once, just outside the valid domain: a station 1e-9 m below the surface, stations
+# of shape (2,), drho0 = 0 (gz = 0, where a relative accuracy has no meaning), y1 = y2, depth 0 and depth
+# 50001 m (5e4 m itself is valid), lam = 0.0101 per m
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
     _t_ok = (0.0, 100.0, 0.0, 200.0, 3000.0, -400.0, 5e-4)
-    for _t_q, _t_c in (((0, 0, 1.0), _t_ok), ((0, 0), _t_ok), ((0, float("nan"), 0), _t_ok),
-                       ((0, 0, 0), (100.0, 0.0, 0.0, 200.0, 3000.0, -400.0, 5e-4)), ((0, 0, 0), (0.0, 100.0, 0.0, 200.0, 0.0, -400.0, 5e-4)),
-                       ((0, 0, 0), (0.0, 100.0, 0.0, 200.0, 6e4, -400.0, 5e-4)), ((0, 0, 0), (0.0, 100.0, 0.0, 200.0, 3000.0, -400.0, -1e-4)),
-                       ((0, 0, 0), (0.0, 100.0, 0.0, 200.0, 3000.0, -400.0, 0.02)), ((0, 0, 0), (0.0, 100.0, 0.0, 200.0, 3000.0, float("nan"), 0.0)),
-                       ((0, 0, 0), (0.0, float("inf"), 0.0, 200.0, 3000.0, -400.0, 5e-4)), ((0, 0, 0), (0.0, 100.0, 0.0, 200.0, float("nan"), -400.0, 5e-4)),
-                       ((0, 0, 0), (0.0, 100.0, 0.0, 200.0, 3000.0, -400.0, float("nan"))),
-                       ((0, 0, 0), (0.0, 100.0, 200.0, 200.0, 3000.0, -400.0, 5e-4))):
+    for _t_q, _t_c in (((0, 0, 1e-9), _t_ok), ((0, 0), _t_ok), ((0, 0, 0), (0.0, 100.0, 0.0, 200.0, 3000.0, 0.0, 5e-4)),
+                       ((0, 0, 0), (0.0, 100.0, 200.0, 200.0, 3000.0, -400.0, 5e-4)), ((0, 0, 0), (0.0, 100.0, 0.0, 200.0, 0.0, -400.0, 5e-4)),
+                       ((0, 0, 0), (0.0, 100.0, 0.0, 200.0, 50001.0, -400.0, 5e-4)), ((0, 0, 0), (0.0, 100.0, 0.0, 200.0, 3000.0, -400.0, 0.0101))):
         try:
             column_gz(np.array(_t_q, float), *_t_c)
         except ValueError:
@@ -182,8 +178,9 @@ _crown_case()
 
 # --- test case 4 ---
 # far from the column: stations 5e4 m to 1e7 m away horizontally from columns 1 m to 200 m wide
-# (where the four arctangents of the lamina term nearly cancel); targets: 60- and 70-digit tanh-sinh
-# quadrature of the lamina term over depth (lam > 0) and the 90-digit closed form of the prism (lam = 0)
+# (where the four arctangents of the lamina term nearly cancel), two of them exactly 1e7 m from the column
+# (the stated limit); targets: 60- and 70-digit tanh-sinh quadrature of the lamina term over depth
+# (lam > 0) and the 90-digit closed form of the prism (lam = 0)
 import numpy as np
 
 
@@ -204,15 +201,106 @@ def _crown_case():
         ((3000.0, 0.5, 0.0), (0.0, 1.0, 0.0, 1.0, 100.0, 1000.0, 0.0), 1.235569840256834949936735e-14),
         ((100000.0, -20000.0, -100.0), (0.0, 1.0, 0.0, 1.0, 100.0, 1000.0, 0.0), 9.439531039743038573934735e-19),
         ((10000000.0, 0.0, 0.0), (0.0, 1.0, 0.0, 1.0, 100.0, 1000.0, 0.0), 3.337150500322263744703456e-25),
+        ((10000001.0, 0.5, 0.0), (0.0, 1.0, 0.0, 1.0, 100.0, 1000.0, 0.0), 3.337149499177276384147608e-25),
+        ((-20.0, -10000030.0, 0.0), (-20.0, 20.0, -30.0, 30.0, 10.0, -250.0, 0.01), -1.873662109979042872997625e-24),
     ]
 
     for _t_q, _t_c, _t_g in _T_FAR:
         _t_got = column_gz(np.array(_t_q, float), *_t_c)
-        assert type(_t_got) is float and _t_rel(_t_got, _t_g) < 1e-10, (_t_q, _t_c, _t_got, _t_g)
+        assert _t_rel(_t_got, _t_g) < 1e-10, (_t_q, _t_c, _t_got, _t_g)
     _t_got = column_gz(np.array([r[0] for r in _T_FAR[:4]], float), *_T_FAR[0][1])
-    assert isinstance(_t_got, np.ndarray) and _t_got.shape == (4,)
     for _t_k in range(4):
         assert _t_rel(_t_got[_t_k], _T_FAR[_t_k][2]) < 1e-10, (_t_k, _t_got[_t_k], _T_FAR[_t_k][2])
+
+
+_crown_case()
+
+# --- test case 5 ---
+# the output contract: one station (shape (3,)) gives a Python float, a one-row batch (shape (1, 3)) an
+# array of shape (1,), three stations an array of shape (3,); in every form the values are those of the
+# stored mpmath quadratures
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+
+    _t_c = (0.0, 100.0, 0.0, 200.0, 3000.0, -400.0, 0.0005)
+    # (station, g_z) for the column _t_c
+    _T_ROWS = [((50, 200.000001, 0), -0.000007345710253637675303238618), ((0, 0, 0), -0.000005577048275340553263853427),
+               ((500, -300, -10), -0.000000461492152714326746302963)]
+
+    _t_q = np.array([r[0] for r in _T_ROWS], float)
+    _t_t = np.array([r[1] for r in _T_ROWS])
+    _t_g0 = column_gz(_t_q[0], *_t_c)
+    _t_g1 = column_gz(_t_q[:1], *_t_c)
+    _t_g3 = column_gz(_t_q, *_t_c)
+    assert (type(_t_g0) is float and isinstance(_t_g1, np.ndarray) and _t_g1.shape == (1,)
+            and isinstance(_t_g3, np.ndarray) and _t_g3.shape == (3,)), (type(_t_g0), _t_g1, _t_g3)
+    assert abs(_t_g0 - _t_t[0]) < 1e-10 * abs(_t_t[0]) and abs(_t_g1[0] - _t_t[0]) < 1e-10 * abs(_t_t[0]), (_t_g0, _t_g1)
+    assert np.all(np.abs(_t_g3 - _t_t) < 1e-10 * np.abs(_t_t)), (_t_g3, _t_t)
+
+
+_crown_case()
+
+# --- test case 6 ---
+# exact identities of the column integral, against the stored 30- to 70-digit quadratures of the
+# 100 m x 200 m x 3 km column (drho0 = -400, lam = 5e-4): (a) cutting the depth at D1 = 1 km, the part
+# below D1 is a column from 0 to 2 km with drho0 exp(-lam D1) seen from the station raised by D1:
+# gz(D) = gz(D1) + exp(-lam D1) gz'; (b) cutting the column by the plane x = 50, the two half columns sum
+# to the whole (the station (50, 100, 0) is then on the surface directly above an edge of both);
+# (c) lengths scaled by s = 8 and s = 1/4 (exact in binary) with lam / s and drho0 = 600: gz scales as
+# s (600 / -400); (d) column and stations translated to survey coordinates (x + 4e5 m, y + 5e5 m): the
+# same attraction (the rounding of the shifted stations moves it by at most 2e-12 relative); (e) the
+# column is symmetric under x -> 100 - x and y -> 200 - y: reflected stations see the same attraction.
+# Tolerance: twice the stated one for a sum of two outputs, the stated one otherwise
+import numpy as np
+
+
+def _crown_case():
+    import math
+    import numpy as np
+
+    _t_c = (0.0, 100.0, 0.0, 200.0, 3000.0, -400.0, 0.0005)
+    # (station, g_z) for the column _t_c
+    _T_ROWS = [
+        ((50, 100, 0), -0.00001182266896761075020671915),
+        ((0.001, 100, 0), -0.000008461011867755590504171835),
+        ((0, 0, 0), -0.000005577048275340553263853427),
+        ((1, 1, 0), -0.000005923119386556591979168138),
+        ((100, 200, 0), -0.000005577048275340553263853427),
+        ((1e-06, 1e-06, 0), -0.000005577049359548094151539434),
+        ((50, 100, -0.01), -0.00001182105089404037832452287),
+        ((500, -300, -10), -0.000000461492152714326746302963),
+        ((-2000, 150, 0), -5.351795817357728662434799e-8),
+        ((50, 200.000001, 0), -0.000007345710253637675303238618),
+    ]
+
+    _t_q = np.array([r[0] for r in _T_ROWS], float)
+    _t_t = np.array([r[1] for r in _T_ROWS])
+    _t_lam = _t_c[6]
+    # (a) depth cut at 1 km
+    _t_up = column_gz(_t_q, 0.0, 100.0, 0.0, 200.0, 1000.0, -400.0, _t_lam)
+    _t_low = column_gz(_t_q - np.array([0.0, 0.0, 1000.0]), 0.0, 100.0, 0.0, 200.0, 2000.0, -400.0, _t_lam)
+    _t_sum = _t_up + math.exp(-_t_lam * 1000.0) * _t_low
+    assert np.all(np.abs(_t_sum - _t_t) < 2e-10 * np.abs(_t_t)), _t_sum / _t_t - 1.0
+    # (b) width cut at x = 50
+    _t_sum = column_gz(_t_q, 0.0, 50.0, 0.0, 200.0, 3000.0, -400.0, _t_lam) + column_gz(_t_q, 50.0, 100.0, 0.0, 200.0, 3000.0, -400.0, _t_lam)
+    assert np.all(np.abs(_t_sum - _t_t) < 2e-10 * np.abs(_t_t)), _t_sum / _t_t - 1.0
+    # (c) scaling of lengths, with another density contrast
+    for _t_s in (8.0, 0.25):
+        _t_got = column_gz(_t_s * _t_q, 0.0, 100.0 * _t_s, 0.0, 200.0 * _t_s, 3000.0 * _t_s, 600.0, _t_lam / _t_s)
+        _t_want = _t_s * (600.0 / -400.0) * _t_t
+        assert np.all(np.abs(_t_got - _t_want) < 1e-10 * np.abs(_t_want)), (_t_s, _t_got / _t_want - 1.0)
+    # (d) translation
+    _t_got = column_gz(_t_q + np.array([4e5, 5e5, 0.0]), 4e5, 4e5 + 100.0, 5e5, 5e5 + 200.0, 3000.0, -400.0, _t_lam)
+    assert np.all(np.abs(_t_got - _t_t) < 1e-10 * np.abs(_t_t)), _t_got / _t_t - 1.0
+    # (e) reflected stations (in x and y, in x only, in y only) of rows 3, 7 and 8
+    _t_ref = np.array([[99.0, 199.0, 0.0], [99.0, 1.0, 0.0], [-400.0, 500.0, -10.0], [500.0, 500.0, -10.0],
+                       [2100.0, 50.0, 0.0], [2100.0, 150.0, 0.0]])
+    _t_got = column_gz(_t_ref, *_t_c)
+    _t_want = _t_t[[3, 3, 7, 7, 8, 8]]
+    assert np.all(np.abs(_t_got - _t_want) < 1e-10 * np.abs(_t_want)), _t_got / _t_want - 1.0
 
 
 _crown_case()

@@ -17,14 +17,16 @@ def _crown_case():
         return abs(a - b) / abs(b)
 
     def _t_check(x, target, scale):
-        x = np.asarray(x)
-        assert x.shape == (len(target),), x.shape
+        x = np.asarray(x, dtype=float).reshape(len(target))
         for a, b in zip(x, target):
             if b >= max(1e-250 * scale, 1e-300):
                 assert _t_rel(a, b) < 1e-10, (a, b)
             else:
                 assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)
 
+    # output contract: one nuclide gives a numpy array of shape (1,), not a scalar
+    x = network_inventory(np.array([0.5]), np.zeros((1, 1)), np.array([3.0]), np.array([1.0]), 2.0)
+    assert isinstance(x, np.ndarray) and x.shape == (1,), (type(x), np.shape(x))
     for _t_lam, _t_q, _t_n0, _t_t in ((0.5, 3.0, 1.0, 2.0), (1e-10, 7.0, 0.0, 1e-5), (2.0, 1e6, 1e-3, 1e3), (0.0, 2.0, 1.0, 10.0), (1.0, 0.0, 1.0, 550.0), (1.0, 0.0, 1.0, 575.0), (1.0, 0.0, 1.0, 575.6363229176583), (1.0, 0.0, 1.0, 600.0),
                                      (1.0, 0.0, 1e-70, 500.0), (1.0, 0.0, 1e-70, 570.0), (0.5, 1e-200, 0.0, 2.0)):
         x = network_inventory(np.array([_t_lam]), np.zeros((1, 1)), np.array([_t_q]), np.array([_t_n0]), _t_t)
@@ -50,8 +52,7 @@ def _crown_case():
         return abs(a - b) / abs(b)
 
     def _t_check(x, target, scale):
-        x = np.asarray(x)
-        assert x.shape == (len(target),), x.shape
+        x = np.asarray(x, dtype=float).reshape(len(target))
         for a, b in zip(x, target):
             if b >= max(1e-250 * scale, 1e-300):
                 assert _t_rel(a, b) < 1e-10, (a, b)
@@ -93,8 +94,7 @@ def _crown_case():
             return [v[i] for i in range(m)]
 
     def _t_check(x, target, scale):
-        x = np.asarray(x)
-        assert x.shape == (len(target),), x.shape
+        x = np.asarray(x, dtype=float).reshape(len(target))
         for a, b in zip(x, target):
             if b >= max(1e-250 * scale, 1e-300):
                 assert _t_rel(a, b) < 1e-10, (a, b)
@@ -151,8 +151,7 @@ def _crown_case():
             return [v[i] for i in range(m)]
 
     def _t_check(x, target, scale):
-        x = np.asarray(x)
-        assert x.shape == (len(target),), x.shape
+        x = np.asarray(x, dtype=float).reshape(len(target))
         for a, b in zip(x, target):
             if b >= max(1e-250 * scale, 1e-300):
                 assert _t_rel(a, b) < 1e-10, (a, b)
@@ -198,7 +197,7 @@ _crown_case()
 
 # --- test case 4 ---
 # the ends of the domain: t = 0 returns n0, lam = 1e10, t = 1e20 with a stable nuclide
-# and production (n0 + q t), a 30-nuclide network, column sums up to 1 + 1e-12 accepted, and an
+# and production (n0 + q t), a 30-nuclide network, column sums up to 1 + 1e-12 accepted and normalized, and an
 # empty inventory without production (S = 0, all exact zeros)
 import numpy as np
 
@@ -229,8 +228,7 @@ def _crown_case():
             return [float(x) for x in out]
 
     def _t_check(x, target, scale):
-        x = np.asarray(x)
-        assert x.shape == (len(target),), x.shape
+        x = np.asarray(x, dtype=float).reshape(len(target))
         for a, b in zip(x, target):
             if b >= max(1e-250 * scale, 1e-300):
                 assert _t_rel(a, b) < 1e-10, (a, b)
@@ -250,22 +248,28 @@ def _crown_case():
     B = np.diag(np.ones(29), -1)
     n0 = np.r_[1.0, np.zeros(29)]
     _t_check(network_inventory(lam, B, np.zeros(30), n0, 50.0), _t_bateman(lam, n0, 50.0), 1.0)
+    # column sums in (1, 1 + 1e-12] are rounding of 1: the column is divided by its sum, so the stable daughters
+    # share exactly what the parent lost and the network keeps its one atom
     B = np.zeros((3, 3))
     B[1, 0], B[2, 0] = 0.5, 0.5 + 5e-13
     x = network_inventory(np.array([1.0, 0.0, 0.0]), B, np.zeros(3), np.array([1.0, 0.0, 0.0]), 2.0)
-    _t_check(x, [np.exp(-2.0), 0.5 * -np.expm1(-2.0), (0.5 + 5e-13) * -np.expm1(-2.0)], 1.0)
+    _t_s = 0.5 + (0.5 + 5e-13)
+    _t_check(x, [np.exp(-2.0), 0.5 / _t_s * -np.expm1(-2.0), (0.5 + 5e-13) / _t_s * -np.expm1(-2.0)], 1.0)
+    assert _t_rel(float(np.sum(np.asarray(x, dtype=float))), 1.0) < 1e-10, x
     B = np.zeros((2, 2))
-    B[1, 0] = 1.0 + 1e-12                       # exactly at the accepted bound
+    B[1, 0] = 1.0 + 1e-12                       # exactly at the accepted bound: normalized to 1
     x = network_inventory(np.array([1.0, 0.0]), B, np.zeros(2), np.array([1.0, 0.0]), 2.0)
-    _t_check(x, [np.exp(-2.0), (1.0 + 1e-12) * -np.expm1(-2.0)], 1.0)
+    _t_check(x, [np.exp(-2.0), -np.expm1(-2.0)], 1.0)
     _t_check(network_inventory(np.array([1.0, 0.5]), np.array([[0.0, 0.0], [1.0, 0.0]]), np.zeros(2), np.zeros(2), 3.0), [0.0, 0.0], 0.0)
 
 
 _crown_case()
 
 # --- test case 5 ---
-# a cycle, a nonzero diagonal, a column sum above 1 + 1e-12, 31 nuclides, an empty network, a scalar source or a 2-D n0, sum(n0) + t sum(source) above 1e100, negative production, a NaN initial amount or a bad time,
-# a negative decay constant, a negative branching entry or an infinite production rate raise ValueError
+# each stated error rule once, at its boundary where it has one: a cycle, a nonzero diagonal, a column sum of
+# 1 + 1e-9, a negative branching entry, a decay constant just above 1e10, a time just above 1e20,
+# sum(n0) + t sum(source) = 1.01e101 (just above 1e100), 31 nuclides and a branching matrix of the wrong
+# shape raise ValueError
 import numpy as np
 
 
@@ -273,21 +277,144 @@ def _crown_case():
     import numpy as np
     _t_cyc = np.array([[0.0, 1.0], [1.0, 0.0]])
     _t_diag = np.array([[0.5, 0.0], [0.5, 0.0]])
-    _t_over = np.array([[0.0, 0.0], [1.2, 0.0]])
     _t_ok = np.array([[0.0, 0.0], [1.0, 0.0]])
     for _t_bad in ((np.ones(2), _t_cyc, np.zeros(2), np.ones(2), 1.0), (np.ones(2), _t_diag, np.zeros(2), np.ones(2), 1.0),
-                   (np.ones(2), _t_over, np.zeros(2), np.ones(2), 1.0), (np.ones(2), _t_ok, np.array([0.0, -1.0]), np.ones(2), 1.0),
-                   (np.ones(2), _t_ok, np.zeros(2), np.ones(2), float("nan")), (np.array([2e10, 1.0]), _t_ok, np.zeros(2), np.ones(2), 1.0), (np.ones(2), _t_ok, np.zeros(2), np.ones(2), 2e20), (np.ones(2), np.array([[0.0, 0.0], [1.0 + 1e-9, 0.0]]), np.zeros(2), np.ones(2), 1.0), (np.ones(31), np.zeros((31, 31)), np.zeros(31), np.ones(31), 1.0), (np.array([]), np.zeros((0, 0)), np.array([]), np.array([]), 1.0), (np.ones(2), _t_ok, np.array(0.5), np.ones(2), 1.0), (np.ones(2), _t_ok, np.zeros(2), np.ones((2, 1)), 1.0), (np.zeros(1), np.zeros((1, 1)), np.array([1e90]), np.zeros(1), 1e20), (np.zeros(1), np.zeros((1, 1)), np.array([1e81]), np.zeros(1), 1e20), (np.ones(2), np.zeros((3, 3)), np.zeros(2), np.ones(2), 1.0),
-                   (np.ones(2), _t_ok, np.zeros(2), np.array([1.0, np.nan]), 1.0),
-                   (np.array([-1.0, 1.0]), _t_ok, np.zeros(2), np.ones(2), 1.0),
+                   (np.ones(2), np.array([[0.0, 0.0], [1.0 + 1e-9, 0.0]]), np.zeros(2), np.ones(2), 1.0),
                    (np.ones(2), np.array([[0.0, -0.1], [1.0, 0.0]]), np.zeros(2), np.ones(2), 1.0),
-                   (np.ones(2), _t_ok, np.array([np.inf, 0.0]), np.ones(2), 1.0)):
+                   (np.array([1.0001e10, 1.0]), _t_ok, np.zeros(2), np.ones(2), 1.0),
+                   (np.ones(2), _t_ok, np.zeros(2), np.ones(2), 1.0001e20),
+                   (np.zeros(1), np.zeros((1, 1)), np.array([1.01e81]), np.zeros(1), 1e20),
+                   (np.ones(31), np.zeros((31, 31)), np.zeros(31), np.ones(31), 1.0),
+                   (np.ones(2), np.zeros((3, 3)), np.zeros(2), np.ones(2), 1.0)):
         try:
             network_inventory(*_t_bad)
         except ValueError:
             pass
         else:
             raise AssertionError("network_inventory must raise ValueError for %r" % (_t_bad,))
+
+
+_crown_case()
+
+# --- test case 6 ---
+# a diamond network given out of topological order: 0 decays to 1 (40 %) and 2 (60 %), both decay to 3
+# (all of 1, 70 % of 2; 30 % of the decays of 2 leave the network), and 3 decays to stable 4; from 0 alone,
+# every amount is the sum over the decay paths that reach it of the product of the fractions times the
+# Bateman amount of the linear chain along the path (600 digits); the atoms lost are 30 % of the decays of 2
+import numpy as np
+
+
+def _crown_case():
+    import mpmath as _t_mp
+
+    def _t_rel(a, b):
+        return abs(a - b) / abs(b)
+
+    def _t_bateman_last(lam, t, dps=600):
+        # last member of a linear chain with distinct decay constants, one atom initially in the first member
+        with _t_mp.workdps(dps):
+            lam = [_t_mp.mpf(float(x)) for x in lam]
+            t = _t_mp.mpf(float(t))
+            k = len(lam) - 1
+            tot = _t_mp.mpf(0)
+            for i in range(k + 1):
+                tot += _t_mp.exp(-lam[i] * t) / _t_mp.fprod([lam[l] - lam[i] for l in range(k + 1) if l != i])
+            return _t_mp.fprod(lam[:k]) * tot
+
+    def _t_check(x, target, scale):
+        x = np.asarray(x, dtype=float).reshape(len(target))
+        for a, b in zip(x, target):
+            if b >= max(1e-250 * scale, 1e-300):
+                assert _t_rel(a, b) < 1e-10, (a, b)
+            else:
+                assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)
+
+    # physical nuclides 0..4 (decay constants per s) stored at the positions pos[0..4]
+    rate = [1e-3, 0.7, 2.5e-2, 3.0, 0.0]
+    edges = {(0, 1): 0.4, (0, 2): 0.6, (1, 3): 1.0, (2, 3): 0.7, (3, 4): 1.0}
+    paths = {0: [[0]], 1: [[0, 1]], 2: [[0, 2]], 3: [[0, 1, 3], [0, 2, 3]], 4: [[0, 1, 3, 4], [0, 2, 3, 4]]}
+    pos = [3, 0, 4, 1, 2]
+    lam = np.zeros(5)
+    B = np.zeros((5, 5))
+    for p in range(5):
+        lam[pos[p]] = rate[p]
+    for (a, b), f in edges.items():
+        B[pos[b], pos[a]] = f
+    n0 = np.zeros(5)
+    n0[pos[0]] = 2.0
+    for _t_t in (10.0, 1e3, 1e5):
+        with _t_mp.workdps(600):
+            amounts = []
+            for p in range(5):
+                tot = _t_mp.mpf(0)
+                for path in paths[p]:
+                    frac = _t_mp.fprod([_t_mp.mpf(edges[(path[m], path[m + 1])]) for m in range(len(path) - 1)])
+                    tot += frac * _t_bateman_last([rate[q] for q in path], _t_t)
+                amounts.append(2 * tot)
+            lost = _t_mp.mpf("0.3") * (_t_mp.mpf("0.6") * (2 - amounts[0]) - amounts[2])
+            target = [0.0] * 5
+            for p in range(5):
+                target[pos[p]] = float(amounts[p])
+            total = float(2 - lost)
+        x = network_inventory(lam, B, np.zeros(5), n0, _t_t)
+        _t_check(x, target, 2.0)
+        # balance: the atoms still in the network are the initial ones minus 30 % of the decays of nuclide 2
+        assert _t_rel(float(np.sum(x)), total) < 1e-10, (float(np.sum(x)), total)
+
+
+_crown_case()
+
+# --- test case 7 ---
+# a chain 0 -> 1 -> 2 -> 3 (3 decays out of the network) with one initial atom in member 0 and a constant
+# production q = 5e-3 per unit time into member 0: the production acts as a parent of decay constant 0
+# feeding member 0 at the rate q, so each amount is a Bateman sum that includes the rate 0 (600 digits),
+# plus the Bateman amount of the initial atom; at long times (lam t >= 200 for every member) each member
+# reaches the saturation amount q / lam, where its decay rate equals the production rate
+import numpy as np
+
+
+def _crown_case():
+    import mpmath as _t_mp
+
+    def _t_rel(a, b):
+        return abs(a - b) / abs(b)
+
+    def _t_check(x, target, scale):
+        x = np.asarray(x, dtype=float).reshape(len(target))
+        for a, b in zip(x, target):
+            if b >= max(1e-250 * scale, 1e-300):
+                assert _t_rel(a, b) < 1e-10, (a, b)
+            else:
+                assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)
+
+    def _t_bateman_sum(rates, k, t):
+        # sum_i exp(-r_i t) / prod_{l != i} (r_l - r_i) over the first k + 1 rates (distinct), 600 digits
+        tot = _t_mp.mpf(0)
+        for i in range(k + 1):
+            tot += _t_mp.exp(-rates[i] * t) / _t_mp.fprod([rates[l] - rates[i] for l in range(k + 1) if l != i])
+        return tot
+
+    lam = np.array([2e-3, 5e-2, 1e-1, 3e-2])
+    B = np.diag(np.ones(3), -1)
+    q = np.array([5e-3, 0.0, 0.0, 0.0])
+    n0 = np.array([1.0, 0.0, 0.0, 0.0])
+    for _t_t in (10.0, 300.0, 1e5):
+        with _t_mp.workdps(600):
+            r = [_t_mp.mpf(float(v)) for v in lam]
+            T = _t_mp.mpf(_t_t)
+            Q = _t_mp.mpf(float(q[0]))
+            target = []
+            for k in range(4):
+                pre = _t_mp.fprod(r[:k]) if k > 0 else _t_mp.mpf(1)
+                from_atom = pre * _t_bateman_sum(r, k, T)
+                from_source = Q * pre * _t_bateman_sum([_t_mp.mpf(0)] + r, k + 1, T)
+                target.append(float(from_atom + from_source))
+        x = network_inventory(lam, B, q, n0, _t_t)
+        _t_check(x, target, 1.0 + _t_t * 5e-3)
+    # saturation: lam[k] x[k] = q for every member once lam t >= 200
+    x = network_inventory(lam, B, q, n0, 1e5)
+    for k in range(4):
+        assert _t_rel(lam[k] * float(np.asarray(x, dtype=float).reshape(4)[k]), 5e-3) < 1e-10, (k, x)
 
 
 _crown_case()

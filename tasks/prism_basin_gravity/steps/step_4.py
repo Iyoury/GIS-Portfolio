@@ -16,11 +16,11 @@ def invert_basin_depths(x_edges, y_edges, gz_obs, drho0, lam):
       lam: float, 0 <= lam <= 1e-2 (per m).
 
     Output:
-      depths: numpy array (nx, ny) in m, each with a relative error below 1e-8.
+      depths: numpy array (nx, ny) in m (also when nx or ny is 1), each with a relative error below 1e-8.
 
     Raises:
-      ValueError for invalid edges, nx ny > 100, gz_obs of the wrong shape or non-finite, drho0 zero or
-      non-finite, lam outside [0, 1e-2], an observation without the sign of drho0, or (lam > 0) an
-      observation of at least 2 pi G |drho0| / lam.
+      ValueError for invalid edges, nx ny > 100, gz_obs of the wrong shape, drho0 = 0, lam outside
+      [0, 1e-2], an observation without the sign of drho0, or (lam > 0) an observation of at least
+      2 pi G |drho0| / lam.
     """
     raise NotImplementedError

@@ -7,7 +7,7 @@
 # mpmath (case 2); and the Sommerfeld expansion of the degenerate gas in 60-digit mpmath (case 3).
 # The complete equation of state of a carbon-oxygen white-dwarf interior (rho = 2e6 g cm^-3, T = 1e9 K,
 # Ye = 0.5) and of a pair plasma (rho = 1e-3 g cm^-3, T = 1e10 K, Ye = 0.5), against 40-digit targets;
-# the result is a dict with exactly the seven keys
+# the result is a dict with exactly the seven keys, whose values are Python floats
 import numpy as np
 
 
@@ -25,13 +25,13 @@ def _crown_case():
 
     def _t_check5(args, target):
         out = electron_positron_eos(*args)
-        assert isinstance(out, dict) and set(out) == set(_T_KEYS), out
+        assert isinstance(out, dict) and set(out) == set(_T_KEYS) and all(type(v) is float for v in out.values()), out
         for k, want in zip(_T_KEYS, target):
             tol = 1e-8 if k == "cv" else 1e-10
             if k == "n_plus" and want < 1e-250:
-                assert type(out[k]) is float and abs(out[k] - want) <= 1e-250, (args, k, out[k], want)
+                assert abs(out[k] - want) <= 1e-250, (args, k, out[k], want)
             else:
-                assert type(out[k]) is float and _t_rel(out[k], want) < tol, (args, k, out[k], want)
+                assert _t_rel(out[k], want) < tol, (args, k, out[k], want)
 
     for _t_args, _t_v in _T_EOS.items():
         _t_check5(_t_args, [float(x) for x in _t_v])
@@ -63,9 +63,9 @@ def _crown_case():
         for k, want in zip(_T_KEYS, target):
             tol = 1e-8 if k == "cv" else 1e-10
             if k == "n_plus" and want < 1e-250:
-                assert type(out[k]) is float and abs(out[k] - want) <= 1e-250, (args, k, out[k], want)
+                assert abs(out[k] - want) <= 1e-250, (args, k, out[k], want)
             else:
-                assert type(out[k]) is float and _t_rel(out[k], want) < tol, (args, k, out[k], want)
+                assert _t_rel(out[k], want) < tol, (args, k, out[k], want)
 
     for _t_args, _t_v in _T_EOS.items():
         _t_check5(_t_args, [float(x) for x in _t_v])
@@ -81,9 +81,11 @@ _crown_case()
 # n_minus, n_plus = B e^{+-psi}, P = (n_minus + n_plus) k T, <eps> = E / N,
 # u = m_e c^2 [(n_minus + n_plus) <eps> - rho Ye N_A], s = k [(n_minus + n_plus) (<eps> / theta + 1)
 # - psi rho Ye N_A] and c_V = (2 k / (pi^2 lambda^3 theta^2)) [F cosh psi - (E^2 / N) tanh psi sinh psi];
-# rho = 2e-10 g cm^-3, T = 1.4e8 K, Ye = 0.5 (psi about 9.8; pair creation adds 1.5e-5 to c_V) and
-# rho = 1e-8 g cm^-3, T = 1.2e8 K, Ye = 1 (psi about 21.7). The closed forms agree with the exact
-# Bessel-function series of the Fermi-Dirac integrals within 4e-13.
+# rho = 2e-10 g cm^-3, T = 1.4e8 K, Ye = 0.5 (psi about 9.8; pair creation adds 1.5e-5 to c_V),
+# rho = 1e-8 g cm^-3, T = 1.2e8 K, Ye = 1 (psi about 21.7) and a pair plasma at rho = 2e-10 g cm^-3,
+# T = 2e8 K, Ye = 0.5 (psi about 0.0156, 0.97 positrons per electron, c_V 3.9e4 times that of the electrons
+# alone). The closed forms agree with the exact Bessel-function series of the Fermi-Dirac integrals within
+# 4e-13.
 import numpy as np
 
 
@@ -101,7 +103,7 @@ def _crown_case():
 
     _T_KEYS = ("psi", "n_minus", "n_plus", "P", "u", "s", "cv")
 
-    for _t_rho, _t_T, _t_Ye in ((2e-10, 1.4e8, 0.5), (1e-8, 1.2e8, 1.0)):
+    for _t_rho, _t_T, _t_Ye in ((2e-10, 1.4e8, 0.5), (1e-8, 1.2e8, 1.0), (2e-10, 2e8, 0.5)):
         with _t_mp.workdps(40):
             _t_n = _t_mp.mpf(_t_rho) * _t_mp.mpf(_t_Ye) * _t_mp.mpf(_T_NA)
             _t_th = _t_mp.mpf(_T_KB) * _t_T / _t_mp.mpf(_T_MEC2)
@@ -127,7 +129,7 @@ def _crown_case():
         _t_out = electron_positron_eos(_t_rho, _t_T, _t_Ye)
         for _t_k, _t_w in zip(_T_KEYS, _t_want):
             _t_tol = 1e-8 if _t_k == "cv" else 1e-10
-            assert type(_t_out[_t_k]) is float and _t_rel(_t_out[_t_k], _t_w) < _t_tol, (_t_rho, _t_T, _t_Ye, _t_k, _t_out[_t_k], _t_w)
+            assert _t_rel(_t_out[_t_k], _t_w) < _t_tol, (_t_rho, _t_T, _t_Ye, _t_k, _t_out[_t_k], _t_w)
 
 
 _crown_case()
@@ -162,9 +164,9 @@ def _crown_case():
         for k, want in zip(_T_KEYS, target):
             tol = 1e-8 if k == "cv" else 1e-10
             if k == "n_plus" and want < 1e-250:
-                assert type(out[k]) is float and abs(out[k] - want) <= 1e-250, (args, k, out[k], want)
+                assert abs(out[k] - want) <= 1e-250, (args, k, out[k], want)
             else:
-                assert type(out[k]) is float and _t_rel(out[k], want) < tol, (args, k, out[k], want)
+                assert _t_rel(out[k], want) < tol, (args, k, out[k], want)
 
     for _t_args, _t_v in _T_EOS.items():
         _t_check5(_t_args, [float(x) for x in _t_v])
@@ -193,7 +195,7 @@ def _crown_case():
     _t_out = electron_positron_eos(1e6, 1e9, 1.0)
     for _t_k, _t_want in zip(_T_KEYS, _T_WANT):
         _t_tol = 1e-8 if _t_k == "cv" else 1e-10
-        assert type(_t_out[_t_k]) is float and _t_rel(_t_out[_t_k], _t_want) < _t_tol, (_t_k, _t_out[_t_k], _t_want)
+        assert _t_rel(_t_out[_t_k], _t_want) < _t_tol, (_t_k, _t_out[_t_k], _t_want)
 
 
 _crown_case()
@@ -225,9 +227,9 @@ def _crown_case():
         for _t_k, _t_want in zip(_T_KEYS, _t_target):
             _t_tol = 1e-8 if _t_k == "cv" else 1e-10
             if _t_k == "n_plus" and _t_want < 1e-250:
-                assert type(_t_out[_t_k]) is float and abs(_t_out[_t_k] - _t_want) <= 1e-250, (_t_args, _t_k, _t_out[_t_k], _t_want)
+                assert abs(_t_out[_t_k] - _t_want) <= 1e-250, (_t_args, _t_k, _t_out[_t_k], _t_want)
             else:
-                assert type(_t_out[_t_k]) is float and _t_rel(_t_out[_t_k], _t_want) < _t_tol, (_t_args, _t_k, _t_out[_t_k], _t_want)
+                assert _t_rel(_t_out[_t_k], _t_want) < _t_tol, (_t_args, _t_k, _t_out[_t_k], _t_want)
 
 
 _crown_case()

@@ -118,7 +118,10 @@ values (k, N_A).
   kT, u = m_e c^2 [(n_- + n_+) E/N - n_net], s = k [(n_- + n_+)(E/(N theta) + 1) - psi n_net] and
   c_V = (2k/(pi^2 lambda^3 theta^2)) [F cosh psi - (E^2/N) tanh psi sinh psi] (N, E, F the three moments
   above at a = 1/theta). Used where the electron occupation exponent exceeds 27; the closed forms then agree
-  with the exact Bessel series within 3.3e-13.
+  with the exact Bessel series within 3.3e-13. This includes classical pair plasmas at T = 2e8 K (steps 1
+  and 2 at psi = 0.0156, steps 3 and 4 at rho_Ye = 1e-10, 1e-9 and 1e-8 g cm^-3, step 5 at (2e-10, 2e8,
+  0.5)), with up to 0.97 positrons per electron and occupation exponents above 28.4, where the closed forms
+  agree with the series within 1.6e-13.
 - **General case 1** (version 4) has no stored target. At (rho, T, Ye) = (1e6, 3e9, 0.5) it checks
   identities of the returned equation of state (charge neutrality, the Euler relation, c_V = du/dT =
   T ds/dT at constant rho Ye), each within its first-order error budget (see Version 4).
@@ -605,51 +608,68 @@ the finding, its cause, the change, the regression test and what was rerun.
     raise, 6 of them stated in the prompt and counted at half weight) and computed values 1 times."
   - Cause: step 4 had one computed-value case (twelve states in one loop) and one validation case. Steps 2,
     3 and 5 had the same pattern (one or two computed cases, each with a single assertion over many states,
-    plus separate type/shape assertions), so their counts were close too.
-  - Change (counts are assertion sites; a raise entry stated in the prompt counts one half):
-    - Step 4 (computed 1 / validation 3 before; 7 / 2 after): new case 0, classical gas without pairs at
-      (rho_Ye, T) = (1e-10, 1e7), (1e-10, 1e8), (1e-8, 1.2e8): c_V = n k d/dtheta [K1(1/theta)/K2(1/theta)
-      + 3 theta] in closed form, evaluated in the test; new case 1, classical gas with thermal pairs at
-      T = 1.4e8 K, rho_Ye = 1e-10 and 1e-9 (pair creation raises c_V by 1.5e-5 and 1.5e-7), closed form
-      evaluated in the test; new case 2, Sommerfeld targets at (1e13, 1e9), (2e6, 1e7), (1e11, 5e7); new
-      case 3, Bessel-series targets at (1e-10, 1e9) and (1e4, 2e9) (Fermi-Dirac corrections 1.2e-3 and
-      1.6e-2 of c_V); the twelve 40-digit states split by regime into cases 4 (five degenerate gases), 5
-      (five pair plasmas) and 6 (two partly degenerate or classical gases). n_test_cases 2 -> 8.
-    - Step 3 (computed 2 / validation 3 before; 6 / 2 after): new case 1, Sommerfeld psi at the same three
-      degenerate states; new case 2, Bessel-series psi at the same two pair plasmas; the twelve 40-digit
-      states split into cases 3 (degenerate), 4 (pair plasmas) and 5 (partly degenerate or classical).
-      n_test_cases 3 -> 7.
-    - Step 2 (computed 2 / validation 5 before, of which 2 type/shape assertions; 18 / 8 after, of which 6
-      type/shape assertions in the six computed cases): P, u and s are now asserted separately; new case 1,
-      Sommerfeld P, u, s at (T, psi) = (3e7, 2e4), (1e9, 300), (5e9, 200); new case 2, Bessel-series P, u, s
-      at (1e9, 1) and (2e9, 0.3) (Fermi-Dirac corrections 6e-4 to 1.1e-2); the twelve 40-digit states split
-      into cases 3 (degenerate), 4 (pair plasmas) and 5 (classical and partly degenerate). n_test_cases
-      3 -> 7.
-    - Step 5 (computed 5 / validation 10.5 before, of which 6 type/shape assertions; 10 / 3.5 after): the
-      Python-float check is folded into each value assertion and the exact key set is checked once (case
-      0); the four 40-digit states split into cases 0 and 1; new case 2, the complete equation of state of
-      a classical gas with thermal pairs in closed form, evaluated in the test, at (rho, T, Ye) =
-      (2e-10, 1.4e8, 0.5) and (1e-8, 1.2e8, 1); new case 3, Sommerfeld targets for all seven quantities
-      at (2e13, 1e9, 0.5) and (4e6, 1e7, 0.5). n_test_cases 4 -> 7.
-    - Step 1 (computed 14 / validation 6.5 before; 14 / 5 after) and the general tests (two computed cases,
-      no validation) needed no new case.
+    while the type/shape check was repeated in every case), so their counts were close too.
+  - Change (counts are assertion sites; a raise entry stated in the prompt counts one half; the type/shape
+    contract of each function is now asserted once per step, in its case 0, instead of in every case):
+    - Step 4 (computed 1 / validation 3 before; 8 / 3 after, of which 1 type check and 4 raise entries):
+      case 0, classical gas without pairs at (rho_Ye, T) = (1e-10, 1e7), (1e-10, 1e8), (1e-8, 1.2e8):
+      c_V = n k d/dtheta [K1(1/theta)/K2(1/theta) + 3 theta] in closed form, evaluated in the test; case 1,
+      classical gas with thermal pairs at T = 1.4e8 K, rho_Ye = 1e-10 and 1e-9 (pair creation raises c_V by
+      1.5e-5 and 1.5e-7), closed form evaluated in the test; case 2, a classical pair plasma at T = 2e8 K,
+      rho_Ye = 1e-10, 1e-9, 1e-8 (0.97, 0.73 and 0.086 positrons per electron, c_V 3.9e4, 3.8e3 and 210
+      times that of the electrons alone), same closed form; case 3, Sommerfeld targets at (1e13, 1e9),
+      (2e6, 1e7), (1e11, 5e7); case 4, Bessel-series targets at (1e-10, 1e9) and (1e4, 2e9) (Fermi-Dirac
+      corrections 1.2e-3 and 1.6e-2 of c_V); the twelve 40-digit states split by regime into cases 5 (five
+      degenerate gases), 6 (five pair plasmas) and 7 (two partly degenerate or classical gases).
+      n_test_cases 2 -> 9.
+    - Step 3 (computed 2 / validation 3 before, plus the type check folded into both computed asserts;
+      7 / 3 after, of which 1 type check and 4 raise entries): case 1, classical pair plasma at T = 2e8 K,
+      psi = asinh(rho_Ye N_A / 2B) in closed form at rho_Ye = 1e-10, 1e-9, 1e-8 (solving n_minus = rho_Ye
+      N_A instead puts psi off by up to a factor 220); case 2, Sommerfeld psi at the three degenerate states
+      of step 4; case 3, Bessel-series psi at the two pair plasmas of step 4; the twelve 40-digit states split
+      into cases 4 (degenerate), 5 (pair plasmas) and 6 (partly degenerate or classical). n_test_cases
+      3 -> 8.
+    - Step 2 (computed 2 / validation 5 before, of which 2 type/shape assertions; 18 / 3 after, of which 1
+      type/shape assertion and 4 raise entries): P, u and s are asserted separately; case 0 gains a classical
+      pair plasma at (T, psi) = (2e8, 0.0156) (0.97 positrons per electron); new case 1, Sommerfeld P, u, s
+      at (3e7, 2e4), (1e9, 300), (5e9, 200); new case 2, Bessel-series P, u, s at (1e9, 1) and (2e9, 0.3)
+      (Fermi-Dirac corrections 6e-4 to 1.1e-2); the twelve 40-digit states split into cases 3 (degenerate),
+      4 (pair plasmas) and 5 (classical and partly degenerate). n_test_cases 3 -> 7.
+    - Step 5 (computed 5 / validation 10.5 before, of which 6 type/shape assertions; 10 / 3.5 after, of
+      which 1 contract assertion (exact key set, Python-float values) and 5 raise entries): the four
+      40-digit states split into cases 0 and 1; new case 2, the complete equation of state of classical
+      gases with thermal pairs in closed form, evaluated in the test, at (rho, T, Ye) = (2e-10, 1.4e8, 0.5),
+      (1e-8, 1.2e8, 1) and the pair plasma (2e-10, 2e8, 0.5); new case 3, Sommerfeld targets for all seven
+      quantities at (2e13, 1e9, 0.5) and (4e6, 1e7, 0.5). n_test_cases 4 -> 7.
+    - Step 1 (computed 14 / validation 6.5 before; 14 / 3 after, of which 1 type/shape assertion and 4 raise
+      entries): case 0 gains the classical pair plasma (2e8, 0.0156). The general tests (two computed
+      cases, four computed assertions, no validation) needed no change.
   - Target provenance: the new targets come from the Sommerfeld expansion, the Bessel series and the
     classical closed forms described under Targets; none uses the reference or the second solution. The
     reference agrees with them to 1.6e-14 (Sommerfeld and Bessel targets) and 3.3e-13 (classical closed
-    forms, which omit Fermi corrections up to 3.2e-13); the second solution to 9.3e-15 and 3.3e-13. The
-    generator scripts (mpmath) were kept outside the task folder.
+    forms, which omit Fermi corrections up to 3.2e-13); the second solution to 9.3e-15 and 3.3e-13. At the
+    T = 2e8 K pair plasmas the closed forms agree with the exact Bessel series within 1.6e-13, and both
+    solutions agree with the series within 8.5e-15. The generator scripts (mpmath) were kept outside the
+    task folder.
   - Regression test: each new case rejects at least one shipped mutant or control: entropy_from_euler fails
-    step 2 cases 1 and 3; positrons_ignored fails step 3 cases 2, 4 and 5; positron_fluctuations_ignored
-    fails step 4 cases 1, 3, 5 and 6; schur_complement fails step 4 case 4; cv_at_fixed_psi fails step 5
+    step 2 cases 1 and 3; positrons_ignored fails step 3 cases 1, 3, 5 and 6; positron_fluctuations_ignored
+    fails step 4 cases 1, 2, 4, 6 and 7; schur_complement fails step 4 case 5; cv_at_fixed_psi fails step 5
     cases 0-5; all-None and all-zero controls pass no case.
+  - Scientific grounding and stated requirements (checked, no change needed): no output with a relative
+    accuracy requirement can be exactly zero (n_minus, P, u, s, psi and c_V are positive on the whole
+    domain; n_plus and n_net have the absolute 1e-250 cm^-3 rule below 1e-250 cm^-3, exercised in step 1
+    case 4 and step 5 case 5); every stated output form is asserted once per step (a tuple of three Python
+    floats, a Python float, a dict with exactly seven keys of Python floats); the inclusive endpoints are
+    exercised with values: T = 1e7 and 1e11 K and psi = 1e6 (steps 1 and 2), rho_Ye = 1e-10 and 1e13 g cm^-3
+    at T = 1e7 and 1e11 K (steps 3 and 4), Ye = 1 and rho Ye = 1e-10 and 1e13 g cm^-3 (step 5).
 - Rerun after these changes:
   - tools/crown_check.py, all modes, every case alone in a fresh process, one BLAS/OpenMP thread, -j 2:
-    - FORMAT OK.
-    - REF: steps 1-5 pass 5/5, 7/7, 7/7, 8/8 and 7/7, general passes 2/2.
+    - FORMAT OK (no non-finite literal in tests/, nothing before the first case marker).
+    - REF: steps 1-5 pass 5/5, 7/7, 8/8, 9/9 and 7/7, general passes 2/2.
     - SECOND: steps 1-5 and general all pass.
     - Mutants: net_by_subtraction fails 3/5 (cases 1, 2, 4), entropy_from_euler 2/7 (cases 1, 3),
-      positrons_ignored 3/7 (cases 2, 4, 5), schur_complement 1/8 (case 4), positron_fluctuations_ignored
-      4/8 (cases 1, 3, 5, 6), cv_at_fixed_psi 6/7 (cases 0-5) and whole_task_classical_occupation 1/2
+      positrons_ignored 4/8 (cases 1, 3, 5, 6), schur_complement 1/9 (case 5), positron_fluctuations_ignored
+      5/9 (cases 1, 2, 4, 6, 7), cv_at_fixed_psi 6/7 (cases 0-5) and whole_task_classical_occupation 1/2
       general (case 0).
     - SHIFT +-1e-12: every step case and every general case pass.
     - Controls: all-None and all-zero pass 0 cases of every step and of general.

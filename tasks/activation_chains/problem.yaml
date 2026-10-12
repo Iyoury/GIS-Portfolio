@@ -42,7 +42,7 @@ metadata:
     Taylor series of a nonnegative matrix, and each squaring E -> E E only adds nonnegative products while
     the diagonal is reset to its exact value exp(-lam tau 2**level). network_inventory applies the same
     scheme to the rate matrix augmented by one constant source state, after checking acyclicity with Kahn's
-    algorithm. activation_inventory turns each period of the history into a branching network with total
+    algorithm and dividing every branching column whose sum lies in (1, 1 + 1e-12] by that sum. activation_inventory turns each period of the history into a branching network with total
     removal rates lam + sigma 1e-24 phi and fractions that combine decay branching and capture, and chains
     network_inventory over the periods. monitor_flux checks the domain rule
     x[k](flux_lo) >= max(1e-250 sum(n0), 1e-300) and the end rule |ln(activity / A(end))| <= 1e-9 (flux_lo first) in logarithms, then solves
@@ -52,12 +52,18 @@ metadata:
     Independent targets are closed forms (single decay, Erlang amounts for equal decay constants,
     saturation with production, two-way branching, burnup exp(-sigma phi t) down to exp(-600), inventories
     of 1e-70 atoms on both sides of the floor 1e-300 of the relative rule, a combined rate of exactly 1e10
-    per s), the Bateman sum evaluated in 600-digit mpmath arithmetic for linear chains
-    with distinct constants (the 15-member 238U series at 1 y, 1e4 y, 3e5 y and 1e9 y, a 30-member chain of
-    successive captures in step 3, and the 238U(n,gamma)239U -> 239Np -> 239Pu capture branch of the
-    whole-task test), and mpmath's matrix exponential at 300 digits for branching networks with production
-    and for every period of an irradiation history. The flux-inversion tests regenerate the activity from
-    these 300-digit or 600-digit forward models (the flux is the input of the round trip), and the
+    per s, a stable member stopping a chain, two-member activation with burnup of target and product
+    including equal removal rates, decay competing with capture, histories propagated period by period),
+    analytic limits and identities (saturation activity equal to the production rate, conservation of the
+    atoms, normalized branching columns), the Bateman sum evaluated in 600-digit mpmath arithmetic for
+    linear chains with distinct constants (the 15-member 238U series at 1 y, 1e4 y, 3e5 y and 1e9 y, the
+    232Th series, a constant production treated as a parent of decay constant 0, the decay paths of a
+    diamond network, a 30-member chain of successive captures in steps 3 and 4, and the
+    238U(n,gamma)239U -> 239Np -> 239Pu capture branch of the whole-task test), and mpmath's matrix
+    exponential at 300 digits for branching networks with production and for every period of an
+    irradiation history. The flux-inversion tests regenerate the activity from these 300-digit or
+    600-digit forward models or from the closed-form cobalt activity (the flux is the input of the round
+    trip), check the power laws A ~ phi and A ~ phi**2 of one- and two-capture products at low flux, and the
     end-tolerance tests locate the boundary activities |ln(activity / A(end))| = 1e-9 -+ 1e-10 with 60-digit
     logarithms. Every case of tests/general.py calls monitor_flux: case 0 recovers the flux from the 239Np
     activity of the irradiated 238U series (once from the 600-digit target, once from an activity predicted
@@ -69,7 +75,7 @@ metadata:
     (the magnitudes of the cancelling terms are carried along) and the precision raised until that bound
     is below 1e-14 of every amount or of the floor, instead of the reference's nonnegative scaling and
     squaring and of the tests' mpmath expm; and bisection on ln flux followed by secant steps instead of
-    brentq. It agrees with the reference to 3.7e-14 on 120 random networks with production (2 to 30
+    brentq. It agrees with the reference to 2.7e-14 on 120 random networks with production (2 to 30
     nuclides, including equal and nearly equal rates), to 2.8e-15 on 30 networks with inventories scaled
     to 1e-280 to 1e-50 and to 2.2e-16 on 30 networks over times of 1e-250 to 1e-20. Each step has named scientific mutants (Bateman sum in double precision, squared diagonal in
     scaling and squaring for the chain and for the network, transposed branching matrix, barns converted
@@ -109,13 +115,13 @@ problem_io: |-
       Inputs:
         lam: 1-D array of n decay constants in 1/s (1 <= n <= 30), 0 <= lam[i] <= 1e10.
         branching: (n, n) array, branching[j, i] = fraction of the decays of nuclide i that give nuclide j;
-                   nonnegative, zero diagonal, column sums at most 1 + 1e-12.
+                   nonnegative, zero diagonal, column sums at most 1 + 1e-12 (normalized as in step 2).
         sigma: 1-D array of n radiative-capture cross sections in barns, sigma[i] = 0 or 1e-6 <= sigma[i] <= 1e7.
         capture_to: 1-D integer array of n entries, the nuclide made by a capture on nuclide i, or -1 if
                     it is not followed; never i itself.
         n0: 1-D array of n initial numbers of atoms, nonnegative, sum(n0) <= 1e100.
-        All values finite; the combined decay and capture network must be acyclic, exactly as in
-        activation_inventory (step 3).
+        The combined decay and capture network must be acyclic, exactly as in activation_inventory
+        (step 3).
         t_irr: irradiation time in s at a constant unknown flux, 0 < t_irr <= 1e9.
         t_cool: cooling time in s without flux after the irradiation, 0 <= t_cool <= 1e9.
         k: int, index of the measured nuclide, with lam[k] > 0.
@@ -130,7 +136,7 @@ problem_io: |-
 
       Raises:
         ValueError for nuclide data as in step 3, for times, k, activity or flux bounds outside these
-        ranges (NaN and infinite values included), if A(flux_lo) < lam[k] * max(1e-250 * sum(n0), 1e-300)
+        ranges, if A(flux_lo) < lam[k] * max(1e-250 * sum(n0), 1e-300)
         (at flux_lo the measured nuclide must hold at least 1e-250 of the initial atoms and at least 1e-300
         atoms; for x[k](flux_lo) within a relative 1e-10 of this bound, the accuracy of step 3,
         ValueError and a result are both correct), or if activity lies outside [A(flux_lo), A(flux_hi)]
@@ -172,8 +178,8 @@ sub_steps:
       Inputs: lam and n0, 1-D arrays of the same length n (1 <= n <= 30), with 0 <= lam[i] <= 1e10 and
       n0 >= 0 with sum(n0) <= 1e100; t with 0 <= t <= 1e20 (lam and t in consistent units).
       Errors: raise ValueError if lam and n0 are not 1-D arrays of the same length in [1, 30], if a decay
-      constant is negative, above 1e10 or not finite, if an initial amount is negative or not finite, if
-      sum(n0) > 1e100, or if t is not finite or outside [0, 1e20].
+      constant is negative or above 1e10, if an initial amount is negative, if sum(n0) > 1e100, or if t is
+      outside [0, 1e20].
     function_header: |-
       def chain_inventory(lam, n0, t):
           '''Atoms of every member of a linear radioactive decay chain after a time t (Bateman problem).
@@ -191,8 +197,8 @@ sub_steps:
 
           Raises:
             ValueError if lam and n0 are not 1-D arrays of the same length between 1 and 30, if an entry of
-            lam is negative, above 1e10 or not finite, if an entry of n0 is negative or not finite, if
-            sum(n0) > 1e100, or if t is not finite or outside [0, 1e20].
+            lam is negative or above 1e10, if an entry of n0 is negative, if sum(n0) > 1e100, or if t is
+            outside [0, 1e20].
           '''
     return_line: return x
     step_background: |-
@@ -202,12 +208,12 @@ sub_steps:
       only relative to the largest entry. The exact solution is a positive combination of positive terms
       (the off-diagonal entries of M are nonnegative), so methods that keep every operation nonnegative
       can keep the relative accuracy of every entry.
-    n_test_cases: 7
+    n_test_cases: 9
     contract:
       quantity: "Numbers of atoms of the members of a linear radioactive decay chain after a time t."
       assumptions: "Constant decay constants, first-order kinetics, the last member decays out of the chain."
       result_kind: exact
-      valid_input_ranges: "1 <= n <= 30; 0 <= lam <= 1e10; n0 >= 0, sum(n0) <= 1e100; 0 <= t <= 1e20; all values finite."
+      valid_input_ranges: "1 <= n <= 30; 0 <= lam <= 1e10; n0 >= 0, sum(n0) <= 1e100; 0 <= t <= 1e20."
       units: "Atoms; lam and t in consistent units."
       output_shape: "numpy float array of shape (n,)."
       step_dependencies: []
@@ -226,8 +232,9 @@ sub_steps:
     step_description_prompt: |-
       Generalize the linear chain of step 1 to a branching network with constant production.
       - Nuclide i decays at the rate lam[i].
-      - A fraction branching[j, i] of its decays gives nuclide j. The column sums are at most 1 (sums up
-        to 1 + 1e-12 are accepted as rounding of 1); the rest leaves the network.
+      - A fraction branching[j, i] of its decays gives nuclide j. The column sums are at most 1; the rest
+        leaves the network. A column sum in (1, 1 + 1e-12] is accepted as rounding of 1, and that column
+        is divided by its sum before use, so that its fractions add up to exactly 1.
       - Nuclide i is also produced at the constant rate source[i] (atoms per unit time).
 
       The equations are dx_j/dt = -lam[j] x_j + sum_i branching[j, i] lam[i] x_i + source[j]. Return
@@ -238,12 +245,11 @@ sub_steps:
       F = max(1e-250 * S, 1e-300). Every entry of x whose exact value is at least F must have a relative
       error below 1e-10; every other entry, exact zeros included, must lie within F of the exact value.
       This includes amounts that are reached only through low-probability branches.
-      Inputs: lam, source, n0 (1-D, length n, 1 <= n <= 30), branching (n x n), t; all entries nonnegative
-      and finite, lam <= 1e10, 0 <= t <= 1e20, sum(n0) + t * sum(source) <= 1e100.
-      Errors: raise ValueError if the shapes are wrong, if an entry is negative or not finite, if a decay
-      constant exceeds 1e10, if a diagonal entry of branching is nonzero or a column sum exceeds
-      1 + 1e-12, if the network has a cycle, if t is not finite or outside [0, 1e20], or if
-      sum(n0) + t * sum(source) > 1e100.
+      Inputs: lam, source, n0 (1-D, length n, 1 <= n <= 30), branching (n x n), t; all entries nonnegative,
+      lam <= 1e10, 0 <= t <= 1e20, sum(n0) + t * sum(source) <= 1e100.
+      Errors: raise ValueError if the shapes are wrong, if an entry is negative, if a decay constant
+      exceeds 1e10, if a diagonal entry of branching is nonzero or a column sum exceeds 1 + 1e-12, if the
+      network has a cycle, if t is outside [0, 1e20], or if sum(n0) + t * sum(source) > 1e100.
     function_header: |-
       def network_inventory(lam, branching, source, n0, t):
           '''Atoms of every nuclide of a branching decay network with constant production after a time t.
@@ -251,8 +257,8 @@ sub_steps:
           Inputs:
             lam: 1-D array of n decay constants (1 <= n <= 30), 0 <= lam[i] <= 1e10 (per unit of time).
             branching: (n, n) array, branching[j, i] = fraction of the decays of nuclide i that give nuclide j;
-                       nonnegative, zero diagonal, column sums at most 1 + 1e-12 (1 up to rounding; the rest
-                       leaves the network). The
+                       nonnegative, zero diagonal, column sums at most 1 + 1e-12 (the rest leaves the network;
+                       a column whose sum lies in (1, 1 + 1e-12] is divided by its sum before use). The
                        directed graph with an edge i -> j wherever branching[j, i] > 0 must be acyclic.
             source: 1-D array of n constant production rates (atoms per unit of time), nonnegative.
             n0: 1-D array of n initial numbers of atoms, nonnegative.
@@ -264,9 +270,9 @@ sub_steps:
                below 1e-10; every other entry (exact zeros included) lies within F of the exact value.
 
           Raises:
-            ValueError if the arrays do not have these shapes (1 <= n <= 30), if an entry is negative or not
-            finite, if a decay constant exceeds 1e10, if a diagonal entry of branching is nonzero or a column
-            sum exceeds 1 + 1e-12, if the network has a cycle, if t is not finite or outside [0, 1e20], or if
+            ValueError if the arrays do not have these shapes (1 <= n <= 30), if an entry is negative, if a
+            decay constant exceeds 1e10, if a diagonal entry of branching is nonzero or a column sum exceeds
+            1 + 1e-12, if the network has a cycle, if t is outside [0, 1e20], or if
             sum(n0) + t * sum(source) > 1e100.
           '''
     return_line: return x
@@ -274,12 +280,12 @@ sub_steps:
       Real decay schemes branch (for example 214Bi decays to 214Po and in 0.02 % of cases to 210Tl), and
       nuclides are produced at constant rates in reactors, by cosmic rays or in accelerators. A source
       approaches the saturation amount source / lam.
-    n_test_cases: 6
+    n_test_cases: 8
     contract:
       quantity: "Numbers of atoms in an acyclic branching decay network with constant production after a time t."
-      assumptions: "First-order decay with branching fractions, constant production rates, acyclic network."
+      assumptions: "First-order decay with branching fractions (a column summing to more than 1, up to 1 + 1e-12, divided by its sum), constant production rates, acyclic network."
       result_kind: exact
-      valid_input_ranges: "1 <= n <= 30; lam, branching, source, n0 nonnegative and finite; lam <= 1e10; branching with zero diagonal, column sums <= 1 + 1e-12 and an acyclic graph; 0 <= t <= 1e20; sum(n0) + t * sum(source) <= 1e100."
+      valid_input_ranges: "1 <= n <= 30; lam, branching, source, n0 nonnegative; lam <= 1e10; branching with zero diagonal, column sums <= 1 + 1e-12 and an acyclic graph; 0 <= t <= 1e20; sum(n0) + t * sum(source) <= 1e100."
       units: "Atoms; rates and t in consistent units."
       output_shape: "numpy float array of shape (n,)."
       step_dependencies: []
@@ -299,7 +305,7 @@ sub_steps:
       Neutron activation. A sample is irradiated according to a history of periods (duration in s,
       neutron flux phi in neutrons / (cm^2 s)); a period with phi = 0 is cooling.
       - During a period, nuclide i decays as in network_inventory (step 2), with constant lam[i] in 1/s
-        and the given branching fractions.
+        and the given branching fractions (a column summing to more than 1 is normalized as in step 2).
       - It also captures neutrons at the rate sigma[i] * 1e-24 * phi, where sigma[i] is its
         radiative-capture cross section in barns.
       - A capture removes the atom (burnup) and makes nuclide capture_to[i], or a nuclide that is not
@@ -319,7 +325,7 @@ sub_steps:
         history: a list or tuple of (duration, flux) pairs, applied in order, with 0 <= duration <= 1e12 s and
                  0 <= flux <= 1e18.
       Errors: raise ValueError if:
-        - the shapes or ranges above are violated, or a value is not finite;
+        - the shapes or ranges above are violated;
         - capture_to is not an integer array with entries in [-1, n - 1], or capture_to[i] = i;
         - branching violates the conditions of step 2;
         - the combined network has a cycle (edges i -> j where branching[j, i] > 0, or where sigma[i] > 0
@@ -358,12 +364,12 @@ sub_steps:
       section in cm^2: 1 barn = 1e-24 cm^2, and fluxes are in neutrons per cm^2 per second. At high fluence
       the target and the products are burnt up by further captures; 198Au, with a cross section of
       25100 b, is a well-known case.
-    n_test_cases: 6
+    n_test_cases: 9
     contract:
       quantity: "Inventory of a sample after an irradiation history with neutron capture, burnup, decay and cooling."
       assumptions: "Constant flux within each period, one-group capture cross sections in barns, capture product capture_to[i], acyclic combined network."
       result_kind: exact
-      valid_input_ranges: "1 <= n <= 30; 0 <= lam <= 1e10 per s; sigma = 0 or 1e-6 <= sigma <= 1e7 b; n0 >= 0 with sum(n0) <= 1e100; branching as in step 2; capture_to integers in [-1, n - 1] with capture_to[i] != i; acyclic combined decay and capture network; history a list or tuple of (duration, flux) pairs with 0 <= duration <= 1e12 s and 0 <= flux <= 1e18 n / (cm^2 s); lam + sigma * 1e-24 * flux <= 1e10 per s in every period; all values finite."
+      valid_input_ranges: "1 <= n <= 30; 0 <= lam <= 1e10 per s; sigma = 0 or 1e-6 <= sigma <= 1e7 b; n0 >= 0 with sum(n0) <= 1e100; branching as in step 2; capture_to integers in [-1, n - 1] with capture_to[i] != i; acyclic combined decay and capture network; history a list or tuple of (duration, flux) pairs with 0 <= duration <= 1e12 s and 0 <= flux <= 1e18 n / (cm^2 s); lam + sigma * 1e-24 * flux <= 1e10 per s in every period."
       units: "Atoms; s, barns, neutrons / (cm^2 s)."
       output_shape: "numpy float array of shape (n,)."
       step_dependencies: [2]
@@ -403,8 +409,8 @@ sub_steps:
       within a relative 1e-10 of max(1e-250 * sum(n0), 1e-300).
       Inputs:
         lam, sigma, n0: 1-D, length n with 1 <= n <= 30; 0 <= lam <= 1e10 per s, sigma = 0 or 1e-6 <= sigma <= 1e7 b,
-                        n0 >= 0 with sum(n0) <= 1e100; all finite.
-        branching: n x n, nonnegative, zero diagonal, column sums at most 1 + 1e-12.
+                        n0 >= 0 with sum(n0) <= 1e100.
+        branching: n x n, nonnegative, zero diagonal, column sums at most 1 + 1e-12 (as in step 2).
         capture_to: integer array of length n with entries in [-1, n - 1] and capture_to[i] != i; the
                     combined decay and capture network must be acyclic (as in step 3).
         t_irr, t_cool: 0 < t_irr <= 1e9 s and 0 <= t_cool <= 1e9 s.
@@ -413,10 +419,10 @@ sub_steps:
         flux_lo, flux_hi: 1e-2 <= flux_lo < flux_hi <= 1e18.
       Errors: raise ValueError for:
         - nuclide data rejected by step 3;
-        - times not finite or out of range;
+        - times out of range;
         - k not an integer (bool is not accepted) or not the index of a radioactive nuclide;
-        - activity not positive or not finite;
-        - flux bounds not finite or out of range;
+        - activity not positive;
+        - flux bounds out of range;
         - A(flux_lo) < lam[k] * max(1e-250 * sum(n0), 1e-300);
         - an activity outside [A(flux_lo), A(flux_hi)] by more than a relative 1e-9.
     function_header: |-
@@ -426,13 +432,13 @@ sub_steps:
           Inputs:
             lam: 1-D array of n decay constants in 1/s (1 <= n <= 30), 0 <= lam[i] <= 1e10.
             branching: (n, n) array, branching[j, i] = fraction of the decays of nuclide i that give nuclide j;
-                       nonnegative, zero diagonal, column sums at most 1 + 1e-12.
+                       nonnegative, zero diagonal, column sums at most 1 + 1e-12 (normalized as in step 2).
             sigma: 1-D array of n radiative-capture cross sections in barns, sigma[i] = 0 or 1e-6 <= sigma[i] <= 1e7.
             capture_to: 1-D integer array of n entries, the nuclide made by a capture on nuclide i, or -1 if
                         it is not followed; never i itself.
             n0: 1-D array of n initial numbers of atoms, nonnegative, sum(n0) <= 1e100.
-            All values finite; the combined decay and capture network must be acyclic, exactly as in
-            activation_inventory (step 3).
+            The combined decay and capture network must be acyclic, exactly as in activation_inventory
+            (step 3).
             t_irr: irradiation time in s at a constant unknown flux, 0 < t_irr <= 1e9.
             t_cool: cooling time in s without flux after the irradiation, 0 <= t_cool <= 1e9.
             k: int, index of the measured nuclide, with lam[k] > 0.
@@ -447,7 +453,7 @@ sub_steps:
 
           Raises:
             ValueError for nuclide data as in step 3, for times, k, activity or flux bounds outside these
-            ranges (NaN and infinite values included), if A(flux_lo) < lam[k] * max(1e-250 * sum(n0), 1e-300)
+            ranges, if A(flux_lo) < lam[k] * max(1e-250 * sum(n0), 1e-300)
             (at flux_lo the measured nuclide must hold at least 1e-250 of the initial atoms and at least 1e-300
             atoms; for x[k](flux_lo) within a relative 1e-10 of this bound, the accuracy of step 3,
             ValueError and a result are both correct), or if activity lies outside [A(flux_lo), A(flux_hi)]
@@ -464,12 +470,12 @@ sub_steps:
       irradiation gives the flux. At low fluence the activity is proportional to the flux, but burnup of a
       large-cross-section product makes the response saturate and turn over. Second-order products such
       as 199Au grow like phi**2.
-    n_test_cases: 6
+    n_test_cases: 8
     contract:
       quantity: "Neutron flux that reproduces a measured activation activity after irradiation and cooling."
       assumptions: "Constant flux during the irradiation, none during cooling; A(phi) strictly increasing on the given interval."
       result_kind: exact
-      valid_input_ranges: "Nuclide data of step 3; 0 < t_irr <= 1e9 s; 0 <= t_cool <= 1e9 s; k an integer (not bool) with lam[k] > 0; activity > 0 and finite; 1e-2 <= flux_lo < flux_hi <= 1e18 with A strictly increasing on [flux_lo, flux_hi]; A(flux_lo) >= lam[k] * max(1e-250 * sum(n0), 1e-300), with ValueError and a result both correct when x[k](flux_lo) is within a relative 1e-10 of max(1e-250 * sum(n0), 1e-300)."
+      valid_input_ranges: "Nuclide data of step 3; 0 < t_irr <= 1e9 s; 0 <= t_cool <= 1e9 s; k an integer (not bool) with lam[k] > 0; activity > 0; 1e-2 <= flux_lo < flux_hi <= 1e18 with A strictly increasing on [flux_lo, flux_hi]; A(flux_lo) >= lam[k] * max(1e-250 * sum(n0), 1e-300), with ValueError and a result both correct when x[k](flux_lo) is within a relative 1e-10 of max(1e-250 * sum(n0), 1e-300)."
       units: "Neutrons / (cm^2 s)."
       output_shape: "One Python float."
       step_dependencies: [3]

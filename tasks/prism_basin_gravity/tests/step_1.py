@@ -23,7 +23,6 @@ def _crown_case():
     def _t_check1(p, bounds, rho, U_t, g_t):
         L = max(bounds[1] - bounds[0], bounds[3] - bounds[2], bounds[5] - bounds[4])
         U, g = prism_gravity(np.array(p, float), bounds, rho)
-        assert type(U) is float and isinstance(g, np.ndarray) and g.shape == (3,), (U, g)
         g_t = np.array(g_t, float)
         assert _t_rel(U, U_t) < 1e-10, (p, U, U_t)
         tol = 1e-10 * np.linalg.norm(g_t) + 1e-14 * _T_G * abs(rho) * L
@@ -73,7 +72,6 @@ def _crown_case():
     def _t_check1(p, bounds, rho, U_t, g_t):
         L = max(bounds[1] - bounds[0], bounds[3] - bounds[2], bounds[5] - bounds[4])
         U, g = prism_gravity(np.array(p, float), bounds, rho)
-        assert type(U) is float and isinstance(g, np.ndarray) and g.shape == (3,), (U, g)
         g_t = np.array(g_t, float)
         assert _t_rel(U, U_t) < 1e-10, (p, U, U_t)
         tol = 1e-10 * np.linalg.norm(g_t) + 1e-14 * _T_G * abs(rho) * L
@@ -116,8 +114,8 @@ def _crown_case():
 _crown_case()
 
 # --- test case 2 ---
-# several points at once give arrays of shapes (n,) and (n, 3) with the same accuracy, for
-# 7 points and for 1000 points (the stored points of the first prism, near and far, repeated)
+# several points in one call keep the stated accuracy, for 7 points and for 1000 points (the stored
+# points of the first prism, near and far, repeated)
 import numpy as np
 
 
@@ -159,14 +157,12 @@ def _crown_case():
 
     _t_pts = np.array([r[0] for r in _T_NEAR_A[:4]] + [r[0] for r in _T_FAR_A[:3]], float)
     _t_U, _t_g = prism_gravity(_t_pts, _T_BA, _T_RA)
-    assert isinstance(_t_U, np.ndarray) and _t_U.shape == (7,) and isinstance(_t_g, np.ndarray) and _t_g.shape == (7, 3)
     for _t_k, (_t_p, _t_Ut, _t_gt) in enumerate(_T_NEAR_A[:4] + _T_FAR_A[:3]):
         _t_gt = np.array(_t_gt, float)
         assert _t_rel(_t_U[_t_k], _t_Ut) < 1e-10
         assert np.all(np.abs(_t_g[_t_k] - _t_gt) <= 1e-10 * np.linalg.norm(_t_gt) + 1e-14 * _T_G * _T_RA * 250.0)
     _t_rows = ((_T_NEAR_A + _T_FAR_A) * 50)[:1000]
     _t_U, _t_g = prism_gravity(np.array([r[0] for r in _t_rows], float), _T_BA, _T_RA)
-    assert isinstance(_t_U, np.ndarray) and _t_U.shape == (1000,) and isinstance(_t_g, np.ndarray) and _t_g.shape == (1000, 3)
     for _t_k, (_t_p, _t_Ut, _t_gt) in enumerate(_t_rows):
         _t_gt = np.array(_t_gt, float)
         assert _t_rel(_t_U[_t_k], _t_Ut) < 1e-10, (_t_p, _t_U[_t_k], _t_Ut)
@@ -176,7 +172,8 @@ def _crown_case():
 _crown_case()
 
 # --- test case 3 ---
-# invalid bounds, density or points raise ValueError
+# each stated error rule once: bounds that are not six numbers, a degenerate prism (x1 = x2), a zero
+# density (U = 0, where a relative accuracy has no meaning), points of shape (2,) and an empty (0, 3) array
 import numpy as np
 
 
@@ -185,10 +182,8 @@ def _crown_case():
 
     _T_BA, _T_RA = (0.0, 100.0, 0.0, 200.0, 50.0, 300.0), 2670.0
 
-    for _t_args in (((0, 0, 0), (0, 100, 0, 200, 300, 50), 1.0), ((0, 0, 0), (0, 100, 0, 200, 50), 1.0),
-                    ((0, 0, 0), (0, 100, 0, 200, 50, float("inf")), 1.0), ((0, 0, 0), _T_BA, float("nan")),
-                    ((0, 0), _T_BA, 1.0), (np.zeros((2, 2)), _T_BA, 1.0), ((0, float("nan"), 0), _T_BA, 1.0),
-                    (np.zeros((0, 3)), _T_BA, 1.0), ((0, 0, 0), (100, 100, 0, 200, 50, 300), 1.0)):
+    for _t_args in (((0, 0, 0), (0, 100, 0, 200, 50), 1.0), ((0, 0, 0), (100, 100, 0, 200, 50, 300), 1.0),
+                    ((0, 0, 0), _T_BA, 0.0), ((0, 0), _T_BA, 1.0), (np.zeros((0, 3)), _T_BA, 1.0)):
         try:
             prism_gravity(np.array(_t_args[0], float), _t_args[1], _t_args[2])
         except ValueError:
@@ -240,17 +235,158 @@ def _crown_case():
         _t_L = max(_t_b[1] - _t_b[0], _t_b[3] - _t_b[2], _t_b[5] - _t_b[4])
         for _t_p, _t_Ut, _t_gt in _t_rows:
             _t_U, _t_g = prism_gravity(np.array(_t_p, float), _t_b, _t_rho)
-            assert type(_t_U) is float and isinstance(_t_g, np.ndarray) and _t_g.shape == (3,), (_t_U, _t_g)
             _t_gt = np.array(_t_gt, float)
             assert abs(_t_U - _t_Ut) / abs(_t_Ut) < 1e-10, (_t_p, _t_U, _t_Ut)
             assert np.all(np.abs(_t_g - _t_gt) <= 1e-10 * np.linalg.norm(_t_gt) + 1e-14 * _T_G * abs(_t_rho) * _t_L), (_t_p, _t_g, _t_gt)
         # all the points of the prism in one call
         _t_U, _t_g = prism_gravity(np.array([r[0] for r in _t_rows], float), _t_b, _t_rho)
-        assert isinstance(_t_U, np.ndarray) and _t_U.shape == (len(_t_rows),) and _t_g.shape == (len(_t_rows), 3)
         for _t_k, (_t_p, _t_Ut, _t_gt) in enumerate(_t_rows):
             _t_gt = np.array(_t_gt, float)
             assert abs(_t_U[_t_k] - _t_Ut) / abs(_t_Ut) < 1e-10, (_t_p, _t_U[_t_k], _t_Ut)
             assert np.all(np.abs(_t_g[_t_k] - _t_gt) <= 1e-10 * np.linalg.norm(_t_gt) + 1e-14 * _T_G * abs(_t_rho) * _t_L)
+
+
+_crown_case()
+
+# --- test case 5 ---
+# the output contract: one point (shape (3,)) gives a Python float U and g of shape (3,); a one-row batch
+# (shape (1, 3)) keeps its batch dimension, U of shape (1,) and g of shape (1, 3); three points give (3,)
+# and (3, 3); in every form the values are those of the stored 60-digit closed forms
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+
+    _T_G = 6.6743e-11
+
+    _T_BA, _T_RA = (0.0, 100.0, 0.0, 200.0, 50.0, 300.0), 2670.0
+
+    # (point, U, g)
+    _T_ROWS = [
+        ((150, 260, 10), 0.003617603335459918394206756, (-0.000006997465731942261213621431, -0.000009714039470350318412456028, 0.000009141565208708669444627144)),
+        ((-0.001, 100.0, 175.0), 0.009789745717150190905104604, (0.00007229176408681407055792856, 0.0, 0.0)),
+        ((3419.468083841879, 6838.936167683758, -32508.840413266225), 0.00002656512508099100438145185, (-7.956606708257177922878548e-11, -1.591310732517717528903638e-10, 7.717818465485889195439492e-10)),
+    ]
+
+    _t_p = np.array([r[0] for r in _T_ROWS], float)
+    _t_Ut = np.array([r[1] for r in _T_ROWS])
+    _t_gt = np.array([r[2] for r in _T_ROWS], float)
+    _t_tol = 1e-10 * np.linalg.norm(_t_gt, axis=1)[:, None] + 1e-14 * _T_G * _T_RA * 250.0
+    _t_U0, _t_g0 = prism_gravity(_t_p[0], _T_BA, _T_RA)
+    _t_U1, _t_g1 = prism_gravity(_t_p[:1], _T_BA, _T_RA)
+    _t_U3, _t_g3 = prism_gravity(_t_p, _T_BA, _T_RA)
+    assert (type(_t_U0) is float and isinstance(_t_g0, np.ndarray) and _t_g0.shape == (3,)
+            and isinstance(_t_U1, np.ndarray) and _t_U1.shape == (1,) and isinstance(_t_g1, np.ndarray)
+            and _t_g1.shape == (1, 3) and isinstance(_t_U3, np.ndarray) and _t_U3.shape == (3,)
+            and isinstance(_t_g3, np.ndarray) and _t_g3.shape == (3, 3)), (type(_t_U0), _t_g0, _t_U1, _t_g1)
+    assert abs(_t_U0 - _t_Ut[0]) < 1e-10 * _t_Ut[0] and abs(_t_U1[0] - _t_Ut[0]) < 1e-10 * _t_Ut[0], (_t_U0, _t_U1)
+    assert np.all(np.abs(_t_g0 - _t_gt[0]) <= _t_tol[0]) and np.all(np.abs(_t_g1[0] - _t_gt[0]) <= _t_tol[0]), (_t_g0, _t_g1)
+    assert np.all(np.abs(_t_U3 - _t_Ut) < 1e-10 * _t_Ut) and np.all(np.abs(_t_g3 - _t_gt) <= _t_tol), (_t_U3, _t_g3)
+
+
+_crown_case()
+
+# --- test case 6 ---
+# a cube of side s (analytic special case): at its centre U = 2 G rho K s^2 and g = 0; at each corner
+# U = G rho K s^2 and g = G rho s C (+-1, +-1, +-1), pointing into the cube, with
+# K = (3/2) ln(2 + sqrt 3) - pi / 4 (the integral of 1/r over a unit cube seen from a corner) and
+# C = 2 ln(1 + sqrt 2) - ln(2 + sqrt 3) + pi / 6 (the integral of x / r^3 over it); both constants agree
+# with 60-digit closed forms and with mpmath quadrature. g = 0 at the centre is held to the absolute
+# part 1e-14 G |rho| L of the stated tolerance
+import numpy as np
+
+
+def _crown_case():
+    import math
+    import numpy as np
+
+    _T_G = 6.6743e-11
+
+    _t_s, _t_rho = 300.0, 2900.0
+    _t_b = (1000.0, 1300.0, -200.0, 100.0, 50.0, 350.0)
+    _t_K = 1.5 * math.log(2.0 + math.sqrt(3.0)) - math.pi / 4.0
+    _t_C = 2.0 * math.log(1.0 + math.sqrt(2.0)) - math.log(2.0 + math.sqrt(3.0)) + math.pi / 6.0
+    _t_abs = 1e-14 * _T_G * _t_rho * _t_s
+    _t_U, _t_g = prism_gravity(np.array([1150.0, -50.0, 200.0]), _t_b, _t_rho)
+    _t_Uc = 2.0 * _T_G * _t_rho * _t_K * _t_s ** 2
+    assert abs(_t_U - _t_Uc) < 1e-10 * _t_Uc, (_t_U, _t_Uc)
+    assert np.all(np.abs(_t_g) <= _t_abs), _t_g
+    _t_Uk = _T_G * _t_rho * _t_K * _t_s ** 2
+    _t_gk = _T_G * _t_rho * _t_s * _t_C
+    for _t_p, _t_dir in (((1000.0, -200.0, 50.0), (1.0, 1.0, 1.0)), ((1300.0, 100.0, 350.0), (-1.0, -1.0, -1.0)),
+                         ((1000.0, 100.0, 350.0), (1.0, -1.0, -1.0))):
+        _t_U, _t_g = prism_gravity(np.array(_t_p), _t_b, _t_rho)
+        assert abs(_t_U - _t_Uk) < 1e-10 * _t_Uk, (_t_p, _t_U, _t_Uk)
+        _t_want = _t_gk * np.array(_t_dir)
+        assert np.all(np.abs(_t_g - _t_want) <= 1e-10 * np.linalg.norm(_t_want) + _t_abs), (_t_p, _t_g, _t_want)
+
+
+_crown_case()
+
+# --- test case 7 ---
+# scaling and superposition, against the stored 60-digit targets of the first prism: (a) the prism and the
+# points scaled by s = 1024 and by s = 1/1024 (exact in binary) give s^2 U and s g (U is G rho times a
+# length squared, g is G rho times a length), near the prism and up to a million diagonals away; (b) the
+# prism cut by the plane y = 100 into two prisms gives, summed over the two, U and g of the whole prism:
+# the cut puts the centre on a common face of the halves and the stored points of that plane on their
+# edges or on the line of an edge, where the limits taken must agree with those of the whole prism;
+# tolerance twice the sum of the stated tolerances of the two halves
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+
+    _T_G = 6.6743e-11
+
+    _T_BA, _T_RA = (0.0, 100.0, 0.0, 200.0, 50.0, 300.0), 2670.0
+
+    _T_FAR_A = [
+        ((3419.468083841879, 6838.936167683758, -32508.840413266225), 0.00002656512508099100438145185, (-7.956606708257177922878548e-11, -1.591310732517717528903638e-10, 7.717818465485889195439492e-10)),
+        ((-235919.95186213477, 236069.95186213477, 33884.993123162116), 0.000002656505517618524707088312, (5.572048743571365789144135e-12, -5.572048372101477602378368e-12, -7.960068704998571571919094e-13)),
+        ((3354151.966249685, 100.0, 175.0), 0.0000002656505552584668419385961, (-7.920169326073176895809003e-14, 0.0, 0.0)),
+        ((100625322.76784329, 134167130.35712439, 290471795.72317433), 2.656505553396427367444657e-9, (-2.376103074843040349073944e-18, -3.16813743312384258960305e-18, -6.859017542712777036757812e-18)),
+    ]
+
+    _T_NEAR_A = [
+        ((30, 40, -20), 0.004647029595518059322531897, (0.00000330112155559446269274671, 0.000007156561567138818749072275, 0.00002439525891123995774656419)),
+        ((0, 0, 50), 0.005783669719005623574377812, (0.00002251653795106050632435074, 0.00002859571941767522188348318, 0.00003010015992100261210405549)),
+        ((100, 200, 300), 0.005783669719005623574377812, (-0.00002251653795106050632435074, -0.00002859571941767522188348318, -0.00003010015992100261210405549)),
+        ((0, 100, 175), 0.009789818009265639248296765, (0.00007229246681069329560310504, 0.0, 0.0)),
+        ((50, 0, 50), 0.006345239445497427371407195, (0.0, 0.00004038549440218272253764441, 0.00004198501189717845579818864)),
+        ((50, 100, 50), 0.008102910741682739331168468, (0.0, 0.0, 0.00007193938719373315019248601)),
+        ((50, 100, 175), 0.01156733943801124714875562, (0.0, 1.41947524121992205204861e-65, 0.0)),
+        ((10, 20, 60), 0.007008583030247066542581962, (0.0000296636766372728669217914, 0.00002814366529157195129186314, 0.0000398785047431948763708575)),
+        ((-300, 100, 50), 0.00235138220978255112132904, (0.00000578648207346190481793357, 0.0, 0.000001883518733155004744094624)),
+        ((150, 260, 10), 0.003617603335459918394206756, (-0.000006997465731942261213621431, -0.000009714039470350318412456028, 0.000009141565208708669444627144)),
+        ((100.0, 250.0, 50.0), 0.004592676004309462514880799, (-0.000008010283016628205930747702, -0.00001965771548277877658294516, 0.0000133568423986596575284989)),
+        ((-0.001, 100.0, 175.0), 0.009789745717150190905104604, (0.00007229176408681407055792856, 0.0, 0.0)),
+        ((100.000001, 250.0, 50.000001), 0.00459267600965602173943157, (-0.000008010283197882915256888178, -0.00001965771552439359214995309, 0.00001335684229195053503764236)),
+        ((-1e-07, -1e-07, 175.0), 0.007502168506929950490030722, (0.00004059379330595907781941405, 0.00004966117498365167621786153, 0.0)),
+        ((-30.0, 1e-06, 50.000001), 0.005154339710236875125518064, (0.00001948305750122624847434645, 0.0000169029315718887989251387, 0.0000182761549607867223982051)),
+        ((554.5299621460925, -320.4416351217438, 696.3476275509622), 0.001062661835321654739556056, (-0.0000007702162805699043997693396, 0.0000006349134830410408943226999, -0.0000007811127535598808127445)),
+    ]
+
+    _t_rows = _T_NEAR_A + _T_FAR_A
+    _t_p = np.array([r[0] for r in _t_rows], float)
+    _t_Ut = np.array([r[1] for r in _t_rows])
+    _t_gt = np.array([r[2] for r in _t_rows], float)
+    # (a) scaling
+    for _t_s in (1024.0, 1.0 / 1024.0):
+        _t_U, _t_g = prism_gravity(_t_s * _t_p, tuple(_t_s * v for v in _T_BA), _T_RA)
+        assert np.all(np.abs(_t_U - _t_s ** 2 * _t_Ut) < 1e-10 * _t_s ** 2 * _t_Ut), (_t_s, _t_U / (_t_s ** 2 * _t_Ut) - 1.0)
+        _t_tol = 1e-10 * _t_s * np.linalg.norm(_t_gt, axis=1)[:, None] + 1e-14 * _T_G * _T_RA * 250.0 * _t_s
+        assert np.all(np.abs(_t_g - _t_s * _t_gt) <= _t_tol), (_t_s, np.max(np.abs(_t_g - _t_s * _t_gt) / _t_tol))
+    # (b) superposition of the two halves y <= 100 and y >= 100
+    _t_pn = _t_p[:len(_T_NEAR_A)]
+    _t_U1, _t_g1 = prism_gravity(_t_pn, (0.0, 100.0, 0.0, 100.0, 50.0, 300.0), _T_RA)
+    _t_U2, _t_g2 = prism_gravity(_t_pn, (0.0, 100.0, 100.0, 200.0, 50.0, 300.0), _T_RA)
+    _t_Utn, _t_gtn = _t_Ut[:len(_T_NEAR_A)], _t_gt[:len(_T_NEAR_A)]
+    assert np.all(np.abs(_t_U1 + _t_U2 - _t_Utn) < 2e-10 * _t_Utn), (_t_U1 + _t_U2) / _t_Utn - 1.0
+    _t_tol = 2.0 * (1e-10 * (np.linalg.norm(_t_g1, axis=1) + np.linalg.norm(_t_g2, axis=1))[:, None]
+                    + 2e-14 * _T_G * _T_RA * 250.0)
+    assert np.all(np.abs(_t_g1 + _t_g2 - _t_gtn) <= _t_tol), np.max(np.abs(_t_g1 + _t_g2 - _t_gtn) / _t_tol)
 
 
 _crown_case()

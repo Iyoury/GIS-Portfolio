@@ -54,9 +54,11 @@ def _crown_case():
     def _t_roundtrip(k, flux, t_irr, t_cool, lo, hi, data):
         act = _t_activity(k, flux, t_irr, t_cool, *data)
         got = monitor_flux(*data, t_irr, t_cool, k, act, lo, hi)
-        assert isinstance(got, float), type(got)
         assert _t_rel(got, flux) < 1e-8, (k, flux, got)
 
+    # output contract: the flux is a Python float
+    got = monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, _t_activity(1, 1e10, 5 * _T_DAY, _T_DAY, *_T_DATA), 1e6, 1e15)
+    assert isinstance(got, float), type(got)
     for _t_flux in (1e8, 3.3e12, 5e13):
         _t_roundtrip(1, _t_flux, 5 * _T_DAY, _T_DAY, 1e6, 1e15, _T_DATA)
 
@@ -117,7 +119,6 @@ def _crown_case():
     def _t_roundtrip(k, flux, t_irr, t_cool, lo, hi, data):
         act = _t_activity(k, flux, t_irr, t_cool, *data)
         got = monitor_flux(*data, t_irr, t_cool, k, act, lo, hi)
-        assert isinstance(got, float), type(got)
         assert _t_rel(got, flux) < 1e-8, (k, flux, got)
 
     for _t_flux in (1e4, 7.7e9):
@@ -189,7 +190,6 @@ def _crown_case():
     def _t_roundtrip(k, flux, t_irr, t_cool, lo, hi, data):
         act = _t_activity(k, flux, t_irr, t_cool, *data)
         got = monitor_flux(*data, t_irr, t_cool, k, act, lo, hi)
-        assert isinstance(got, float), type(got)
         assert _t_rel(got, flux) < 1e-8, (k, flux, got)
 
     _t_roundtrip(1, 1e14, 5 * _T_DAY, _T_DAY, 1e13, 1.5e15, _T_DATA)
@@ -259,7 +259,6 @@ def _crown_case():
     def _t_roundtrip(k, flux, t_irr, t_cool, lo, hi, data):
         act = _t_activity(k, flux, t_irr, t_cool, *data)
         got = monitor_flux(*data, t_irr, t_cool, k, act, lo, hi)
-        assert isinstance(got, float), type(got)
         assert _t_rel(got, flux) < 1e-8, (k, flux, got)
 
     _t_roundtrip(1, 2e11, 5 * _T_DAY, 0.0, 1e6, 1e15, _T_DATA)
@@ -297,11 +296,11 @@ def _crown_case():
                 _t_in = float(_t_A * _t_mp.exp(_t_sgn * _t_lo_b))
                 while _t_lr(_t_in) > _t_lo_b:
                     _t_in = float(np.nextafter(_t_in, _t_a))
-                while _t_lr(np.nextafter(_t_in, _t_sgn * np.inf)) <= _t_lo_b:
-                    _t_in = float(np.nextafter(_t_in, _t_sgn * np.inf))
+                while _t_lr(np.nextafter(_t_in, _t_sgn * 1e308)) <= _t_lo_b:
+                    _t_in = float(np.nextafter(_t_in, _t_sgn * 1e308))
                 _t_beyond = float(_t_A * _t_mp.exp(_t_sgn * _t_hi_b))
                 while _t_lr(_t_beyond) <= _t_hi_b:
-                    _t_beyond = float(np.nextafter(_t_beyond, _t_sgn * np.inf))
+                    _t_beyond = float(np.nextafter(_t_beyond, _t_sgn * 1e308))
                 while _t_lr(np.nextafter(_t_beyond, _t_a)) > _t_hi_b:
                     _t_beyond = float(np.nextafter(_t_beyond, _t_a))
             got = monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, _t_in, 1e8, 1e13)
@@ -329,65 +328,10 @@ def _crown_case():
 _crown_case()
 
 # --- test case 4 ---
-# an activity outside [A(flux_lo), A(flux_hi)] raises ValueError
-import numpy as np
-
-
-def _crown_case():
-    import numpy as np
-    import mpmath as _t_mp
-
-    def _t_expm_apply(rates, removal, x0, t, dps=300):
-        # exp(t (rates - diag(removal))) x0 with mpmath
-        with _t_mp.workdps(dps):
-            m = len(removal)
-            A = _t_mp.matrix(m, m)
-            for i in range(m):
-                for j in range(m):
-                    A[i, j] = _t_mp.mpf(float(rates[i][j])) - (_t_mp.mpf(float(removal[i])) if i == j else 0)
-            v = _t_mp.expm(A * _t_mp.mpf(float(t))) * _t_mp.matrix([_t_mp.mpf(float(a)) for a in x0])
-            return [v[i] for i in range(m)]
-
-    def _t_activation(lam, branching, sigma, capture_to, n0, history):
-        # each period exponentiated from the decay and capture rates at 300 digits
-        n = len(lam)
-        x = [float(a) for a in n0]
-        for duration, flux in history:
-            rates = np.zeros((n, n))
-            removal = np.zeros(n)
-            for i in range(n):
-                removal[i] = lam[i] + sigma[i] * 1e-24 * flux
-                for j in range(n):
-                    rates[j, i] = branching[j][i] * lam[i]
-                if capture_to[i] >= 0:
-                    rates[capture_to[i], i] += sigma[i] * 1e-24 * flux
-            x = [float(a) for a in _t_expm_apply(rates, removal, x, duration)]
-        return x
-
-    # gold flux monitor: 197Au (stable, 98.65 b) -> 198Au (2.6941 d, 25100 b) -> 199Au (3.139 d, 30 b);
-    # 198Au and 199Au beta-decay to mercury, which is not followed
-    _T_DAY = 86400.0
-    _T_DATA = (np.array([0.0, np.log(2.0) / (2.6941 * _T_DAY), np.log(2.0) / (3.139 * _T_DAY)]), np.zeros((3, 3)),
-               np.array([98.65, 25100.0, 30.0]), np.array([1, 2, -1]), np.array([1e18, 0.0, 0.0]))
-
-    def _t_activity(k, flux, t_irr, t_cool, lam, branching, sigma, capture_to, n0):
-        x = _t_activation(lam, branching, sigma, capture_to, n0, [(t_irr, flux), (t_cool, 0.0)])
-        return lam[k] * x[k]
-
-    for _t_act in (_t_activity(1, 1e7, 5 * _T_DAY, _T_DAY, *_T_DATA), _t_activity(1, 1e14, 5 * _T_DAY, _T_DAY, *_T_DATA)):
-        try:
-            monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, _t_act, 1e8, 1e13)
-        except ValueError:
-            pass
-        else:
-            raise AssertionError("monitor_flux must raise ValueError for activity %r" % _t_act)
-
-
-_crown_case()
-
-# --- test case 5 ---
-# bad times, nuclide index, activity or flux bounds (NaN and infinite values included) raise ValueError, and
-# so does a measured nuclide below the domain floor at flux_lo (1e-250 of the initial atoms, or 1e-300 atoms)
+# each stated error rule once: t_irr = 0, k of a stable nuclide, k a float or a bool, activity 0, flux_lo
+# equal to flux_hi or below 1e-2 raise ValueError; flux_lo is checked first when both ends are within the
+# tolerance; and a measured nuclide below the domain floor at flux_lo (1e-250 of the initial atoms, also
+# with a tiny lam[k], or 1e-300 atoms) or nuclide data rejected by step 3 raise ValueError
 import numpy as np
 
 
@@ -436,16 +380,10 @@ def _crown_case():
         return lam[k] * x[k]
 
     _t_act = _t_activity(1, 1e10, 5 * _T_DAY, _T_DAY, *_T_DATA)
-    for _t_args in ((0.0, _T_DAY, 1, _t_act, 1e8, 1e13), (5 * _T_DAY, -1.0, 1, _t_act, 1e8, 1e13),
-                    (5 * _T_DAY, _T_DAY, 0, _t_act, 1e8, 1e13), (5 * _T_DAY, _T_DAY, 1.0, _t_act, 1e8, 1e13), (5 * _T_DAY, _T_DAY, True, _t_act, 1e8, 1e13),
-                    (5 * _T_DAY, _T_DAY, 1, -5.0, 1e8, 1e13), (5 * _T_DAY, _T_DAY, 1, _t_act, 1e13, 1e8),
-                    (5 * _T_DAY, _T_DAY, 1, _t_act, 1e-3, 1e13), (2e9, _T_DAY, 1, _t_act, 1e8, 1e13),
-                    (5 * _T_DAY, 2e9, 1, _t_act, 1e8, 1e13), (5 * _T_DAY, _T_DAY, -1, _t_act, 1e8, 1e13),
-                    (5 * _T_DAY, _T_DAY, 3, _t_act, 1e8, 1e13), (5 * _T_DAY, _T_DAY, 1, float("nan"), 1e8, 1e13),
-                    (5 * _T_DAY, _T_DAY, 1, _t_act, 1e8, 2e18), (5 * _T_DAY, _T_DAY, 1, 0.0, 1e8, 1e13),
-                    (5 * _T_DAY, _T_DAY, 1, _t_act, 1e10, 1e10), (5 * _T_DAY, _T_DAY, 1, _t_act, float("nan"), 1e13),
-                    (5 * _T_DAY, _T_DAY, 1, float("inf"), 1e8, 1e13), (5 * _T_DAY, _T_DAY, 1, _t_act, 1e8, float("inf")),
-                    (float("inf"), _T_DAY, 1, _t_act, 1e8, 1e13)):
+    for _t_args in ((0.0, _T_DAY, 1, _t_act, 1e8, 1e13), (5 * _T_DAY, _T_DAY, 0, _t_act, 1e8, 1e13),
+                    (5 * _T_DAY, _T_DAY, 1.0, _t_act, 1e8, 1e13), (5 * _T_DAY, _T_DAY, True, _t_act, 1e8, 1e13),
+                    (5 * _T_DAY, _T_DAY, 1, 0.0, 1e8, 1e13), (5 * _T_DAY, _T_DAY, 1, _t_act, 1e10, 1e10),
+                    (5 * _T_DAY, _T_DAY, 1, _t_act, 9.99e-3, 1e13)):
         try:
             monitor_flux(*_T_DATA, *_t_args)
         except ValueError:
@@ -497,6 +435,144 @@ def _crown_case():
     except ValueError:
         _t_raised = True
     assert _t_raised, "a cross section of 1e-300 b must raise ValueError"
+
+
+_crown_case()
+
+# --- test case 5 ---
+# a cobalt monitor in closed form: 59Co (37.18 b, 4e22 atoms) captures into 60Co (5.2714 y), which is also
+# burnt up by its own capture (2.0 b); after 3e7 s of irradiation and 1e7 s of cooling the 60Co activity is
+# lam n0 c (exp(-c t) - exp(-r t)) / (r - c) exp(-lam t_cool), with c = 37.18e-24 phi and
+# r = lam + 2.0e-24 phi (50-digit arithmetic). A increases up to about 2.7e15; the flux is recovered at 1e9
+# (d ln A / d ln phi = 1.00), 1e13 (0.99) and 3e14 (0.83), the interval reaching 2e15 (slope 0.15)
+import numpy as np
+
+
+def _crown_case():
+    import mpmath as _t_mp
+
+    def _t_rel(a, b):
+        return abs(a - b) / abs(b)
+
+    _t_lam = np.log(2.0) / (5.2714 * 3.15576e7)
+    _t_data = (np.array([0.0, _t_lam]), np.zeros((2, 2)), np.array([37.18, 2.0]), np.array([1, -1]), np.array([4e22, 0.0]))
+
+    def _t_activity(flux, t_irr=3e7, t_cool=1e7):
+        with _t_mp.workdps(50):
+            L = _t_mp.mpf(_t_lam)
+            c = _t_mp.mpf("37.18") * _t_mp.mpf("1e-24") * _t_mp.mpf(flux)
+            r = L + _t_mp.mpf(2) * _t_mp.mpf("1e-24") * _t_mp.mpf(flux)
+            T = _t_mp.mpf(t_irr)
+            return float(L * _t_mp.mpf("4e22") * c * (_t_mp.exp(-c * T) - _t_mp.exp(-r * T)) / (r - c)
+                         * _t_mp.exp(-L * _t_mp.mpf(t_cool)))
+
+    got = monitor_flux(*_t_data, 3e7, 1e7, 1, _t_activity(1e9), 1e8, 2e15)
+    assert _t_rel(got, 1e9) < 1e-8, got
+    got = monitor_flux(*_t_data, 3e7, 1e7, 1, _t_activity(1e13), 1e8, 2e15)
+    assert _t_rel(got, 1e13) < 1e-8, got
+    got = monitor_flux(*_t_data, 3e7, 1e7, 1, _t_activity(3e14), 1e8, 2e15)
+    assert _t_rel(got, 3e14) < 1e-8, got
+
+
+_crown_case()
+
+# --- test case 6 ---
+# power laws at low flux: on the gold monitor at 10 n / (cm^2 s) the burnup terms are below 1e-14, so the
+# 198Au activity (one capture) is proportional to the flux and the 199Au activity (two captures) to its
+# square: 10 times the 198Au activity gives 10 times the flux, 4 times the 199Au activity twice the flux.
+# The activities at 10 come from mpmath's matrix exponential of each period at 300 digits
+import numpy as np
+
+
+def _crown_case():
+    import mpmath as _t_mp
+
+    def _t_rel(a, b):
+        return abs(a - b) / abs(b)
+
+    def _t_expm_apply(rates, removal, x0, t, dps=300):
+        # exp(t (rates - diag(removal))) x0 with mpmath
+        with _t_mp.workdps(dps):
+            m = len(removal)
+            A = _t_mp.matrix(m, m)
+            for i in range(m):
+                for j in range(m):
+                    A[i, j] = _t_mp.mpf(float(rates[i][j])) - (_t_mp.mpf(float(removal[i])) if i == j else 0)
+            v = _t_mp.expm(A * _t_mp.mpf(float(t))) * _t_mp.matrix([_t_mp.mpf(float(a)) for a in x0])
+            return [v[i] for i in range(m)]
+
+    def _t_activation(lam, branching, sigma, capture_to, n0, history):
+        # each period exponentiated from the decay and capture rates at 300 digits
+        n = len(lam)
+        x = [float(a) for a in n0]
+        for duration, flux in history:
+            rates = np.zeros((n, n))
+            removal = np.zeros(n)
+            for i in range(n):
+                removal[i] = lam[i] + sigma[i] * 1e-24 * flux
+                for j in range(n):
+                    rates[j, i] = branching[j][i] * lam[i]
+                if capture_to[i] >= 0:
+                    rates[capture_to[i], i] += sigma[i] * 1e-24 * flux
+            x = [float(a) for a in _t_expm_apply(rates, removal, x, duration)]
+        return x
+
+    # gold flux monitor: 197Au (stable, 98.65 b) -> 198Au (2.6941 d, 25100 b) -> 199Au (3.139 d, 30 b)
+    _T_DAY = 86400.0
+    _T_DATA = (np.array([0.0, np.log(2.0) / (2.6941 * _T_DAY), np.log(2.0) / (3.139 * _T_DAY)]), np.zeros((3, 3)),
+               np.array([98.65, 25100.0, 30.0]), np.array([1, 2, -1]), np.array([1e18, 0.0, 0.0]))
+    x = _t_activation(*_T_DATA, [(5 * _T_DAY, 10.0), (_T_DAY, 0.0)])
+    a1, a2 = _T_DATA[0][1] * x[1], _T_DATA[0][2] * x[2]
+    got = monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, a1, 1e-2, 1e6)
+    assert _t_rel(got, 10.0) < 1e-8, got
+    got = monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 1, 10.0 * a1, 1e-2, 1e6)
+    assert _t_rel(got, 100.0) < 1e-8, got
+    got = monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 2, a2, 1e-2, 1e6)
+    assert _t_rel(got, 10.0) < 1e-8, got
+    got = monitor_flux(*_T_DATA, 5 * _T_DAY, _T_DAY, 2, 4.0 * a2, 1e-2, 1e6)
+    assert _t_rel(got, 20.0) < 1e-8, got
+
+
+_crown_case()
+
+# --- test case 7 ---
+# 30 nuclides and the largest inventory, sum(n0) = 1e100: a stable target followed by 29 products, each
+# made by a capture on the previous one; the activity of the three-capture product (index 3) after 1e5 s
+# of irradiation and 2e4 s of cooling grows like phi**3 at low flux (slope 2.6 at 3e16); target from the
+# Bateman sum of the capture chain at 600 digits (distinct removal rates)
+import numpy as np
+
+
+def _crown_case():
+    import mpmath as _t_mp
+
+    def _t_rel(a, b):
+        return abs(a - b) / abs(b)
+
+    lam = np.r_[0.0, np.geomspace(1e-6, 1e-3, 29)]
+    sig = np.r_[np.geomspace(1e2, 1e4, 29), 0.0]
+    cap = np.r_[np.arange(1, 30), -1]
+    n0 = np.r_[1e100, np.zeros(29)]
+
+    def _t_capture_activity(k, flux, t_irr, t_cool, dps=600):
+        # nuclide i captures into i + 1 (rate c_i = sig_i 1e-24 flux) and decays out of the network: during the
+        # irradiation a linear chain with transfer rates c_i and removal rates r_i = lam_i + c_i,
+        # x_k = n0 prod_{i<k} c_i sum_{i<=k} exp(-r_i t) / prod_{l<=k, l!=i} (r_l - r_i); then decay alone
+        with _t_mp.workdps(dps):
+            c = [_t_mp.mpf(float(s)) * _t_mp.mpf("1e-24") * _t_mp.mpf(float(flux)) for s in sig[:k + 1]]
+            r = [_t_mp.mpf(float(l)) + ci for l, ci in zip(lam[:k + 1], c)]
+            T = _t_mp.mpf(float(t_irr))
+            tot = _t_mp.mpf(0)
+            for i in range(k + 1):
+                tot += _t_mp.exp(-r[i] * T) / _t_mp.fprod([r[l] - r[i] for l in range(k + 1) if l != i])
+            xk = _t_mp.mpf("1e100") * _t_mp.fprod(c[:k]) * tot
+            L = _t_mp.mpf(float(lam[k]))
+            return float(L * xk * _t_mp.exp(-L * _t_mp.mpf(float(t_cool))))
+
+    got = monitor_flux(lam, np.zeros((30, 30)), sig, cap, n0, 1e5, 2e4, 3, _t_capture_activity(3, 1e10, 1e5, 2e4), 1e8, 1e17)
+    assert _t_rel(got, 1e10) < 1e-8, got
+    got = monitor_flux(lam, np.zeros((30, 30)), sig, cap, n0, 1e5, 2e4, 3, _t_capture_activity(3, 3e16, 1e5, 2e4), 1e8, 1e17)
+    assert _t_rel(got, 3e16) < 1e-8, got
 
 
 _crown_case()

@@ -15,8 +15,8 @@ def _check_bounds(bounds, rho):
     if not (b[0] < b[1] and b[2] < b[3] and b[4] < b[5]):
         raise ValueError("need x1 < x2, y1 < y2, z1 < z2")
     rho = float(rho)
-    if not math.isfinite(rho):
-        raise ValueError("rho must be finite")
+    if not math.isfinite(rho) or rho == 0.0:
+        raise ValueError("rho must be finite and nonzero")
     return b, rho
 
 
@@ -258,18 +258,18 @@ def prism_gravity(points, bounds, rho):
         z positive down.
       bounds: (x1, x2, y1, y2, z1, z2), the prism x1 <= x <= x2, y1 <= y <= y2, z1 <= z <= z2 (m), its
         longest edge at most 1000 times its shortest.
-      rho: float, density (kg m^-3).
+      rho: float, nonzero density (kg m^-3).
 
     Output:
       (U, g): U = G rho int dV / |Q - P| (m^2 s^-2) and g = grad U (m s^-2, toward the mass for rho > 0,
         z component positive down). Python float and array (3,) for one point, arrays (n,) and (n, 3)
-        otherwise. U with a relative error below 1e-10; each component of g within
-        1e-10 |g| + 1e-14 G |rho| L (L the longest edge), at every point, inside, on the surface or
-        outside at any distance up to a million times the diagonal of the prism.
+        for points of shape (n, 3), n = 1 included. U with a relative error below 1e-10; each
+        component of g within 1e-10 |g| + 1e-14 G |rho| L (L the longest edge), at every point, inside,
+        on the surface or outside at any distance up to a million times the diagonal of the prism.
 
     Raises:
-      ValueError for invalid bounds (not six finite numbers with x1 < x2, y1 < y2, z1 < z2), a
-      non-finite rho, or points of the wrong shape or with a non-finite value.
+      ValueError for invalid bounds (not six numbers with x1 < x2, y1 < y2, z1 < z2), rho = 0, or
+      points of the wrong shape.
     """
     p, single = _check_points(points)
     b, rho = _check_bounds(bounds, rho)
@@ -300,10 +300,10 @@ def prism_gradients(points, bounds, rho):
       points: float array of shape (3,) or (n, 3), up to 1000 points, observation points (m), not on the
         prism surface.
       bounds: (x1, x2, y1, y2, z1, z2) (m), the longest edge at most 1000 times the shortest.
-      rho: float, density (kg m^-3).
+      rho: float, nonzero density (kg m^-3).
 
     Output:
-      T: numpy array of shape (3, 3) (one point) or (n, 3, 3), in s^-2; each component within
+      T: numpy array of shape (3, 3) (one point) or (n, 3, 3) (n >= 1), in s^-2; each component within
         1e-9 ||T|| (Frobenius norm of the exact tensor), inside or outside at any distance up to a million
         times the diagonal of the prism.
 
@@ -383,22 +383,24 @@ def column_gz(stations, x1, x2, y1, y2, depth, drho0, lam):
       stations: float array of shape (3,) or (n, 3), up to 1000 stations (x, y, z) in m with z <= 0.
       x1, x2, y1, y2: floats, the column x1 <= x <= x2, y1 <= y <= y2 (m), x1 < x2, y1 < y2.
       depth: float, 0 < depth <= 5e4 (m).
-      drho0: float, density contrast at the surface (kg m^-3).
+      drho0: float, nonzero density contrast at the surface (kg m^-3).
       lam: float, 0 <= lam <= 1e-2 (per m).
 
     Output:
       gz: z component of the attraction (m s^-2, positive down for drho0 > 0); a Python float for one
-        station, a numpy array (n,) otherwise; relative error below 1e-10 at every station up to 1e7 m
-        from the column.
+        station of shape (3,), a numpy array (n,) for stations of shape (n, 3), n = 1 included; relative
+        error below 1e-10 at every station up to 1e7 m from the column.
 
     Raises:
-      ValueError for stations of the wrong shape, non-finite or with z > 0, a non-finite parameter,
-      x1 >= x2 or y1 >= y2, depth outside (0, 5e4] or lam outside [0, 1e-2].
+      ValueError for stations of the wrong shape or with z > 0, drho0 = 0, x1 >= x2 or y1 >= y2, depth
+      outside (0, 5e4] or lam outside [0, 1e-2].
     """
     st, single = _check_points(stations)
     vals = np.array([x1, x2, y1, y2, depth, drho0, lam], float)
     if not np.all(np.isfinite(vals)):
         raise ValueError("column parameters must be finite")
+    if drho0 == 0.0:
+        raise ValueError("drho0 must be nonzero")
     if not (x1 < x2 and y1 < y2):
         raise ValueError("need x1 < x2 and y1 < y2")
     if not 0.0 < depth <= 5e4:
@@ -466,12 +468,12 @@ def invert_basin_depths(x_edges, y_edges, gz_obs, drho0, lam):
       lam: float, 0 <= lam <= 1e-2 (per m).
 
     Output:
-      depths: numpy array (nx, ny) in m, each with a relative error below 1e-8.
+      depths: numpy array (nx, ny) in m (also when nx or ny is 1), each with a relative error below 1e-8.
 
     Raises:
-      ValueError for invalid edges, nx ny > 100, gz_obs of the wrong shape or non-finite, drho0 zero or
-      non-finite, lam outside [0, 1e-2], an observation without the sign of drho0, or (lam > 0) an
-      observation of at least 2 pi G |drho0| / lam.
+      ValueError for invalid edges, nx ny > 100, gz_obs of the wrong shape, drho0 = 0, lam outside
+      [0, 1e-2], an observation without the sign of drho0, or (lam > 0) an observation of at least
+      2 pi G |drho0| / lam.
     """
     xe = np.asarray(x_edges, float)
     ye = np.asarray(y_edges, float)

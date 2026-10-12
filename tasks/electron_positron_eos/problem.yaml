@@ -320,7 +320,7 @@ sub_steps:
       and Arnett 1999; Timmes and Swesty 2000, the Helmholtz EOS); for every (rho, T) the chemical potential
       must first be found from the net electron density rho Y_e N_A. psi = (mu + m_e c^2) / (k T) covers both
       the degenerate limit (psi large) and the pair-dominated limit (psi tiny) with full relative precision.
-    n_test_cases: 7
+    n_test_cases: 8
     contract:
       quantity: "Degeneracy parameter psi = (mu + m_e c^2)/(k T) from the net electron density rho Y_e N_A."
       assumptions: "As in step 1; n_net strictly increasing in psi."
@@ -375,7 +375,7 @@ sub_steps:
       pi^2 k T / E_F (the Sommerfeld expansion); pair creation adds to it at high temperature. In the grand
       canonical ensemble, c_V = (<dE^2> - <dE dN>^2 / <dN^2>) / (k T^2), with the fluctuations of energy and of
       the net particle number.
-    n_test_cases: 8
+    n_test_cases: 9
     contract:
       quantity: "Specific heat per volume at constant net electron density."
       assumptions: "As in step 1; pairs created freely, only n_net held fixed. c_V is the temperature derivative of the energy density of step 2 along the path on which n_net of step 1 is fixed; psi comes from step 3."

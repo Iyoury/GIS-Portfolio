@@ -1,10 +1,10 @@
 # --- test case 0 ---
 # Independent targets, none from the solution code: closed forms of the classical (Maxwell-Juettner) gas
-# with modified Bessel functions, evaluated here in 40-digit mpmath (case 0); the Sommerfeld expansion of
-# the degenerate gas and the Bessel-function series of the Fermi-Dirac integrals, evaluated once in 50- to
-# 60-digit mpmath (cases 1 and 2); and values computed once with mpmath at 40 digits by tanh-sinh
+# with modified Bessel functions, evaluated here in 40-digit mpmath (cases 0 and 1); the Sommerfeld expansion
+# of the degenerate gas and the Bessel-function series of the Fermi-Dirac integrals, evaluated once in 50- to
+# 60-digit mpmath (cases 2 and 3); and values computed once with mpmath at 40 digits by tanh-sinh
 # quadrature of the defining integrals in the momentum (breakpoints every k T over the Fermi edge), with
-# the chemical potential from a root search on those integrals (cases 3 to 5).
+# the chemical potential from a root search on those integrals (cases 4 to 6).
 # classical gas without pairs: n_net = n_- = theta K2(1/theta) e^psi / (pi^2 lambda^3)
 # (positrons below 2e-19 of the electrons, shifting psi by less than 1e-20 relative; Fermi corrections
 # below 1e-11), so psi follows in closed form
@@ -29,12 +29,47 @@ def _crown_case():
             _t_base = _t_th * _t_mp.besselk(2, 1 / _t_th) / (_t_mp.pi ** 2 * _t_mp.mpf(_T_LC) ** 3)
             _t_want = float(_t_mp.log(_t_mp.mpf(_t_rY) * _T_NA / _t_base))
         _t_got = degeneracy_parameter(_t_rY, _t_T)
-        assert type(_t_got) is float and _t_rel(_t_got, _t_want) < 1e-10, (_t_rY, _t_T, _t_got, _t_want)
+        assert type(_t_got) is float, type(_t_got)
+        assert _t_rel(_t_got, _t_want) < 1e-10, (_t_rY, _t_T, _t_got, _t_want)
 
 
 _crown_case()
 
 # --- test case 1 ---
+# classical gas with thermal pairs at T = 2e8 K (1 / theta = 29.65): both species follow Maxwell-Juettner
+# statistics, n_minus, n_plus = B e^{+-psi} with B = theta K2(1/theta) / (pi^2 lambda^3), so
+# n_net = 2 B sinh(psi) = rho_Ye N_A gives psi = asinh(rho_Ye N_A / (2 B)) in closed form: about 0.0156,
+# 0.155 and 1.23 at rho_Ye = 1e-10, 1e-9 and 1e-8 g cm^-3, where the positrons number 0.97, 0.73 and 0.086
+# of the electrons (solving n_minus = rho_Ye N_A instead puts psi off by a factor of up to 220). The
+# occupation exponents stay above 28.4, so the Fermi corrections shift psi by less than 2e-13 relative
+# (measured against the exact Bessel-function series of the Fermi-Dirac integrals)
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+    import mpmath as _t_mp
+
+    _T_MEC2 = 8.1871057769e-7
+    _T_KB = 1.380649e-16
+    _T_LC = 3.8615926796e-11
+    _T_NA = 6.02214076e23
+
+    def _t_rel(a, b):
+        return abs(a - b) / abs(b)
+
+    for _t_rY in (1e-10, 1e-9, 1e-8):
+        with _t_mp.workdps(40):
+            _t_th = _t_mp.mpf(_T_KB) * 2e8 / _t_mp.mpf(_T_MEC2)
+            _t_B = _t_th * _t_mp.besselk(2, 1 / _t_th) / (_t_mp.pi ** 2 * _t_mp.mpf(_T_LC) ** 3)
+            _t_want = float(_t_mp.asinh(_t_mp.mpf(_t_rY) * _T_NA / (2 * _t_B)))
+        _t_got = degeneracy_parameter(_t_rY, 2e8)
+        assert _t_rel(_t_got, _t_want) < 1e-10, (_t_rY, _t_got, _t_want)
+
+
+_crown_case()
+
+# --- test case 2 ---
 # strongly degenerate gases from the Sommerfeld expansion (positrons and the lower end of the momentum
 # integral contribute below e^{-300}): with mu = psi theta the electron chemical energy (rest energy
 # included, units m_e c^2), n = int_1^mu eps p deps + sum_k 2 (1 - 2^{1-2k}) zeta(2k) theta^{2k}
@@ -59,12 +94,12 @@ def _crown_case():
 
     for (_t_rY, _t_T), _t_v in _T_RT.items():
         _t_got = degeneracy_parameter(_t_rY, _t_T)
-        assert type(_t_got) is float and _t_rel(_t_got, float(_t_v[0])) < 1e-10, (_t_rY, _t_T, _t_got, _t_v[0])
+        assert _t_rel(_t_got, float(_t_v[0])) < 1e-10, (_t_rY, _t_T, _t_got, _t_v[0])
 
 
 _crown_case()
 
-# --- test case 2 ---
+# --- test case 3 ---
 # pair plasmas with Fermi-Dirac corrections, from the series of the Fermi-Dirac integrals in modified
 # Bessel functions, exact for psi < 1 / theta: n_net = (2 / (pi^2 lambda^3)) sum_j (-1)^{j+1} sinh(j psi)
 # K2(j / theta) theta / j (from 1 / (e^x + 1) = sum_j (-1)^{j+1} e^{-j x}, x > 0), solved for
@@ -86,12 +121,12 @@ def _crown_case():
 
     for (_t_rY, _t_T), _t_v in _T_RT.items():
         _t_got = degeneracy_parameter(_t_rY, _t_T)
-        assert type(_t_got) is float and _t_rel(_t_got, float(_t_v[0])) < 1e-10, (_t_rY, _t_T, _t_got, _t_v[0])
+        assert _t_rel(_t_got, float(_t_v[0])) < 1e-10, (_t_rY, _t_T, _t_got, _t_v[0])
 
 
 _crown_case()
 
-# --- test case 3 ---
+# --- test case 4 ---
 # degenerate gases against the 40-digit targets, from psi about 1.3e5 (rho_Ye = 1e13 g cm^-3, T = 1e7 K);
 # includes two degenerate, non-relativistic gases near T = 1e7 K (rho_Ye = 1e5 g cm^-3 at 1e7 K and 4e5
 # g cm^-3 at 1.2e7 K, E_F about 60 and 120 k T, psi about 650 and 620), where the slope of ln n_net against
@@ -116,12 +151,12 @@ def _crown_case():
 
     for (_t_rY, _t_T), _t_v in _T_RT.items():
         _t_got = degeneracy_parameter(_t_rY, _t_T)
-        assert type(_t_got) is float and _t_rel(_t_got, float(_t_v[0])) < 1e-10, (_t_rY, _t_T, _t_got, _t_v[0])
+        assert _t_rel(_t_got, float(_t_v[0])) < 1e-10, (_t_rY, _t_T, _t_got, _t_v[0])
 
 
 _crown_case()
 
-# --- test case 4 ---
+# --- test case 5 ---
 # pair plasmas against the 40-digit targets, down to psi about 2e-21 at the hottest, most dilute corner
 # (rho_Ye = 1e-10 g cm^-3, T = 1e11 K), where the positrons and electrons outnumber their difference by
 # 20 decades, and a dense gas at 1e11 K (rho_Ye = 1e13 g cm^-3)
@@ -144,12 +179,12 @@ def _crown_case():
 
     for (_t_rY, _t_T), _t_v in _T_RT.items():
         _t_got = degeneracy_parameter(_t_rY, _t_T)
-        assert type(_t_got) is float and _t_rel(_t_got, float(_t_v[0])) < 1e-10, (_t_rY, _t_T, _t_got, _t_v[0])
+        assert _t_rel(_t_got, float(_t_v[0])) < 1e-10, (_t_rY, _t_T, _t_got, _t_v[0])
 
 
 _crown_case()
 
-# --- test case 5 ---
+# --- test case 6 ---
 # a partly degenerate gas with pairs (rho_Ye = 1e6 g cm^-3, T = 1e9 K, psi about 7.8) and the coolest,
 # most dilute corner (rho_Ye = 1e-10 g cm^-3, T = 1e7 K, psi about 564), against the 40-digit targets
 import numpy as np
@@ -168,12 +203,12 @@ def _crown_case():
 
     for (_t_rY, _t_T), _t_v in _T_RT.items():
         _t_got = degeneracy_parameter(_t_rY, _t_T)
-        assert type(_t_got) is float and _t_rel(_t_got, float(_t_v[0])) < 1e-10, (_t_rY, _t_T, _t_got, _t_v[0])
+        assert _t_rel(_t_got, float(_t_v[0])) < 1e-10, (_t_rY, _t_T, _t_got, _t_v[0])
 
 
 _crown_case()
 
-# --- test case 6 ---
+# --- test case 7 ---
 # rho_Ye or T outside its range
 import numpy as np
 

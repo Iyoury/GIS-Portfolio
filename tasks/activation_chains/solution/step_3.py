@@ -42,13 +42,17 @@ def activation_inventory(lam, branching, sigma, capture_to, n0, history):
         raise ValueError("capture_to entries must be -1 or another nuclide index")
     for name, arr in (("lam", lam), ("sigma", sigma), ("n0", n0), ("branching", branching)):
         if not (np.all(np.isfinite(arr)) and np.all(arr >= 0.0)):
-            raise ValueError("%s must be finite and nonnegative" % name)
+            raise ValueError("%s must be nonnegative" % name)
     if np.any(lam > 1e10) or np.any(sigma > 1e7) or np.any((sigma > 0.0) & (sigma < 1e-6)):
         raise ValueError("need lam <= 1e10 and sigma = 0 or 1e-6 <= sigma <= 1e7 b")
     if n0.sum() > 1e100:
         raise ValueError("sum(n0) must not exceed 1e100")
     if np.any(np.diag(branching) != 0.0) or np.any(branching.sum(axis=0) > 1.0 + 1e-12):
         raise ValueError("branching needs a zero diagonal and column sums at most 1 + 1e-12")
+    # as in step 2, a column sum in (1, 1 + 1e-12] is rounding of 1 and that column is divided by its sum
+    colsum = branching.sum(axis=0)
+    if np.any(colsum > 1.0):
+        branching = branching / np.where(colsum > 1.0, colsum, 1.0)[None, :]
     steps = []
     # an ordered container is required: periods are applied in their given order
     if not isinstance(history, (list, tuple)):

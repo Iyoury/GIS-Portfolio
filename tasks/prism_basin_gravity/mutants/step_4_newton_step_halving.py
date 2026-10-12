@@ -15,8 +15,8 @@ def _check_bounds(bounds, rho):
     if not (b[0] < b[1] and b[2] < b[3] and b[4] < b[5]):
         raise ValueError("need x1 < x2, y1 < y2, z1 < z2")
     rho = float(rho)
-    if not math.isfinite(rho):
-        raise ValueError("rho must be finite")
+    if not math.isfinite(rho) or rho == 0.0:
+        raise ValueError("rho must be finite and nonzero")
     return b, rho
 
 
@@ -106,12 +106,12 @@ def invert_basin_depths(x_edges, y_edges, gz_obs, drho0, lam):
       lam: float, 0 <= lam <= 1e-2 (per m).
 
     Output:
-      depths: numpy array (nx, ny) in m, each with a relative error below 1e-8.
+      depths: numpy array (nx, ny) in m (also when nx or ny is 1), each with a relative error below 1e-8.
 
     Raises:
-      ValueError for invalid edges, nx ny > 100, gz_obs of the wrong shape or non-finite, drho0 zero or
-      non-finite, lam outside [0, 1e-2], an observation without the sign of drho0, or (lam > 0) an
-      observation of at least 2 pi G |drho0| / lam.
+      ValueError for invalid edges, nx ny > 100, gz_obs of the wrong shape, drho0 = 0, lam outside
+      [0, 1e-2], an observation without the sign of drho0, or (lam > 0) an observation of at least
+      2 pi G |drho0| / lam.
     """
     xe = np.asarray(x_edges, float)
     ye = np.asarray(y_edges, float)

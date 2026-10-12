@@ -18,7 +18,6 @@ def _crown_case():
     def _t_check2(p, bounds, rho, T_t):
         T = prism_gradients(np.array(p, float), bounds, rho)
         T_t = np.array(T_t, float)
-        assert isinstance(T, np.ndarray) and T.shape == (3, 3), T
         tol = 1e-9 * np.linalg.norm(T_t)
         assert np.all(np.abs(T - T_t) <= tol), (p, T, T_t)
         return T
@@ -62,7 +61,6 @@ def _crown_case():
     def _t_check2(p, bounds, rho, T_t):
         T = prism_gradients(np.array(p, float), bounds, rho)
         T_t = np.array(T_t, float)
-        assert isinstance(T, np.ndarray) and T.shape == (3, 3), T
         tol = 1e-9 * np.linalg.norm(T_t)
         assert np.all(np.abs(T - T_t) <= tol), (p, T, T_t)
         return T
@@ -99,9 +97,9 @@ def _crown_case():
 _crown_case()
 
 # --- test case 2 ---
-# Poisson's equation inside (trace -4 pi G rho) and Laplace's equation outside; several
-# points at once give an array of shape (n, 3, 3), for 3 points and for 1000 points (the stored points of
-# the first prism, near and far, repeated)
+# Poisson's equation inside (trace -4 pi G rho) and Laplace's equation outside, for 3 points in one call;
+# 1000 points in one call (the stored points of the first prism, near and far, repeated) keep the stated
+# accuracy
 import numpy as np
 
 
@@ -135,13 +133,11 @@ def _crown_case():
     ]
 
     _t_T = prism_gradients(np.array([[50.0, 100.0, 175.0], [10.0, 20.0, 60.0], [30.0, 40.0, -20.0]]), _T_BA, _T_RA)
-    assert isinstance(_t_T, np.ndarray) and _t_T.shape == (3, 3, 3)
     for _t_k, _t_want in ((0, -4 * math.pi * _T_G * _T_RA), (1, -4 * math.pi * _T_G * _T_RA), (2, 0.0)):
         _t_tol = 3e-9 * np.linalg.norm(_t_T[_t_k])                                     # three components
         assert abs(np.trace(_t_T[_t_k]) - _t_want) <= _t_tol, (_t_k, np.trace(_t_T[_t_k]), _t_want)
     _t_rows = ((_T_NEAR_A + _T_FAR_A) * 67)[:1000]
     _t_T = prism_gradients(np.array([r[0] for r in _t_rows], float), _T_BA, _T_RA)
-    assert isinstance(_t_T, np.ndarray) and _t_T.shape == (1000, 3, 3)
     for _t_k, (_t_p, _t_Tt) in enumerate(_t_rows):
         _t_Tt = np.array(_t_Tt, float)
         assert np.all(np.abs(_t_T[_t_k] - _t_Tt) <= 1e-9 * np.linalg.norm(_t_Tt)), (_t_p, _t_T[_t_k], _t_Tt)
@@ -150,7 +146,8 @@ def _crown_case():
 _crown_case()
 
 # --- test case 3 ---
-# points on the surface of the prism (face, edge, corner) and invalid input raise ValueError
+# a point on the surface of the prism (on a face, an edge or a corner), where the tensor jumps or diverges,
+# and the rules of prism_gravity once each (invalid bounds, rho = 0, points of shape (2,)) raise ValueError
 import numpy as np
 
 
@@ -160,9 +157,7 @@ def _crown_case():
     _T_BA, _T_RA = (0.0, 100.0, 0.0, 200.0, 50.0, 300.0), 2670.0
 
     for _t_args in (((0.0, 100.0, 175.0), _T_BA, 1.0), ((100.0, 200.0, 175.0), _T_BA, 1.0), ((0.0, 0.0, 50.0), _T_BA, 1.0),
-                    ((50.0, 100.0, 300.0), _T_BA, 1.0), ((0, 0, -10), (0, 100, 200, 0, 50, 300), 1.0),
-                    ((0, 0, -10), _T_BA, float("inf")), ((0, 0), _T_BA, 1.0), ((0, float("nan"), -10), _T_BA, 1.0),
-                    (np.zeros((0, 3)), _T_BA, 1.0)):
+                    ((0, 0, -10), (0, 100, 200, 0, 50, 300), 1.0), ((0, 0, -10), _T_BA, 0.0), ((0, 0), _T_BA, 1.0)):
         try:
             prism_gradients(np.array(_t_args[0], float), _t_args[1], _t_args[2])
         except ValueError:
@@ -209,13 +204,117 @@ def _crown_case():
         for _t_p, _t_Tt in _t_rows:
             _t_T = prism_gradients(np.array(_t_p, float), _t_b, _t_rho)
             _t_Tt = np.array(_t_Tt, float)
-            assert isinstance(_t_T, np.ndarray) and _t_T.shape == (3, 3), _t_T
             assert np.all(np.abs(_t_T - _t_Tt) <= 1e-9 * np.linalg.norm(_t_Tt)), (_t_p, _t_T, _t_Tt)
         _t_T = prism_gradients(np.array([r[0] for r in _t_rows], float), _t_b, _t_rho)
-        assert isinstance(_t_T, np.ndarray) and _t_T.shape == (len(_t_rows), 3, 3)
         for _t_k, (_t_p, _t_Tt) in enumerate(_t_rows):
             _t_Tt = np.array(_t_Tt, float)
             assert np.all(np.abs(_t_T[_t_k] - _t_Tt) <= 1e-9 * np.linalg.norm(_t_Tt)), (_t_p, _t_T[_t_k], _t_Tt)
+
+
+_crown_case()
+
+# --- test case 5 ---
+# the output contract: one point (shape (3,)) gives an array of shape (3, 3), a one-row batch (shape
+# (1, 3)) an array of shape (1, 3, 3), three points an array of shape (3, 3, 3); in every form the values
+# are those of the stored 60-digit closed forms
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+
+    _T_BA, _T_RA = (0.0, 100.0, 0.0, 200.0, 50.0, 300.0), 2670.0
+
+    # (point, T)
+    _T_ROWS = [
+        ((150, 260, 10), ((-2.05017168218425013253337e-8, 6.332982830374772865167821e-8, -5.624430297983030171015541e-8), (6.332982830374772865167821e-8, 1.657213504894955064889316e-8, -7.247200241695419415194204e-8), (-5.624430297983030171015541e-8, -7.247200241695419415194204e-8, 3.929581772892950676440541e-9))),
+        ((10, 20, 60), ((-0.0000009615000623005662405995551, 0.0000002881690971591079462675037, 0.0000004783179621698388106156458), (0.0000002881690971591079462675037, -0.0000005150630649584975193814809, 0.000000342197638657393729705307), (0.0000004783179621698388106156458, 0.000000342197638657393729705307, -0.0000007628119940917815688440904))),
+        ((3419.468083841879, 6838.936167683758, -32508.840413266225), ((-2.289889256701333825605052e-14, 1.429871181524445056326443e-15, -6.934817445783579928393712e-15), (1.429871181524445056326443e-15, -2.075396808505219792142394e-14, -1.386948077879761226934618e-14), (-6.934817445783579928393712e-15, -1.386948077879761226934618e-14, 4.365286065206553617747445e-14))),
+    ]
+
+    _t_p = np.array([r[0] for r in _T_ROWS], float)
+    _t_Tt = np.array([r[1] for r in _T_ROWS], float)
+    _t_tol = 1e-9 * np.linalg.norm(_t_Tt, axis=(1, 2))[:, None, None]
+    _t_T0 = prism_gradients(_t_p[0], _T_BA, _T_RA)
+    _t_T1 = prism_gradients(_t_p[:1], _T_BA, _T_RA)
+    _t_T3 = prism_gradients(_t_p, _T_BA, _T_RA)
+    assert (isinstance(_t_T0, np.ndarray) and _t_T0.shape == (3, 3) and isinstance(_t_T1, np.ndarray)
+            and _t_T1.shape == (1, 3, 3) and isinstance(_t_T3, np.ndarray) and _t_T3.shape == (3, 3, 3)), (_t_T0, _t_T1)
+    assert np.all(np.abs(_t_T0 - _t_Tt[0]) <= _t_tol[0]) and np.all(np.abs(_t_T1[0] - _t_Tt[0]) <= _t_tol[0]), (_t_T0, _t_T1)
+    assert np.all(np.abs(_t_T3 - _t_Tt) <= _t_tol), _t_T3
+
+
+_crown_case()
+
+# --- test case 6 ---
+# analytic special cases inside: at the centre of a prism of half-edges (a, b, c), r = sqrt(a^2 + b^2 + c^2),
+# T = -8 G rho diag(atan(b c / (a r)), atan(c a / (b r)), atan(a b / (c r))) (off-diagonal zero by
+# symmetry; -(4 pi / 3) G rho I for a cube), for a 100 m x 200 m x 250 m prism, a 300 m cube, the rod and the
+# plate of aspect ratio 1000; Poisson's equation (trace -4 pi G rho) at off-centre points inside the rod and
+# the plate and Laplace's equation (trace 0) 1e-6 m outside their faces and edges (trace tolerance: the sum
+# of the three diagonal tolerances)
+import numpy as np
+
+
+def _crown_case():
+    import math
+    import numpy as np
+
+    _T_G = 6.6743e-11
+
+    _T_PRISMS = [((0.0, 100.0, 0.0, 200.0, 50.0, 300.0), 2670.0), ((1000.0, 1300.0, -200.0, 100.0, 50.0, 350.0), 2900.0),
+                 ((100.0, 102.0, -50.0, -48.0, 10.0, 2010.0), 2000.0), ((-1000.0, 1000.0, 0.0, 2000.0, 5.0, 7.0), -250.0)]
+
+    for _t_b, _t_rho in _T_PRISMS:
+        _t_c = np.array([_t_b[0] + _t_b[1], _t_b[2] + _t_b[3], _t_b[4] + _t_b[5]]) / 2.0
+        _t_a, _t_bb, _t_cc = [(_t_b[2 * i + 1] - _t_b[2 * i]) / 2.0 for i in range(3)]
+        _t_r = math.sqrt(_t_a ** 2 + _t_bb ** 2 + _t_cc ** 2)
+        _t_want = -8.0 * _T_G * _t_rho * np.diag([math.atan(_t_bb * _t_cc / (_t_a * _t_r)), math.atan(_t_cc * _t_a / (_t_bb * _t_r)),
+                                                    math.atan(_t_a * _t_bb / (_t_cc * _t_r))])
+        _t_T = prism_gradients(_t_c, _t_b, _t_rho)
+        assert np.all(np.abs(_t_T - _t_want) <= 1e-9 * np.linalg.norm(_t_want)), (_t_b, _t_T, _t_want)
+    # (prism index, points inside, points outside)
+    for _t_k, _t_in, _t_out in ((2, [[101.3, -48.4, 1500.0], [100.5, -49.9, 20.0]], [[102.000001, -49.0, 1010.0], [100.0, -50.000001, 2010.000001]]),
+                                (3, [[-900.0, 1950.0, 6.5], [300.0, 700.0, 5.2]], [[0.0, 1000.0, 4.999999], [1000.000001, 2000.000001, 6.0]])):
+        _t_b, _t_rho = _T_PRISMS[_t_k]
+        _t_T = prism_gradients(np.array(_t_in), _t_b, _t_rho)
+        _t_tr = np.trace(_t_T, axis1=1, axis2=2)
+        assert np.all(np.abs(_t_tr + 4.0 * math.pi * _T_G * _t_rho) <= 3e-9 * np.linalg.norm(_t_T, axis=(1, 2))), (_t_k, _t_tr)
+        _t_T = prism_gradients(np.array(_t_out), _t_b, _t_rho)
+        _t_tr = np.trace(_t_T, axis1=1, axis2=2)
+        assert np.all(np.abs(_t_tr) <= 3e-9 * np.linalg.norm(_t_T, axis=(1, 2))) and np.all(np.linalg.norm(_t_T, axis=(1, 2)) > 0.0), (_t_k, _t_tr)
+
+
+_crown_case()
+
+# --- test case 7 ---
+# the jump across a face (a consequence of Gauss's law for the surface of the mass): just inside minus just
+# outside a face of normal n, T_in - T_out = -4 pi G rho n n^T, every other component continuous; pairs of
+# points a distance 1e-9 m (1e-10 m for the rod) on either side of the centre of the top face of the first
+# prism, of a side of the cube, of a side of the rod and of the top of the plate (the smooth variation of T
+# over that distance is at most 4.2e-11 (||T_in|| + ||T_out||), 4 % of the tolerance, from the 60-digit
+# closed forms); tolerance the sum of the two stated tolerances
+import numpy as np
+
+
+def _crown_case():
+    import math
+    import numpy as np
+
+    _T_G = 6.6743e-11
+
+    # (bounds, rho, point inside, point outside, normal axis)
+    _T_PAIRS = [((0.0, 100.0, 0.0, 200.0, 50.0, 300.0), 2670.0, (50.0, 100.0, 50.000000001), (50.0, 100.0, 49.999999999), 2),
+                ((1000.0, 1300.0, -200.0, 100.0, 50.0, 350.0), 2900.0, (1150.0, -199.999999999, 200.0), (1150.0, -200.000000001, 200.0), 1),
+                ((100.0, 102.0, -50.0, -48.0, 10.0, 2010.0), 2000.0, (101.9999999999, -49.0, 1010.0), (102.0000000001, -49.0, 1010.0), 0),
+                ((-1000.0, 1000.0, 0.0, 2000.0, 5.0, 7.0), -250.0, (0.0, 1000.0, 5.000000001), (0.0, 1000.0, 4.999999999), 2)]
+
+    for _t_b, _t_rho, _t_pin, _t_pout, _t_ax in _T_PAIRS:
+        _t_T = prism_gradients(np.array([_t_pin, _t_pout]), _t_b, _t_rho)
+        _t_J = np.zeros((3, 3))
+        _t_J[_t_ax, _t_ax] = -4.0 * math.pi * _T_G * _t_rho
+        _t_tol = 1e-9 * (np.linalg.norm(_t_T[0]) + np.linalg.norm(_t_T[1]))
+        assert np.all(np.abs(_t_T[0] - _t_T[1] - _t_J) <= _t_tol), (_t_b, _t_T[0] - _t_T[1], _t_J)
 
 
 _crown_case()

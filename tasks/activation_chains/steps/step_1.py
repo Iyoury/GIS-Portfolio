@@ -19,7 +19,7 @@ def chain_inventory(lam, n0, t):
 
     Raises:
       ValueError if lam and n0 are not 1-D arrays of the same length between 1 and 30, if an entry of
-      lam is negative, above 1e10 or not finite, if an entry of n0 is negative or not finite, if
-      sum(n0) > 1e100, or if t is not finite or outside [0, 1e20].
+      lam is negative or above 1e10, if an entry of n0 is negative, if sum(n0) > 1e100, or if t is
+      outside [0, 1e20].
     '''
     raise NotImplementedError

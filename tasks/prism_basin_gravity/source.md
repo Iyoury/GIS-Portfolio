@@ -108,6 +108,26 @@ reference's strategies with other parameters, is described under Version 4 below
   -1.1106331967251501474213766859e-5 m s^-2, confirmed to 30 digits by a 50-digit mpmath quadrature over
   depth of the solid angle of the centred laminae, 4 atan(a b / (z sqrt(a^2 + b^2 + z^2))). The depth
   (300 m) is the known input.
+- **Version 6 additions.** Step 3: two stations exactly 1e7 m from their column (the stated limit), by
+  the 90-digit prism closed form (lam = 0; the 60-digit quadrature agrees to 1.6e-51) and by 70-digit
+  tanh-sinh quadrature (lam = 1e-2; mpmath Gauss-Legendre on the same panels agrees to 4e-62). Step 4: the
+  one-cell basin 20 km x 25 km, 5e4 m deep (the inclusive depth limit), drho0 = -380: for lam = 2e-5 the
+  attraction at the centre of its top by 40-digit tanh-sinh quadrature of 4 atan(a b / (z r)) e^(-lam z)
+  over depth, -1.416642663755939106e-3 m s^-2, confirmed to 1.5e-17 by Gauss-Legendre quadrature on 50
+  uniform panels; for lam = 0 the 60-digit closed form, -1.742444386281940718e-3, confirmed to 1e-41 by the
+  quadrature. A 1 x 3 basin (lam = 5e-4, drho0 = -350) by 30-digit tanh-sinh quadrature of every
+  station-column pair, confirmed to 7e-26 by Gauss-Legendre quadrature on other panels (graded near
+  z = 0, then 50 m); a 3 x 1 basin (lam = 0, drho0 = +280) by sums of 60-digit prism closed forms,
+  confirmed to 1.2e-30 by quadrature. Analytic targets computed in the tests themselves: the cube constants
+  K = (3/2) ln(2 + sqrt 3) - pi/4 = 1.19003868198977675... (integral of 1/r over a unit cube from a corner)
+  and C = 2 ln(1 + sqrt 2) - ln(2 + sqrt 3) + pi/6 = 0.96938805271256821... (integral of x / r^3), which
+  agree with mpmath two-dimensional quadratures to 20 digits and, for a 300 m cube, with the 60-digit
+  closed forms to all 25 printed digits; the tensor at the centre of a prism of half-edges (a, b, c),
+  -8 G rho diag(atan(b c / (a r)), atan(c a / (b r)), atan(a b / (c r))), equal to the 60-digit closed
+  forms to 2e-61 for the four prisms used; the face jump -4 pi G rho n n^T, which the 60-digit closed
+  forms at 1e-9 m (1e-10 m for the rod) on either side of a face reproduce to at most 4.2e-11 (||T_in|| +
+  ||T_out||). Identity checks (scaling by powers of 2 or by 1024, superposition of halves, translation,
+  reflection, linearity in the density) use the stored targets multiplied by exact factors.
 - No HDF5 file: every target is stored inline in the test case that uses it, so there is no
   target_evidence record.
 
@@ -569,3 +589,71 @@ SUMMARY ALL OK.
 Not changed: the physics, the algorithms of both solutions, every stored target of earlier versions, and
 every stated tolerance (U 1e-10, g 1e-10 |g| + 1e-14 G |rho| L, T 1e-9 ||T||, columns 1e-10, depths 1e-8);
 relevant_experience stays the placeholder for the author.
+
+## Version 6 (grading_fix: platform content check v2)
+
+Finding (platform content check of version 5, 15 items to fix): (1) blocking "Edge-case inputs": the
+error tests of steps 1 to 4 passed float("inf"), float("nan") and float("-inf") (step 1 case 3, step 2
+case 3, step 3 case 3, step 4 case 1 with a NaN in gz_obs and an infinite edge); (2) "Science outweighs
+validation": step 2 counted 12.5 validation sites (9 raises at half weight plus repeated type and shape
+asserts) against 10 computed, step 4 12.5 against 6; (3) "Scientific grounding": step 1 allowed rho = 0
+and step 3 drho0 = 0, where U and gz vanish and the stated relative error has no meaning; (4)
+"Requirements tested": rho = 0 and drho0 = 0 untested, the one-row (1, 3) inputs of steps 1 to 3 untested
+(a squeezed output would have passed), and the inclusive depth limit 5e4 m of step 4 untested.
+
+Cause: the error tests checked every input rule, including non-finite inputs that the science does not
+need, and each case repeated its own type and shape assert; the zero density was never excluded although
+every accuracy statement is relative; the batch tests used n >= 3 only; the step-4 basins were at most
+2.6 km deep.
+
+Change:
+- Prompts, function headers, problem_io, contracts and the docstrings of steps/, solution/, solution.py,
+  second_solution.py and the mutants (synchronised from problem.yaml): no promise about non-finite input
+  remains; rho (steps 1 and 2) and drho0 (step 3) must be nonzero and raise ValueError when zero (step 4
+  already required drho0 nonzero); the outputs for (n, 3) inputs are stated for n = 1 included, and for
+  step 4 also when nx or ny is 1. The solutions keep their internal finiteness checks and now reject
+  rho = 0 and drho0 = 0 (reference, per-step files, second solution, mutants).
+- Error tests trimmed to each stated rule once, just outside the valid domain: step 1 five entries (five
+  bounds, x1 = x2, rho = 0, shape (2,), shape (0, 3)); step 2 six (a face, an edge, a corner, invalid
+  bounds, rho = 0, shape (2,)); step 3 seven (z = 1e-9, shape (2,), drho0 = 0, y1 = y2, depth 0, depth
+  50001 m, lam = 0.0101); step 4 seven (decreasing edges, 121 cells, wrong gz_obs shape, drho0 = 0,
+  lam < 0, wrong sign, the infinite-slab value). No non-finite literal remains in any test.
+- The type and shape asserts of the computed-value cases are removed; each step has one contract case:
+  step 1 case 5, step 2 case 5, step 3 case 5 (one point, a one-row (1, 3) batch, three points; values
+  checked in every form) and step 4 case 8 (a 1 x 3 basin with lam = 5e-4 and a 3 x 1 basin with lam = 0,
+  shapes (1, 3) and (3, 1)).
+- New computed cases with independent targets (see Targets, version 6 additions): step 1 case 6 (cube
+  centre and corners, analytic) and case 7 (scaling by 1024 and 1/1024, superposition of the two halves
+  cut by y = 100, which puts stored points on common faces and edges of the halves); step 2 case 6 (the
+  tensor at the centre of four prisms, analytic; Poisson inside and Laplace outside the rod and the plate)
+  and case 7 (the face jump -4 pi G rho n n^T on four faces); step 3 case 4 two stations exactly 1e7 m
+  away, case 6 (depth cut with the station raised, width cut through an edge, scaling by 8 and 1/4 with
+  another drho0, translation by (4e5, 5e5) m, reflections); step 4 case 7 (one cell exactly 5e4 m deep,
+  lam = 2e-5 and lam = 0) and case 9 (lengths doubled with lam halved, x and y exchanged, gz_obs and drho0
+  scaled by -1 and 1/2, translation by (5e5, 5.3e6) m).
+- n_test_cases 8, 8, 7, 10; verification_explanation names the new evidence; the step-2 background no longer
+  says that every diagonal component jumps across a face (only the normal-normal one does, by 4 pi G rho,
+  as step 2 case 7 checks).
+
+Assertion sites (validation, with stated raises at half weight, versus computed): step 1 10.5 / 12 before,
+3.5 / 23 after; step 2 10.5 / 6 before (the platform counted 12.5 / 10), 4.0 / 12 after; step 3 11.5 / 6
+before, 4.5 / 13 after; step 4 12.5 / 6 before, 4.5 / 13 after.
+
+Regression tests: the new cases above; margins of both solutions on them: cube 1.8e-5 of the tolerance
+(second 3.3e-6), centre tensors 7.6e-7 (8.9e-8), Poisson and Laplace 1.7e-5 (5.9e-8), face jumps at most
+0.041 (the physical variation over the 1e-10 m to 1e-9 m offsets, same for both), column identities at
+most 5.6e-6 except the translation, 1.4e-2 for both (the rounding of the shifted stations), stations at
+1e7 m below 1.1e-6; depths of the new step-4 cases within 2.7e-13 (reference) and 1.3e-13 (second
+solution) of the targets, a few 1e-5 of the 1e-8 tolerance.
+
+Rerun: `OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 python3 tools/crown_check.py
+tasks/prism_basin_gravity -j 2` (all modes): FORMAT OK (no non-finite literal, markers and n_test_cases
+agree); REF steps 1-4 8/8, 8/8, 7/7, 10/10 and general 3/3; SECOND the same; mutants: closed_form_everywhere
+(step 1) fails cases 0, 2, 4, 5, 7, direct_log 1, 2, 7, no_subdivision (step 1) 4, closed_form_everywhere
+(step 2) 0, 2, 4, 5, no_subdivision (step 2) 4, uniform_gauss_legendre 0, 2, 5, 6, uniform_density 0, 2, 4,
+5, 6, corner_sum_far 2, 4, slab_thickness 0, 2-9, newton_step_halving 5, whole_task_mgal general 0, 1, 2;
+SHIFT +-1e-12 all pass; all-None and all-zero controls pass 0 cases in every step and in general; SUMMARY
+ALL OK.
+
+Not changed: the physics, the algorithms of both solutions, every stored target of earlier versions, and
+every stated tolerance (U 1e-10, g 1e-10 |g| + 1e-14 G |rho| L, T 1e-9 ||T||, columns 1e-10, depths 1e-8).

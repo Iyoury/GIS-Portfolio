@@ -1,11 +1,11 @@
 # --- test case 0 ---
 # Independent targets, none from the solution code: closed forms of the classical (Maxwell-Juettner) gas
-# with modified Bessel functions, evaluated here in 40-digit mpmath (cases 0 and 1); the Sommerfeld
+# with modified Bessel functions, evaluated here in 40-digit mpmath (cases 0 to 2); the Sommerfeld
 # expansion of the degenerate gas and the Bessel-function series of the Fermi-Dirac integrals, evaluated
-# once in 50- to 60-digit mpmath (cases 2 and 3); and values computed once with mpmath at 40 digits by
+# once in 50- to 60-digit mpmath (cases 3 and 4); and values computed once with mpmath at 40 digits by
 # tanh-sinh quadrature of the defining integrals in the momentum (breakpoints every k T over the Fermi
 # edge), the chemical potential by a root search on those integrals and the specific heat by a centred
-# difference of the energy at constant net electron density (T +- 1e-7 T) (cases 4 to 6).
+# difference of the energy at constant net electron density (T +- 1e-7 T) (cases 5 to 7).
 # Classical gas without pairs, from cool and non-relativistic (T = 1e7 K, theta = 1.7e-3) to mildly
 # relativistic (1.2e8 K, theta = 0.020): at constant n_net = n_minus = rho_Ye N_A the energy per electron
 # is m_e c^2 (K1(1/theta) / K2(1/theta) + 3 theta - 1), so c_V = n k d/dtheta [K1(1/theta) / K2(1/theta)
@@ -38,7 +38,8 @@ def _crown_case():
             _t_dratio = (_t_dK1 * _t_K2 - _t_K1 * _t_dK2) / _t_K2 ** 2       # d(K1/K2)/dx
             _t_want = float(_t_n * _t_mp.mpf(_T_KB) * (3 - _t_dratio / _t_th ** 2))
         _t_got = specific_heat(_t_rY, _t_T)
-        assert type(_t_got) is float and _t_rel(_t_got, _t_want) < 1e-8, (_t_rY, _t_T, _t_got, _t_want)
+        assert type(_t_got) is float, type(_t_got)
+        assert _t_rel(_t_got, _t_want) < 1e-8, (_t_rY, _t_T, _t_got, _t_want)
 
 
 _crown_case()
@@ -82,12 +83,55 @@ def _crown_case():
             _t_want = float(2 * _t_mp.mpf(_T_KB) * _t_pref / _t_th ** 2
                             * (_t_F * _t_mp.cosh(_t_psi) - _t_E ** 2 / _t_N * _t_mp.tanh(_t_psi) * _t_mp.sinh(_t_psi)))
         _t_got = specific_heat(_t_rY, 1.4e8)
-        assert type(_t_got) is float and _t_rel(_t_got, _t_want) < 1e-8, (_t_rY, _t_got, _t_want)
+        assert _t_rel(_t_got, _t_want) < 1e-8, (_t_rY, _t_got, _t_want)
 
 
 _crown_case()
 
 # --- test case 2 ---
+# a classical pair plasma at T = 2e8 K (1 / theta = 29.65), rho_Ye = 1e-10, 1e-9 and 1e-8 g cm^-3
+# (psi about 0.0156, 0.155 and 1.23): the positrons number 0.97, 0.73 and 0.086 of the electrons, and pair
+# creation makes c_V about 3.9e4, 3.8e3 and 210 times the value of the electrons alone. Same closed form as
+# case 1: with a = 1 / theta, N = K2(a) / a, E = K1(a) / a + 3 K2(a) / a^2, F = K0(a) / a + 5 K1(a) / a^2
+# + 12 K2(a) / a^3 and psi = asinh(rho_Ye N_A / (2 N / (pi^2 lambda^3))),
+#   c_V = (2 k / (pi^2 lambda^3 theta^2)) [F cosh psi - (E^2 / N) tanh psi sinh psi].
+# The occupation exponents stay above 28.4, so the Fermi corrections are below 2e-13 of c_V (measured
+# against the exact Bessel-function series of the Fermi-Dirac integrals)
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+    import mpmath as _t_mp
+
+    _T_MEC2 = 8.1871057769e-7
+    _T_KB = 1.380649e-16
+    _T_LC = 3.8615926796e-11
+    _T_NA = 6.02214076e23
+
+    def _t_rel(a, b):
+        return abs(a - b) / abs(b)
+
+    for _t_rY in (1e-10, 1e-9, 1e-8):
+        with _t_mp.workdps(40):
+            _t_n = _t_mp.mpf(_t_rY) * _t_mp.mpf(_T_NA)
+            _t_th = _t_mp.mpf(_T_KB) * 2e8 / _t_mp.mpf(_T_MEC2)
+            _t_a = 1 / _t_th
+            _t_pref = 1 / (_t_mp.pi ** 2 * _t_mp.mpf(_T_LC) ** 3)
+            _t_K0, _t_K1, _t_K2 = _t_mp.besselk(0, _t_a), _t_mp.besselk(1, _t_a), _t_mp.besselk(2, _t_a)
+            _t_N = _t_K2 / _t_a
+            _t_E = _t_K1 / _t_a + 3 * _t_K2 / _t_a ** 2
+            _t_F = _t_K0 / _t_a + 5 * _t_K1 / _t_a ** 2 + 12 * _t_K2 / _t_a ** 3
+            _t_psi = _t_mp.asinh(_t_n / (2 * _t_pref * _t_N))
+            _t_want = float(2 * _t_mp.mpf(_T_KB) * _t_pref / _t_th ** 2
+                            * (_t_F * _t_mp.cosh(_t_psi) - _t_E ** 2 / _t_N * _t_mp.tanh(_t_psi) * _t_mp.sinh(_t_psi)))
+        _t_got = specific_heat(_t_rY, 2e8)
+        assert _t_rel(_t_got, _t_want) < 1e-8, (_t_rY, _t_got, _t_want)
+
+
+_crown_case()
+
+# --- test case 3 ---
 # strongly degenerate gases from the Sommerfeld expansion (positrons and the lower end of the momentum
 # integral contribute below e^{-300}): with mu = psi theta the electron chemical energy (rest energy
 # included, units m_e c^2), n and u are int_1^mu H deps + sum_k 2 (1 - 2^{1-2k}) zeta(2k) theta^{2k}
@@ -113,12 +157,12 @@ def _crown_case():
 
     for (_t_rY, _t_T), _t_v in _T_SOMM.items():
         _t_got = specific_heat(_t_rY, _t_T)
-        assert type(_t_got) is float and _t_rel(_t_got, float(_t_v[1])) < 1e-8, (_t_rY, _t_T, _t_got, _t_v[1])
+        assert _t_rel(_t_got, float(_t_v[1])) < 1e-8, (_t_rY, _t_T, _t_got, _t_v[1])
 
 
 _crown_case()
 
-# --- test case 3 ---
+# --- test case 4 ---
 # pair plasmas with Fermi-Dirac corrections, from the series of the Fermi-Dirac integrals in modified
 # Bessel functions, exact for psi < 1 / theta: 1 / (e^x + 1) = sum_j (-1)^{j+1} e^{-j x} for x > 0 and
 # int p^2 eps^k e^{-a eps} dp in K0, K1, K2 (a = j / theta), so n_net = (2 / (pi^2 lambda^3)) sum_j
@@ -142,17 +186,17 @@ def _crown_case():
 
     for (_t_rY, _t_T), _t_v in _T_SER.items():
         _t_got = specific_heat(_t_rY, _t_T)
-        assert type(_t_got) is float and _t_rel(_t_got, float(_t_v[1])) < 1e-8, (_t_rY, _t_T, _t_got, _t_v[1])
+        assert _t_rel(_t_got, float(_t_v[1])) < 1e-8, (_t_rY, _t_T, _t_got, _t_v[1])
 
 
 _crown_case()
 
-# --- test case 4 ---
+# --- test case 5 ---
 # degenerate gases against the 40-digit targets: c_V about 8e-10 of u / T at rho_Ye = 1e13 g cm^-3,
 # T = 1e7 K, where the Schur form <dE^2> - <dE dN>^2 / <dN^2> loses about 2e-7, and two degenerate,
 # non-relativistic gases near T = 1e7 K (rho_Ye = 1e5 g cm^-3 at 1e7 K and 4e5 g cm^-3 at 1.2e7 K), where
 # the psi solving n_net = rho_Ye N_A is hard to converge (d ln c_V / d ln psi is about 7 and 4 there, so an
-# error of psi enters c_V amplified); the Sommerfeld expansion of case 2 reproduces these five c_V within
+# error of psi enters c_V amplified); the Sommerfeld expansion of case 3 reproduces these five c_V within
 # 4e-16
 import numpy as np
 
@@ -173,12 +217,12 @@ def _crown_case():
 
     for (_t_rY, _t_T), _t_v in _T_RT.items():
         _t_got = specific_heat(_t_rY, _t_T)
-        assert type(_t_got) is float and _t_rel(_t_got, float(_t_v[1])) < 1e-8, (_t_rY, _t_T, _t_got, _t_v[1])
+        assert _t_rel(_t_got, float(_t_v[1])) < 1e-8, (_t_rY, _t_T, _t_got, _t_v[1])
 
 
 _crown_case()
 
-# --- test case 5 ---
+# --- test case 6 ---
 # pair plasmas against the 40-digit targets, from rho_Ye = 1e5 g cm^-3 at 5e9 K to the hottest, most dilute
 # corner (rho_Ye = 1e-10 g cm^-3, T = 1e11 K, psi about 2e-21), where c_V is almost entirely that of the
 # thermal pairs, and a dense gas at 1e11 K (rho_Ye = 1e13 g cm^-3)
@@ -201,12 +245,12 @@ def _crown_case():
 
     for (_t_rY, _t_T), _t_v in _T_RT.items():
         _t_got = specific_heat(_t_rY, _t_T)
-        assert type(_t_got) is float and _t_rel(_t_got, float(_t_v[1])) < 1e-8, (_t_rY, _t_T, _t_got, _t_v[1])
+        assert _t_rel(_t_got, float(_t_v[1])) < 1e-8, (_t_rY, _t_T, _t_got, _t_v[1])
 
 
 _crown_case()
 
-# --- test case 6 ---
+# --- test case 7 ---
 # partly degenerate and classical gases against the 40-digit targets: a white-dwarf-like state
 # (rho_Ye = 1e6 g cm^-3, T = 1e9 K, psi about 7.8) and the coolest, most dilute corner
 # (rho_Ye = 1e-10 g cm^-3, T = 1e7 K, psi about 564, where d ln c_V / d ln psi is about 564)
@@ -226,12 +270,12 @@ def _crown_case():
 
     for (_t_rY, _t_T), _t_v in _T_RT.items():
         _t_got = specific_heat(_t_rY, _t_T)
-        assert type(_t_got) is float and _t_rel(_t_got, float(_t_v[1])) < 1e-8, (_t_rY, _t_T, _t_got, _t_v[1])
+        assert _t_rel(_t_got, float(_t_v[1])) < 1e-8, (_t_rY, _t_T, _t_got, _t_v[1])
 
 
 _crown_case()
 
-# --- test case 7 ---
+# --- test case 8 ---
 # rho_Ye or T outside its range
 import numpy as np
 

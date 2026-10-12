@@ -5,8 +5,11 @@
 # root search on those integrals and the specific heat by a centred difference of the energy at constant
 # net electron density (T +- 1e-7 T), all in mpmath; positron densities of a classical positron gas
 # (eps/kT + psi >= 40) from the Maxwell-Juettner formula.
-# classical gas (the electron occupation exponent stays above 39 and that of the positrons
-# above 59, so Fermi corrections are below 1e-17): Maxwell-Juettner densities
+# classical gases, Maxwell-Juettner densities: at (T, psi) = (1e8, 20), (2e7, 5) and (5e7, 30) the
+# electron occupation exponent stays above 39 and that of the positrons above 59, so Fermi corrections are
+# below 1e-17; at (2e8, 0.0156), a classical pair plasma with 0.97 positrons per electron (n_net 3 percent
+# of n_minus), both exponents stay above 29.6 and the Fermi corrections are below 1e-13 (measured against
+# the exact Bessel-function series of the Fermi-Dirac integrals)
 import numpy as np
 
 
@@ -50,7 +53,7 @@ def _crown_case():
             assert abs(net - target[2]) <= 1e-250, (T, psi, net, target[2])
         return out
 
-    for _t_T, _t_psi in ((1e8, 20.0), (2e7, 5.0), (5e7, 30.0)):
+    for _t_T, _t_psi in ((1e8, 20.0), (2e7, 5.0), (5e7, 30.0), (2e8, 0.0156)):
         _t_c = _t_classical(_t_T, _t_psi)
         _t_check1(_t_T, _t_psi, _t_c[:3])
 
@@ -86,7 +89,6 @@ def _crown_case():
 
     def _t_check1(T, psi, target):
         out = pair_densities(T, psi)
-        assert isinstance(out, tuple) and len(out) == 3 and all(type(x) is float for x in out), out
         nm, npl, net = out
         assert _t_rel(nm, target[0]) < 1e-10, (T, psi, nm, target[0])
         if target[1] >= 1e-250:
@@ -171,7 +173,6 @@ def _crown_case():
             _t_base = _t_th * _t_mp.besselk(2, 1 / _t_th) / (_t_mp.pi ** 2 * _t_mp.mpf(_T_LC) ** 3)
             _t_want = [_t_base * _t_mp.exp(_t_psi), _t_base * _t_mp.exp(-_t_psi), 2 * _t_base * _t_mp.sinh(_t_psi)]
         _t_out = pair_densities(1e7, _t_psi)
-        assert isinstance(_t_out, tuple) and len(_t_out) == 3 and all(type(x) is float for x in _t_out), _t_out
         for _t_got, _t_w, _t_name in zip(_t_out, _t_want, ("n_minus", "n_plus", "n_net")):
             if _t_w >= 1e-250:
                 assert _t_rel(_t_got, float(_t_w)) < 1e-10, (_t_psi, _t_name, _t_got, _t_w)

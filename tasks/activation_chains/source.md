@@ -597,3 +597,111 @@ results):
   chain with two equal constants, the gold monitor at 1e14 and two flux inversions (gold at 1e12 and the
   round trip with 1e-70 target atoms): identical outputs (bitwise) within each solution; solution.py was
   also run alone on every case of tests/step_1.py to tests/step_4.py (7/7, 6/6, 6/6, 6/6).
+
+## Version 15 (grading_fix: platform content check of upload v13)
+
+Platform content check of upload v13: six blocking items ("Edge-case inputs" in steps 1-4, "Science
+outweighs validation" in steps 2 and 3) and one advisory ("Scientific grounding", step 2). The science,
+the reference algorithms (apart from the column normalization below), the targets of the kept cases, the
+1e-10 and 1e-8 tolerances and the input domain are unchanged. edit_label stays grading_fix.
+
+- Non-finite inputs (blocking, steps 1-4).
+  - Finding: the error tests passed NaN or infinite inputs (step 1 case 6: a NaN decay constant, a NaN
+    amount, a NaN time; step 2 case 5: a NaN time, a NaN amount, an infinite production rate; step 3
+    case 5: a NaN cross section, an infinite duration; step 4 case 5: NaN or infinite activity, flux
+    bounds and t_irr), and step 4 case 3 used np.inf internally as the direction of np.nextafter.
+  - Cause: the prompts promised ValueError for values that are not finite, and the tests checked that
+    promise; the platform now refuses every non-finite literal in tests, internal ones included.
+  - Change: those entries were removed; np.nextafter(x, +-np.inf) became np.nextafter(x, +-1e308), which
+    gives the same neighbour for every activity used (all far below 1e308). The clauses "or not finite",
+    "(NaN and infinite values included)", "all values finite" and "all finite" were removed from the four
+    prompts, the function headers, problem_io, the contracts' valid_input_ranges and every docstring copy
+    (steps/, solution/, solution.py, second_solution.py, mutants/; still identical to problem.yaml).
+    The solutions still reject non-finite values internally (unstated, untested); their error messages
+    no longer mention finiteness.
+  - Regression: crown_check format (non-finite-literal scan) reports nothing; step 4 case 3 passes with
+    the reference and the second solution, and the end-cutoff variants below still fail it.
+- Science outweighs validation (blocking for steps 2 and 3; applied to every step).
+  - Finding: counted per step as the platform does (assertion sites, stated raises at half weight), the
+    validation and computed-value sites were 12.5 / 13 (step 1), 14.5 / 11 (step 2), 22 / 10 (step 3) and
+    18 / 9 (step 4); the shape assert of the _t_check helper was repeated in every case, the float check
+    in every round trip, and the error lists tested several entries per stated rule.
+  - Cause: each case had been made self-contained with its own copy of the helper, shape check included,
+    and the error lists had grown with every review round.
+  - Change: one contract check per step (steps 1-3, case 0: a one-nuclide input returns a numpy array of
+    shape (1,), not a scalar; step 4, case 0: the flux is a Python float); elsewhere the helpers compare
+    entry by entry after reshape(len(target)), so a wrong number of entries still fails. The error lists
+    keep each stated rule once, at its boundary where it has one: step 1 nine entries (1.0001e10,
+    sum(n0) = 1.01e100, t = -1 and 1.0001e20, ...), step 2 nine (column sum 1 + 1e-9, 1.0001e10,
+    1.0001e20, sum(n0) + t sum(source) = 1.01e101, ...), step 3 thirteen (a decay-capture cycle with an
+    empty history, positive sigma 1e-7 b, a duration of 1.0001e12 s, a history given as a set, ...),
+    step 4 seven (t_irr = 0, k of a stable nuclide, k = 1.0 and True, activity 0, flux_lo = flux_hi,
+    flux_lo = 9.99e-3), plus the three domain-floor cases, the step-3 data case and the two outside-interval
+    checks of case 3. The old step 4 case 4 (two activities outside the interval) was dropped, since case 3
+    tests the same rule at both ends (2e-9 outside, and the representable activity just beyond
+    1e-9 + 1e-10). New computed cases, each with independent targets:
+    - step 1 case 7: a stable member inside a chain (closed forms at 50 digits; the members after it stay
+      exact zeros; conservation of the atoms above it); case 8: the 232Th series as a linear chain through
+      212Po (1.6e-18 to 2.3e6 per s) after 1 d, 10 y and 1e10 y, against the Bateman sum at 600 digits,
+      208Pb as the 600-digit remainder, and the total conserved;
+    - step 2 case 6: a diamond network given out of topological order, every amount the sum over its decay
+      paths of the product of fractions times the 600-digit Bateman amount along the path, and the balance
+      (atoms lost = 30 % of the decays of nuclide 2); case 7: a chain fed by a constant source, the source
+      treated as a parent of decay constant 0 in the 600-digit Bateman sum, and the saturation limit
+      lam[k] x[k] = q at lam t >= 200; case 4 also checks conservation with a normalized column;
+    - step 3 case 6: two-member activation with burnup of target and product in closed form (cobalt from
+      sigma phi t = 1e-6 to 111, a product removed at the target's rate, where the textbook formula divides
+      by zero) and the 198Au saturation activity equal to the production rate n0 sigma 1e-24 phi; case 7:
+      decay competing with capture with decay branching (shares 0.3 lam : 0.7 lam : c of the losses, then
+      cooling), also with a column summing to 1 + 1e-12, and conservation of the atoms; case 8: the order
+      of the periods (irradiation then cooling against the reverse, and their ratio exp(-0.6) between two
+      outputs at 2e-10) and a four-period history propagated with the closed-form two-member solution;
+    - step 4 case 5: round trips on a cobalt monitor whose activity is the closed-form two-member solution
+      with burnup (at 1e9, 1e13 and 3e14, slopes 1.00, 0.99 and 0.83; maximum of A near 2.7e15); case 6:
+      the power laws at low flux on the gold monitor (10 times the 198Au activity gives 10 times the flux, 4
+      times the 199Au activity twice the flux; burnup terms below 1e-14); case 7: 30 nuclides and
+      sum(n0) = 1e100, the three-capture product of the capture chain inverted at 1e10 and 3e16 against the
+      600-digit Bateman sum of the chain.
+    n_test_cases: 9, 8, 9, 8 (were 7, 6, 6, 6).
+  - Counts after the change (same counting): 5.5 / 19 (step 1), 5.5 / 18 (step 2), 7.5 / 19 (step 3),
+    7.5 / 18 (step 4).
+  - Regression: every new case passes with the reference and the second solution and fails at least one
+    mutant (crown_check below); the error budget of step 4 was rerun on the new cases.
+- Column sums in (1, 1 + 1e-12] (advisory, step 2).
+  - Finding: such sums were accepted as rounding of 1 but used as given, so a column summing to
+    1 + 1e-12 made more daughter atoms than parent decays.
+  - Cause: the bound was written for the validation only.
+  - Change: network_inventory divides such a column by its sum before building the rates, and
+    activation_inventory normalizes the decay branching the same way before combining it with capture
+    (reference, second solution through a helper _unit_columns, mutants rebuilt from the reference with
+    their one change). Stated in the step 2 prompt and header ("divided by its sum before use, so that its
+    fractions add up to exactly 1"), in the step 3 prompt and in the step 4 header and prompt
+    ("normalized as in step 2"), and in the step 2 contract. Targets updated: step 2 case 4 now expects
+    0.5 / s and (0.5 + 5e-13) / s of the decays (s the column sum) and 1 - exp(-2) for the column at
+    1 + 1e-12. The change moves results by at most a relative 1e-12, below the stated 1e-10, so no
+    tolerance can single it out; the tests use the normalized targets and check conservation.
+- Zero outputs and stated shapes and endpoints (checked, no change needed beyond the above). The relative
+  rule of steps 1-3 applies only to exact values of at least F = max(1e-250 S, 1e-300) > 0, so an exact
+  zero is always under the absolute rule (tested: empty inventories, the members behind a stable one);
+  the flux of step 4 is at least 1e-2. The (1,) shape of a one-nuclide result is now asserted in steps
+  1-3; the inclusive ends n = 30, lam = 1e10, sigma = 1e-6 and 1e7 b, sum(n0) = 1e100 (now also in step
+  4), t = 0 and 1e20, duration 0 and 1e12 s, flux 0 and 1e18, t_irr and t_cool = 1e9 s, t_cool = 0,
+  flux_lo = 1e-2 and flux_hi = 1e18 are exercised with values.
+
+Rerun after these changes (single-threaded BLAS, every case alone in a fresh process, -j 2):
+- tools/crown_check.py, all modes: FORMAT OK; REF 9/9, 8/8, 9/9, 8/8 and general 2/2; SECOND the same;
+  mutants: float_bateman fails 7/9 (cases 1-5, 7, 8), chain_squared_diagonal 4/9 (3, 4, 5, 8),
+  transposed_branching 6/8 (1-4, 6, 7), network_squared_diagonal 3/8 (3, 4, 6), barn_in_square_metres 7/9
+  (0, 1, 2, 4, 6, 7, 8), linear_response 7/8 (0-3, 5, 6, 7), whole-task barn mutant 2/2; SHIFT +-1e-12
+  passes every step and general case; all-None and all-zero controls pass no case; SUMMARY ALL OK.
+- Error budget of step 4 on the new test file: the step-3 context scaled by 1 + 9e-11, by 1 - 9e-11, and
+  by 1 + 9e-11 below a flux of 10**10.5 and 1 - 9e-11 above it (and the reverse), which gives opposite
+  signs at the two ends of the end-rule tests: every case passes; end cutoffs 0.85e-9 and 1.15e-9 fail
+  case 3.
+- Second solution against the reference (scratch comparison script, seeds 5, 6, 7): largest relative
+  difference 2.7e-14 on 120 random networks with production, 2.8e-15 on 30 networks scaled to 1e-280 to
+  1e-50, 2.2e-16 on 30 networks over times of 1e-250 to 1e-20 (no difference above 1.8e-29 F below F);
+  problem.yaml now quotes 2.7e-14 (it quoted 3.7e-14 from an earlier run).
+- solution.py (twice), the concatenated solution/step_*.py and second_solution.py (twice) on the 238U
+  series, a random network, the gold monitor and two inversions in clean processes: bitwise identical
+  outputs within each solution, and the reference identical to the concatenated steps.

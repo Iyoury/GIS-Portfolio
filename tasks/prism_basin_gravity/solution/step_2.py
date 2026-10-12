@@ -15,8 +15,8 @@ def _check_bounds(bounds, rho):
     if not (b[0] < b[1] and b[2] < b[3] and b[4] < b[5]):
         raise ValueError("need x1 < x2, y1 < y2, z1 < z2")
     rho = float(rho)
-    if not math.isfinite(rho):
-        raise ValueError("rho must be finite")
+    if not math.isfinite(rho) or rho == 0.0:
+        raise ValueError("rho must be finite and nonzero")
     return b, rho
 
 
@@ -257,10 +257,10 @@ def prism_gradients(points, bounds, rho):
       points: float array of shape (3,) or (n, 3), up to 1000 points, observation points (m), not on the
         prism surface.
       bounds: (x1, x2, y1, y2, z1, z2) (m), the longest edge at most 1000 times the shortest.
-      rho: float, density (kg m^-3).
+      rho: float, nonzero density (kg m^-3).
 
     Output:
-      T: numpy array of shape (3, 3) (one point) or (n, 3, 3), in s^-2; each component within
+      T: numpy array of shape (3, 3) (one point) or (n, 3, 3) (n >= 1), in s^-2; each component within
         1e-9 ||T|| (Frobenius norm of the exact tensor), inside or outside at any distance up to a million
         times the diagonal of the prism.
 

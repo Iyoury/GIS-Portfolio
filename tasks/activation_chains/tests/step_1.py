@@ -15,14 +15,16 @@ def _crown_case():
         return abs(a - b) / abs(b)
 
     def _t_check(x, target, scale):
-        x = np.asarray(x)
-        assert x.shape == (len(target),), x.shape
+        x = np.asarray(x, dtype=float).reshape(len(target))
         for a, b in zip(x, target):
             if b >= max(1e-250 * scale, 1e-300):
                 assert _t_rel(a, b) < 1e-10, (a, b)
             else:
                 assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)
 
+    # output contract: a one-member chain gives a numpy array of shape (1,), not a scalar
+    x = chain_inventory(np.array([0.3]), np.array([2.5]), 2.0)
+    assert isinstance(x, np.ndarray) and x.shape == (1,), (type(x), np.shape(x))
     for _t_lam, _t_t in ((0.3, 2.0), (1e-9, 1e3), (5.0, 100.0), (1.0, 550.0), (1.0, 575.0), (1.0, 575.6363229176583), (1.0, 600.0), (0.0, 1e20)):
         x = chain_inventory(np.array([_t_lam]), np.array([2.5]), _t_t)
         _t_check(x, [2.5 * np.exp(-_t_lam * _t_t)], 2.5)
@@ -48,8 +50,7 @@ def _crown_case():
         return abs(a - b) / abs(b)
 
     def _t_check(x, target, scale):
-        x = np.asarray(x)
-        assert x.shape == (len(target),), x.shape
+        x = np.asarray(x, dtype=float).reshape(len(target))
         for a, b in zip(x, target):
             if b >= max(1e-250 * scale, 1e-300):
                 assert _t_rel(a, b) < 1e-10, (a, b)
@@ -97,8 +98,7 @@ def _crown_case():
             return [float(x) for x in out]
 
     def _t_check(x, target, scale):
-        x = np.asarray(x)
-        assert x.shape == (len(target),), x.shape
+        x = np.asarray(x, dtype=float).reshape(len(target))
         for a, b in zip(x, target):
             if b >= max(1e-250 * scale, 1e-300):
                 assert _t_rel(a, b) < 1e-10, (a, b)
@@ -145,8 +145,7 @@ def _crown_case():
             return [float(x) for x in out]
 
     def _t_check(x, target, scale):
-        x = np.asarray(x)
-        assert x.shape == (len(target),), x.shape
+        x = np.asarray(x, dtype=float).reshape(len(target))
         for a, b in zip(x, target):
             if b >= max(1e-250 * scale, 1e-300):
                 assert _t_rel(a, b) < 1e-10, (a, b)
@@ -203,8 +202,7 @@ def _crown_case():
             return [float(x) for x in out]
 
     def _t_check(x, target, scale):
-        x = np.asarray(x)
-        assert x.shape == (len(target),), x.shape
+        x = np.asarray(x, dtype=float).reshape(len(target))
         for a, b in zip(x, target):
             if b >= max(1e-250 * scale, 1e-300):
                 assert _t_rel(a, b) < 1e-10, (a, b)
@@ -251,8 +249,7 @@ def _crown_case():
             return [float(x) for x in out]
 
     def _t_check(x, target, scale):
-        x = np.asarray(x)
-        assert x.shape == (len(target),), x.shape
+        x = np.asarray(x, dtype=float).reshape(len(target))
         for a, b in zip(x, target):
             if b >= max(1e-250 * scale, 1e-300):
                 assert _t_rel(a, b) < 1e-10, (a, b)
@@ -278,24 +275,115 @@ def _crown_case():
 _crown_case()
 
 # --- test case 6 ---
-# bad shapes, decay constants, amounts or times raise ValueError
+# each stated error rule once, just outside the domain: lam and n0 of different lengths, 31 members, 2-D
+# arrays, a negative decay constant or one above 1e10, a negative amount, sum(n0) above 1e100, and a time
+# below 0 or above 1e20 raise ValueError
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
     for _t_bad in ((np.array([0.1, 0.2]), np.array([1.0]), 1.0), (np.zeros(31), np.ones(31), 1.0),
-                   (np.zeros((2, 2)), np.ones((2, 2)), 1.0), (np.array([]), np.array([]), 1.0),
-                   (np.array([-0.1]), np.array([1.0]), 1.0), (np.array([2e10]), np.array([1.0]), 1.0),
-                   (np.array([0.1]), np.array([-1.0]), 1.0), (np.array([0.1]), np.array([1.0]), -1.0),
-                   (np.array([0.1]), np.array([1.0]), 2e20), (np.array([np.nan]), np.array([1.0]), 1.0), (np.array([0.1, 0.1]), np.array([1e100, 1e98]), 1.0),
-                   (np.array([0.1, 0.1]), np.array([1.0, np.nan]), 1.0), (np.array([0.1]), np.array([1.0]), float("nan"))):
+                   (np.zeros((2, 2)), np.ones((2, 2)), 1.0), (np.array([-0.1]), np.array([1.0]), 1.0),
+                   (np.array([1.0001e10]), np.array([1.0]), 1.0), (np.array([0.1]), np.array([-1.0]), 1.0),
+                   (np.array([0.1, 0.1]), np.array([1e100, 1e98]), 1.0), (np.array([0.1]), np.array([1.0]), -1.0),
+                   (np.array([0.1]), np.array([1.0]), 1.0001e20)):
         try:
             chain_inventory(*_t_bad)
         except ValueError:
             pass
         else:
             raise AssertionError("chain_inventory%r must raise ValueError" % (_t_bad,))
+
+
+_crown_case()
+
+# --- test case 7 ---
+# a stable member inside the chain stops it: from member 0 alone (lam = 0.5, then the stable member 1),
+# member 1 collects 1 - exp(-0.5 t) and the members after it stay exact zeros; atoms initially on member 2
+# (lam = 2) feed member 3 (lam = 1, decaying out of the chain), 0.6 (exp(-t) - exp(-2 t)); closed forms
+# evaluated in 50-digit arithmetic, and the atoms above the stable member are conserved
+import numpy as np
+
+
+def _crown_case():
+    import mpmath as _t_mp
+
+    def _t_rel(a, b):
+        return abs(a - b) / abs(b)
+
+    def _t_check(x, target, scale):
+        x = np.asarray(x, dtype=float).reshape(len(target))
+        for a, b in zip(x, target):
+            if b >= max(1e-250 * scale, 1e-300):
+                assert _t_rel(a, b) < 1e-10, (a, b)
+            else:
+                assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)
+
+    lam = np.array([0.5, 0.0, 2.0, 1.0])
+    for _t_t in (1e-3, 3.0, 40.0):
+        with _t_mp.workdps(50):
+            T = _t_mp.mpf(_t_t)
+            e0, e1, e2 = _t_mp.exp(-T / 2), _t_mp.exp(-T), _t_mp.exp(-2 * T)
+            top = [float(e0), float(-_t_mp.expm1(-T / 2))]
+            low = [float(_t_mp.mpf("0.3") * e2), float(_t_mp.mpf("0.6") * (e1 - e2))]
+        x = chain_inventory(lam, np.array([1.0, 0.0, 0.0, 0.0]), _t_t)
+        _t_check(x, top + [0.0, 0.0], 1.0)
+        x = chain_inventory(lam, np.array([1.0, 0.0, 0.3, 0.0]), _t_t)
+        _t_check(x, top + low, 1.3)
+        # conservation above the stable member: x0 + x1 = n0[0]
+        assert _t_rel(x[0] + x[1], 1.0) < 1e-10, (x[0], x[1])
+
+
+_crown_case()
+
+# --- test case 8 ---
+# the 232Th series to stable 208Pb as a linear chain through 212Po (the 36 % branch of 212Bi through 208Tl
+# is not part of this chain): decay constants from 1.6e-18 to 2.3e6 per s; after one day, 10 years and
+# 1e10 years, against the Bateman sum at 600 digits, 208Pb holding the rest of the atoms (also evaluated at
+# 600 digits), and the total number of atoms conserved
+import numpy as np
+
+
+def _crown_case():
+    import mpmath as _t_mp
+
+    def _t_rel(a, b):
+        return abs(a - b) / abs(b)
+
+    def _t_bateman_mp(lam, n0, t, dps=600):
+        # linear chain with distinct decay constants, from member 0 alone; the amounts as 600-digit numbers
+        with _t_mp.workdps(dps):
+            lam = [_t_mp.mpf(float(x)) for x in lam]
+            t = _t_mp.mpf(float(t))
+            out = []
+            for k in range(len(lam)):
+                pre = _t_mp.fprod(lam[:k]) if k > 0 else _t_mp.mpf(1)
+                tot = _t_mp.mpf(0)
+                for i in range(k + 1):
+                    tot += _t_mp.exp(-lam[i] * t) / _t_mp.fprod([lam[l] - lam[i] for l in range(k + 1) if l != i])
+                out.append(_t_mp.mpf(float(n0)) * pre * tot)
+            rest = _t_mp.mpf(float(n0)) - _t_mp.fsum(out)
+            return [float(v) for v in out] + [float(rest)]
+
+    def _t_check(x, target, scale):
+        x = np.asarray(x, dtype=float).reshape(len(target))
+        for a, b in zip(x, target):
+            if b >= max(1e-250 * scale, 1e-300):
+                assert _t_rel(a, b) < 1e-10, (a, b)
+            else:
+                assert abs(a - b) <= max(1e-250 * scale, 1e-300), (a, b)
+
+    _T_YEAR, _T_DAY, _T_H, _T_MIN = 3.15576e7, 86400.0, 3600.0, 60.0
+    # 232Th, 228Ra, 228Ac, 228Th, 224Ra, 220Rn, 216Po, 212Pb, 212Bi, 212Po, then stable 208Pb
+    lam = np.r_[np.log(2.0) / np.array([1.405e10 * _T_YEAR, 5.75 * _T_YEAR, 6.15 * _T_H, 1.9116 * _T_YEAR, 3.6319 * _T_DAY,
+                                         55.6, 0.145, 10.64 * _T_H, 60.55 * _T_MIN, 0.299e-6]), 0.0]
+    n0 = np.r_[1e3, np.zeros(10)]
+    for _t_t in (_T_DAY, 10.0 * _T_YEAR, 1e10 * _T_YEAR):
+        x = chain_inventory(lam, n0, _t_t)
+        _t_check(x, _t_bateman_mp(lam[:-1], 1e3, _t_t), 1e3)
+        # atoms are conserved: the members together hold the initial 1e3 atoms
+        assert _t_rel(float(np.sum(x)), 1e3) < 1e-10, float(np.sum(x))
 
 
 _crown_case()

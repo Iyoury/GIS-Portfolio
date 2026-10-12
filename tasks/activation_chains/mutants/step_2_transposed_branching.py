@@ -9,8 +9,8 @@ def network_inventory(lam, branching, source, n0, t):
     Inputs:
       lam: 1-D array of n decay constants (1 <= n <= 30), 0 <= lam[i] <= 1e10 (per unit of time).
       branching: (n, n) array, branching[j, i] = fraction of the decays of nuclide i that give nuclide j;
-                 nonnegative, zero diagonal, column sums at most 1 + 1e-12 (1 up to rounding; the rest
-                 leaves the network). The
+                 nonnegative, zero diagonal, column sums at most 1 + 1e-12 (the rest leaves the network;
+                 a column whose sum lies in (1, 1 + 1e-12] is divided by its sum before use). The
                  directed graph with an edge i -> j wherever branching[j, i] > 0 must be acyclic.
       source: 1-D array of n constant production rates (atoms per unit of time), nonnegative.
       n0: 1-D array of n initial numbers of atoms, nonnegative.
@@ -22,9 +22,9 @@ def network_inventory(lam, branching, source, n0, t):
          below 1e-10; every other entry (exact zeros included) lies within F of the exact value.
 
     Raises:
-      ValueError if the arrays do not have these shapes (1 <= n <= 30), if an entry is negative or not
-      finite, if a decay constant exceeds 1e10, if a diagonal entry of branching is nonzero or a column
-      sum exceeds 1 + 1e-12, if the network has a cycle, if t is not finite or outside [0, 1e20], or if
+      ValueError if the arrays do not have these shapes (1 <= n <= 30), if an entry is negative, if a
+      decay constant exceeds 1e10, if a diagonal entry of branching is nonzero or a column sum exceeds
+      1 + 1e-12, if the network has a cycle, if t is outside [0, 1e20], or if
       sum(n0) + t * sum(source) > 1e100.
     '''
     lam = np.asarray(lam, dtype=float)
@@ -37,7 +37,7 @@ def network_inventory(lam, branching, source, n0, t):
         raise ValueError("need lam, source, n0 of shape (n,) and branching of shape (n, n), 1 <= n <= 30")
     for name, arr in (("lam", lam), ("branching", branching), ("source", source), ("n0", n0)):
         if not (np.all(np.isfinite(arr)) and np.all(arr >= 0.0)):
-            raise ValueError("%s must be finite and nonnegative" % name)
+            raise ValueError("%s must be nonnegative" % name)
     if np.any(lam > 1e10):
         raise ValueError("decay constants must not exceed 1e10")
     if np.any(np.diag(branching) != 0.0) or np.any(branching.sum(axis=0) > 1.0 + 1e-12):
@@ -59,6 +59,13 @@ def network_inventory(lam, branching, source, n0, t):
         indeg = indeg - edges[:, free].sum(axis=1)
     if not removed.all():
         raise ValueError("the decay network has a cycle")
+    # a column sum in (1, 1 + 1e-12] is rounding of 1: that column is divided by its sum, so that the decays
+    # of the nuclide give exactly one daughter atom each in total and no atoms are created
+    colsum = branching.sum(axis=0)
+    over = colsum > 1.0
+    if np.any(over):
+        branching = branching.copy()
+        branching[:, over] = branching[:, over] / colsum[None, over]
     if t == 0.0:
         x = n0.copy()
         return x
