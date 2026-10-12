@@ -164,3 +164,13 @@ construction a appris :
   par la géométrie des contacts (l'empreinte voit les unités voisines) ; seule la comparaison des
   passages opposés annule cette géométrie. Une implémentation indépendante doit être différente
   dans l'estimateur, pas dans le principe physique quand il n'y en a qu'un de juste.
+
+Ce que les trois sondes locales ont appris (version à cinq défauts, puis à huit défauts dont trois de
+jugement : constante périmée datée, panne du détecteur vers le haut, spectres de pads dans l'ordre
+d'acquisition) : résolues en 24, 21 et 15 commandes, la dernière à **effort bas**, tous les défauts
+trouvés et corrigés, y compris en déclarant invalide une constante du dossier à cause de sa date. Règle
+à retenir : avec ce niveau d'agent, « enregistrements bruts + défauts silencieux découvrables par le
+contrôle qualité » ne suffit plus ; chaque défaut supplémentaire coûte deux commandes. Toujours faire une
+sonde locale **à effort bas** avant de soumettre : c'est elle qui imite la sonde de facilité. La seule voie
+restante est une science sans procédure de manuel (la méthode standard fausse pour ces données, la
+correction à dériver), avec le risque de la revue d'équité.
