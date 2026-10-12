@@ -2,90 +2,85 @@
 
 domain: physics
 
-subfield: "Nuclear physics: radioactive decay chains, neutron activation with burnup and flux-monitor analysis"
-
-tags:
-  - Bateman equations
-  - radioactive decay chains
-  - neutron activation
-  - burnup
-  - matrix exponential
-  - flux monitor
-  - uranium series
-
-expert_time_estimate_hours: 12
-
-relevant_experience: "B.Sc. in Georesources and Environment (FST Fes, 2016), known as Geological Engineering in Canada, and a graduate certificate in geomatics from Université Laval (reference frames, rotations, least-squares adjustment). GIS analyst at Morocco's Ministry of Energy and Mines (2016-2018) on exploration databases, and now running an independent geospatial consultancy (Craton Géodonnées) in Quebec that works with the drilling databases of Abitibi exploration programs."
-
-author: "Ayoub Bousfiha"
-affiliation: "Independent Researcher"
-
-difficulty_explanation: >-
-  The decay constants of natural chains span more than 20 decades (4.9e-18 to 4.2e3 per s in the 238U
-  series), and every amount down to 1e-250 of the inventory (and not below 1e-300 atoms, which keeps it
-  a normal double) must have a relative error below 1e-10, so both textbook methods fail: the Bateman sum cancels catastrophically for close decay constants and is
-  undefined for equal ones, and a dense matrix exponential such as scipy.linalg.expm is accurate only
-  relative to the largest entry. The solver has to recognise that the exact solution is a sum of
-  nonnegative path contributions and build exp(tA) without subtractions, for example by scaling and
-  squaring a shifted nonnegative Taylor series while resetting the exactly known diagonal exp(-lam t) at
-  every squaring level; squaring the diagonal with the rest loses the 238U amounts completely. Steps 2 and
-  3 add branching, constant production, neutron capture with burnup (barns converted to cm^2) and an
-  acyclicity check of the combined decay and capture network, and the accuracy must hold for products
-  reached only through low-probability branches or several successive captures at low flux. Step 4
-  inverts a response that is not proportional to the flux (flux**m growth for an m-capture product, burnup
-  turnover near 1.6e15 n / (cm^2 s) for 198Au) to a relative 1e-8 for activities of any size in the
-  domain (about 2e-11 Bq for the two-capture product 199Au at low flux), with a closed-interval end rule
-  whose tolerance band (1e-10 in ln) matches the stated accuracy of step 3, and a domain rule that must
-  be evaluated in logarithms to avoid underflow.
-
-solution_explanation: >-
-  chain_inventory builds exp(tM) by scaling and squaring in nonnegative arithmetic: t is halved s times
-  until tau max(lam) <= 1/2, exp(tau M) = exp(-c) exp(tau M + c I) with c = tau max(lam) is summed as the
-  Taylor series of a nonnegative matrix, and each squaring E -> E E only adds nonnegative products while
-  the diagonal is reset to its exact value exp(-lam tau 2**level). network_inventory applies the same
-  scheme to the rate matrix augmented by one constant source state, after checking acyclicity with Kahn's
-  algorithm. activation_inventory turns each period of the history into a branching network with total
-  removal rates lam + sigma 1e-24 phi and fractions that combine decay branching and capture, and chains
-  network_inventory over the periods. monitor_flux checks the domain rule
-  x[k](flux_lo) >= max(1e-250 sum(n0), 1e-300) and the end rule |ln(activity / A(end))| <= 1e-9 (flux_lo first) in logarithms, then solves
-  ln A(ln phi) = ln activity with brentq on the log-flux bracket, forming ln A as ln lam[k] + ln x[k] so
-  that tiny activities cannot underflow.
-
-verification_explanation: >-
-  Independent targets are closed forms (single decay, Erlang amounts for equal decay constants,
-  saturation with production, two-way branching, burnup exp(-sigma phi t) down to exp(-600), inventories
-  of 1e-70 atoms on both sides of the floor 1e-300 of the relative rule, a combined rate of exactly 1e10
-  per s), the Bateman sum evaluated in 600-digit mpmath arithmetic for linear chains
-  with distinct constants (the 15-member 238U series at 1 y, 1e4 y, 3e5 y and 1e9 y, a 30-member chain of
-  successive captures in step 3, and the 238U(n,gamma)239U -> 239Np -> 239Pu capture branch of the
-  whole-task test), and mpmath's matrix exponential at 300 digits for branching networks with production
-  and for every period of an irradiation history. The flux-inversion tests regenerate the activity from
-  these 300-digit or 600-digit forward models (the flux is the input of the round trip), and the
-  end-tolerance tests locate the boundary activities |ln(activity / A(end))| = 1e-9 -+ 1e-10 with 60-digit
-  logarithms. Every case of tests/general.py calls monitor_flux: case 0 recovers the flux from the 239Np
-  activity of the irradiated 238U series (once from the 600-digit target, once from an activity predicted
-  with chain_inventory alone, compared with twice the single-output tolerance), case 1 from the 60Co
-  activity of a cobalt network. The domain floor of step 4 is tested on both sides (a round trip with
-  about 1e-294 atoms of the product at flux_lo, ValueError with about 1e-319). second_solution.py uses different methods and passes every test case: the
-  generalized Bateman solution (each amount a sum of t**p exp(-a t) terms, built nuclide by nuclide in
-  topological order with equal rates handled exactly) evaluated in mpmath with a running error bound
-  (the magnitudes of the cancelling terms are carried along) and the precision raised until that bound
-  is below 1e-14 of every amount or of the floor, instead of the reference's nonnegative scaling and
-  squaring and of the tests' mpmath expm; and bisection on ln flux followed by secant steps instead of
-  brentq. It agrees with the reference to 3.7e-14 on 120 random networks with production (2 to 30
-  nuclides, including equal and nearly equal rates), to 2.8e-15 on 30 networks with inventories scaled
-  to 1e-280 to 1e-50 and to 2.2e-16 on 30 networks over times of 1e-250 to 1e-20. Each step has named scientific mutants (Bateman sum in double precision, squared diagonal in
-  scaling and squaring for the chain and for the network, transposed branching matrix, barns converted
-  with 1e-28, activity assumed proportional to the flux), each the current reference with one mistake, and
-  there is a whole-task barn-conversion mutant; each fails at least one case of its target tests (the
-  whole-task mutant both general cases). The error budget of step 4 was checked by running its tests with
-  the step-3 context perturbed by a relative +-9e-11 (also with opposite signs at the two ends): every case
-  passes, while end cutoffs at 0.85e-9 and 1.15e-9 fail. tools/crown_check.py ran every test case alone in
-  a fresh process (step k with the reference steps 1..k-1 as context, general cases with solution.py) for
-  the reference, the second solution and the mutants, checked that perturbing every reference output by a
-  relative +-1e-12 still passes every step case and that the general cases pass with every evaluated
-  function so perturbed, and checked that all-None and all-zero controls pass no case. Both solutions were
-  also run twice in clean processes on the same inputs and gave identical outputs.
+metadata:
+  author_name: "Ayoub Bousfiha"
+  author_email: "iyoury.ab@gmail.com"
+  author_organization: "Independent Researcher"
+  relevant_experience: "B.Sc. in Georesources and Environment (FST Fes, 2016), known as Geological Engineering in Canada, and a graduate certificate in geomatics from Université Laval (reference frames, rotations, least-squares adjustment). GIS analyst at Morocco's Ministry of Energy and Mines (2016-2018) on exploration databases, and now running an independent geospatial consultancy (Craton Géodonnées) in Quebec that works with the drilling databases of Abitibi exploration programs."
+  subfield: "Nuclear physics: radioactive decay chains, neutron activation with burnup and flux-monitor analysis"
+  tags:
+    - Bateman equations
+    - radioactive decay chains
+    - neutron activation
+    - burnup
+    - matrix exponential
+    - flux monitor
+    - uranium series
+  expert_time_estimate_hours: 12
+  difficulty_explanation: >-
+    The decay constants of natural chains span more than 20 decades (4.9e-18 to 4.2e3 per s in the 238U
+    series), and every amount down to 1e-250 of the inventory (and not below 1e-300 atoms, which keeps it
+    a normal double) must have a relative error below 1e-10, so both textbook methods fail: the Bateman sum cancels catastrophically for close decay constants and is
+    undefined for equal ones, and a dense matrix exponential such as scipy.linalg.expm is accurate only
+    relative to the largest entry. The solver has to recognise that the exact solution is a sum of
+    nonnegative path contributions and build exp(tA) without subtractions, for example by scaling and
+    squaring a shifted nonnegative Taylor series while resetting the exactly known diagonal exp(-lam t) at
+    every squaring level; squaring the diagonal with the rest loses the 238U amounts completely. Steps 2 and
+    3 add branching, constant production, neutron capture with burnup (barns converted to cm^2) and an
+    acyclicity check of the combined decay and capture network, and the accuracy must hold for products
+    reached only through low-probability branches or several successive captures at low flux. Step 4
+    inverts a response that is not proportional to the flux (flux**m growth for an m-capture product, burnup
+    turnover near 1.6e15 n / (cm^2 s) for 198Au) to a relative 1e-8 for activities of any size in the
+    domain (about 2e-11 Bq for the two-capture product 199Au at low flux), with a closed-interval end rule
+    whose tolerance band (1e-10 in ln) matches the stated accuracy of step 3, and a domain rule that must
+    be evaluated in logarithms to avoid underflow.
+  solution_explanation: >-
+    chain_inventory builds exp(tM) by scaling and squaring in nonnegative arithmetic: t is halved s times
+    until tau max(lam) <= 1/2, exp(tau M) = exp(-c) exp(tau M + c I) with c = tau max(lam) is summed as the
+    Taylor series of a nonnegative matrix, and each squaring E -> E E only adds nonnegative products while
+    the diagonal is reset to its exact value exp(-lam tau 2**level). network_inventory applies the same
+    scheme to the rate matrix augmented by one constant source state, after checking acyclicity with Kahn's
+    algorithm. activation_inventory turns each period of the history into a branching network with total
+    removal rates lam + sigma 1e-24 phi and fractions that combine decay branching and capture, and chains
+    network_inventory over the periods. monitor_flux checks the domain rule
+    x[k](flux_lo) >= max(1e-250 sum(n0), 1e-300) and the end rule |ln(activity / A(end))| <= 1e-9 (flux_lo first) in logarithms, then solves
+    ln A(ln phi) = ln activity with brentq on the log-flux bracket, forming ln A as ln lam[k] + ln x[k] so
+    that tiny activities cannot underflow.
+  verification_explanation: >-
+    Independent targets are closed forms (single decay, Erlang amounts for equal decay constants,
+    saturation with production, two-way branching, burnup exp(-sigma phi t) down to exp(-600), inventories
+    of 1e-70 atoms on both sides of the floor 1e-300 of the relative rule, a combined rate of exactly 1e10
+    per s), the Bateman sum evaluated in 600-digit mpmath arithmetic for linear chains
+    with distinct constants (the 15-member 238U series at 1 y, 1e4 y, 3e5 y and 1e9 y, a 30-member chain of
+    successive captures in step 3, and the 238U(n,gamma)239U -> 239Np -> 239Pu capture branch of the
+    whole-task test), and mpmath's matrix exponential at 300 digits for branching networks with production
+    and for every period of an irradiation history. The flux-inversion tests regenerate the activity from
+    these 300-digit or 600-digit forward models (the flux is the input of the round trip), and the
+    end-tolerance tests locate the boundary activities |ln(activity / A(end))| = 1e-9 -+ 1e-10 with 60-digit
+    logarithms. Every case of tests/general.py calls monitor_flux: case 0 recovers the flux from the 239Np
+    activity of the irradiated 238U series (once from the 600-digit target, once from an activity predicted
+    with chain_inventory alone, compared with twice the single-output tolerance), case 1 from the 60Co
+    activity of a cobalt network. The domain floor of step 4 is tested on both sides (a round trip with
+    about 1e-294 atoms of the product at flux_lo, ValueError with about 1e-319). second_solution.py uses different methods and passes every test case: the
+    generalized Bateman solution (each amount a sum of t**p exp(-a t) terms, built nuclide by nuclide in
+    topological order with equal rates handled exactly) evaluated in mpmath with a running error bound
+    (the magnitudes of the cancelling terms are carried along) and the precision raised until that bound
+    is below 1e-14 of every amount or of the floor, instead of the reference's nonnegative scaling and
+    squaring and of the tests' mpmath expm; and bisection on ln flux followed by secant steps instead of
+    brentq. It agrees with the reference to 3.7e-14 on 120 random networks with production (2 to 30
+    nuclides, including equal and nearly equal rates), to 2.8e-15 on 30 networks with inventories scaled
+    to 1e-280 to 1e-50 and to 2.2e-16 on 30 networks over times of 1e-250 to 1e-20. Each step has named scientific mutants (Bateman sum in double precision, squared diagonal in
+    scaling and squaring for the chain and for the network, transposed branching matrix, barns converted
+    with 1e-28, activity assumed proportional to the flux), each the current reference with one mistake, and
+    there is a whole-task barn-conversion mutant; each fails at least one case of its target tests (the
+    whole-task mutant both general cases). The error budget of step 4 was checked by running its tests with
+    the step-3 context perturbed by a relative +-9e-11 (also with opposite signs at the two ends): every case
+    passes, while end cutoffs at 0.85e-9 and 1.15e-9 fail. tools/crown_check.py ran every test case alone in
+    a fresh process (step k with the reference steps 1..k-1 as context, general cases with solution.py) for
+    the reference, the second solution and the mutants, checked that perturbing every reference output by a
+    relative +-1e-12 still passes every step case and that the general cases pass with every evaluated
+    function so perturbed, and checked that all-None and all-zero controls pass no case. Both solutions were
+    also run twice in clean processes on the same inputs and gave identical outputs.
 
 required_dependencies: |-
   import numpy as np

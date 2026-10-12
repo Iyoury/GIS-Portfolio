@@ -2,91 +2,86 @@
 
 domain: physics
 
-subfield: "Statistical mechanics: transfer matrices, finite-size scaling and tensor networks for the 2D Ising model"
-
-tags:
-  - Ising model
-  - transfer matrix
-  - finite-size scaling
-  - conformal invariance
-  - Yang-Lee edge
-  - corner transfer matrix
-  - tensor networks
-
-expert_time_estimate_hours: 12
-
-relevant_experience: "B.Sc. in Georesources and Environment (FST Fes, 2016), known as Geological Engineering in Canada, and a graduate certificate in geomatics from Université Laval (reference frames, rotations, least-squares adjustment). GIS analyst at Morocco's Ministry of Energy and Mines (2016-2018) on exploration databases, and now running an independent geospatial consultancy (Craton Géodonnées) in Quebec that works with the drilling databases of Abitibi exploration programs."
-
-author: "Ayoub Bousfiha"
-affiliation: "Independent Researcher"
-
-difficulty_explanation: >-
-  The strip steps fail with the first route a practitioner usually takes: the energy correlation
-  length is set by the second state of the spin-flip-even sector, whereas the second eigenvalue of
-  the whole matrix is the top odd state at every temperature, and the third is the second even state
-  only below a width-dependent crossover temperature (2.05 at L = 3, 2.33 at L = 4, 2.41 to 2.43 for
-  L = 5 to 10, so at Tc and just above it for L >= 4) and an odd state above it. Below Tc the two
-  leading states are nearly degenerate, with a gap that closes exponentially with the width and
-  reaches the level of machine precision far below Tc at the larger widths (about 1e-14 relative or
-  less for T <= 0.6 at L = 10), so the strip magnetization needs states of definite parity and the
-  zero-field susceptibility cannot come from a finite difference in h. The Yang-Lee edge needs a
-  non-Hermitian eigensolver on a complex symmetric matrix, a bracket that reaches edges down to about
-  5e-5 below Tc, and tracking of the leading pair only, since at many points of the range, most of
-  them at or above Tc on the wider strips, a lower pair of eigenvalues leaves the real axis before
-  the leading pair meets.
-  Step 6 combines four earlier functions into finite-size exponent and central-charge estimates at the
-  exact Tc. The last step asks for f, m, chi = dm/dh and c = -T d2f/dT2 of the infinite lattice down
-  to h = 0.005 near Tc, where no diagonalizable strip is close to the bulk limit, so an
-  infinite-lattice method with a correctly normalized partition function per site and derivatives
-  converged to 1e-5 relative is required.
-
-solution_explanation: >-
-  The reference builds the symmetric transfer matrix with the in-row bonds and the field shared
-  equally between the two factors, then splits it into spin-flip-even and odd blocks: f comes from the
-  top even eigenvalue, xi_spin from the top odd one, xi_energy from the second even one, and m_L is the
-  matrix element of s_0 between the top even and top odd eigenvectors of the blocks. The strip
-  susceptibility is the closed-form spectral sum over odd states of |<k|S|0>|^2 (lam0 + lam_k) /
-  (lam0 - lam_k), divided by T L. The Yang-Lee edge is the brentq root of the real part of the squared
-  difference of the two leading eigenvalues of the complex symmetric matrix, bracketed by doubling from
-  1e-12 T. Step 6 applies Cardy's relation at width L, two-width logarithmic ratios for beta/nu,
-  gamma/nu and y_h, and a 3x3 linear solve for c. Step 7 runs corner-transfer-matrix renormalization at
-  bond dimension 16 on the infinite lattice, takes f from kappa = Z(3x3) Z(4 corners) / Z(corners + 2
-  edges)**2 and m from the converged environment, and obtains chi and c by Richardson-extrapolated
-  central differences of m in h and of f in T around one cold and eight warm-started runs.
-
-verification_explanation: >-
-  Step 1 targets are brute-force sums over the energy written inside the tests (entry by entry for
-  L = 3, 4 and 6, over all pairs of rows at L = 10) plus hand-worked entries at the ends of the stated
-  range (T = 0.5 and 10, |h| = 20, L = 10, largest entry exp(440)); both solutions also agree with a
-  40-digit sum over the energy to 3e-14 relative at the corners of the range. Step 2 targets are
-  Kaufman's exact free-fermion spectrum of the periodic strip, evaluated inside the tests with 60-digit
-  decimal arithmetic and no transfer matrix. The inline targets of steps 3 to 6 were regenerated for
-  this version by a route that shares no code with either solution: the transfer matrix, summed from
-  the energy, is reduced exactly to its zero-momentum block (every state involved is translation
-  invariant) and diagonalized with mpmath, giving m_L at 50 digits, chi as a 90-digit second
-  difference of the top eigenvalue with a field step of 1e-25, and H_edge as a 40-digit root of the
-  leading-pair discriminant; the step 6 targets apply the stated estimators in extended precision to
-  these values and to Kaufman's f and lengths. The reference agrees with these targets to 7e-16 in
-  m_L, 1.5e-8 relative in chi, 1.1e-13 relative in H_edge and 3e-13 in the step 6 values, and
-  second_solution.py, which uses other methods (momentum and flip sectors for the lengths, rotation of
-  the leading pair into parity states, an odd-sector linear solve, bisection on the leading pair
-  leaving the real axis, divided differences for c, VUMPS), to 1.2e-15, 1.7e-8, 5.7e-12 and 4.5e-12.
-  The step 7 and whole-task targets are reference-algorithm outputs at a higher setting:
-  corner-transfer-matrix renormalization at bond dimension 28 (the reference uses 16); for the eight
-  points kept from version 9 a rerun in this version reproduces the stored values within 2.2e-15 in
-  f, 7e-14 in m, 1.7e-10 relative in chi and 1.2e-8 relative in c, and the two weak-field corner
-  points added in this version were computed the same way. They are
-  confirmed independently by VUMPS (the second solution, a different algorithm with f from the
-  per-site eigenvalue of the row transfer matrix and chi = -d2f/dh2 and c from five-point stencils),
-  which agrees within 5.2e-14 in f, 4.6e-11 in m, 5.3e-7 relative in chi and 1e-7 relative in c on
-  all ten points, and at h = 0 the same corner-transfer-matrix free energy reproduces Onsager's to
-  2e-14 at T = 2, 2.5 and 3 and the magnetization Yang's to 1e-14 at T = 2. tools/crown_check.py ran
-  every test case alone in a fresh process for the reference (per-step files and solution.py), the
-  second solution, every named mutant (each failing at least one case), a relative shift by +-1e-12
-  of every real and complex reference output in the step cases and of every evaluated function of
-  solution.py in the whole-task cases (all cases pass) and all-None and all-zero controls (no case
-  passes). All validation ran with single-threaded BLAS; both solutions were run twice in clean
-  processes on every test input and gave identical outputs.
+metadata:
+  author_name: "Ayoub Bousfiha"
+  author_email: "iyoury.ab@gmail.com"
+  author_organization: "Independent Researcher"
+  relevant_experience: "B.Sc. in Georesources and Environment (FST Fes, 2016), known as Geological Engineering in Canada, and a graduate certificate in geomatics from Université Laval (reference frames, rotations, least-squares adjustment). GIS analyst at Morocco's Ministry of Energy and Mines (2016-2018) on exploration databases, and now running an independent geospatial consultancy (Craton Géodonnées) in Quebec that works with the drilling databases of Abitibi exploration programs."
+  subfield: "Statistical mechanics: transfer matrices, finite-size scaling and tensor networks for the 2D Ising model"
+  tags:
+    - Ising model
+    - transfer matrix
+    - finite-size scaling
+    - conformal invariance
+    - Yang-Lee edge
+    - corner transfer matrix
+    - tensor networks
+  expert_time_estimate_hours: 12
+  difficulty_explanation: >-
+    The strip steps fail with the first route a practitioner usually takes: the energy correlation
+    length is set by the second state of the spin-flip-even sector, whereas the second eigenvalue of
+    the whole matrix is the top odd state at every temperature, and the third is the second even state
+    only below a width-dependent crossover temperature (2.05 at L = 3, 2.33 at L = 4, 2.41 to 2.43 for
+    L = 5 to 10, so at Tc and just above it for L >= 4) and an odd state above it. Below Tc the two
+    leading states are nearly degenerate, with a gap that closes exponentially with the width and
+    reaches the level of machine precision far below Tc at the larger widths (about 1e-14 relative or
+    less for T <= 0.6 at L = 10), so the strip magnetization needs states of definite parity and the
+    zero-field susceptibility cannot come from a finite difference in h. The Yang-Lee edge needs a
+    non-Hermitian eigensolver on a complex symmetric matrix, a bracket that reaches edges down to about
+    5e-5 below Tc, and tracking of the leading pair only, since at many points of the range, most of
+    them at or above Tc on the wider strips, a lower pair of eigenvalues leaves the real axis before
+    the leading pair meets.
+    Step 6 combines four earlier functions into finite-size exponent and central-charge estimates at the
+    exact Tc. The last step asks for f, m, chi = dm/dh and c = -T d2f/dT2 of the infinite lattice down
+    to h = 0.005 near Tc, where no diagonalizable strip is close to the bulk limit, so an
+    infinite-lattice method with a correctly normalized partition function per site and derivatives
+    converged to 1e-5 relative is required.
+  solution_explanation: >-
+    The reference builds the symmetric transfer matrix with the in-row bonds and the field shared
+    equally between the two factors, then splits it into spin-flip-even and odd blocks: f comes from the
+    top even eigenvalue, xi_spin from the top odd one, xi_energy from the second even one, and m_L is the
+    matrix element of s_0 between the top even and top odd eigenvectors of the blocks. The strip
+    susceptibility is the closed-form spectral sum over odd states of |<k|S|0>|^2 (lam0 + lam_k) /
+    (lam0 - lam_k), divided by T L. The Yang-Lee edge is the brentq root of the real part of the squared
+    difference of the two leading eigenvalues of the complex symmetric matrix, bracketed by doubling from
+    1e-12 T. Step 6 applies Cardy's relation at width L, two-width logarithmic ratios for beta/nu,
+    gamma/nu and y_h, and a 3x3 linear solve for c. Step 7 runs corner-transfer-matrix renormalization at
+    bond dimension 16 on the infinite lattice, takes f from kappa = Z(3x3) Z(4 corners) / Z(corners + 2
+    edges)**2 and m from the converged environment, and obtains chi and c by Richardson-extrapolated
+    central differences of m in h and of f in T around one cold and eight warm-started runs.
+  verification_explanation: >-
+    Step 1 targets are brute-force sums over the energy written inside the tests (entry by entry for
+    L = 3, 4 and 6, over all pairs of rows at L = 10) plus hand-worked entries at the ends of the stated
+    range (T = 0.5 and 10, |h| = 20, L = 10, largest entry exp(440)); both solutions also agree with a
+    40-digit sum over the energy to 3e-14 relative at the corners of the range. Step 2 targets are
+    Kaufman's exact free-fermion spectrum of the periodic strip, evaluated inside the tests with 60-digit
+    decimal arithmetic and no transfer matrix. The inline targets of steps 3 to 6 were regenerated for
+    this version by a route that shares no code with either solution: the transfer matrix, summed from
+    the energy, is reduced exactly to its zero-momentum block (every state involved is translation
+    invariant) and diagonalized with mpmath, giving m_L at 50 digits, chi as a 90-digit second
+    difference of the top eigenvalue with a field step of 1e-25, and H_edge as a 40-digit root of the
+    leading-pair discriminant; the step 6 targets apply the stated estimators in extended precision to
+    these values and to Kaufman's f and lengths. The reference agrees with these targets to 7e-16 in
+    m_L, 1.5e-8 relative in chi, 1.1e-13 relative in H_edge and 3e-13 in the step 6 values, and
+    second_solution.py, which uses other methods (momentum and flip sectors for the lengths, rotation of
+    the leading pair into parity states, an odd-sector linear solve, bisection on the leading pair
+    leaving the real axis, divided differences for c, VUMPS), to 1.2e-15, 1.7e-8, 5.7e-12 and 4.5e-12.
+    The step 7 and whole-task targets are reference-algorithm outputs at a higher setting:
+    corner-transfer-matrix renormalization at bond dimension 28 (the reference uses 16); for the eight
+    points kept from version 9 a rerun in this version reproduces the stored values within 2.2e-15 in
+    f, 7e-14 in m, 1.7e-10 relative in chi and 1.2e-8 relative in c, and the two weak-field corner
+    points added in this version were computed the same way. They are
+    confirmed independently by VUMPS (the second solution, a different algorithm with f from the
+    per-site eigenvalue of the row transfer matrix and chi = -d2f/dh2 and c from five-point stencils),
+    which agrees within 5.2e-14 in f, 4.6e-11 in m, 5.3e-7 relative in chi and 1e-7 relative in c on
+    all ten points, and at h = 0 the same corner-transfer-matrix free energy reproduces Onsager's to
+    2e-14 at T = 2, 2.5 and 3 and the magnetization Yang's to 1e-14 at T = 2. tools/crown_check.py ran
+    every test case alone in a fresh process for the reference (per-step files and solution.py), the
+    second solution, every named mutant (each failing at least one case), a relative shift by +-1e-12
+    of every real and complex reference output in the step cases and of every evaluated function of
+    solution.py in the whole-task cases (all cases pass) and all-None and all-zero controls (no case
+    passes). All validation ran with single-threaded BLAS; both solutions were run twice in clean
+    processes on every test input and gave identical outputs.
 
 required_dependencies: |-
   import numpy as np

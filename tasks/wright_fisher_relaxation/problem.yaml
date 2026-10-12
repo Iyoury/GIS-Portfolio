@@ -2,94 +2,89 @@
 
 domain: biology
 
-subfield: "Theoretical population genetics: Wright-Fisher Markov chains with selection, mutation and genetic drift"
-
-tags:
-  - population genetics
-  - Wright-Fisher model
-  - Markov chains
-  - fixation probability
-  - quasi-stationary distribution
-  - spectral gap
-  - totally positive matrices
-  - extended-precision numerics
-
-expert_time_estimate_hours: 14
-
-relevant_experience: "B.Sc. in Georesources and Environment (FST Fes, 2016), known as Geological Engineering in Canada, and a graduate certificate in geomatics from Université Laval (reference frames, rotations, least-squares adjustment). GIS analyst at Morocco's Ministry of Energy and Mines (2016-2018) on exploration databases, and now running an independent geospatial consultancy (Craton Géodonnées) in Quebec that works with the drilling databases of Abitibi exploration programs."
-
-author: "Ayoub Bousfiha"
-affiliation: "Independent Researcher"
-
-difficulty_explanation: >-
-  Every requested quantity of the Wright-Fisher chain is needed to a relative 1e-8 although it lies far below the
-  rounding error of the matrix entries next to it: fixation probabilities down to about 6e-240, stationary
-  probabilities spanning more than 200 decades, a relaxation gap down to 2e-12 next to eigenvalues of order 1/N,
-  passage times above 1e248 generations, an absorption rate down to about 2e-249, and a smallest eigenvalue between
-  about 1e-225 and 1e-172 at N = 400 whose eigenvector spans up to about 175 decades. Dense double-precision linear
-  algebra (np.linalg.solve, dense eigensolvers, pivots formed as 1 - P_kk) loses these quantities completely, so the
-  solver has to recognise where cancellation occurs and choose subtraction-free formulations of the absorbing-chain,
-  stationary, first-passage and quasi-stationary problems. The last step is the hardest: the smallest eigenvalue of
-  the totally positive binomial kernel is ill-conditioned with respect to the entries of P, so it must come from the
-  structure of the model (a scaled Vandermonde matrix of increasing nodes) and the absorbing cases u = 0 or v = 0
-  must be reduced to the transient block. Arbitrary-precision linear algebra is a valid but slow alternative: the
-  independent N = 400 targets needed plain LU factorizations at 400 digits, about 4 minutes each.
-
-solution_explanation: >-
-  Step 1 builds every binomial row in logarithms with the complement q = 1 - p of the post-selection, post-mutation
-  frequency formed directly from the model, so rare entries keep their relative accuracy down to 1e-250. Steps 2, 3
-  and 5 use subtraction-free state reduction (Grassmann-Taksar-Heyman): transient states are eliminated one at a
-  time and every pivot is a sum of off-diagonal transition probabilities, never 1 - P_kk; the conditional fixation
-  and loss times come from the Doob h-transform, t_i = (G h)_i / h_i. Step 4 runs inverse iteration on a GTH-type
-  factorization of I - P that eliminates towards the most probable state, and step 6 runs inverse iteration for the
-  left Perron vector of I - Q with an M-matrix LU whose pivots are the remaining rates plus the accumulated
-  absorption probability. Step 7 writes the transient block of P as diag(q^N x^i0) V(x) diag(C(N, j)) with V the
-  Vandermonde matrix of the increasing nodes x_i = p_i / q_i, so 1 / lambda_min is the Perron root of |P_II^-1|,
-  whose entries are elementary symmetric functions over products of node differences obtained without
-  cancellation; a power method in logarithms gives lambda_min and the mode, which is padded with zeros on the
-  absorbing states and takes the checkerboard sign pattern with + on the first transient state (the stated
-  normalisation, set by position rather than read from a computed entry). For N = 1 with mutation in both
-  directions the exact 2 x 2 eigenpair (1 - u - v with the eigenvector (v, -u)) is used, because there the power
-  method would contract only like the ratio 1 - u - v of the two eigenvalues.
-
-verification_explanation: >-
-  Independent targets come from analytic results (neutral fixation probability i0 / N, the exact neutral
-  stationary moments, the neutral gap u + v and smallest eigenvalue (1 - u - v)^N N! / N^N of the Feller-Cannings
-  spectrum, N = 1 and N = 2 closed forms, the exact allele-relabeling symmetry) and from extended-precision
-  recomputation by a different method: the transition matrix from mpmath binomials with plain LU solves, mpmath
-  eig and inverse iteration at 40 to 400 digits, the N = 400 targets of steps 2 to 7 computed once at 400 digits
-  and stored inline. The whole-task tests call every step, compare the final function (and the gap, passage
-  times, stationary and quasi-stationary distributions) with extended precision, and check identities between the
-  steps: the stationary distribution and, with u = 0, the quasi-stationary distribution are orthogonal to the
-  fastest mode, lambda_min lies below 1 - gap and below 1 - rate, and with rare mutations gap = 1 / t_up + 1 / t_down,
-  t_up = 1 / (N v p_fix) and rate * t_up = 1. The second solution uses different algorithms: rows built by ratio
-  recursion with beta-function coefficients for step 1; for steps 2-6 a double-precision regenerative decomposition
-  instead of state reduction, in which the chain outside a few hub states (the two monomorphic states and the
-  deterministic equilibrium) is summed as a Neumann series by repeated squaring and the hub skeleton is solved with
-  the Markov chain tree theorem, inside the same outer inverse iteration as the reference for steps 4 and 6; for
-  step 7 inverse iteration whose linear solves use the Bjorck-Pereyra algorithm (Newton divided differences) in
-  log-magnitude arithmetic with known alternating signs, without the explicit inverse and the elementary symmetric
-  functions of the reference. Step 7 of both solutions rests on the same factorization of the transient block into
-  diagonal and Vandermonde factors with node differences formed without cancellation (the structure of the model,
-  which a double-precision method needs), so the step-7 evidence that does not use this structure is the neutral
-  closed form, the N = 1 closed form and the mpmath eig and 400-digit inverse-iteration targets. The second solution
-  passes every case of every step and of the whole-task tests; its step 7 agrees with the reference to 8.5e-12
-  relative or better on a grid of N from 1 to 400 with u, v including 0 and to 1.4e-12 on 120 random parameter sets
-  (exact zeros on the absorbing states), and its steps 2-6 agreed to about 2e-11 in the version-13 comparison (those
-  functions are unchanged). The magnitudes stated in the step-5 and step-7 prompts come from scans (source.md, version
-  14, items 9 and 10): for step 7, whose positive rates are bounded below by 1e-12 like those of steps 3-6, a grid with
-  u, v in {0, 1e-12, 2e-12, 1e-11, ..., 0.1} at N = 200 to 400 (second solution) and at N = 400 (reference) gives
-  lambda_min between 1.357e-225 and 9.603e-173 at N = 400, a span of the mode of at most 175.5 decades and a smallest
-  entry off the absorbing states of 3.3e-176; for step 5, lines through the extreme corner and 1200 random inputs
-  near it (second solution, reference spot checks) put every t_up above 1e300 inside the stated region, and t_down
-  stays far below 1e300.
-  Each step has named scientific mutants (cancelled complement, mutation before selection, loss as 1 - p_fix,
-  unconditional times, dense eigensolvers and dense solves, neutral gap, absorption rate from mutation supply,
-  regularized absorbing states, sign fixed by the largest entry), and a complete whole-task mutant applies mutation
-  before selection; each fails at least one case of its target tests. Every case was run alone in a fresh process
-  with tools/crown_check.py for the per-step references, solution.py, the second solution, the mutants, the
-  all-None and all-zero controls (which pass no case), with every step output scaled by 1 +- 1e-12 and with every
-  evaluated function so scaled in the whole-task tests (all cases still pass).
+metadata:
+  author_name: "Ayoub Bousfiha"
+  author_email: "iyoury.ab@gmail.com"
+  author_organization: "Independent Researcher"
+  relevant_experience: "B.Sc. in Georesources and Environment (FST Fes, 2016), known as Geological Engineering in Canada, and a graduate certificate in geomatics from Université Laval (reference frames, rotations, least-squares adjustment). GIS analyst at Morocco's Ministry of Energy and Mines (2016-2018) on exploration databases, and now running an independent geospatial consultancy (Craton Géodonnées) in Quebec that works with the drilling databases of Abitibi exploration programs."
+  subfield: "Theoretical population genetics: Wright-Fisher Markov chains with selection, mutation and genetic drift"
+  tags:
+    - population genetics
+    - Wright-Fisher model
+    - Markov chains
+    - fixation probability
+    - quasi-stationary distribution
+    - spectral gap
+    - totally positive matrices
+    - extended-precision numerics
+  expert_time_estimate_hours: 14
+  difficulty_explanation: >-
+    Every requested quantity of the Wright-Fisher chain is needed to a relative 1e-8 although it lies far below the
+    rounding error of the matrix entries next to it: fixation probabilities down to about 6e-240, stationary
+    probabilities spanning more than 200 decades, a relaxation gap down to 2e-12 next to eigenvalues of order 1/N,
+    passage times above 1e248 generations, an absorption rate down to about 2e-249, and a smallest eigenvalue between
+    about 1e-225 and 1e-172 at N = 400 whose eigenvector spans up to about 175 decades. Dense double-precision linear
+    algebra (np.linalg.solve, dense eigensolvers, pivots formed as 1 - P_kk) loses these quantities completely, so the
+    solver has to recognise where cancellation occurs and choose subtraction-free formulations of the absorbing-chain,
+    stationary, first-passage and quasi-stationary problems. The last step is the hardest: the smallest eigenvalue of
+    the totally positive binomial kernel is ill-conditioned with respect to the entries of P, so it must come from the
+    structure of the model (a scaled Vandermonde matrix of increasing nodes) and the absorbing cases u = 0 or v = 0
+    must be reduced to the transient block. Arbitrary-precision linear algebra is a valid but slow alternative: the
+    independent N = 400 targets needed plain LU factorizations at 400 digits, about 4 minutes each.
+  solution_explanation: >-
+    Step 1 builds every binomial row in logarithms with the complement q = 1 - p of the post-selection, post-mutation
+    frequency formed directly from the model, so rare entries keep their relative accuracy down to 1e-250. Steps 2, 3
+    and 5 use subtraction-free state reduction (Grassmann-Taksar-Heyman): transient states are eliminated one at a
+    time and every pivot is a sum of off-diagonal transition probabilities, never 1 - P_kk; the conditional fixation
+    and loss times come from the Doob h-transform, t_i = (G h)_i / h_i. Step 4 runs inverse iteration on a GTH-type
+    factorization of I - P that eliminates towards the most probable state, and step 6 runs inverse iteration for the
+    left Perron vector of I - Q with an M-matrix LU whose pivots are the remaining rates plus the accumulated
+    absorption probability. Step 7 writes the transient block of P as diag(q^N x^i0) V(x) diag(C(N, j)) with V the
+    Vandermonde matrix of the increasing nodes x_i = p_i / q_i, so 1 / lambda_min is the Perron root of |P_II^-1|,
+    whose entries are elementary symmetric functions over products of node differences obtained without
+    cancellation; a power method in logarithms gives lambda_min and the mode, which is padded with zeros on the
+    absorbing states and takes the checkerboard sign pattern with + on the first transient state (the stated
+    normalisation, set by position rather than read from a computed entry). For N = 1 with mutation in both
+    directions the exact 2 x 2 eigenpair (1 - u - v with the eigenvector (v, -u)) is used, because there the power
+    method would contract only like the ratio 1 - u - v of the two eigenvalues.
+  verification_explanation: >-
+    Independent targets come from analytic results (neutral fixation probability i0 / N, the exact neutral
+    stationary moments, the neutral gap u + v and smallest eigenvalue (1 - u - v)^N N! / N^N of the Feller-Cannings
+    spectrum, N = 1 and N = 2 closed forms, the exact allele-relabeling symmetry) and from extended-precision
+    recomputation by a different method: the transition matrix from mpmath binomials with plain LU solves, mpmath
+    eig and inverse iteration at 40 to 400 digits, the N = 400 targets of steps 2 to 7 computed once at 400 digits
+    and stored inline. The whole-task tests call every step, compare the final function (and the gap, passage
+    times, stationary and quasi-stationary distributions) with extended precision, and check identities between the
+    steps: the stationary distribution and, with u = 0, the quasi-stationary distribution are orthogonal to the
+    fastest mode, lambda_min lies below 1 - gap and below 1 - rate, and with rare mutations gap = 1 / t_up + 1 / t_down,
+    t_up = 1 / (N v p_fix) and rate * t_up = 1. The second solution uses different algorithms: rows built by ratio
+    recursion with beta-function coefficients for step 1; for steps 2-6 a double-precision regenerative decomposition
+    instead of state reduction, in which the chain outside a few hub states (the two monomorphic states and the
+    deterministic equilibrium) is summed as a Neumann series by repeated squaring and the hub skeleton is solved with
+    the Markov chain tree theorem, inside the same outer inverse iteration as the reference for steps 4 and 6; for
+    step 7 inverse iteration whose linear solves use the Bjorck-Pereyra algorithm (Newton divided differences) in
+    log-magnitude arithmetic with known alternating signs, without the explicit inverse and the elementary symmetric
+    functions of the reference. Step 7 of both solutions rests on the same factorization of the transient block into
+    diagonal and Vandermonde factors with node differences formed without cancellation (the structure of the model,
+    which a double-precision method needs), so the step-7 evidence that does not use this structure is the neutral
+    closed form, the N = 1 closed form and the mpmath eig and 400-digit inverse-iteration targets. The second solution
+    passes every case of every step and of the whole-task tests; its step 7 agrees with the reference to 8.5e-12
+    relative or better on a grid of N from 1 to 400 with u, v including 0 and to 1.4e-12 on 120 random parameter sets
+    (exact zeros on the absorbing states), and its steps 2-6 agreed to about 2e-11 in the version-13 comparison (those
+    functions are unchanged). The magnitudes stated in the step-5 and step-7 prompts come from scans (source.md, version
+    14, items 9 and 10): for step 7, whose positive rates are bounded below by 1e-12 like those of steps 3-6, a grid with
+    u, v in {0, 1e-12, 2e-12, 1e-11, ..., 0.1} at N = 200 to 400 (second solution) and at N = 400 (reference) gives
+    lambda_min between 1.357e-225 and 9.603e-173 at N = 400, a span of the mode of at most 175.5 decades and a smallest
+    entry off the absorbing states of 3.3e-176; for step 5, lines through the extreme corner and 1200 random inputs
+    near it (second solution, reference spot checks) put every t_up above 1e300 inside the stated region, and t_down
+    stays far below 1e300.
+    Each step has named scientific mutants (cancelled complement, mutation before selection, loss as 1 - p_fix,
+    unconditional times, dense eigensolvers and dense solves, neutral gap, absorption rate from mutation supply,
+    regularized absorbing states, sign fixed by the largest entry), and a complete whole-task mutant applies mutation
+    before selection; each fails at least one case of its target tests. Every case was run alone in a fresh process
+    with tools/crown_check.py for the per-step references, solution.py, the second solution, the mutants, the
+    all-None and all-zero controls (which pass no case), with every step output scaled by 1 +- 1e-12 and with every
+    evaluated function so scaled in the whole-task tests (all cases still pass).
 
 required_dependencies: |-
   import numpy as np

@@ -171,9 +171,19 @@ def mode_format(t):
             probs.append(f"whole mutant {m.get('name')}: missing file")
     if not (y.get("mutants") or []):
         probs.append("no whole-task mutant")
-    missing = META - set(y)
+    md = y.get("metadata") or {}
+    need = META | {"author_name", "author_email", "author_organization", "author_profile", "conflicts_of_interest"}
+    missing = sorted(k for k in need if md.get(k) in (None, "", []))
     if missing:
-        probs.append(f"metadata missing: {sorted(missing)}")
+        probs.append(f"metadata block missing or empty: {missing}")
+    if any(isinstance(v, str) and "TODO" in v for v in md.values()):
+        probs.append("metadata contains a TODO placeholder")
+    if y.get("domain") not in ("physics", "biology", "materials", "math", "chemistry"):
+        probs.append(f"domain {y.get('domain')!r} not accepted (physics, biology, materials, math, chemistry)")
+    size = sum(os.path.getsize(os.path.join(dp, fn)) for dp, _, fns in os.walk(t.root) for fn in fns
+               if "__pycache__" not in dp)
+    if size > 650 * 1024:
+        probs.append(f"task folder is {size / 1024:.0f} KB (platform limit 800 KB as it measures; keep raw size <= 650 KB)")
     for p in probs:
         print("FORMAT", p)
     print("FORMAT", "OK" if not probs else f"{len(probs)} problem(s)")

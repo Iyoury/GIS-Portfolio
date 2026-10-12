@@ -1,102 +1,97 @@
 domain: physics
 
-subfield: "Stellar astrophysics: equation of state of the relativistic electron-positron gas with pair equilibrium"
-
-tags:
-  - equation of state
-  - Fermi-Dirac integrals
-  - electron-positron pairs
-  - degenerate matter
-  - specific heat
-  - stellar interiors
-  - numerical cancellation
-
-expert_time_estimate_hours: 10
-
-relevant_experience: "B.Sc. in Georesources and Environment (FST Fes, 2016), known as Geological Engineering in Canada, and a graduate certificate in geomatics from Université Laval (reference frames, rotations, least-squares adjustment). GIS analyst at Morocco's Ministry of Energy and Mines (2016-2018) on exploration databases, and now running an independent geospatial consultancy (Craton Géodonnées) in Quebec that works with the drilling databases of Abitibi exploration programs."
-
-author: "Ayoub Bousfiha"
-affiliation: "Independent Researcher"
-
-difficulty_explanation: >-
-  Every quantity must be delivered with a relative error below 1e-10 (c_V below 1e-8; n_plus and n_net
-  below 1e-250 cm^-3 to within 1e-250 cm^-3) for 1e7 <= T <= 1e11 K and psi from about 2e-21 to 1e6, a
-  domain that spans classical and completely degenerate, non-relativistic and ultra-relativistic, and
-  pair-dominated gases, so no single textbook formula or fixed grid works. Three of the wanted quantities
-  are tiny differences of large ones: in a pair plasma at rho Ye = 1e-10 g cm^-3, T = 1e11 K the net
-  electron density is 4e-21 of n_minus, so n_minus - n_plus has no correct digit; the entropy of a
-  degenerate gas is 6e-10 of (u + P) / T at psi = 1.3e5, T = 1e7 K and 1e-11 at psi = 1e6, T = 2e7 K, so
-  the Euler relation (u_tot + P - mu n) / T gives it with relative errors of 7.5e-7 and 3.2e-5 there
-  (measured with the shipped entropy_from_euler mutant); and c_V of a degenerate gas is smaller than the
-  energy and number fluctuations it is built from by (k T / E_F)^2, so the textbook Schur form <dE^2> -
-  <dE dN>^2 / <dN^2> evaluated directly loses 1.9e-7 at rho Ye = 1e13 g cm^-3, T = 1e7 K and 4.5e-8 at
-  1e11 g cm^-3 (shipped schur_complement mutant, against the required 1e-8). The solver has to recast each
-  of them without subtraction, integrate across a Fermi edge only k T wide at an energy up to 1e6 k T with
-  the occupation argument taken relative to the edge, invert n_net(psi) to full relative precision when
-  psi is 2e-21 (which requires working in psi, rest energy included, rather than mu / k T), and
-  differentiate the energy at constant net density so that pair creation enters c_V. The complete equation
-  of state must meet these bounds with respect to the exact values at (rho, T, Ye), and n_minus, n_plus,
-  P, u and s amplify a relative error of psi up to about 600 times (in a cool classical gas d ln n / d ln
-  psi is about psi, close to m_e c^2 / k T), so psi has to be converged to about 1e-13; in a degenerate,
-  non-relativistic gas near 1e7 K the slope of ln n_net against ln psi falls from several hundred to below
-  20 across the bracket, where plain false position stalls.
-
-solution_explanation: >-
-  The reference integrates over the kinetic energy E with composite 24-point Gauss-Legendre rules: below
-  the Fermi edge in t = sqrt(E) on doubling panels, and over the window E_F +- 60 k T in y = (E - E_F) /
-  (k T) on unit panels, so the electron occupation argument is y itself and the integrands stay accurate
-  even at psi = 1e6. The net electron density uses the identity f(b - psi) - f(b + psi) = sinh(psi) /
-  (cosh b + cosh psi) (b = eps / theta), a positive integrand summed in logarithms; the entropy uses the
-  positive integrand log1p(e^{-|x|}) + |x| / (e^{|x|} + 1). degeneracy_parameter solves ln n_net(ln psi) =
-  ln(rho_Ye N_A) by bisection-safeguarded false position with the Illinois modification in ln psi, stopped
-  when the bracket is below 1e-14 or the residual below 1e-15, well inside the about 1e-13 that the
-  complete equation of state needs. specific_heat evaluates the grand-canonical fluctuation formula c_V =
-  det / (k T^2 <dN^2>) with det = <dE^2><dN^2> - <dE dN>^2 written as 1/2 sum_ij w_i w_j (e_i n_j - e_j
-  n_i)^2, i.e. two-pass centred second moments for same-species pairs and (e_i + e_j)^2 > 0 for
-  electron-positron pairs, so nothing cancels. electron_positron_eos validates rho, T and Ye and chains
-  the four functions at rho_Ye = rho Ye. The module-level helpers and constants of the per-step reference
-  files carry the prefixes _epeos_ and _EPEOS_, so that a helper a candidate defines in a later step
-  cannot replace them in the shared evaluation namespace.
-
-verification_explanation: >-
-  The test targets do not come from the solution code: classical-gas states use the Maxwell-Juettner
-  closed forms with modified Bessel functions in 40-digit mpmath (only where the Fermi corrections are
-  below 1e-11), twelve (T, psi) states use 40-digit mpmath tanh-sinh quadrature of the defining integrals
-  with breakpoints every k T over the Fermi edge, and twelve (rho_Ye, T) and four (rho, T, Ye) states take
-  psi from an mpmath root search on those integrals and c_V from a centred difference of u at constant
-  n_net (T +- 1e-7 T, psi re-solved at each temperature), a different route from the fluctuation formula
-  of the reference; three of the twelve (T, psi) states (T = 1e7, 1e9, 1e11 K) were re-checked with mpmath
-  Gauss-Legendre quadrature of the same integrals. The two (rho_Ye, T) states added in version 3 (1e5 g
-  cm^-3 at 1e7 K and 4e5 g cm^-3 at 1.2e7 K) were computed with both tanh-sinh and Gauss-Legendre
-  quadrature, which agree to 30 digits, and their centred-difference c_V agrees with the 40-digit
-  fluctuation formula to 1e-17; the two step 5 corner states at the domain endpoints use the stored psi
-  and c_V with P, u, s and the densities from the same 40-digit quadratures (n_minus of the degenerate
-  corner from n_minus = rho Ye N_A + n_plus). General case 1 needs no stored target: at (rho, T, Ye) =
-  (1e6 g cm^-3, 3e9 K, 0.5), where n_plus / n_minus = 0.29, it checks charge neutrality n_minus - n_plus =
-  rho Ye N_A, the Euler relation u_tot + P - T s = mu n_net and c_V = du/dT = T ds/dT at constant rho Ye
-  (five-point differences of the returned u and s, h = 5e-3 T), each within the first-order error budget
-  of the stated accuracies computed in the test (plus 1.2e-8 for the stencil truncation, measured at
-  4.8e-9 and 6.0e-9); it rejects whole solutions that ignore the positrons in psi, s or P, drop the pair
-  rest energy from u or the positron fluctuations from c_V, or take c_V at constant psi. The reference
-  agrees with every stored target to 1.4e-13 or better. second_solution.py follows different routes:
-  adaptive QUADPACK quadrature in the momentum p below the Fermi window and in y over it; n_net as n_minus
-  - n_plus for psi >= 1 and as the integral over psi of the positive charge susceptibility d n_net / d psi
-  for psi < 1 (Gauss-Legendre in psi), instead of the sinh identity; P from the grand potential k T int
-  p^2 ln(1 + e^{-x}) dp instead of the p^4 / eps moment; Brent's method for psi; and c_V from the Jacobian
-  of (u_tot, n_net) in (T, mu) with analytic derivative integrands, instead of the pairwise fluctuation
-  determinant (only s uses the same stable form of the defining integrand). It agrees with every stored
-  target to 1.1e-13 and passes every test case. Each step has a named scientific mutant (net density by
-  subtraction, entropy from the Euler relation, positrons ignored in the density equation, Schur-form c_V
-  and c_V without positron fluctuations, c_V at constant psi) and the whole-task mutant uses classical
-  (Maxwell-Boltzmann) statistics throughout; each fails at least one case of its target tests.
-  tools/crown_check.py ran every test case alone in a fresh process for the reference (each step with the
-  reference earlier steps, and solution.py on every test file), the second solution and the mutants;
-  checked that scaling the outputs by 1 +- 1e-12 still passes every step case and, with all five functions
-  scaled at once, every general case; checked that all-None and all-zero controls pass no case; and
-  checked the file format. Both solutions were run three times in clean processes (once with one
-  BLAS/OpenMP thread) and gave identical outputs; on a 240-state (rho_Ye, T) grid with Ye = 1 the complete
-  equations of state of the two solutions agree to 2.7e-12, and on a 190-point (T, psi) grid their
-  pair_densities and pair_thermodynamics agree to 3.2e-12.
+metadata:
+  author_name: "Ayoub Bousfiha"
+  author_email: "iyoury.ab@gmail.com"
+  author_organization: "Independent Researcher"
+  relevant_experience: "B.Sc. in Georesources and Environment (FST Fes, 2016), known as Geological Engineering in Canada, and a graduate certificate in geomatics from Université Laval (reference frames, rotations, least-squares adjustment). GIS analyst at Morocco's Ministry of Energy and Mines (2016-2018) on exploration databases, and now running an independent geospatial consultancy (Craton Géodonnées) in Quebec that works with the drilling databases of Abitibi exploration programs."
+  subfield: "Stellar astrophysics: equation of state of the relativistic electron-positron gas with pair equilibrium"
+  tags:
+    - equation of state
+    - Fermi-Dirac integrals
+    - electron-positron pairs
+    - degenerate matter
+    - specific heat
+    - stellar interiors
+    - numerical cancellation
+  expert_time_estimate_hours: 10
+  difficulty_explanation: >-
+    Every quantity must be delivered with a relative error below 1e-10 (c_V below 1e-8; n_plus and n_net
+    below 1e-250 cm^-3 to within 1e-250 cm^-3) for 1e7 <= T <= 1e11 K and psi from about 2e-21 to 1e6, a
+    domain that spans classical and completely degenerate, non-relativistic and ultra-relativistic, and
+    pair-dominated gases, so no single textbook formula or fixed grid works. Three of the wanted quantities
+    are tiny differences of large ones: in a pair plasma at rho Ye = 1e-10 g cm^-3, T = 1e11 K the net
+    electron density is 4e-21 of n_minus, so n_minus - n_plus has no correct digit; the entropy of a
+    degenerate gas is 6e-10 of (u + P) / T at psi = 1.3e5, T = 1e7 K and 1e-11 at psi = 1e6, T = 2e7 K, so
+    the Euler relation (u_tot + P - mu n) / T gives it with relative errors of 7.5e-7 and 3.2e-5 there
+    (measured with the shipped entropy_from_euler mutant); and c_V of a degenerate gas is smaller than the
+    energy and number fluctuations it is built from by (k T / E_F)^2, so the textbook Schur form <dE^2> -
+    <dE dN>^2 / <dN^2> evaluated directly loses 1.9e-7 at rho Ye = 1e13 g cm^-3, T = 1e7 K and 4.5e-8 at
+    1e11 g cm^-3 (shipped schur_complement mutant, against the required 1e-8). The solver has to recast each
+    of them without subtraction, integrate across a Fermi edge only k T wide at an energy up to 1e6 k T with
+    the occupation argument taken relative to the edge, invert n_net(psi) to full relative precision when
+    psi is 2e-21 (which requires working in psi, rest energy included, rather than mu / k T), and
+    differentiate the energy at constant net density so that pair creation enters c_V. The complete equation
+    of state must meet these bounds with respect to the exact values at (rho, T, Ye), and n_minus, n_plus,
+    P, u and s amplify a relative error of psi up to about 600 times (in a cool classical gas d ln n / d ln
+    psi is about psi, close to m_e c^2 / k T), so psi has to be converged to about 1e-13; in a degenerate,
+    non-relativistic gas near 1e7 K the slope of ln n_net against ln psi falls from several hundred to below
+    20 across the bracket, where plain false position stalls.
+  solution_explanation: >-
+    The reference integrates over the kinetic energy E with composite 24-point Gauss-Legendre rules: below
+    the Fermi edge in t = sqrt(E) on doubling panels, and over the window E_F +- 60 k T in y = (E - E_F) /
+    (k T) on unit panels, so the electron occupation argument is y itself and the integrands stay accurate
+    even at psi = 1e6. The net electron density uses the identity f(b - psi) - f(b + psi) = sinh(psi) /
+    (cosh b + cosh psi) (b = eps / theta), a positive integrand summed in logarithms; the entropy uses the
+    positive integrand log1p(e^{-|x|}) + |x| / (e^{|x|} + 1). degeneracy_parameter solves ln n_net(ln psi) =
+    ln(rho_Ye N_A) by bisection-safeguarded false position with the Illinois modification in ln psi, stopped
+    when the bracket is below 1e-14 or the residual below 1e-15, well inside the about 1e-13 that the
+    complete equation of state needs. specific_heat evaluates the grand-canonical fluctuation formula c_V =
+    det / (k T^2 <dN^2>) with det = <dE^2><dN^2> - <dE dN>^2 written as 1/2 sum_ij w_i w_j (e_i n_j - e_j
+    n_i)^2, i.e. two-pass centred second moments for same-species pairs and (e_i + e_j)^2 > 0 for
+    electron-positron pairs, so nothing cancels. electron_positron_eos validates rho, T and Ye and chains
+    the four functions at rho_Ye = rho Ye. The module-level helpers and constants of the per-step reference
+    files carry the prefixes _epeos_ and _EPEOS_, so that a helper a candidate defines in a later step
+    cannot replace them in the shared evaluation namespace.
+  verification_explanation: >-
+    The test targets do not come from the solution code: classical-gas states use the Maxwell-Juettner
+    closed forms with modified Bessel functions in 40-digit mpmath (only where the Fermi corrections are
+    below 1e-11), twelve (T, psi) states use 40-digit mpmath tanh-sinh quadrature of the defining integrals
+    with breakpoints every k T over the Fermi edge, and twelve (rho_Ye, T) and four (rho, T, Ye) states take
+    psi from an mpmath root search on those integrals and c_V from a centred difference of u at constant
+    n_net (T +- 1e-7 T, psi re-solved at each temperature), a different route from the fluctuation formula
+    of the reference; three of the twelve (T, psi) states (T = 1e7, 1e9, 1e11 K) were re-checked with mpmath
+    Gauss-Legendre quadrature of the same integrals. The two (rho_Ye, T) states added in version 3 (1e5 g
+    cm^-3 at 1e7 K and 4e5 g cm^-3 at 1.2e7 K) were computed with both tanh-sinh and Gauss-Legendre
+    quadrature, which agree to 30 digits, and their centred-difference c_V agrees with the 40-digit
+    fluctuation formula to 1e-17; the two step 5 corner states at the domain endpoints use the stored psi
+    and c_V with P, u, s and the densities from the same 40-digit quadratures (n_minus of the degenerate
+    corner from n_minus = rho Ye N_A + n_plus). General case 1 needs no stored target: at (rho, T, Ye) =
+    (1e6 g cm^-3, 3e9 K, 0.5), where n_plus / n_minus = 0.29, it checks charge neutrality n_minus - n_plus =
+    rho Ye N_A, the Euler relation u_tot + P - T s = mu n_net and c_V = du/dT = T ds/dT at constant rho Ye
+    (five-point differences of the returned u and s, h = 5e-3 T), each within the first-order error budget
+    of the stated accuracies computed in the test (plus 1.2e-8 for the stencil truncation, measured at
+    4.8e-9 and 6.0e-9); it rejects whole solutions that ignore the positrons in psi, s or P, drop the pair
+    rest energy from u or the positron fluctuations from c_V, or take c_V at constant psi. The reference
+    agrees with every stored target to 1.4e-13 or better. second_solution.py follows different routes:
+    adaptive QUADPACK quadrature in the momentum p below the Fermi window and in y over it; n_net as n_minus
+    - n_plus for psi >= 1 and as the integral over psi of the positive charge susceptibility d n_net / d psi
+    for psi < 1 (Gauss-Legendre in psi), instead of the sinh identity; P from the grand potential k T int
+    p^2 ln(1 + e^{-x}) dp instead of the p^4 / eps moment; Brent's method for psi; and c_V from the Jacobian
+    of (u_tot, n_net) in (T, mu) with analytic derivative integrands, instead of the pairwise fluctuation
+    determinant (only s uses the same stable form of the defining integrand). It agrees with every stored
+    target to 1.1e-13 and passes every test case. Each step has a named scientific mutant (net density by
+    subtraction, entropy from the Euler relation, positrons ignored in the density equation, Schur-form c_V
+    and c_V without positron fluctuations, c_V at constant psi) and the whole-task mutant uses classical
+    (Maxwell-Boltzmann) statistics throughout; each fails at least one case of its target tests.
+    tools/crown_check.py ran every test case alone in a fresh process for the reference (each step with the
+    reference earlier steps, and solution.py on every test file), the second solution and the mutants;
+    checked that scaling the outputs by 1 +- 1e-12 still passes every step case and, with all five functions
+    scaled at once, every general case; checked that all-None and all-zero controls pass no case; and
+    checked the file format. Both solutions were run three times in clean processes (once with one
+    BLAS/OpenMP thread) and gave identical outputs; on a 240-state (rho_Ye, T) grid with Ye = 1 the complete
+    equations of state of the two solutions agree to 2.7e-12, and on a 190-point (T, psi) grid their
+    pair_densities and pair_thermodynamics agree to 3.2e-12.
 
 required_dependencies: |-
   import numpy as np

@@ -2,122 +2,117 @@
 
 domain: physics
 
-subfield: "Condensed matter physics: thermal phase diffusion and noise in overdamped and underdamped Josephson junctions"
-
-tags:
-  - Josephson junction
-  - phase diffusion
-  - Fokker-Planck equation
-  - Kramers equation
-  - giant diffusion
-  - matrix continued fraction
-  - noise thermometry
-
-expert_time_estimate_hours: 14
-
-relevant_experience: "B.Sc. in Georesources and Environment (FST Fes, 2016), known as Geological Engineering in Canada, and a graduate certificate in geomatics from Université Laval (reference frames, rotations, least-squares adjustment). GIS analyst at Morocco's Ministry of Energy and Mines (2016-2018) on exploration databases, and now running an independent geospatial consultancy (Craton Géodonnées) in Quebec that works with the drilling databases of Abitibi exploration programs."
-
-author: "Ayoub Bousfiha"
-affiliation: "Independent Researcher"
-
-difficulty_explanation: >-
-  Below the critical current at low noise the mean voltage and the effective diffusion coefficient are
-  exponentially small (about 1e-17 at some tested points), yet they must keep a relative error below 1e-9, so
-  a double-precision Fourier or finite-difference solution of the Fokker-Planck equation, whose error is
-  only absolute, fails there; the solver needs a formulation with relative accuracy, for example the exact
-  Stratonovich and Reimann integral representations with quadrature adapted to the boundary layer of width
-  theta / i, extended-precision continued fractions or Bessel series. Out of equilibrium the diffusion coefficient is not theta dv/di (Einstein relation),
-  and locating the flat giant-diffusion maximum to 1e-6 in bias needs D_eff or its derivative far more
-  accurately than that. The thermometry step inverts an exponentially sensitive voltage over theta in
-  [0.02, 50] with a stated endpoint rule and needs d ln v / d ln theta, which step 1 does not provide, to a
-  relative 1e-6 also where it is as small as about 4e-8 (far above the critical current at weak noise),
-  where differentiating the Boltzmann factors of the Stratonovich integrals directly loses that accuracy
-  to cancellation, and the theta it returns inherits the voltage error of step 1 amplified by kappa. The
-  array step requires each junction's own noise strength theta0 / c_k and its own reduced time, so the
-  voltage noise scales with c_k r_k, not (c_k r_k)**2. The final RCSJ step has no closed form: the
-  stationary Kramers equation in phase and velocity must be solved to a relative 1e-7 at strong inertia and
-  weak noise, where a time integration started on one branch of the hysteretic current-voltage curve does
-  not reach the stationary average.
-
-solution_explanation: >-
-  mean_voltage evaluates the Stratonovich formula v = 2 pi (1 - exp(-2 pi i / theta)) / S, where S is a
-  double integral of Boltzmann factors of the tilted washboard, with the periodic trapezoid rule in the
-  position and composite 10-point Gauss-Legendre panels in the shift graded geometrically toward the
-  boundary layer of width theta / i; dv/di comes from differentiating the same quadrature in i.
-  effective_diffusion uses the Reimann et al. formula D = theta <I_+**2 I_-> / <I_+>**3 with the same
-  quadrature, and diffusion_peak solves d ln D / di = 0 with brentq on (0.5, 3), the derivative taken
-  analytically under the integrals. noise_temperature applies the stated endpoint rule with the voltages of
-  mean_voltage at theta = 0.02 and 50, solves ln v(theta) = ln v with mean_voltage by brentq in ln theta,
-  and obtains kappa from the theta-derivative of the Stratonovich integrals taken with the shift scaled
-  as y = theta u: the derivative becomes the integral of the Boltzmann factor times
-  F = cos x - cos(x - y) + y sin(x - y) = O(y**2) (evaluated without cancellation) plus a boundary term
-  in exp(-2 pi i / theta), which keeps its relative accuracy where d ln v / d ln theta is tiny.
-  array_criterion finds the criterion current by brentq on the summed
-  junction voltages c_k r_k v(J / c_k, theta0 / c_k) and sums r_k dv_k/di and 2 c_k r_k D_k for the
-  differential resistance and the zero-frequency voltage noise. rcsj_voltage expands the stationary Kramers
-  equation in Hermite functions of the velocity (110 terms) and Fourier modes of the phase (|p| <= 56),
-  solves the resulting Brinkman hierarchy by a matrix continued fraction with dv/di carried analytically
-  through the same recursion, and calls mean_voltage for beta_c = 0.
-
-verification_explanation: >-
-  Every test computes its own target independently of the reference: the stationary Fokker-Planck density
-  and the homogenization corrector as continued fractions in mpmath extended precision (30 + 1.8 / theta
-  digits), the single-integral Bessel form of the Ambegaokar-Halperin voltage at 40 digits, the closed
-  forms at i = 0 (1 / I_0(1/theta)**2 and the Lifson-Jackson D), Newton-step criteria on those targets for
-  the diffusion peak and the array criterion current, and a central difference for kappa in at least
-  60-digit arithmetic (60 + 1.8 / theta digits, step 1e-15 theta). Step 4 defines theta through
-  mean_voltage, whose relative error (below 1e-9) enters theta multiplied by |kappa| (kappa from about
-  0.01 to about 2e7 over the domain), so theta is graded against the theta of the continued-fraction
-  voltage with the stated propagated tolerance 1e-7 + 2e-9 |kappa| (kappa from the extended-precision
-  difference at that theta), and kappa against the extended-precision difference at the returned theta to
-  1e-6; the endpoint rule is defined with the voltages of mean_voltage at theta = 0.02 and 50, so the
-  endpoint inputs (v_lo and v_hi themselves and the probes 0.9e-11 and 1.1e-11 beyond them) are built from
-  mean_voltage, which each case first checks against the continued fraction to its stated 1e-9. The
-  reference kappa agrees with the extended-precision difference to 1.9e-11 relative on a geometric 14 x 10
-  grid of (i, theta) over the domain (kappa from 0.0102 to 2.42e7), and step 4 test case 1 includes a point
-  with kappa about 2.4e6. Step 5 grades j_star in the same way, against the criterion current of the
-  continued-fraction array voltage with the stated propagated tolerance 1e-9 + 2e-9 / s, s = d ln V / d ln J
-  (a relative voltage error enters j_star divided by s, which is at least 1 on a 25 x 50 grid of the
-  domain and tends to 1 in linear response), and r_diff and s_v at the returned j_star to 1e-8. Step 3
-  grades i_peak against the maximum of the continued-fraction D_eff; its prompt states that the flat
-  maximum cannot be located to 1e-6 from the 1e-9 guaranteed by effective_diffusion alone (a relative error
-  of 1e-9 that varies with i can move it by 4e-6 to 1.2e-4), and the reference locates it from its own
-  d ln D / di. Steps 3 to 6 were also run case by case with the earlier reference functions they call
-  multiplied by factors inside their stated accuracy (step 3: effective_diffusion by 1 +- 9.9e-10 and by
-  smooth, rapidly oscillating and discontinuous i-dependent factors up to 1 +- 9.9e-10; step 4:
-  mean_voltage v by 1 +- 5e-10, 1 +- 9.9e-10 and two theta-dependent factors up to 1 +- 9.9e-10; step 5:
-  v by 1 +- 9.9e-10, r_d by 1 +- 9.9e-9 and effective_diffusion by 1 +- 9.9e-10 with equal and mixed
-  signs and as i-dependent factors; step 6: v by 1 +- 9.9e-10 together with r_d by 1 +- 9.9e-9): every
-  case passes for the reference. For the RCSJ step the target is a Hermite expansion centred at the shifted
-  velocity 0.6 i with its own truncation (120 Hermite terms, |p| <= 60) and dv/di from a fourth-order
-  five-point central difference (h = 1e-3); against 220 terms, |p| <= 110 its v is within 5e-5 of the v
-  tolerance and its dv/di within 1e-12 relative except at the smallest tested voltage, where the stencil
-  truncation and the rounding of the shifted basis leave dv/di within about 3e-7 of the analytic value of
-  the reference (about 3 per cent of the 1e-5 tolerance; within 1e-9 elsewhere). second_solution.py uses a
-  third exact representation for steps 1 to 5, independent of the reference and of the targets: the
-  Jacobi-Anger Bessel series of the Stratonovich and Reimann integrals (every shift integral in closed form,
-  alternating Bessel sums in mpmath at 30 + 1.8 / theta digits, Fourier products by exact integer
-  convolutions, analytic derivatives in i and theta), with a grid scan and Illinois regula falsi for the
-  peak, Illinois regula falsi in 1 / theta for the temperature and safeguarded Newton on ln V for the
-  criterion current; it reproduces the continued-fraction v, dv/di and D_eff on the tested points to the
-  last double-precision bit. For the RCSJ step no method outside the family of Hermite-Fourier matrix
-  continued fractions was found that reaches 1e-7 |v| + 1e-12 at voltages of order 1e-9 (a sparse direct solve
-  of the hierarchy and a continued fraction over the Fourier index were tried in version 5 and rejected), so
-  the reference, the target and the second solution all belong to that family; they differ in the centre
-  of the velocity basis (0, 0.6 i, the overdamped velocity), the truncation, the Fourier representation
-  (complex exponentials or cos/sin) and the derivative (analytic recursion, five-point difference,
-  complex-step differentiation). This limitation is recorded in source.md for the project lead; the
-  beta_c = 0 limit is checked against the overdamped continued fraction and, in the whole-task test,
-  against mean_voltage. Each step has named scientific mutants (forward slips only, Kramers rates, Einstein
-  relation, maximum of dv/di instead of D_eff, Kramers-rate inversion, inverted or Arrhenius sensitivity,
-  squared voltage scale, no inertia, unscaled velocity noise, missing thermal-velocity scale) and there is a
-  whole-task unscaled-velocity-noise mutant; each fails at least one case of its target tests.
-  tools/crown_check.py (version 12, single-threaded BLAS) ran every test case alone in a fresh process (step
-  k with reference steps 1..k-1 as context, general cases with solution.py) for the reference (solution.py
-  also on every step file), the second solution and the mutants, checked that scaling every reference
-  output by 1 +- 1e-12 (in the general cases the outputs of every evaluated function) still passes every
-  case, and checked that all-None and all-zero controls pass no case; all of these held. solution.py and
-  second_solution.py were each run twice in clean processes and gave identical outputs.
+metadata:
+  author_name: "Ayoub Bousfiha"
+  author_email: "iyoury.ab@gmail.com"
+  author_organization: "Independent Researcher"
+  relevant_experience: "B.Sc. in Georesources and Environment (FST Fes, 2016), known as Geological Engineering in Canada, and a graduate certificate in geomatics from Université Laval (reference frames, rotations, least-squares adjustment). GIS analyst at Morocco's Ministry of Energy and Mines (2016-2018) on exploration databases, and now running an independent geospatial consultancy (Craton Géodonnées) in Quebec that works with the drilling databases of Abitibi exploration programs."
+  subfield: "Condensed matter physics: thermal phase diffusion and noise in overdamped and underdamped Josephson junctions"
+  tags:
+    - Josephson junction
+    - phase diffusion
+    - Fokker-Planck equation
+    - Kramers equation
+    - giant diffusion
+    - matrix continued fraction
+    - noise thermometry
+  expert_time_estimate_hours: 14
+  difficulty_explanation: >-
+    Below the critical current at low noise the mean voltage and the effective diffusion coefficient are
+    exponentially small (about 1e-17 at some tested points), yet they must keep a relative error below 1e-9, so
+    a double-precision Fourier or finite-difference solution of the Fokker-Planck equation, whose error is
+    only absolute, fails there; the solver needs a formulation with relative accuracy, for example the exact
+    Stratonovich and Reimann integral representations with quadrature adapted to the boundary layer of width
+    theta / i, extended-precision continued fractions or Bessel series. Out of equilibrium the diffusion coefficient is not theta dv/di (Einstein relation),
+    and locating the flat giant-diffusion maximum to 1e-6 in bias needs D_eff or its derivative far more
+    accurately than that. The thermometry step inverts an exponentially sensitive voltage over theta in
+    [0.02, 50] with a stated endpoint rule and needs d ln v / d ln theta, which step 1 does not provide, to a
+    relative 1e-6 also where it is as small as about 4e-8 (far above the critical current at weak noise),
+    where differentiating the Boltzmann factors of the Stratonovich integrals directly loses that accuracy
+    to cancellation, and the theta it returns inherits the voltage error of step 1 amplified by kappa. The
+    array step requires each junction's own noise strength theta0 / c_k and its own reduced time, so the
+    voltage noise scales with c_k r_k, not (c_k r_k)**2. The final RCSJ step has no closed form: the
+    stationary Kramers equation in phase and velocity must be solved to a relative 1e-7 at strong inertia and
+    weak noise, where a time integration started on one branch of the hysteretic current-voltage curve does
+    not reach the stationary average.
+  solution_explanation: >-
+    mean_voltage evaluates the Stratonovich formula v = 2 pi (1 - exp(-2 pi i / theta)) / S, where S is a
+    double integral of Boltzmann factors of the tilted washboard, with the periodic trapezoid rule in the
+    position and composite 10-point Gauss-Legendre panels in the shift graded geometrically toward the
+    boundary layer of width theta / i; dv/di comes from differentiating the same quadrature in i.
+    effective_diffusion uses the Reimann et al. formula D = theta <I_+**2 I_-> / <I_+>**3 with the same
+    quadrature, and diffusion_peak solves d ln D / di = 0 with brentq on (0.5, 3), the derivative taken
+    analytically under the integrals. noise_temperature applies the stated endpoint rule with the voltages of
+    mean_voltage at theta = 0.02 and 50, solves ln v(theta) = ln v with mean_voltage by brentq in ln theta,
+    and obtains kappa from the theta-derivative of the Stratonovich integrals taken with the shift scaled
+    as y = theta u: the derivative becomes the integral of the Boltzmann factor times
+    F = cos x - cos(x - y) + y sin(x - y) = O(y**2) (evaluated without cancellation) plus a boundary term
+    in exp(-2 pi i / theta), which keeps its relative accuracy where d ln v / d ln theta is tiny.
+    array_criterion finds the criterion current by brentq on the summed
+    junction voltages c_k r_k v(J / c_k, theta0 / c_k) and sums r_k dv_k/di and 2 c_k r_k D_k for the
+    differential resistance and the zero-frequency voltage noise. rcsj_voltage expands the stationary Kramers
+    equation in Hermite functions of the velocity (110 terms) and Fourier modes of the phase (|p| <= 56),
+    solves the resulting Brinkman hierarchy by a matrix continued fraction with dv/di carried analytically
+    through the same recursion, and calls mean_voltage for beta_c = 0.
+  verification_explanation: >-
+    Every test computes its own target independently of the reference: the stationary Fokker-Planck density
+    and the homogenization corrector as continued fractions in mpmath extended precision (30 + 1.8 / theta
+    digits), the single-integral Bessel form of the Ambegaokar-Halperin voltage at 40 digits, the closed
+    forms at i = 0 (1 / I_0(1/theta)**2 and the Lifson-Jackson D), Newton-step criteria on those targets for
+    the diffusion peak and the array criterion current, and a central difference for kappa in at least
+    60-digit arithmetic (60 + 1.8 / theta digits, step 1e-15 theta). Step 4 defines theta through
+    mean_voltage, whose relative error (below 1e-9) enters theta multiplied by |kappa| (kappa from about
+    0.01 to about 2e7 over the domain), so theta is graded against the theta of the continued-fraction
+    voltage with the stated propagated tolerance 1e-7 + 2e-9 |kappa| (kappa from the extended-precision
+    difference at that theta), and kappa against the extended-precision difference at the returned theta to
+    1e-6; the endpoint rule is defined with the voltages of mean_voltage at theta = 0.02 and 50, so the
+    endpoint inputs (v_lo and v_hi themselves and the probes 0.9e-11 and 1.1e-11 beyond them) are built from
+    mean_voltage, which each case first checks against the continued fraction to its stated 1e-9. The
+    reference kappa agrees with the extended-precision difference to 1.9e-11 relative on a geometric 14 x 10
+    grid of (i, theta) over the domain (kappa from 0.0102 to 2.42e7), and step 4 test case 1 includes a point
+    with kappa about 2.4e6. Step 5 grades j_star in the same way, against the criterion current of the
+    continued-fraction array voltage with the stated propagated tolerance 1e-9 + 2e-9 / s, s = d ln V / d ln J
+    (a relative voltage error enters j_star divided by s, which is at least 1 on a 25 x 50 grid of the
+    domain and tends to 1 in linear response), and r_diff and s_v at the returned j_star to 1e-8. Step 3
+    grades i_peak against the maximum of the continued-fraction D_eff; its prompt states that the flat
+    maximum cannot be located to 1e-6 from the 1e-9 guaranteed by effective_diffusion alone (a relative error
+    of 1e-9 that varies with i can move it by 4e-6 to 1.2e-4), and the reference locates it from its own
+    d ln D / di. Steps 3 to 6 were also run case by case with the earlier reference functions they call
+    multiplied by factors inside their stated accuracy (step 3: effective_diffusion by 1 +- 9.9e-10 and by
+    smooth, rapidly oscillating and discontinuous i-dependent factors up to 1 +- 9.9e-10; step 4:
+    mean_voltage v by 1 +- 5e-10, 1 +- 9.9e-10 and two theta-dependent factors up to 1 +- 9.9e-10; step 5:
+    v by 1 +- 9.9e-10, r_d by 1 +- 9.9e-9 and effective_diffusion by 1 +- 9.9e-10 with equal and mixed
+    signs and as i-dependent factors; step 6: v by 1 +- 9.9e-10 together with r_d by 1 +- 9.9e-9): every
+    case passes for the reference. For the RCSJ step the target is a Hermite expansion centred at the shifted
+    velocity 0.6 i with its own truncation (120 Hermite terms, |p| <= 60) and dv/di from a fourth-order
+    five-point central difference (h = 1e-3); against 220 terms, |p| <= 110 its v is within 5e-5 of the v
+    tolerance and its dv/di within 1e-12 relative except at the smallest tested voltage, where the stencil
+    truncation and the rounding of the shifted basis leave dv/di within about 3e-7 of the analytic value of
+    the reference (about 3 per cent of the 1e-5 tolerance; within 1e-9 elsewhere). second_solution.py uses a
+    third exact representation for steps 1 to 5, independent of the reference and of the targets: the
+    Jacobi-Anger Bessel series of the Stratonovich and Reimann integrals (every shift integral in closed form,
+    alternating Bessel sums in mpmath at 30 + 1.8 / theta digits, Fourier products by exact integer
+    convolutions, analytic derivatives in i and theta), with a grid scan and Illinois regula falsi for the
+    peak, Illinois regula falsi in 1 / theta for the temperature and safeguarded Newton on ln V for the
+    criterion current; it reproduces the continued-fraction v, dv/di and D_eff on the tested points to the
+    last double-precision bit. For the RCSJ step no method outside the family of Hermite-Fourier matrix
+    continued fractions was found that reaches 1e-7 |v| + 1e-12 at voltages of order 1e-9 (a sparse direct solve
+    of the hierarchy and a continued fraction over the Fourier index were tried in version 5 and rejected), so
+    the reference, the target and the second solution all belong to that family; they differ in the centre
+    of the velocity basis (0, 0.6 i, the overdamped velocity), the truncation, the Fourier representation
+    (complex exponentials or cos/sin) and the derivative (analytic recursion, five-point difference,
+    complex-step differentiation). This limitation is recorded in source.md for the project lead; the
+    beta_c = 0 limit is checked against the overdamped continued fraction and, in the whole-task test,
+    against mean_voltage. Each step has named scientific mutants (forward slips only, Kramers rates, Einstein
+    relation, maximum of dv/di instead of D_eff, Kramers-rate inversion, inverted or Arrhenius sensitivity,
+    squared voltage scale, no inertia, unscaled velocity noise, missing thermal-velocity scale) and there is a
+    whole-task unscaled-velocity-noise mutant; each fails at least one case of its target tests.
+    tools/crown_check.py (version 12, single-threaded BLAS) ran every test case alone in a fresh process (step
+    k with reference steps 1..k-1 as context, general cases with solution.py) for the reference (solution.py
+    also on every step file), the second solution and the mutants, checked that scaling every reference
+    output by 1 +- 1e-12 (in the general cases the outputs of every evaluated function) still passes every
+    case, and checked that all-None and all-zero controls pass no case; all of these held. solution.py and
+    second_solution.py were each run twice in clean processes and gave identical outputs.
 
 required_dependencies: |-
   import numpy as np

@@ -2,100 +2,95 @@
 
 domain: chemistry
 
-subfield: "Quantum chemistry: Gaussian integrals, Hartree-Fock and full CI of two-electron diatomics, vibrational levels"
-
-tags:
-  - quantum chemistry
-  - Boys function
-  - Gaussian integrals
-  - Hartree-Fock
-  - full configuration interaction
-  - vibrational levels
-  - McMurchie-Davidson
-
-expert_time_estimate_hours: 12
-
-relevant_experience: "B.Sc. in Georesources and Environment (FST Fes, 2016), known as Geological Engineering in Canada, and a graduate certificate in geomatics from Université Laval (reference frames, rotations, least-squares adjustment). GIS analyst at Morocco's Ministry of Energy and Mines (2016-2018) on exploration databases, and now running an independent geospatial consultancy (Craton Géodonnées) in Quebec that works with the drilling databases of Abitibi exploration programs."
-
-author: "Ayoub Bousfiha"
-affiliation: "Independent Researcher"
-
-difficulty_explanation: >-
-  The task chains six pieces of molecular electronic-structure work that each have a known numerical or
-  conceptual trap. The Boys functions F_0 .. F_16 must have a relative error below 1e-11 from t = 0 to
-  t = 1e6, which the textbook upward recursion from the erf form cannot deliver at small t, so a series or
-  downward-recursion branch has to be combined with the large-t form. Full CI must select the lowest
-  singlet, because already in the two-function basis the triplet falls below it for diffuse exponents at
-  stretched R, and the closed-shell RHF energy must be the global minimum over closed-shell determinants:
-  for stretched or asymmetric molecules a self-consistent-field run from the core guess settles on a
-  branch up to 2.6 hartree too high, and with diffuse p shells the aufbau orbital is not the lowest
-  determinant. The vibrational levels need the exact
-  R -> infinity limit of the full-CI curve, which can be an ion pair or fractionally charged fragments with
-  a q_A q_B / R tail, and a radial solver converged both for tight wells at small R with heavy nuclei and for a
-  near-threshold state reaching about 100 bohr, to 0.01 cm^-1. The last step requires Cartesian p-function integrals
-  (overlap, kinetic, nuclear attraction and repulsion up to F_4) and a singlet-restricted full CI in a
-  non-orthogonal 8-function basis, where the lowest product-space eigenvalue can be a triplet.
-
-solution_explanation: >-
-  boys_function sums the series exp(-t) sum_k (2t)^k / ((2n+1)(2n+3)...) for the highest order and
-  recurs downward when t < n_max + 25, and uses the erf form with the upward recursion above that.
-  sto3g_one_electron and sto3g_two_electron evaluate the closed-form s-Gaussian integrals of the Gaussian
-  product theorem for all primitive pairs and quartets at once, with F_0 from boys_function. fci_energy
-  writes every normalized orbital as S^(-1/2) (cos theta, sin theta), scans theta over the whole period,
-  refines every local minimum with a bounded Brent search and keeps the lowest (RHF), then diagonalizes the
-  3 x 3 singlet configuration matrix in the RHF orbitals (full CI). vibrational_levels evaluates the
-  curve from the step 2 and 3 integrals with the same singlet CI in Loewdin orbitals, obtains the
-  dissociation limit from one-centre integrals as the lowest of the three fragment arrangements, solves the
-  radial equation on [r0, a] with a Lagrange-Legendre mesh and an R-matrix match to the analytic tail
-  min_j (E_j - E_inf + c_j / R) integrated outward with solve_ivp, locates the five levels by Sturm node
-  counting and bisection, and refines wall, tail start and mesh until the levels change by less than
-  1e-4 cm^-1. polarized_energies builds McMurchie-Davidson Hermite integrals over the 8 functions, finds RHF
-  by projected-gradient descent on the unit sphere from 48 starting orbitals polished by a maximum-overlap
-  SCF, and takes full CI as the lowest eigenvalue of the Hamiltonian in the symmetric (singlet) product
-  functions of Loewdin orbitals.
-
-verification_explanation: >-
-  Every test computes its own target without calling the reference, and every step test calls only
-  the function of its own step (general case 0 also checks the variational link E <= fci_energy of
-  step 4 with slack 2e-9): F_n from the regularized incomplete gamma function in 40-digit mpmath, and
-  the integrals of steps 2-4 by real-space shell-theorem radial Gauss-Legendre quadrature, with RHF
-  from an angle scan that refines every local minimum and full CI as a generalized eigenproblem in the
-  non-orthogonal singlet product basis. For step 5 the tests rebuild the full-CI curve from their own re-implementation of the
-  closed-form s-Gaussian integrals (vectorized over R) with that generalized-eigenproblem CI, take the
-  limit from adaptive-quadrature one-centre integrals and solve the radial equation by second-order
-  finite differences on three grids with two Richardson extrapolations (the near-threshold case is also
-  checked with outer walls at 150 and 250 bohr). For step 6 and the general tests they use Obara-Saika
-  integrals with F_m from Kummer's function, full CI as a generalized eigenproblem and RHF by BFGS from
-  40 random starts; step 6 case 0 also requires the variational lowering below the same oracle
-  restricted to the two 1s functions, and Szabo-Ostlund literature values serve as coarse bands.
-  second_solution.py uses, function by function, a method different from the reference and from the
-  oracles: Gauss-Legendre quadrature of the defining integral for F_n; momentum-space (Fourier) radial
-  integrals for the overlap, kinetic, attraction and repulsion integrals of steps 2-3 and the one-centre
-  integrals of step 5; for step 4 RHF from the exact trigonometric-polynomial form of the energy in the
-  orbital angle and the roots of its derivative, with full CI in the whole product space of the RHF
-  orbitals and a spin penalty on the triplet; a Chebyshev interpolant of the curve in ln R and a sinc DVR
-  of doubled length for the levels, with an explicit count of the eigenvalues below the limit (the box
-  grows until it holds every bound level, or to 1000 bohr for a neutral tail); and for step 6
-  Gaussian-transform (Rys-type) integrals done by Gauss-Hermite and Gauss-Legendre quadrature, RHF by
-  level-shifted Roothaan-Hall SCF from 64 fixed guess orbitals, and full CI by direct CI (sigma vectors,
-  no Hamiltonian matrix) with Davidson iteration in the canonical RHF orbitals. Full CI is the same
-  eigenvalue problem in every method, so for the full-CI energies the independence lies in the
-  integrals, orbitals and eigensolver. As a further check of the step 6 RHF global minimum, on 202
-  inputs (the 10 step 6 and general inputs, 32 range corners, 160 random points) a 400-start BFGS search
-  and a dense singlet full CI (generalized eigenproblem) on the second-solution integrals agree with
-  the second solution within 4.7e-14 and 1.8e-13 hartree, the minimum being reached from at least 29 of
-  the 64 guesses. On 30 further step 5 inputs near the five-level threshold the reference and the
-  second solution agree on which raise ValueError (16) and on the levels of the others (14) within
-  1.1e-6 cm^-1. At the ends of the stated ranges of steps 2-4 (R = 0.02 and 100 bohr for the
-  integrals, R = 0.1 and 100 bohr for the energies, zeta = 0.5 and 3, Z = 3) the oracles and the
-  reference were compared with a 50-digit mpmath evaluation of the closed-form integrals, the singlet
-  full CI and RHF, and step 4 with its oracle on a 432-point grid of its range (version 14); the
-  version-15 second solution of steps 2-4 was compared with the same kind of 50-digit evaluation at six
-  integral points and seven energy points (within 3.6e-15 and 3.5e-13 hartree). tools/crown_check.py
-  ran every case alone in a fresh process: the reference and the second solution pass all cases, each
-  of the 13 step mutants and the whole-task mutant fails at least one case, reference outputs scaled by
-  1 +- 1e-12 (for the general tests every evaluated function scaled) still pass every case, and
-  all-None and all-zero stubs pass no case.
+metadata:
+  author_name: "Ayoub Bousfiha"
+  author_email: "iyoury.ab@gmail.com"
+  author_organization: "Independent Researcher"
+  relevant_experience: "B.Sc. in Georesources and Environment (FST Fes, 2016), known as Geological Engineering in Canada, and a graduate certificate in geomatics from Université Laval (reference frames, rotations, least-squares adjustment). GIS analyst at Morocco's Ministry of Energy and Mines (2016-2018) on exploration databases, and now running an independent geospatial consultancy (Craton Géodonnées) in Quebec that works with the drilling databases of Abitibi exploration programs."
+  subfield: "Quantum chemistry: Gaussian integrals, Hartree-Fock and full CI of two-electron diatomics, vibrational levels"
+  tags:
+    - quantum chemistry
+    - Boys function
+    - Gaussian integrals
+    - Hartree-Fock
+    - full configuration interaction
+    - vibrational levels
+    - McMurchie-Davidson
+  expert_time_estimate_hours: 12
+  difficulty_explanation: >-
+    The task chains six pieces of molecular electronic-structure work that each have a known numerical or
+    conceptual trap. The Boys functions F_0 .. F_16 must have a relative error below 1e-11 from t = 0 to
+    t = 1e6, which the textbook upward recursion from the erf form cannot deliver at small t, so a series or
+    downward-recursion branch has to be combined with the large-t form. Full CI must select the lowest
+    singlet, because already in the two-function basis the triplet falls below it for diffuse exponents at
+    stretched R, and the closed-shell RHF energy must be the global minimum over closed-shell determinants:
+    for stretched or asymmetric molecules a self-consistent-field run from the core guess settles on a
+    branch up to 2.6 hartree too high, and with diffuse p shells the aufbau orbital is not the lowest
+    determinant. The vibrational levels need the exact
+    R -> infinity limit of the full-CI curve, which can be an ion pair or fractionally charged fragments with
+    a q_A q_B / R tail, and a radial solver converged both for tight wells at small R with heavy nuclei and for a
+    near-threshold state reaching about 100 bohr, to 0.01 cm^-1. The last step requires Cartesian p-function integrals
+    (overlap, kinetic, nuclear attraction and repulsion up to F_4) and a singlet-restricted full CI in a
+    non-orthogonal 8-function basis, where the lowest product-space eigenvalue can be a triplet.
+  solution_explanation: >-
+    boys_function sums the series exp(-t) sum_k (2t)^k / ((2n+1)(2n+3)...) for the highest order and
+    recurs downward when t < n_max + 25, and uses the erf form with the upward recursion above that.
+    sto3g_one_electron and sto3g_two_electron evaluate the closed-form s-Gaussian integrals of the Gaussian
+    product theorem for all primitive pairs and quartets at once, with F_0 from boys_function. fci_energy
+    writes every normalized orbital as S^(-1/2) (cos theta, sin theta), scans theta over the whole period,
+    refines every local minimum with a bounded Brent search and keeps the lowest (RHF), then diagonalizes the
+    3 x 3 singlet configuration matrix in the RHF orbitals (full CI). vibrational_levels evaluates the
+    curve from the step 2 and 3 integrals with the same singlet CI in Loewdin orbitals, obtains the
+    dissociation limit from one-centre integrals as the lowest of the three fragment arrangements, solves the
+    radial equation on [r0, a] with a Lagrange-Legendre mesh and an R-matrix match to the analytic tail
+    min_j (E_j - E_inf + c_j / R) integrated outward with solve_ivp, locates the five levels by Sturm node
+    counting and bisection, and refines wall, tail start and mesh until the levels change by less than
+    1e-4 cm^-1. polarized_energies builds McMurchie-Davidson Hermite integrals over the 8 functions, finds RHF
+    by projected-gradient descent on the unit sphere from 48 starting orbitals polished by a maximum-overlap
+    SCF, and takes full CI as the lowest eigenvalue of the Hamiltonian in the symmetric (singlet) product
+    functions of Loewdin orbitals.
+  verification_explanation: >-
+    Every test computes its own target without calling the reference, and every step test calls only
+    the function of its own step (general case 0 also checks the variational link E <= fci_energy of
+    step 4 with slack 2e-9): F_n from the regularized incomplete gamma function in 40-digit mpmath, and
+    the integrals of steps 2-4 by real-space shell-theorem radial Gauss-Legendre quadrature, with RHF
+    from an angle scan that refines every local minimum and full CI as a generalized eigenproblem in the
+    non-orthogonal singlet product basis. For step 5 the tests rebuild the full-CI curve from their own re-implementation of the
+    closed-form s-Gaussian integrals (vectorized over R) with that generalized-eigenproblem CI, take the
+    limit from adaptive-quadrature one-centre integrals and solve the radial equation by second-order
+    finite differences on three grids with two Richardson extrapolations (the near-threshold case is also
+    checked with outer walls at 150 and 250 bohr). For step 6 and the general tests they use Obara-Saika
+    integrals with F_m from Kummer's function, full CI as a generalized eigenproblem and RHF by BFGS from
+    40 random starts; step 6 case 0 also requires the variational lowering below the same oracle
+    restricted to the two 1s functions, and Szabo-Ostlund literature values serve as coarse bands.
+    second_solution.py uses, function by function, a method different from the reference and from the
+    oracles: Gauss-Legendre quadrature of the defining integral for F_n; momentum-space (Fourier) radial
+    integrals for the overlap, kinetic, attraction and repulsion integrals of steps 2-3 and the one-centre
+    integrals of step 5; for step 4 RHF from the exact trigonometric-polynomial form of the energy in the
+    orbital angle and the roots of its derivative, with full CI in the whole product space of the RHF
+    orbitals and a spin penalty on the triplet; a Chebyshev interpolant of the curve in ln R and a sinc DVR
+    of doubled length for the levels, with an explicit count of the eigenvalues below the limit (the box
+    grows until it holds every bound level, or to 1000 bohr for a neutral tail); and for step 6
+    Gaussian-transform (Rys-type) integrals done by Gauss-Hermite and Gauss-Legendre quadrature, RHF by
+    level-shifted Roothaan-Hall SCF from 64 fixed guess orbitals, and full CI by direct CI (sigma vectors,
+    no Hamiltonian matrix) with Davidson iteration in the canonical RHF orbitals. Full CI is the same
+    eigenvalue problem in every method, so for the full-CI energies the independence lies in the
+    integrals, orbitals and eigensolver. As a further check of the step 6 RHF global minimum, on 202
+    inputs (the 10 step 6 and general inputs, 32 range corners, 160 random points) a 400-start BFGS search
+    and a dense singlet full CI (generalized eigenproblem) on the second-solution integrals agree with
+    the second solution within 4.7e-14 and 1.8e-13 hartree, the minimum being reached from at least 29 of
+    the 64 guesses. On 30 further step 5 inputs near the five-level threshold the reference and the
+    second solution agree on which raise ValueError (16) and on the levels of the others (14) within
+    1.1e-6 cm^-1. At the ends of the stated ranges of steps 2-4 (R = 0.02 and 100 bohr for the
+    integrals, R = 0.1 and 100 bohr for the energies, zeta = 0.5 and 3, Z = 3) the oracles and the
+    reference were compared with a 50-digit mpmath evaluation of the closed-form integrals, the singlet
+    full CI and RHF, and step 4 with its oracle on a 432-point grid of its range (version 14); the
+    version-15 second solution of steps 2-4 was compared with the same kind of 50-digit evaluation at six
+    integral points and seven energy points (within 3.6e-15 and 3.5e-13 hartree). tools/crown_check.py
+    ran every case alone in a fresh process: the reference and the second solution pass all cases, each
+    of the 13 step mutants and the whole-task mutant fails at least one case, reference outputs scaled by
+    1 +- 1e-12 (for the general tests every evaluated function scaled) still pass every case, and
+    all-None and all-zero stubs pass no case.
 
 required_dependencies: |-
   import numpy as np

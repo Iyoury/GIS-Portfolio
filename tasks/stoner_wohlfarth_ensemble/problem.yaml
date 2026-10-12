@@ -2,109 +2,104 @@
 
 domain: materials
 
-subfield: "Magnetism of fine particles: Stoner-Wohlfarth hysteresis, Neel-Brown thermal switching and Brown relaxation"
-
-tags:
-  - Stoner-Wohlfarth model
-  - magnetic hysteresis
-  - thermal activation
-  - dynamic coercivity
-  - Fokker-Planck equation
-  - Neel-Brown relaxation
-
-expert_time_estimate_hours: 12
-
-relevant_experience: "B.Sc. in Georesources and Environment (FST Fes, 2016), known as Geological Engineering in Canada, and a graduate certificate in geomatics from Université Laval (reference frames, rotations, least-squares adjustment). GIS analyst at Morocco's Ministry of Energy and Mines (2016-2018) on exploration databases, and now running an independent geospatial consultancy (Craton Géodonnées) in Quebec that works with the drilling databases of Abitibi exploration programs."
-
-difficulty_explanation: |-
-  The task chains the zero-temperature metastable branch of a Stoner-Wohlfarth particle (the
-  local, not the global, energy minimum, followed down to the astroid switching field), the two
-  escape barriers from the occupied minimum, the survival probability under a linear field sweep
-  with Arrhenius escape over both maxima and the median and mean switching fields, and ends with
-  the dynamic coercive field of a weighted ensemble, which needs the branch, the barriers and the
-  survival probability of every particle together. The branch must be chosen correctly at every
-  field angle, including the degenerate end points psi = 0 and psi = pi/2, where a floating-point
-  h_sw slightly below 1 already matters for f0 / rate up to 1e13. The survival probability needs a
-  quadrature with a purely relative tolerance, because only an escape integral of order rate / f0
-  matters, and the mean switching field follows from the identity E[H_s] = h_sw - int P dh. The
-  switching field need not fall in one window: for psi above about pi/4 the lower barrier also has a
-  local minimum at a positive field (at or just below +h_sw close to the hard axis, where the other
-  minimum forms next to the original one), so the escape rate peaks there too and the distribution
-  can be bimodal, with a deep valley of the rate near h = 0; P must be integrated over both windows,
-  not over one window placed around the median. Step 5 stands apart from the chain and computes the
-  exact relaxation from Brown's Fokker-Planck equation; it is hard because of exponential scale
-  separation, not because of extra digits: lam1 falls to about 4.5e-24 (sigma = 60, h = 0) next to
-  eigenvalues of order 100, and in a strong field the shallow well holds a relative Boltzmann
-  weight down to about 1e-94, so a double-precision matrix eigensolver or a smooth starting vector
-  loses the slow mode unless the formulation keeps relative accuracy in both wells. Since version
-  12 the step 5 prompt states the self-adjoint Sturm-Liouville form and Garanin's quadrature for
-  tau_int (a deliberate easing kept by the author), so the work left in step 5 is the numerical
-  treatment of these forms, not their derivation.
-
-solution_explanation: |-
-  Step 1 brackets the followed minimum between its fold angle -arctan(tan(psi)**(1/3)) and psi with
-  Brent's method, with h_sw = (cos(psi)**(2/3) + sin(psi)**(2/3))**(-3/2), and uses the map
-  theta -> theta + pi (field h to -h) beyond -h_sw. Step 2 gets the four extrema from a quartic in a
-  shifted tan(theta/2) (companion-matrix eigenvalues polished by Newton steps), separates minima from
-  maxima by the alternating sign of e'' and measures both barriers from the minimum with cos(theta) > 0.
-  Step 3 integrates exp(-2 a low) + exp(-2 a high) from h to h_sw with an adaptive quadrature at
-  relative tolerance 1e-12 and returns exp(-(f0 / rate) I); step 4 solves (f0 / rate) I = ln 2 for the
-  median with Brent's method and evaluates E[H_s] = h_sw - int P dh by adaptive composite 16-point
-  Gauss-Legendre quadrature in h: U = (f0 / rate) I is accumulated from h_sw downwards with the
-  adaptive quadrature at the panel edges (h = 0, a window around the median, edges graded towards both
-  ends +-h_sw and a coarse uniform set) and inside each panel by a Gauss-Legendre rule per gap between
-  nodes; a panel is halved until halving changes its integral of P by at most 1e-12 and the gap rules
-  reproduce the edge values, so both switching windows are resolved when there are two. Step 5 writes
-  Brown's equation in Sturm-Liouville form with the Boltzmann weight w, represents functions by
-  piecewise Chebyshev interpolation in theta, and runs
-  inverse iteration in which every step is two cumulative integrals (the flux taken from the nearer end
-  on each side of the barrier, the start vector a step at the barrier); lam1 is the Rayleigh quotient
-  of positive integrals and tau_int comes from Garanin's quadrature. The final step 6 builds the
-  expected ensemble magnetization and switched weight from steps 1 and 3 (the other minimum's
-  magnetization is minus the branch value at -h) and finds both zero crossings with Brent's method.
-
-verification_explanation: |-
-  Every test case computes its own target without calling the reference: steps 1 and 2 use a
-  20000-point grid search for the extrema of e on the circle refined by bisection, with h_sw from a
-  golden-section search along the equilibrium curve (no astroid formula), plus the closed-form barriers
-  at psi = 0 and pi/2; steps 3 and 4 use the closed erfc / erf forms at psi = 0 and pi/2 and, at other
-  angles, an adaptive quadrature or one ODE run on the grid barriers and a Newton step that must not
-  move the returned median (step 4 case 5, three particles at angles above pi/4 whose switching field has
-  two windows, holds the rate at its value 1e-7 below h_sw over the last 1e-7, where the grid no longer
-  separates the merging extrema; its mean targets agree to 8.4e-12 or better with a Richardson-extrapolated
-  trapezoid rule on 2e5 and 4e5 nodes); step 5 uses an extended-precision (mpmath) Legendre-polynomial expansion of
-  Brown's operator solved by banded elimination (converged: 80 more modes and 25 more digits change
-  nothing at sigma = 60). Step 6 and the whole-task tests (ensemble_switching of solution.py) use a
-  Newton step with analytic derivatives on the independently computed ensemble magnetization and
-  switched weight and, for a particle at psi = 0 alone or paired with a hard-axis particle at
-  psi = pi/2, closed forms built on the erfc survival probability. second_solution.py uses a different
-  method in every step, none of them a test oracle: quartic roots in tan(theta/2) with h_sw from the
-  fold of the equilibrium curve (step 1); bracketing of each extremum (step 2); one DOP853 ODE run for
-  the escape integral (step 3); for step 4 the median by bisection on the dense output of that run and
-  the mean from the exponential law of u = (f0 / rate) I(H_s), as int h(s) exp(s - e^s) ds by
-  tanh-sinh quadrature in s = ln u, split at the s of h = 0, with h(s) from bisection on the same dense
-  output; for step 5 a finite-volume chain (2000 and 4000 cells, Richardson
-  extrapolation) whose smallest nonzero eigenvalue is located by an inertia (Sturm) count with pivots in
-  differential form, and Garanin's quadrature with closed-form (erfi) inner integrals and tanh-sinh
-  outer quadrature in mpmath; per-particle ODE runs with bisection for step 6. Against the reference it
-  agrees to 6e-12 relative (step 5, 58 points), 1.0e-13 (median) and 8.7e-13 (mean) on 425 step 4 inputs
-  (270 of them with psi from 1.15 to 1.55, where the switching field can have two windows; no failure),
-  2.3e-13 (step 3, 360 evaluations) and 1e-14 (step 6, 10 ensembles), and against the step 5 oracle to
-  6e-12. On 141 of the step 4 inputs both means also agree to 2.5e-12 with an independent
-  Richardson-extrapolated trapezoid rule for h_sw - int P dh (nodes h = h_sw sin u). For step 3 the
-  1e-8 accuracy is not promised at fields less than 1e-6 below h_sw when 0 < psi < pi/2: next to the hard
-  axis P there depends on the last bits of h_sw (the reference is off by 5e-4 at psi = pi/2 - 1e-9,
-  f0 / rate = 6e12, a field 1.2e-13 below h_sw, against a 50-digit evaluation); from 1e-6 below h_sw on,
-  reference and second solution agree to 2e-11. tools/crown_check.py ran every case alone in a fresh
-  process (-j 2): each reference step with the earlier reference steps as context, solution.py on the
-  whole-task tests, the second solution on every case, ten step mutants and one whole-task mutant (each
-  fails at least one case), the reference outputs scaled by 1 + 1e-12 and by 1 - 1e-12 (every step case
-  passes, and every general case with every evaluated function shifted), and all-None and all-zero stubs
-  (no case passes). Each solution was also run twice in clean processes on the same inputs and gave
-  identical outputs.
-author: "Ayoub Bousfiha"
-
-affiliation: "Independent Researcher"
+metadata:
+  author_name: "Ayoub Bousfiha"
+  author_email: "iyoury.ab@gmail.com"
+  author_organization: "Independent Researcher"
+  relevant_experience: "B.Sc. in Georesources and Environment (FST Fes, 2016), known as Geological Engineering in Canada, and a graduate certificate in geomatics from Université Laval (reference frames, rotations, least-squares adjustment). GIS analyst at Morocco's Ministry of Energy and Mines (2016-2018) on exploration databases, and now running an independent geospatial consultancy (Craton Géodonnées) in Quebec that works with the drilling databases of Abitibi exploration programs."
+  subfield: "Magnetism of fine particles: Stoner-Wohlfarth hysteresis, Neel-Brown thermal switching and Brown relaxation"
+  tags:
+    - Stoner-Wohlfarth model
+    - magnetic hysteresis
+    - thermal activation
+    - dynamic coercivity
+    - Fokker-Planck equation
+    - Neel-Brown relaxation
+  expert_time_estimate_hours: 12
+  difficulty_explanation: |-
+    The task chains the zero-temperature metastable branch of a Stoner-Wohlfarth particle (the
+    local, not the global, energy minimum, followed down to the astroid switching field), the two
+    escape barriers from the occupied minimum, the survival probability under a linear field sweep
+    with Arrhenius escape over both maxima and the median and mean switching fields, and ends with
+    the dynamic coercive field of a weighted ensemble, which needs the branch, the barriers and the
+    survival probability of every particle together. The branch must be chosen correctly at every
+    field angle, including the degenerate end points psi = 0 and psi = pi/2, where a floating-point
+    h_sw slightly below 1 already matters for f0 / rate up to 1e13. The survival probability needs a
+    quadrature with a purely relative tolerance, because only an escape integral of order rate / f0
+    matters, and the mean switching field follows from the identity E[H_s] = h_sw - int P dh. The
+    switching field need not fall in one window: for psi above about pi/4 the lower barrier also has a
+    local minimum at a positive field (at or just below +h_sw close to the hard axis, where the other
+    minimum forms next to the original one), so the escape rate peaks there too and the distribution
+    can be bimodal, with a deep valley of the rate near h = 0; P must be integrated over both windows,
+    not over one window placed around the median. Step 5 stands apart from the chain and computes the
+    exact relaxation from Brown's Fokker-Planck equation; it is hard because of exponential scale
+    separation, not because of extra digits: lam1 falls to about 4.5e-24 (sigma = 60, h = 0) next to
+    eigenvalues of order 100, and in a strong field the shallow well holds a relative Boltzmann
+    weight down to about 1e-94, so a double-precision matrix eigensolver or a smooth starting vector
+    loses the slow mode unless the formulation keeps relative accuracy in both wells. Since version
+    12 the step 5 prompt states the self-adjoint Sturm-Liouville form and Garanin's quadrature for
+    tau_int (a deliberate easing kept by the author), so the work left in step 5 is the numerical
+    treatment of these forms, not their derivation.
+  solution_explanation: |-
+    Step 1 brackets the followed minimum between its fold angle -arctan(tan(psi)**(1/3)) and psi with
+    Brent's method, with h_sw = (cos(psi)**(2/3) + sin(psi)**(2/3))**(-3/2), and uses the map
+    theta -> theta + pi (field h to -h) beyond -h_sw. Step 2 gets the four extrema from a quartic in a
+    shifted tan(theta/2) (companion-matrix eigenvalues polished by Newton steps), separates minima from
+    maxima by the alternating sign of e'' and measures both barriers from the minimum with cos(theta) > 0.
+    Step 3 integrates exp(-2 a low) + exp(-2 a high) from h to h_sw with an adaptive quadrature at
+    relative tolerance 1e-12 and returns exp(-(f0 / rate) I); step 4 solves (f0 / rate) I = ln 2 for the
+    median with Brent's method and evaluates E[H_s] = h_sw - int P dh by adaptive composite 16-point
+    Gauss-Legendre quadrature in h: U = (f0 / rate) I is accumulated from h_sw downwards with the
+    adaptive quadrature at the panel edges (h = 0, a window around the median, edges graded towards both
+    ends +-h_sw and a coarse uniform set) and inside each panel by a Gauss-Legendre rule per gap between
+    nodes; a panel is halved until halving changes its integral of P by at most 1e-12 and the gap rules
+    reproduce the edge values, so both switching windows are resolved when there are two. Step 5 writes
+    Brown's equation in Sturm-Liouville form with the Boltzmann weight w, represents functions by
+    piecewise Chebyshev interpolation in theta, and runs
+    inverse iteration in which every step is two cumulative integrals (the flux taken from the nearer end
+    on each side of the barrier, the start vector a step at the barrier); lam1 is the Rayleigh quotient
+    of positive integrals and tau_int comes from Garanin's quadrature. The final step 6 builds the
+    expected ensemble magnetization and switched weight from steps 1 and 3 (the other minimum's
+    magnetization is minus the branch value at -h) and finds both zero crossings with Brent's method.
+  verification_explanation: |-
+    Every test case computes its own target without calling the reference: steps 1 and 2 use a
+    20000-point grid search for the extrema of e on the circle refined by bisection, with h_sw from a
+    golden-section search along the equilibrium curve (no astroid formula), plus the closed-form barriers
+    at psi = 0 and pi/2; steps 3 and 4 use the closed erfc / erf forms at psi = 0 and pi/2 and, at other
+    angles, an adaptive quadrature or one ODE run on the grid barriers and a Newton step that must not
+    move the returned median (step 4 case 5, three particles at angles above pi/4 whose switching field has
+    two windows, holds the rate at its value 1e-7 below h_sw over the last 1e-7, where the grid no longer
+    separates the merging extrema; its mean targets agree to 8.4e-12 or better with a Richardson-extrapolated
+    trapezoid rule on 2e5 and 4e5 nodes); step 5 uses an extended-precision (mpmath) Legendre-polynomial expansion of
+    Brown's operator solved by banded elimination (converged: 80 more modes and 25 more digits change
+    nothing at sigma = 60). Step 6 and the whole-task tests (ensemble_switching of solution.py) use a
+    Newton step with analytic derivatives on the independently computed ensemble magnetization and
+    switched weight and, for a particle at psi = 0 alone or paired with a hard-axis particle at
+    psi = pi/2, closed forms built on the erfc survival probability. second_solution.py uses a different
+    method in every step, none of them a test oracle: quartic roots in tan(theta/2) with h_sw from the
+    fold of the equilibrium curve (step 1); bracketing of each extremum (step 2); one DOP853 ODE run for
+    the escape integral (step 3); for step 4 the median by bisection on the dense output of that run and
+    the mean from the exponential law of u = (f0 / rate) I(H_s), as int h(s) exp(s - e^s) ds by
+    tanh-sinh quadrature in s = ln u, split at the s of h = 0, with h(s) from bisection on the same dense
+    output; for step 5 a finite-volume chain (2000 and 4000 cells, Richardson
+    extrapolation) whose smallest nonzero eigenvalue is located by an inertia (Sturm) count with pivots in
+    differential form, and Garanin's quadrature with closed-form (erfi) inner integrals and tanh-sinh
+    outer quadrature in mpmath; per-particle ODE runs with bisection for step 6. Against the reference it
+    agrees to 6e-12 relative (step 5, 58 points), 1.0e-13 (median) and 8.7e-13 (mean) on 425 step 4 inputs
+    (270 of them with psi from 1.15 to 1.55, where the switching field can have two windows; no failure),
+    2.3e-13 (step 3, 360 evaluations) and 1e-14 (step 6, 10 ensembles), and against the step 5 oracle to
+    6e-12. On 141 of the step 4 inputs both means also agree to 2.5e-12 with an independent
+    Richardson-extrapolated trapezoid rule for h_sw - int P dh (nodes h = h_sw sin u). For step 3 the
+    1e-8 accuracy is not promised at fields less than 1e-6 below h_sw when 0 < psi < pi/2: next to the hard
+    axis P there depends on the last bits of h_sw (the reference is off by 5e-4 at psi = pi/2 - 1e-9,
+    f0 / rate = 6e12, a field 1.2e-13 below h_sw, against a 50-digit evaluation); from 1e-6 below h_sw on,
+    reference and second solution agree to 2e-11. tools/crown_check.py ran every case alone in a fresh
+    process (-j 2): each reference step with the earlier reference steps as context, solution.py on the
+    whole-task tests, the second solution on every case, ten step mutants and one whole-task mutant (each
+    fails at least one case), the reference outputs scaled by 1 + 1e-12 and by 1 - 1e-12 (every step case
+    passes, and every general case with every evaluated function shifted), and all-None and all-zero stubs
+    (no case passes). Each solution was also run twice in clean processes on the same inputs and gave
+    identical outputs.
 
 required_dependencies: |-
   import numpy as np
