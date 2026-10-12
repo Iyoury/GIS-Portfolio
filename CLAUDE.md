@@ -53,6 +53,18 @@ The authoritative standard is the authoring guide, saved in full here:
   right edit_label (repair, clarification, grading_fix, robustness, difficulty_increase).
 - Difficulty band target: about 3-6 of 8 rollouts.
 
+## Platform "too easy" feedback (since 2026-10-12)
+
+A too-easy report now explains, step by step, why the step gave way and suggests directions. Labels seen:
+"Key formula given" (the prompt supplies the central formula: direct substitution), "Prompt reads as a recipe"
+(every equation, index order, constant and update rule is spelled out). Suggested fixes, in line with the guide:
+- remove the central formula/recipe but keep the definition, conventions and accuracy (the agent derives it);
+- state the full numerical range and add demanding but explicitly bounded cases (asymptotic regimes,
+  underflow vs true zero, ill-conditioned or rescaled inputs) checked against high-precision references;
+- "converge on the output": grade energies/residuals/stationarity of the result, not a prescribed algorithm.
+The team says the goal is deeper scientific reasoning, not extra steps or tighter tolerances; the suggestions are
+starting points, use judgement and flag what does not fit. Update prompt, reference and tests together.
+
 ## Validation before every zip
 
 1. Reference: each case of tests/step_k.py run alone in a fresh process with solution/step_1..k; each case
