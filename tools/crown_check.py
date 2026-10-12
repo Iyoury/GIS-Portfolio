@@ -151,7 +151,9 @@ def mode_format(t):
         text = open(t.p(rel)).read()
         for pat, what in ((r"perf_counter|time\.time\(|time\.monotonic|signal\.|setitimer|alarm\(", "clock/timing"),
                           (r"rtol\s*=\s*0(\.0*)?\b", "rtol=0"),
-                          (r"==\s*0\.0\b|==\s*1\.0\b|==\s*-?\d+\.\d+(e-?\d+)?\b", "float ==")):
+                          (r"==\s*0\.0\b|==\s*1\.0\b|==\s*-?\d+\.\d+(e-?\d+)?\b", "float =="),
+                          (r"float\(\s*['\"][-+]?(nan|inf|infinity)['\"]\s*\)|np\.(nan|inf|NaN|Inf|NINF|PINF)\b|math\.(nan|inf)\b|numpy\.(nan|inf)\b",
+                           "non-finite literal (platform: edge-case inputs)")):
             for m in re.finditer(pat, text):
                 line = text[:m.start()].count("\n") + 1
                 probs.append(f"{rel}:{line}: {what}: {text.splitlines()[line - 1].strip()[:90]}")
