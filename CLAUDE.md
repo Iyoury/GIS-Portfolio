@@ -89,6 +89,11 @@ starting points, use judgement and flag what does not fit. Update prompt, refere
 - AfterQuery warning (2026-10-12): too many submissions fail validation and review; each run is costly. Upload only
   versions that are complete, content-check clean (emulated) and hard enough (blind quick-solver probe:
   tools/visible_spec.py + a fast model writing cand.py from the visible text only + tools/grade_candidate.py).
+- Probe calibration (2026-10-12): on the two tasks the platform probe called too easy, Sonnet at medium effort and
+  Opus at low effort (blind, ~3 min each) scored electron v3 38/38 and 38/38, activation v14 34/36 and 35/36 (only
+  validation edges failed); Haiku-low and Sonnet-low scored 27-30/38 on electron. So the platform's quick model is
+  about Sonnet-medium / Opus-low: use those two as the quick-probe proxy, and require that they fail for scientific
+  reasons before uploading a hardened version.
 
 ## Validation before every zip
 
