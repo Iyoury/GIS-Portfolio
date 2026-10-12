@@ -1,9 +1,8 @@
-"""Mutant (step 2): thermal resistance computed with the arithmetic mean conductivity of all layers instead of summing the layer resistances in series."""
+# Mutant (step 2): Thermal resistance from the arithmetic mean conductivity instead of the layer resistances in
+# series.
 import numpy as np
 
-
 def layer_integrals(layer_top_tvd, layer_k, z):
-    """Thermal resistance R(z) = int_0^z dz'/k and S(z) = int_0^z z'/k dz'."""
     tops = np.asarray(layer_top_tvd, float)
     k = np.asarray(layer_k, float)
     z_in = np.asarray(z, float)
@@ -26,7 +25,7 @@ def layer_integrals(layer_top_tvd, layer_k, z):
         a = top
         b = top + lo
         R += (b - a) / np.mean(k)          # MUTANT: arithmetic mean conductivity
-        S += (b - a) * (b + a) / (2 * kk)        # factored: exactly 0 in the layers below z
+        S += (b - a) * (b + a) / (2 * kk)
     if z_in.ndim == 0:
         return float(R[0]), float(S[0])
     return R.reshape(z_in.shape), S.reshape(z_in.shape)

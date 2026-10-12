@@ -1,4 +1,5 @@
-"""Mutant (step 7): Independent errors in every hole (lag-one correlation fixed at 0: the round-2 estimator with one variance per hole) instead of the stationary AR(1) noise model; phi is reported as 0."""
+# Mutant (step 7): Independent errors in every hole (phi fixed at 0, one variance per hole) instead of the stationary
+# AR(1) noise model.
 import numpy as np
 from scipy import stats
 from scipy.optimize import brentq, minimize_scalar
@@ -7,18 +8,14 @@ _RG_KEYS = ("survey_md", "survey_inc", "survey_azi", "log_md", "log_temp", "laye
             "heat_production", "rho_c", "z_min")
 _RG_PHI = np.array([0.0])                      # MUTANT: independent errors (phi = 0 in every hole)
 
-
 def _rg_white(v, phi):
-    """Prais-Winsten transform along axis 0 (readings by increasing MD)."""
     v = np.asarray(v, float)
     out = np.empty_like(v)
     out[0] = np.sqrt(1.0 - phi * phi) * v[0]
     out[1:] = v[1:] - phi * v[:-1]
     return out
 
-
 class _RgHole:
-    """Gram polynomials in phi of the whitened [q1, q2, y_c, P_perp] of one hole at one t_end."""
 
     def __init__(self, d, P):
         Q2 = d["Q2"]
@@ -30,13 +27,11 @@ class _RgHole:
         self.C1 = V[1:].T @ V[:-1] + V[:-1].T @ V[1:]
         self.C2 = V[:-1].T @ V[:-1] - np.outer(V[0], V[0])
         self.n = d["n"]
-        # coefficient arrays on the phi grid
         self.a, self.b, self.c = self.abc(_RG_PHI)
         self.lp1 = 0.5 * np.log1p(-_RG_PHI * _RG_PHI)
         self.flat = tuple([float(C[i, j]) for i in range(4) for j in range(4)] for C in (self.C0, self.C1, self.C2))
 
     def abc(self, phi):
-        """(a, b, c) of Q(phi, g) = c - 2 b (g - g0) + a (g - g0)^2 for an array of phi."""
         phi = np.asarray(phi, float)[..., None, None]
         G = self.C0 - phi * self.C1 + phi * phi * self.C2
         A11, A12, A22 = G[..., 0, 0], G[..., 0, 1], G[..., 1, 1]
@@ -52,7 +47,6 @@ class _RgHole:
         return a, b, c
 
     def abc1(self, phi):
-        """Scalar version of abc in plain floats."""
         p2 = phi * phi
         c0, c1, c2 = self.flat
         G = [c0[k] - phi * c1[k] + p2 * c2[k] for k in range(16)]
@@ -65,7 +59,6 @@ class _RgHole:
         return cpp, cyp, cyy
 
     def value(self, phi, g):
-        """-(n/2) log Q(phi, g) + (1/2) log(1 - phi^2) for a scalar phi."""
         a, b, c = self.abc1(phi)
         x = g - self.g0
         q = c - 2.0 * b * x + a * x * x
@@ -74,7 +67,6 @@ class _RgHole:
         return -0.5 * self.n * np.log(q) + 0.5 * np.log1p(-phi * phi)
 
     def grid_values(self, g):
-        """Values on the phi grid for an array of g: shape (len(phi grid), len(g))."""
         x = np.atleast_1d(g)[None, :] - self.g0
         q = self.c[:, None] - 2.0 * self.b[:, None] * x + self.a[:, None] * x * x
         with np.errstate(divide="ignore", invalid="ignore"):
@@ -82,8 +74,6 @@ class _RgHole:
         return np.where(q > 0, v, -np.inf)
 
     def best_phi(self, g):
-        """Maximum over phi of value(phi, g): best grid point refined by bounded Brent over its neighbouring cells,
-        every grid maximum within 1 of the best one refined."""
         return (self.value(0.0, g), 0.0)               # MUTANT: independent errors
         v = self.grid_values(g)[:, 0]
         m = v.size
@@ -105,10 +95,7 @@ class _RgHole:
                 best = (float(-res.fun), float(res.x))
         return best
 
-
 def _rg_profile_at(hs):
-    """Maximum over g and every phi_h of sum_h value_h(phi_h, g) (all other parameters concentrated):
-    (value, g, [phi_h])."""
     own = []
     glo, ghi = np.inf, -np.inf
     for hh in hs:
@@ -143,10 +130,7 @@ def _rg_profile_at(hs):
     phis = [hh.best_phi(g)[1] for hh in hs]
     return val, g, phis
 
-
 def regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape, t_end_bounds):
-    """Maximum-likelihood regional estimate of the glacial amplitude g and the end of the glaciation t_end with
-    stationary AR(1) noise in every hole."""
     if not isinstance(holes, (list, tuple)) or len(holes) < 2:
         raise ValueError("holes must be a list of at least 2 boreholes")
     for hd in holes:
@@ -187,7 +171,7 @@ def regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape, t_end_bo
         n = int(used.size)
         if n < 8:
             raise ValueError("fewer than 8 readings with TVD >= z_min in a hole")
-        used = used[np.argsort(log_md[used], kind="stable")]          # the AR(1) order: increasing MD
+        used = used[np.argsort(log_md[used], kind="stable")]
         z, T = np.asarray(z_all, float)[used], log_temp[used]
         R, S = layer_integrals(tops, hd["layer_k"], z)
         R, S = np.asarray(R, float), np.asarray(S, float)
@@ -232,9 +216,6 @@ def regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape, t_end_bo
     def lp(t):
         return profile(t)[0]
 
-    # global maximum of the profile log-likelihood on the closed interval: every interior grid maximum is refined
-    # over its two neighbouring cells, and an end value not below its neighbour over the end cell, where the
-    # maximum can still be interior; the end point is the maximum only if no refined value exceeds it
     grid = np.geomspace(t_lo, t_hi, 121)
     vals = np.array([lp(t) for t in grid])
     m_g = grid.size - 1
@@ -253,8 +234,6 @@ def regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape, t_end_bo
         raise ValueError("the maximum of the profile likelihood over [t_lo, t_hi] lies at an end point")
     t_hat = best_t
     _, g, phis = profile(t_hat)
-    # per-hole estimates (generalized least squares at the estimates), noise parameters, exact log-likelihood and the
-    # expected Fisher information of the regression parameters at the estimate
     H = len(data)
     npar = 2 * H + 2
     info = np.zeros((npar, npar))
@@ -283,7 +262,6 @@ def regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape, t_end_bo
     for h, oh in enumerate(out_holes):
         oh["sigma_T0"] = float(sig[2 * h])
         oh["sigma_q0"] = float(sig[2 * h + 1])
-    # 95 % likelihood-ratio interval: nearest crossings of l_p(t_hat) - chi2_0.95(1) / 2 on each side of t_hat
     thr = lp(t_hat) - 0.5 * stats.chi2.ppf(0.95, 1)
 
     def crossing(direction):

@@ -1,29 +1,21 @@
-"""Mutant (step 5): inverts the exact Laplace-domain solution with the Gaver-Stehfest formula in double precision,
-whose cancellation limits the accuracy to far above 1e-8 K per K.
-"""
+# Mutant (step 5): Exact Laplace-domain solution inverted by Gaver-Stehfest in double precision, whose cancellation
+# leaves errors far above 1e-8 K per K.
 import numpy as np
 import math
 
 SECONDS_PER_YEAR = 365.25 * 86400.0
 
-
 def _log_surface_response(z, lay, s, tops, k, rho_c):
-    """log F(z, s): Laplace transform (in time) of the departure at depth z for a unit departure applied
-    at the surface, F(0, s) = 1, in the layered column (z: depths, lay: their layer indices, s: complex)."""
     nl = tops.size
     kap = k / rho_c
-    q = np.sqrt(s[None, :] / kap[:, None])                  # (layers, nodes), Re q > 0
+    q = np.sqrt(s[None, :] / kap[:, None])
     kq = k[:, None] * q
     h = np.diff(tops)
-    # admittance Y = k F' / F at the top of each layer, from the bottom up (continuity of F and k F'):
-    # the bottom half-space keeps only the decaying solution, Y = -k q
     Y = np.empty((nl, s.size), complex)
     Y[-1] = -kq[-1]
     for i in range(nl - 2, -1, -1):
         th = np.tanh(q[i] * h[i])
         Y[i] = (Y[i + 1] - kq[i] * th) / (1.0 - Y[i + 1] * th / kq[i])
-    # F at the layer tops: F_{i+1} / F_i = 1 / (cosh(q h) - r sinh(q h)) with r = Y_{i+1} / (k_i q_i),
-    # written as 2 e^{-q h} / ((1 + e^{-2qh}) - r (1 - e^{-2qh})): no cancellation, no overflow
     lFtop = np.zeros((nl, s.size), complex)
     for i in range(nl - 1):
         e2 = np.exp(-2.0 * q[i] * h[i])
@@ -36,7 +28,6 @@ def _log_surface_response(z, lay, s, tops, k, rho_c):
         if i == nl - 1:
             out[sel] = lFtop[i][None, :] - q[i][None, :] * d
         else:
-            # inside the layer: F(d) / F_top = (cosh(q(h-d)) - r sinh(q(h-d))) / (cosh(qh) - r sinh(qh))
             r = (Y[i + 1] / kq[i])[None, :]
             e2a = np.exp(-2.0 * q[i][None, :] * (h[i] - d))
             e2b = np.exp(-2.0 * q[i] * h[i])[None, :]
@@ -45,9 +36,8 @@ def _log_surface_response(z, lay, s, tops, k, rho_c):
             out[sel] = lFtop[i][None, :] - q[i][None, :] * d + np.log(num / den)
     return out
 
-
 def _step_response(z, lay, tau, tops, k, rho_c, N=16):
-    """MUTANT: Gaver-Stehfest inversion of F / s in double precision (real Laplace variable)."""
+    # MUTANT: Gaver-Stehfest inversion of F / s in double precision (real Laplace variable).
     V = np.zeros(N)
     for i in range(1, N + 1):
         acc = 0.0
@@ -59,10 +49,7 @@ def _step_response(z, lay, tau, tops, k, rho_c, N=16):
     F = np.exp(_log_surface_response(z, lay, s, tops, k, rho_c)).real / s.real[None, :]
     return math.log(2.0) / tau * (F @ V)
 
-
 def layered_paleoclimate_perturbation(z, layer_tops, layer_k, rho_c, t_years, dT):
-    """Present-day departure (K) from the steady state at depth z in a layered column, for a
-    piecewise-constant surface-temperature history."""
     z_in = np.asarray(z, float)
     zz = np.atleast_1d(z_in).ravel()
     tops = np.asarray(layer_tops, float)
@@ -85,10 +72,6 @@ def layered_paleoclimate_perturbation(z, layer_tops, layer_k, rho_c, t_years, dT
         raise ValueError("history times must be positive and increasing")
     if np.any(~np.isfinite(zz)) or np.any(zz < 0):
         raise ValueError("depths must be >= 0")
-    # The departure obeys rho_c dT/dt = d/dz (k dT/dz) with T and k dT/dz continuous at the interfaces
-    # and the surface history as boundary value; the erfc half-space formula holds only for a uniform
-    # column. By superposition it is a sum of step responses U(z, tau) (surface raised by 1 K a time tau
-    # ago), each obtained from its Laplace transform F(z, s) / s, which the layers give in closed form.
     lay = np.searchsorted(tops, zz, side="right") - 1
     ts = t * SECONDS_PER_YEAR
     edges = np.concatenate(([0.0], ts))
@@ -102,9 +85,9 @@ def layered_paleoclimate_perturbation(z, layer_tops, layer_k, rho_c, t_years, dT
         acc = np.zeros(zi.size)
         for i in range(t.size):
             u_old = U[edges[i + 1]]
-            u_new = U[edges[i]] if edges[i] > 0 else 0.0     # U(z > 0, 0) = 0
+            u_new = U[edges[i]] if edges[i] > 0 else 0.0
             acc += d[i] * (u_old - u_new)
         out[inside] = acc
-    out[~inside] = d[0]                                       # at the surface: the present departure
+    out[~inside] = d[0]
     dT_z = float(out[0]) if z_in.ndim == 0 else out.reshape(z_in.shape)
     return dT_z

@@ -1,12 +1,10 @@
-# Tests for step 5: layered_paleoclimate_perturbation (paleoclimate signal in a layered column).
-# Targets: the erfc half-space for a uniform column, the image series of Carslaw and Jaeger (1959, sec. 12.8)
-# for a layer over a half-space evaluated with math.erfc, and 90-digit mpmath values (transfer-matrix
-# transform, mpmath Talbot inversion) stored inline for two multilayer columns and for six depths of a 50-layer
-# column (forward transfer matrices, Talbot and Gaver-Stehfest inversion in mpmath). Accuracy 1e-8 K per kelvin
-# of the largest |dT|; comparisons between two computed outputs use twice that.
-
 # --- test case 0 ---
 # uniform column is the half space
+# Targets: the erfc half-space for a uniform column, the image series of Carslaw and Jaeger (1959, sec. 12.8) for a
+# layer over a half-space evaluated with math.erfc, and 90-digit mpmath values (transfer-matrix transform, mpmath
+# Talbot inversion) stored inline for two multilayer columns and for six depths of a 50-layer column (forward transfer
+# matrices, Talbot and Gaver-Stehfest inversion in mpmath). Accuracy 1e-8 K per kelvin of the largest |dT|;
+# comparisons between two computed outputs use twice that.
 import numpy as np
 
 
@@ -18,7 +16,7 @@ def _crown_case():
 
     def _t5_halfspace(z, kappa, t_years, dT):
         edges = [0.0] + [t * _t5_YEAR for t in t_years]
-        if z <= 0.0:                      # z >= 0: the surface value
+        if z <= 0.0:
             return dT[0]
         tot = 0.0
         for i, d in enumerate(dT):
@@ -50,8 +48,6 @@ def _crown_case():
     _t5_YEAR = 365.25 * 86400.0
 
     def _t5_two_layer_step(x, t, l, k1, k2, rho_c):
-        # surface raised by 1 K a time t (s) ago over a layer 0 < z < l (k1) on a half-space (k2):
-        # alpha = (e1 - e2) / (e1 + e2), e = sqrt(k rho_c) the thermal effusivity
         a1, a2 = k1 / rho_c, k2 / rho_c
         al = (math.sqrt(k1 * rho_c) - math.sqrt(k2 * rho_c)) / (math.sqrt(k1 * rho_c) + math.sqrt(k2 * rho_c))
         tot, n = 0.0, 0
@@ -68,7 +64,7 @@ def _crown_case():
                 return tot
 
     def _t5_two_layer(x, l, k1, k2, rho_c, t_years, dT):
-        if x <= 0.0:                      # x >= 0: the surface value
+        if x <= 0.0:
             return dT[0]
         edges = [0.0] + [t * _t5_YEAR for t in t_years]
         tot = 0.0
@@ -102,8 +98,6 @@ def _crown_case():
     _t5_YEAR = 365.25 * 86400.0
 
     def _t5_two_layer_step(x, t, l, k1, k2, rho_c):
-        # surface raised by 1 K a time t (s) ago over a layer 0 < z < l (k1) on a half-space (k2):
-        # alpha = (e1 - e2) / (e1 + e2), e = sqrt(k rho_c) the thermal effusivity
         a1, a2 = k1 / rho_c, k2 / rho_c
         al = (math.sqrt(k1 * rho_c) - math.sqrt(k2 * rho_c)) / (math.sqrt(k1 * rho_c) + math.sqrt(k2 * rho_c))
         tot, n = 0.0, 0
@@ -120,7 +114,7 @@ def _crown_case():
                 return tot
 
     def _t5_two_layer(x, l, k1, k2, rho_c, t_years, dT):
-        if x <= 0.0:                      # x >= 0: the surface value
+        if x <= 0.0:
             return dT[0]
         edges = [0.0] + [t * _t5_YEAR for t in t_years]
         tot = 0.0
@@ -154,8 +148,6 @@ def _crown_case():
     _t5_YEAR = 365.25 * 86400.0
 
     def _t5_two_layer_step(x, t, l, k1, k2, rho_c):
-        # surface raised by 1 K a time t (s) ago over a layer 0 < z < l (k1) on a half-space (k2):
-        # alpha = (e1 - e2) / (e1 + e2), e = sqrt(k rho_c) the thermal effusivity
         a1, a2 = k1 / rho_c, k2 / rho_c
         al = (math.sqrt(k1 * rho_c) - math.sqrt(k2 * rho_c)) / (math.sqrt(k1 * rho_c) + math.sqrt(k2 * rho_c))
         tot, n = 0.0, 0
@@ -172,7 +164,7 @@ def _crown_case():
                 return tot
 
     def _t5_two_layer(x, l, k1, k2, rho_c, t_years, dT):
-        if x <= 0.0:                      # x >= 0: the surface value
+        if x <= 0.0:
             return dT[0]
         edges = [0.0] + [t * _t5_YEAR for t in t_years]
         tot = 0.0
@@ -251,7 +243,7 @@ def _crown_case():
 
     def _t5_halfspace(z, kappa, t_years, dT):
         edges = [0.0] + [t * _t5_YEAR for t in t_years]
-        if z <= 0.0:                      # z >= 0: the surface value
+        if z <= 0.0:
             return dT[0]
         tot = 0.0
         for i, d in enumerate(dT):

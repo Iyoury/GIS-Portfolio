@@ -1,11 +1,9 @@
-# Tests for step 1: true_vertical_depth (minimum-curvature TVD).
-# Targets: exact straight-hole and constant-build-arc closed forms, the closed form of a constant-azimuth
-# segment with inclination linear in MD (written without cancellation), 8-decimal values checked by
-# adaptive quadrature of the arc tangent, and adaptive quadrature (scipy.integrate.quad) of the down
-# component of the great-circle tangent for random three-dimensional surveys. Accuracy 1e-6 m.
-
 # --- test case 0 ---
 # vertical hole
+# Targets: exact straight-hole and constant-build-arc closed forms, the closed form of a constant-azimuth segment with
+# inclination linear in MD (written without cancellation), 8-decimal values checked by adaptive quadrature of the arc
+# tangent, and adaptive quadrature (scipy.integrate.quad) of the down component of the great-circle tangent for random
+# three-dimensional surveys. Accuracy 1e-6 m.
 import numpy as np
 
 
@@ -163,9 +161,6 @@ def _crown_case():
     import numpy as np
 
     def _t1_exact_build_tvd(inc1_deg, dinc_rad, seg_len, m):
-        """Exact TVD on a constant-azimuth segment whose inclination changes by dinc_rad over seg_len
-        (inclination linear in MD): (sin(I1 + k m) - sin(I1)) / k written without cancellation as
-        m cos(I1 + k m / 2) sinc(k m / 2)."""
         k = dinc_rad / seg_len
         h = 0.5 * k * m
         sinc = 1.0 - h * h / 6.0 if h < 1e-6 else math.sin(h) / h
@@ -194,9 +189,6 @@ def _crown_case():
     import numpy as np
 
     def _t1_exact_build_tvd(inc1_deg, dinc_rad, seg_len, m):
-        """Exact TVD on a constant-azimuth segment whose inclination changes by dinc_rad over seg_len
-        (inclination linear in MD): (sin(I1 + k m) - sin(I1)) / k written without cancellation as
-        m cos(I1 + k m / 2) sinc(k m / 2)."""
         k = dinc_rad / seg_len
         h = 0.5 * k * m
         sinc = 1.0 - h * h / 6.0 if h < 1e-6 else math.sin(h) / h
@@ -225,9 +217,6 @@ def _crown_case():
     import numpy as np
 
     def _t1_exact_build_tvd(inc1_deg, dinc_rad, seg_len, m):
-        """Exact TVD on a constant-azimuth segment whose inclination changes by dinc_rad over seg_len
-        (inclination linear in MD): (sin(I1 + k m) - sin(I1)) / k written without cancellation as
-        m cos(I1 + k m / 2) sinc(k m / 2)."""
         k = dinc_rad / seg_len
         h = 0.5 * k * m
         sinc = 1.0 - h * h / 6.0 if h < 1e-6 else math.sin(h) / h
@@ -256,7 +245,6 @@ def _crown_case():
     import numpy as np
 
     def _t1_quad_tvd(md, inc_deg, azi_deg, m):
-        """TVD by adaptive quadrature of the down component of the unit tangent along the arcs."""
         from scipy.integrate import quad
         inc, azi = np.radians(inc_deg), np.radians(azi_deg)
         t = [np.array([math.sin(a) * math.cos(b), math.sin(a) * math.sin(b), math.cos(a)]) for a, b in zip(inc, azi)]
@@ -268,11 +256,11 @@ def _crown_case():
             t1, t2, L = t[i], t[i + 1], md[i + 1] - md[i]
             axis = np.cross(t1, t2)
             beta = math.atan2(np.linalg.norm(axis), t1 @ t2)
-            if beta <= 0.0:                           # straight segment (beta >= 0)
+            if beta <= 0.0:
                 total += (b - a) * t1[2]
                 continue
             u = axis / np.linalg.norm(axis)
-            w = np.cross(u, t1)                       # t(phi) = t1 cos(phi) + w sin(phi)
+            w = np.cross(u, t1)
             total += quad(lambda s: t1[2] * math.cos(beta * (s - a) / L) + w[2] * math.sin(beta * (s - a) / L),
                           a, b, epsabs=1e-11, epsrel=1e-13, limit=200)[0]
         return total
@@ -301,7 +289,6 @@ def _crown_case():
     import numpy as np
 
     def _t1_quad_tvd(md, inc_deg, azi_deg, m):
-        """TVD by adaptive quadrature of the down component of the unit tangent along the arcs."""
         from scipy.integrate import quad
         inc, azi = np.radians(inc_deg), np.radians(azi_deg)
         t = [np.array([math.sin(a) * math.cos(b), math.sin(a) * math.sin(b), math.cos(a)]) for a, b in zip(inc, azi)]
@@ -313,11 +300,11 @@ def _crown_case():
             t1, t2, L = t[i], t[i + 1], md[i + 1] - md[i]
             axis = np.cross(t1, t2)
             beta = math.atan2(np.linalg.norm(axis), t1 @ t2)
-            if beta <= 0.0:                           # straight segment (beta >= 0)
+            if beta <= 0.0:
                 total += (b - a) * t1[2]
                 continue
             u = axis / np.linalg.norm(axis)
-            w = np.cross(u, t1)                       # t(phi) = t1 cos(phi) + w sin(phi)
+            w = np.cross(u, t1)
             total += quad(lambda s: t1[2] * math.cos(beta * (s - a) / L) + w[2] * math.sin(beta * (s - a) / L),
                           a, b, epsabs=1e-11, epsrel=1e-13, limit=200)[0]
         return total
@@ -346,7 +333,6 @@ def _crown_case():
     import numpy as np
 
     def _t1_quad_tvd(md, inc_deg, azi_deg, m):
-        """TVD by adaptive quadrature of the down component of the unit tangent along the arcs."""
         from scipy.integrate import quad
         inc, azi = np.radians(inc_deg), np.radians(azi_deg)
         t = [np.array([math.sin(a) * math.cos(b), math.sin(a) * math.sin(b), math.cos(a)]) for a, b in zip(inc, azi)]
@@ -358,11 +344,11 @@ def _crown_case():
             t1, t2, L = t[i], t[i + 1], md[i + 1] - md[i]
             axis = np.cross(t1, t2)
             beta = math.atan2(np.linalg.norm(axis), t1 @ t2)
-            if beta <= 0.0:                           # straight segment (beta >= 0)
+            if beta <= 0.0:
                 total += (b - a) * t1[2]
                 continue
             u = axis / np.linalg.norm(axis)
-            w = np.cross(u, t1)                       # t(phi) = t1 cos(phi) + w sin(phi)
+            w = np.cross(u, t1)
             total += quad(lambda s: t1[2] * math.cos(beta * (s - a) / L) + w[2] * math.sin(beta * (s - a) / L),
                           a, b, epsabs=1e-11, epsrel=1e-13, limit=200)[0]
         return total
@@ -391,7 +377,6 @@ def _crown_case():
     import numpy as np
 
     def _t1_quad_tvd(md, inc_deg, azi_deg, m):
-        """TVD by adaptive quadrature of the down component of the unit tangent along the arcs."""
         from scipy.integrate import quad
         inc, azi = np.radians(inc_deg), np.radians(azi_deg)
         t = [np.array([math.sin(a) * math.cos(b), math.sin(a) * math.sin(b), math.cos(a)]) for a, b in zip(inc, azi)]
@@ -403,11 +388,11 @@ def _crown_case():
             t1, t2, L = t[i], t[i + 1], md[i + 1] - md[i]
             axis = np.cross(t1, t2)
             beta = math.atan2(np.linalg.norm(axis), t1 @ t2)
-            if beta <= 0.0:                           # straight segment (beta >= 0)
+            if beta <= 0.0:
                 total += (b - a) * t1[2]
                 continue
             u = axis / np.linalg.norm(axis)
-            w = np.cross(u, t1)                       # t(phi) = t1 cos(phi) + w sin(phi)
+            w = np.cross(u, t1)
             total += quad(lambda s: t1[2] * math.cos(beta * (s - a) / L) + w[2] * math.sin(beta * (s - a) / L),
                           a, b, epsabs=1e-11, epsrel=1e-13, limit=200)[0]
         return total
@@ -436,7 +421,6 @@ def _crown_case():
     import numpy as np
 
     def _t1_quad_tvd(md, inc_deg, azi_deg, m):
-        """TVD by adaptive quadrature of the down component of the unit tangent along the arcs."""
         from scipy.integrate import quad
         inc, azi = np.radians(inc_deg), np.radians(azi_deg)
         t = [np.array([math.sin(a) * math.cos(b), math.sin(a) * math.sin(b), math.cos(a)]) for a, b in zip(inc, azi)]
@@ -448,11 +432,11 @@ def _crown_case():
             t1, t2, L = t[i], t[i + 1], md[i + 1] - md[i]
             axis = np.cross(t1, t2)
             beta = math.atan2(np.linalg.norm(axis), t1 @ t2)
-            if beta <= 0.0:                           # straight segment (beta >= 0)
+            if beta <= 0.0:
                 total += (b - a) * t1[2]
                 continue
             u = axis / np.linalg.norm(axis)
-            w = np.cross(u, t1)                       # t(phi) = t1 cos(phi) + w sin(phi)
+            w = np.cross(u, t1)
             total += quad(lambda s: t1[2] * math.cos(beta * (s - a) / L) + w[2] * math.sin(beta * (s - a) / L),
                           a, b, epsabs=1e-11, epsrel=1e-13, limit=200)[0]
         return total
@@ -481,7 +465,6 @@ def _crown_case():
     import numpy as np
 
     def _t1_quad_tvd(md, inc_deg, azi_deg, m):
-        """TVD by adaptive quadrature of the down component of the unit tangent along the arcs."""
         from scipy.integrate import quad
         inc, azi = np.radians(inc_deg), np.radians(azi_deg)
         t = [np.array([math.sin(a) * math.cos(b), math.sin(a) * math.sin(b), math.cos(a)]) for a, b in zip(inc, azi)]
@@ -493,11 +476,11 @@ def _crown_case():
             t1, t2, L = t[i], t[i + 1], md[i + 1] - md[i]
             axis = np.cross(t1, t2)
             beta = math.atan2(np.linalg.norm(axis), t1 @ t2)
-            if beta <= 0.0:                           # straight segment (beta >= 0)
+            if beta <= 0.0:
                 total += (b - a) * t1[2]
                 continue
             u = axis / np.linalg.norm(axis)
-            w = np.cross(u, t1)                       # t(phi) = t1 cos(phi) + w sin(phi)
+            w = np.cross(u, t1)
             total += quad(lambda s: t1[2] * math.cos(beta * (s - a) / L) + w[2] * math.sin(beta * (s - a) / L),
                           a, b, epsabs=1e-11, epsrel=1e-13, limit=200)[0]
         return total
@@ -526,7 +509,6 @@ def _crown_case():
     import numpy as np
 
     def _t1_quad_tvd(md, inc_deg, azi_deg, m):
-        """TVD by adaptive quadrature of the down component of the unit tangent along the arcs."""
         from scipy.integrate import quad
         inc, azi = np.radians(inc_deg), np.radians(azi_deg)
         t = [np.array([math.sin(a) * math.cos(b), math.sin(a) * math.sin(b), math.cos(a)]) for a, b in zip(inc, azi)]
@@ -538,11 +520,11 @@ def _crown_case():
             t1, t2, L = t[i], t[i + 1], md[i + 1] - md[i]
             axis = np.cross(t1, t2)
             beta = math.atan2(np.linalg.norm(axis), t1 @ t2)
-            if beta <= 0.0:                           # straight segment (beta >= 0)
+            if beta <= 0.0:
                 total += (b - a) * t1[2]
                 continue
             u = axis / np.linalg.norm(axis)
-            w = np.cross(u, t1)                       # t(phi) = t1 cos(phi) + w sin(phi)
+            w = np.cross(u, t1)
             total += quad(lambda s: t1[2] * math.cos(beta * (s - a) / L) + w[2] * math.sin(beta * (s - a) / L),
                           a, b, epsabs=1e-11, epsrel=1e-13, limit=200)[0]
         return total
@@ -571,7 +553,6 @@ def _crown_case():
     import numpy as np
 
     def _t1_quad_tvd(md, inc_deg, azi_deg, m):
-        """TVD by adaptive quadrature of the down component of the unit tangent along the arcs."""
         from scipy.integrate import quad
         inc, azi = np.radians(inc_deg), np.radians(azi_deg)
         t = [np.array([math.sin(a) * math.cos(b), math.sin(a) * math.sin(b), math.cos(a)]) for a, b in zip(inc, azi)]
@@ -583,11 +564,11 @@ def _crown_case():
             t1, t2, L = t[i], t[i + 1], md[i + 1] - md[i]
             axis = np.cross(t1, t2)
             beta = math.atan2(np.linalg.norm(axis), t1 @ t2)
-            if beta <= 0.0:                           # straight segment (beta >= 0)
+            if beta <= 0.0:
                 total += (b - a) * t1[2]
                 continue
             u = axis / np.linalg.norm(axis)
-            w = np.cross(u, t1)                       # t(phi) = t1 cos(phi) + w sin(phi)
+            w = np.cross(u, t1)
             total += quad(lambda s: t1[2] * math.cos(beta * (s - a) / L) + w[2] * math.sin(beta * (s - a) / L),
                           a, b, epsabs=1e-11, epsrel=1e-13, limit=200)[0]
         return total

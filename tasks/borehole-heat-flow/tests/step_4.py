@@ -1,9 +1,7 @@
-# Tests for step 4: fit_heat_flow (joint OLS estimate of T0, q0 and g).
-# Targets: the generating parameters of noise-free synthetic profiles, and numpy.linalg.lstsq with the OLS
-# covariance computed inside the test for a noisy profile.
-
 # --- test case 0 ---
 # exact recovery
+# Targets: the generating parameters of noise-free synthetic profiles, and numpy.linalg.lstsq with the OLS covariance
+# computed inside the test for a noisy profile.
 import numpy as np
 
 
@@ -166,13 +164,10 @@ def _crown_case():
         return T, R, S, P
 
     def _t4_t_scaled_min_sv(R, P):
-        """Smallest singular value of [1, R, P] after scaling each column to unit length (test's own)."""
         G = np.column_stack([np.ones(R.size), R, P])
         return float(np.linalg.svd(G / np.linalg.norm(G, axis=0), compute_uv=False)[-1])
 
     def _t4_t_nearly_proportional_P(R, target):
-        """P = 0.01 R plus a component outside span{1, R}, scaled so that the smallest scaled singular
-        value of [1, R, P] equals `target` (secant iteration on the test's own singular values)."""
         Q, _ = np.linalg.qr(np.column_stack([np.ones(R.size), R]))
         u = R ** 2 - Q @ (Q.T @ (R ** 2))
         u /= np.linalg.norm(u)
@@ -223,13 +218,10 @@ def _crown_case():
         return T, R, S, P
 
     def _t4_t_scaled_min_sv(R, P):
-        """Smallest singular value of [1, R, P] after scaling each column to unit length (test's own)."""
         G = np.column_stack([np.ones(R.size), R, P])
         return float(np.linalg.svd(G / np.linalg.norm(G, axis=0), compute_uv=False)[-1])
 
     def _t4_t_nearly_proportional_P(R, target):
-        """P = 0.01 R plus a component outside span{1, R}, scaled so that the smallest scaled singular
-        value of [1, R, P] equals `target` (secant iteration on the test's own singular values)."""
         Q, _ = np.linalg.qr(np.column_stack([np.ones(R.size), R]))
         u = R ** 2 - Q @ (Q.T @ (R ** 2))
         u /= np.linalg.norm(u)

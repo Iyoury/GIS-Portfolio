@@ -1,20 +1,14 @@
-"""Mutant (step 3): history times used in years instead of seconds in the diffusion length sqrt(kappa t)."""
+# Mutant (step 3): History times used in years instead of seconds in the diffusion length sqrt(kappa t).
 import numpy as np
 import math
 
-
 def _erfc_array(x):
-    """Element-wise complementary error function (numpy + math only)."""
     f = np.frompyfunc(math.erfc, 1, 1)
     return np.asarray(f(np.asarray(x, float)), dtype=float)
 
-
 SECONDS_PER_YEAR = 365.25 * 86400.0
 
-
 def paleoclimate_perturbation(z, t_years, dT, kappa):
-    """Present-day temperature perturbation (K) at depth z (m) from a
-    piecewise-constant surface-temperature history."""
     z_in = np.asarray(z, float)
     zz = np.atleast_1d(z_in).ravel()
     t = np.asarray(t_years, float)
@@ -36,7 +30,7 @@ def paleoclimate_perturbation(z, t_years, dT, kappa):
         t_new, t_old = edges[i], edges[i + 1]
         e_old = _erfc_array(zz / (2 * np.sqrt(kappa * t_old)))
         if t_new == 0.0:
-            e_new = np.zeros_like(zz)       # limit z / sqrt(kappa * 0) -> inf
+            e_new = np.zeros_like(zz)
         else:
             e_new = _erfc_array(zz / (2 * np.sqrt(kappa * t_new)))
         out += d[i] * (e_old - e_new)

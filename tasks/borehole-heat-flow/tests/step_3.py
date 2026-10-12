@@ -1,9 +1,7 @@
-# Tests for step 3: paleoclimate_perturbation (half-space response to a piecewise-constant history).
-# Targets: erfc forms evaluated with math.erfc, and values checked by numerical Duhamel convolution with the
-# half-space impulse response; absolute accuracy 1e-6 K per kelvin of the largest |dT|.
-
 # --- test case 0 ---
 # single step matches erfc [z = 0.0]
+# Targets: erfc forms evaluated with math.erfc, and values checked by numerical Duhamel convolution with the half-
+# space impulse response; absolute accuracy 1e-6 K per kelvin of the largest |dT|.
 import numpy as np
 
 

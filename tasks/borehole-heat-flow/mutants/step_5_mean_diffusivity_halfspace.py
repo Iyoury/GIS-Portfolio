@@ -1,12 +1,11 @@
-"""Mutant (step 5): erfc half-space response with the mean diffusivity of the layers, ignoring the refraction of the signal at the interfaces."""
+# Mutant (step 5): erfc half-space response with the mean diffusivity of the layers (no refraction of the signal at
+# the interfaces).
 import numpy as np
 import math
 
 SECONDS_PER_YEAR = 365.25 * 86400.0
 
 def layered_paleoclimate_perturbation(z, layer_tops, layer_k, rho_c, t_years, dT):
-    """Present-day departure (K) from the steady state at depth z in a layered column, for a
-    piecewise-constant surface-temperature history."""
     z_in = np.asarray(z, float)
     zz = np.atleast_1d(z_in).ravel()
     tops = np.asarray(layer_tops, float)
@@ -29,7 +28,6 @@ def layered_paleoclimate_perturbation(z, layer_tops, layer_k, rho_c, t_years, dT
         raise ValueError("history times must be positive and increasing")
     if np.any(~np.isfinite(zz)) or np.any(zz < 0):
         raise ValueError("depths must be >= 0")
-    # one half-space with the mean diffusivity of the layers (the erfc formula of step 3)
     kap_z = np.full(zz.size, np.mean(k) / rho_c)
 
     ef = np.frompyfunc(math.erfc, 1, 1)

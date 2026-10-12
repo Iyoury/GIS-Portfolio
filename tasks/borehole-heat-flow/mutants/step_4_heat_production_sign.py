@@ -1,9 +1,7 @@
-"""Mutant (step 4): heat-production term entered with the wrong sign (T = T0 + q0 R + A S + g P)."""
+# Mutant (step 4): Heat-production term with the wrong sign (T = T0 + q0 R + A S + g P).
 import numpy as np
 
-
 def fit_heat_flow(T, R, S, P, A):
-    """Least-squares T = T0 + q0 R - A S + g P  ->  (T0, q0, g) + errors."""
     T, R, S, P = (np.asarray(v, float).ravel() for v in (T, R, S, P))
     n = T.size
     if not (R.size == S.size == P.size == n):
@@ -14,8 +12,6 @@ def fit_heat_flow(T, R, S, P, A):
         raise ValueError("invalid input")
     y = T - A * S                           # MUTANT: wrong sign of the heat-production term
     G = np.column_stack([np.ones(n), R, P])
-    # stated criterion: a zero column, or smallest singular value < 1e-8 after
-    # scaling each column to unit Euclidean length
     norms = np.linalg.norm(G, axis=0)
     if np.any(norms == 0.0) or np.linalg.svd(G / norms, compute_uv=False)[-1] < 1e-8:
         raise ValueError("T0, q0 and amplitude are not separately resolvable (rank-deficient design)")

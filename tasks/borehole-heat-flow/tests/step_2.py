@@ -1,8 +1,6 @@
-# Tests for step 2: layer_integrals (R(z) and S(z) of the steady layered geotherm).
-# Targets: hand-computed layer sums and adaptive quadrature of 1/k and z/k; relative accuracy 1e-9.
-
 # --- test case 0 ---
 # single layer closed form
+# Targets: hand-computed layer sums and adaptive quadrature of 1/k and z/k; relative accuracy 1e-9.
 import numpy as np
 
 
@@ -85,7 +83,6 @@ def _crown_case():
     import numpy as np
 
     def _t2_quad_RS(tops, k, z):
-        """R = integral of 1/k(z') and S = integral of z'/k(z') from 0 to z, by adaptive quadrature."""
         from scipy.integrate import quad
         tops = np.asarray(tops, float)
         def kz(x):
@@ -119,7 +116,6 @@ def _crown_case():
     import numpy as np
 
     def _t2_quad_RS(tops, k, z):
-        """R = integral of 1/k(z') and S = integral of z'/k(z') from 0 to z, by adaptive quadrature."""
         from scipy.integrate import quad
         tops = np.asarray(tops, float)
         def kz(x):
@@ -153,7 +149,6 @@ def _crown_case():
     import numpy as np
 
     def _t2_quad_RS(tops, k, z):
-        """R = integral of 1/k(z') and S = integral of z'/k(z') from 0 to z, by adaptive quadrature."""
         from scipy.integrate import quad
         tops = np.asarray(tops, float)
         def kz(x):
@@ -187,7 +182,6 @@ def _crown_case():
     import numpy as np
 
     def _t2_quad_RS(tops, k, z):
-        """R = integral of 1/k(z') and S = integral of z'/k(z') from 0 to z, by adaptive quadrature."""
         from scipy.integrate import quad
         tops = np.asarray(tops, float)
         def kz(x):
@@ -221,7 +215,6 @@ def _crown_case():
     import numpy as np
 
     def _t2_quad_RS(tops, k, z):
-        """R = integral of 1/k(z') and S = integral of z'/k(z') from 0 to z, by adaptive quadrature."""
         from scipy.integrate import quad
         tops = np.asarray(tops, float)
         def kz(x):
@@ -255,7 +248,6 @@ def _crown_case():
     import numpy as np
 
     def _t2_quad_RS(tops, k, z):
-        """R = integral of 1/k(z') and S = integral of z'/k(z') from 0 to z, by adaptive quadrature."""
         from scipy.integrate import quad
         tops = np.asarray(tops, float)
         def kz(x):

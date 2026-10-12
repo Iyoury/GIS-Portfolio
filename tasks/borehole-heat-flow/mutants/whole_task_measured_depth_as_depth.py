@@ -1,31 +1,23 @@
-"""Whole-task mutant: Measured depth along the inclined holes used as depth (no trajectory correction) for the readings and the layer tops.
-
-Complete solution with this single error in regional_deglaciation_inversion.
-"""
+# Whole-task mutant: complete solution with one error in regional_deglaciation_inversion. Measured depth used as depth
+# (no trajectory correction) for the readings and the layer tops of every hole.
 import numpy as np
 import math
 from scipy import stats
 from scipy.optimize import brentq, minimize_scalar
 
-
-# ------------------------------------------------------------ step 1: true vertical depth
 def _unit(inc, azi):
     return np.array([np.sin(inc) * np.cos(azi), np.sin(inc) * np.sin(azi), np.cos(inc)])
 
-
 def _sinc(x):
-    return np.sinc(x / np.pi)          # sin(x) / x, exact at x = 0
-
+    return np.sinc(x / np.pi)
 
 def _ratio_factor(beta):
-    h = 0.5 * beta                     # tan(h) / h, no straight-line shortcut
+    h = 0.5 * beta
     if h < 1e-4:
-        return 1.0 + h * h / 3.0 + 2.0 * h ** 4 / 15.0   # series, truncation < 1e-24
+        return 1.0 + h * h / 3.0 + 2.0 * h ** 4 / 15.0
     return np.tan(h) / h
 
-
 def true_vertical_depth(survey_md, inc_deg, azi_deg, md_query):
-    """TVD (m) at md_query by the minimum-curvature method."""
     md = np.asarray(survey_md, float)
     inc = np.radians(np.asarray(inc_deg, float))
     azi = np.radians(np.asarray(azi_deg, float))
@@ -41,12 +33,10 @@ def true_vertical_depth(survey_md, inc_deg, azi_deg, md_query):
         raise ValueError("inclination must be in [0, 180) degrees")
     if np.any(~np.isfinite(q)) or np.any(q < 0) or np.any(q > md[-1]):
         raise ValueError("query depths must lie within the survey")
-    # cumulative TVD at stations
     tvd_st = np.zeros(md.size)
     units = [_unit(inc[i], azi[i]) for i in range(md.size)]
     betas = np.zeros(md.size - 1)
     for i in range(md.size - 1):
-        # atan2 keeps full precision for tiny doglegs (arccos of a dot product does not)
         betas[i] = np.arctan2(np.linalg.norm(np.cross(units[i], units[i + 1])), units[i] @ units[i + 1])
         if betas[i] >= np.pi - 1e-6:
             raise ValueError("dogleg of 180 degrees between stations: path undefined")
@@ -59,16 +49,12 @@ def true_vertical_depth(survey_md, inc_deg, azi_deg, md_query):
         f = (m - md[i]) / dmd_seg
         b = betas[i]
         t1, t2 = units[i], units[i + 1]
-        # tangent on the arc; the sinc form is exact for every dogleg, including 0
         tq = ((1 - f) * _sinc((1 - f) * b) * t1 + f * _sinc(f * b) * t2) / _sinc(b)
         dm = m - md[i]
         out[j] = tvd_st[i] + 0.5 * dm * (t1[2] + tq[2]) * _ratio_factor(f * b)
     return float(out[0]) if q_in.ndim == 0 else out.reshape(q_in.shape)
 
-
-# ------------------------------------------------------------ step 2: layer integrals R and S
 def layer_integrals(layer_top_tvd, layer_k, z):
-    """Thermal resistance R(z) = int_0^z dz'/k and S(z) = int_0^z z'/k dz'."""
     tops = np.asarray(layer_top_tvd, float)
     k = np.asarray(layer_k, float)
     z_in = np.asarray(z, float)
@@ -91,25 +77,18 @@ def layer_integrals(layer_top_tvd, layer_k, z):
         a = top
         b = top + lo
         R += (b - a) / kk
-        S += (b - a) * (b + a) / (2 * kk)        # factored: exactly 0 in the layers below z
+        S += (b - a) * (b + a) / (2 * kk)
     if z_in.ndim == 0:
         return float(R[0]), float(S[0])
     return R.reshape(z_in.shape), S.reshape(z_in.shape)
 
-
-# ------------------------------------------------------------ step 3: half-space paleoclimate perturbation
 def _erfc_array(x):
-    """Element-wise complementary error function (numpy + math only)."""
     f = np.frompyfunc(math.erfc, 1, 1)
     return np.asarray(f(np.asarray(x, float)), dtype=float)
 
-
 SECONDS_PER_YEAR = 365.25 * 86400.0
 
-
 def paleoclimate_perturbation(z, t_years, dT, kappa):
-    """Present-day temperature perturbation (K) at depth z (m) from a
-    piecewise-constant surface-temperature history."""
     z_in = np.asarray(z, float)
     zz = np.atleast_1d(z_in).ravel()
     t = np.asarray(t_years, float)
@@ -131,16 +110,13 @@ def paleoclimate_perturbation(z, t_years, dT, kappa):
         t_new, t_old = edges[i], edges[i + 1]
         e_old = _erfc_array(zz / (2 * np.sqrt(kappa * t_old)))
         if t_new == 0.0:
-            e_new = np.zeros_like(zz)       # limit z / sqrt(kappa * 0) -> inf
+            e_new = np.zeros_like(zz)
         else:
             e_new = _erfc_array(zz / (2 * np.sqrt(kappa * t_new)))
         out += d[i] * (e_old - e_new)
     return float(out[0]) if z_in.ndim == 0 else out.reshape(z_in.shape)
 
-
-# ------------------------------------------------------------ step 4: joint least-squares estimate
 def fit_heat_flow(T, R, S, P, A):
-    """Least-squares T = T0 + q0 R - A S + g P  ->  (T0, q0, g) + errors."""
     T, R, S, P = (np.asarray(v, float).ravel() for v in (T, R, S, P))
     n = T.size
     if not (R.size == S.size == P.size == n):
@@ -151,8 +127,6 @@ def fit_heat_flow(T, R, S, P, A):
         raise ValueError("invalid input")
     y = T + A * S
     G = np.column_stack([np.ones(n), R, P])
-    # stated criterion: a zero column, or smallest singular value < 1e-8 after
-    # scaling each column to unit Euclidean length
     norms = np.linalg.norm(G, axis=0)
     if np.any(norms == 0.0) or np.linalg.svd(G / norms, compute_uv=False)[-1] < 1e-8:
         raise ValueError("T0, q0 and amplitude are not separately resolvable (rank-deficient design)")
@@ -166,25 +140,17 @@ def fit_heat_flow(T, R, S, P, A):
             "sigma_amplitude": float(np.sqrt(C[2, 2])),
             "rms_residual": float(np.sqrt(np.mean(res**2)))}
 
-
-# ------------------------------------------------------------ step 5: layered paleoclimate perturbation
 def _log_surface_response(z, lay, s, tops, k, rho_c):
-    """log F(z, s): Laplace transform (in time) of the departure at depth z for a unit departure applied
-    at the surface, F(0, s) = 1, in the layered column (z: depths, lay: their layer indices, s: complex)."""
     nl = tops.size
     kap = k / rho_c
-    q = np.sqrt(s[None, :] / kap[:, None])                  # (layers, nodes), Re q > 0
+    q = np.sqrt(s[None, :] / kap[:, None])
     kq = k[:, None] * q
     h = np.diff(tops)
-    # admittance Y = k F' / F at the top of each layer, from the bottom up (continuity of F and k F'):
-    # the bottom half-space keeps only the decaying solution, Y = -k q
     Y = np.empty((nl, s.size), complex)
     Y[-1] = -kq[-1]
     for i in range(nl - 2, -1, -1):
         th = np.tanh(q[i] * h[i])
         Y[i] = (Y[i + 1] - kq[i] * th) / (1.0 - Y[i + 1] * th / kq[i])
-    # F at the layer tops: F_{i+1} / F_i = 1 / (cosh(q h) - r sinh(q h)) with r = Y_{i+1} / (k_i q_i),
-    # written as 2 e^{-q h} / ((1 + e^{-2qh}) - r (1 - e^{-2qh})): no cancellation, no overflow
     lFtop = np.zeros((nl, s.size), complex)
     for i in range(nl - 1):
         e2 = np.exp(-2.0 * q[i] * h[i])
@@ -197,7 +163,6 @@ def _log_surface_response(z, lay, s, tops, k, rho_c):
         if i == nl - 1:
             out[sel] = lFtop[i][None, :] - q[i][None, :] * d
         else:
-            # inside the layer: F(d) / F_top = (cosh(q(h-d)) - r sinh(q(h-d))) / (cosh(qh) - r sinh(qh))
             r = (Y[i + 1] / kq[i])[None, :]
             e2a = np.exp(-2.0 * q[i][None, :] * (h[i] - d))
             e2b = np.exp(-2.0 * q[i] * h[i])[None, :]
@@ -206,10 +171,7 @@ def _log_surface_response(z, lay, s, tops, k, rho_c):
             out[sel] = lFtop[i][None, :] - q[i][None, :] * d + np.log(num / den)
     return out
 
-
 def _step_response(z, lay, tau, tops, k, rho_c, M=32):
-    """Departure now at depth z after the surface was raised by 1 K a time tau (s) ago: inverse Laplace
-    transform of F / s at tau on the fixed Talbot contour (Abate and Valko 2004)."""
     r = 2.0 * M / (5.0 * tau)
     th = np.arange(1, M) * np.pi / M
     cot = np.cos(th) / np.sin(th)
@@ -220,10 +182,7 @@ def _step_response(z, lay, tau, tops, k, rho_c, M=32):
     val = 0.5 * terms[:, 0].real + np.sum((terms[:, 1:] * (1.0 + 1j * beta)[None, :]).real, axis=1)
     return r / M * val
 
-
 def layered_paleoclimate_perturbation(z, layer_tops, layer_k, rho_c, t_years, dT):
-    """Present-day departure (K) from the steady state at depth z in a layered column, for a
-    piecewise-constant surface-temperature history."""
     z_in = np.asarray(z, float)
     zz = np.atleast_1d(z_in).ravel()
     tops = np.asarray(layer_tops, float)
@@ -246,10 +205,6 @@ def layered_paleoclimate_perturbation(z, layer_tops, layer_k, rho_c, t_years, dT
         raise ValueError("history times must be positive and increasing")
     if np.any(~np.isfinite(zz)) or np.any(zz < 0):
         raise ValueError("depths must be >= 0")
-    # The departure obeys rho_c dT/dt = d/dz (k dT/dz) with T and k dT/dz continuous at the interfaces
-    # and the surface history as boundary value; the erfc half-space formula holds only for a uniform
-    # column. By superposition it is a sum of step responses U(z, tau) (surface raised by 1 K a time tau
-    # ago), each obtained from its Laplace transform F(z, s) / s, which the layers give in closed form.
     lay = np.searchsorted(tops, zz, side="right") - 1
     ts = t * SECONDS_PER_YEAR
     edges = np.concatenate(([0.0], ts))
@@ -263,26 +218,21 @@ def layered_paleoclimate_perturbation(z, layer_tops, layer_k, rho_c, t_years, dT
         acc = np.zeros(zi.size)
         for i in range(t.size):
             u_old = U[edges[i + 1]]
-            u_new = U[edges[i]] if edges[i] > 0 else 0.0     # U(z > 0, 0) = 0
+            u_new = U[edges[i]] if edges[i] > 0 else 0.0
             acc += d[i] * (u_old - u_new)
         out[inside] = acc
-    out[~inside] = d[0]                                       # at the surface: the present departure
+    out[~inside] = d[0]
     dT_z = float(out[0]) if z_in.ndim == 0 else out.reshape(z_in.shape)
     return dT_z
 
-
-# ------------------------------------------------------------ step 6: joint inversion with the end of the glaciation
 def _dg_profile_fit(y, R, P):
-    """Ordinary least squares of y on [1, R, P]: (coefficients, residual vector)."""
     G = np.column_stack([np.ones(y.size), R, P])
     m, *_ = np.linalg.lstsq(G, y, rcond=None)
     return m, y - G @ m
 
-
 def deglaciation_heat_flow_inversion(survey_md, survey_inc, survey_azi, log_md, log_temp,
                                      layer_top_md, layer_k, heat_production, rho_c,
                                      hist_t_years, hist_dT_shape, t_end_bounds, z_min):
-    """Steady heat flow, surface temperature, glacial amplitude and end of the glaciation from one log."""
     log_md = np.asarray(log_md, float)
     log_temp = np.asarray(log_temp, float)
     if log_md.ndim != 1 or log_md.shape != log_temp.shape:
@@ -319,7 +269,6 @@ def deglaciation_heat_flow_inversion(survey_md, survey_inc, survey_azi, log_md, 
     R, S = np.asarray(R, float), np.asarray(S, float)
     y = T + A * S
     ds = float(shape[0] - shape[1])
-    # P(z; t) = P_fix(z) + (s0 - s1) U(z, t): P_fix is the history with interval 0 merged into interval 1
     P_fix = np.asarray(layered_paleoclimate_perturbation(
         z, tops, layer_k, rho_c, np.concatenate(([t_lo], t_known)), np.concatenate(([shape[1]], shape[1:]))), float)
     cache = {}
@@ -342,9 +291,6 @@ def deglaciation_heat_flow_inversion(survey_md, survey_inc, survey_azi, log_md, 
         _, r = _dg_profile_fit(y, R, P(t))
         return float(r @ r)
 
-    # global minimum of the profile on the closed interval: every interior grid minimum is refined over its two
-    # neighbouring cells, and an end value not above its neighbour over the end cell, where the minimum can still
-    # be interior; the end point is the minimum only if no refined value is below it
     grid = np.geomspace(t_lo, t_hi, 121)
     vals = np.array([rss(t) for t in grid])
     m_g = grid.size - 1
@@ -362,7 +308,6 @@ def deglaciation_heat_flow_inversion(survey_md, survey_inc, survey_azi, log_md, 
     if best_t is None or min(vals[0], vals[-1]) <= best_v:
         raise ValueError("the minimum of the profile RSS over [t_lo, t_hi] lies at an end point")
     t_hat = best_t
-    # Gauss-Newton polish of the stationarity condition (variable projection), kept inside the bracket
     for _ in range(3):
         m, r = _dg_profile_fit(y, R, P(t_hat))
         G = np.column_stack([np.ones(n), R, P(t_hat)])
@@ -384,12 +329,10 @@ def deglaciation_heat_flow_inversion(survey_md, survey_inc, survey_azi, log_md, 
     m, r = _dg_profile_fit(y, R, P_hat)
     rss_min = float(r @ r)
     T0, q0, g = (float(v) for v in m)
-    # Wald covariance with the Jacobian [1, R, P, g dP/dt_end] (t_end in years), s^2 = RSS_min / (n - 4)
     J = np.column_stack([np.ones(n), R, P_hat, g * dPdt(t_hat)])
     s2 = rss_min / (n - 4)
     C = s2 * np.linalg.inv(J.T @ J)
     sig = np.sqrt(np.diag(C))
-    # profile-likelihood 95 % interval: nearest crossings of the F threshold on each side of t_hat
     thr = rss_min * (1.0 + stats.f.ppf(0.95, 1, n - 4) / (n - 4))
 
     def crossing(direction):
@@ -415,24 +358,18 @@ def deglaciation_heat_flow_inversion(survey_md, survey_inc, survey_azi, log_md, 
             "sigma_t_end": float(sig[3]), "t_end_low": t_low, "t_end_high": t_high,
             "rms_residual": float(np.sqrt(rss_min / n)), "n_used": n}
 
-
-# ------------------------------------------------------------ step 7: regional maximum-likelihood inversion with AR(1) noise
 _RG_KEYS = ("survey_md", "survey_inc", "survey_azi", "log_md", "log_temp", "layer_top_md", "layer_k",
             "heat_production", "rho_c", "z_min")
 _RG_PHI = np.linspace(-0.995, 0.995, 399)
 
-
 def _rg_white(v, phi):
-    """Prais-Winsten transform along axis 0 (readings by increasing MD)."""
     v = np.asarray(v, float)
     out = np.empty_like(v)
     out[0] = np.sqrt(1.0 - phi * phi) * v[0]
     out[1:] = v[1:] - phi * v[:-1]
     return out
 
-
 class _RgHole:
-    """Gram polynomials in phi of the whitened [q1, q2, y_c, P_perp] of one hole at one t_end."""
 
     def __init__(self, d, P):
         Q2 = d["Q2"]
@@ -444,13 +381,11 @@ class _RgHole:
         self.C1 = V[1:].T @ V[:-1] + V[:-1].T @ V[1:]
         self.C2 = V[:-1].T @ V[:-1] - np.outer(V[0], V[0])
         self.n = d["n"]
-        # coefficient arrays on the phi grid
         self.a, self.b, self.c = self.abc(_RG_PHI)
         self.lp1 = 0.5 * np.log1p(-_RG_PHI * _RG_PHI)
         self.flat = tuple([float(C[i, j]) for i in range(4) for j in range(4)] for C in (self.C0, self.C1, self.C2))
 
     def abc(self, phi):
-        """(a, b, c) of Q(phi, g) = c - 2 b (g - g0) + a (g - g0)^2 for an array of phi."""
         phi = np.asarray(phi, float)[..., None, None]
         G = self.C0 - phi * self.C1 + phi * phi * self.C2
         A11, A12, A22 = G[..., 0, 0], G[..., 0, 1], G[..., 1, 1]
@@ -466,7 +401,6 @@ class _RgHole:
         return a, b, c
 
     def abc1(self, phi):
-        """Scalar version of abc in plain floats."""
         p2 = phi * phi
         c0, c1, c2 = self.flat
         G = [c0[k] - phi * c1[k] + p2 * c2[k] for k in range(16)]
@@ -479,7 +413,6 @@ class _RgHole:
         return cpp, cyp, cyy
 
     def value(self, phi, g):
-        """-(n/2) log Q(phi, g) + (1/2) log(1 - phi^2) for a scalar phi."""
         a, b, c = self.abc1(phi)
         x = g - self.g0
         q = c - 2.0 * b * x + a * x * x
@@ -488,7 +421,6 @@ class _RgHole:
         return -0.5 * self.n * np.log(q) + 0.5 * np.log1p(-phi * phi)
 
     def grid_values(self, g):
-        """Values on the phi grid for an array of g: shape (len(phi grid), len(g))."""
         x = np.atleast_1d(g)[None, :] - self.g0
         q = self.c[:, None] - 2.0 * self.b[:, None] * x + self.a[:, None] * x * x
         with np.errstate(divide="ignore", invalid="ignore"):
@@ -496,8 +428,6 @@ class _RgHole:
         return np.where(q > 0, v, -np.inf)
 
     def best_phi(self, g):
-        """Maximum over phi of value(phi, g): best grid point refined by bounded Brent over its neighbouring cells,
-        every grid maximum within 1 of the best one refined."""
         v = self.grid_values(g)[:, 0]
         m = v.size
         best = (-np.inf, 0.0)
@@ -518,10 +448,7 @@ class _RgHole:
                 best = (float(-res.fun), float(res.x))
         return best
 
-
 def _rg_profile_at(hs):
-    """Maximum over g and every phi_h of sum_h value_h(phi_h, g) (all other parameters concentrated):
-    (value, g, [phi_h])."""
     own = []
     glo, ghi = np.inf, -np.inf
     for hh in hs:
@@ -556,10 +483,7 @@ def _rg_profile_at(hs):
     phis = [hh.best_phi(g)[1] for hh in hs]
     return val, g, phis
 
-
 def regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape, t_end_bounds):
-    """Maximum-likelihood regional estimate of the glacial amplitude g and the end of the glaciation t_end with
-    stationary AR(1) noise in every hole."""
     if not isinstance(holes, (list, tuple)) or len(holes) < 2:
         raise ValueError("holes must be a list of at least 2 boreholes")
     for hd in holes:
@@ -593,14 +517,14 @@ def regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape, t_end_bo
         A = float(hd["heat_production"])
         if not np.isfinite(A) or A < 0:
             raise ValueError("heat production must be finite and >= 0")
-        true_vertical_depth(hd["survey_md"], hd["survey_inc"], hd["survey_azi"], log_md)   # (validation only)
+        true_vertical_depth(hd["survey_md"], hd["survey_inc"], hd["survey_azi"], log_md)
         z_all = np.array(log_md, float)                                   # MUTANT: MD used as depth
         tops = np.array(hd["layer_top_md"], float)                        # MUTANT: MD used as depth
         used = np.nonzero(np.asarray(z_all) >= hd["z_min"])[0]
         n = int(used.size)
         if n < 8:
             raise ValueError("fewer than 8 readings with TVD >= z_min in a hole")
-        used = used[np.argsort(log_md[used], kind="stable")]          # the AR(1) order: increasing MD
+        used = used[np.argsort(log_md[used], kind="stable")]
         z, T = np.asarray(z_all, float)[used], log_temp[used]
         R, S = layer_integrals(tops, hd["layer_k"], z)
         R, S = np.asarray(R, float), np.asarray(S, float)
@@ -645,9 +569,6 @@ def regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape, t_end_bo
     def lp(t):
         return profile(t)[0]
 
-    # global maximum of the profile log-likelihood on the closed interval: every interior grid maximum is refined
-    # over its two neighbouring cells, and an end value not below its neighbour over the end cell, where the
-    # maximum can still be interior; the end point is the maximum only if no refined value exceeds it
     grid = np.geomspace(t_lo, t_hi, 121)
     vals = np.array([lp(t) for t in grid])
     m_g = grid.size - 1
@@ -666,8 +587,6 @@ def regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape, t_end_bo
         raise ValueError("the maximum of the profile likelihood over [t_lo, t_hi] lies at an end point")
     t_hat = best_t
     _, g, phis = profile(t_hat)
-    # per-hole estimates (generalized least squares at the estimates), noise parameters, exact log-likelihood and the
-    # expected Fisher information of the regression parameters at the estimate
     H = len(data)
     npar = 2 * H + 2
     info = np.zeros((npar, npar))
@@ -696,7 +615,6 @@ def regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape, t_end_bo
     for h, oh in enumerate(out_holes):
         oh["sigma_T0"] = float(sig[2 * h])
         oh["sigma_q0"] = float(sig[2 * h + 1])
-    # 95 % likelihood-ratio interval: nearest crossings of l_p(t_hat) - chi2_0.95(1) / 2 on each side of t_hat
     thr = lp(t_hat) - 0.5 * stats.chi2.ppf(0.95, 1)
 
     def crossing(direction):

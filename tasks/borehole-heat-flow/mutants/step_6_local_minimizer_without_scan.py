@@ -1,20 +1,17 @@
-"""Mutant (step 6): t_end from one local bounded Brent search of the profile over [t_lo, t_hi] without a global scan: a local minimum in another basin can be returned instead of the global minimizer."""
+# Mutant (step 6): t_end from one bounded Brent search of the profile over [t_lo, t_hi] without a global scan (a local
+# minimum in another basin can be returned).
 import numpy as np
 from scipy import stats
 from scipy.optimize import brentq, minimize_scalar
 
-
 def _dg_profile_fit(y, R, P):
-    """Ordinary least squares of y on [1, R, P]: (coefficients, residual vector)."""
     G = np.column_stack([np.ones(y.size), R, P])
     m, *_ = np.linalg.lstsq(G, y, rcond=None)
     return m, y - G @ m
 
-
 def deglaciation_heat_flow_inversion(survey_md, survey_inc, survey_azi, log_md, log_temp,
                                      layer_top_md, layer_k, heat_production, rho_c,
                                      hist_t_years, hist_dT_shape, t_end_bounds, z_min):
-    """Steady heat flow, surface temperature, glacial amplitude and end of the glaciation from one log."""
     log_md = np.asarray(log_md, float)
     log_temp = np.asarray(log_temp, float)
     if log_md.ndim != 1 or log_md.shape != log_temp.shape:
@@ -51,7 +48,6 @@ def deglaciation_heat_flow_inversion(survey_md, survey_inc, survey_azi, log_md, 
     R, S = np.asarray(R, float), np.asarray(S, float)
     y = T + A * S
     ds = float(shape[0] - shape[1])
-    # P(z; t) = P_fix(z) + (s0 - s1) U(z, t): P_fix is the history with interval 0 merged into interval 1
     P_fix = np.asarray(layered_paleoclimate_perturbation(
         z, tops, layer_k, rho_c, np.concatenate(([t_lo], t_known)), np.concatenate(([shape[1]], shape[1:]))), float)
     cache = {}
@@ -81,7 +77,6 @@ def deglaciation_heat_flow_inversion(survey_md, survey_inc, survey_azi, log_md, 
     if min(rss(t_lo), rss(t_hi)) <= best_v:
         raise ValueError("the minimum of the profile RSS over [t_lo, t_hi] lies at an end point")
     t_hat = best_t
-    # Gauss-Newton polish of the stationarity condition (variable projection), kept inside the bracket
     for _ in range(3):
         m, r = _dg_profile_fit(y, R, P(t_hat))
         G = np.column_stack([np.ones(n), R, P(t_hat)])
@@ -103,12 +98,10 @@ def deglaciation_heat_flow_inversion(survey_md, survey_inc, survey_azi, log_md, 
     m, r = _dg_profile_fit(y, R, P_hat)
     rss_min = float(r @ r)
     T0, q0, g = (float(v) for v in m)
-    # Wald covariance with the Jacobian [1, R, P, g dP/dt_end] (t_end in years), s^2 = RSS_min / (n - 4)
     J = np.column_stack([np.ones(n), R, P_hat, g * dPdt(t_hat)])
     s2 = rss_min / (n - 4)
     C = s2 * np.linalg.inv(J.T @ J)
     sig = np.sqrt(np.diag(C))
-    # profile-likelihood 95 % interval: nearest crossings of the F threshold on each side of t_hat
     thr = rss_min * (1.0 + stats.f.ppf(0.95, 1, n - 4) / (n - 4))
 
     def crossing(direction):
