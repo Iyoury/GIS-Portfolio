@@ -297,9 +297,10 @@ def prism_gradients(points, bounds, rho):
     """Gravity-gradient tensor T_ij = d g_i / d x_j of a right rectangular prism of uniform density.
 
     Inputs:
-      points: float array of shape (3,) or (n, 3), up to 1000 points, observation points (m), not on the
-        prism surface.
-      bounds: (x1, x2, y1, y2, z1, z2) (m), the longest edge at most 1000 times the shortest.
+      points: float array of shape (3,) or (n, 3), n >= 1, up to 1000 points, observation points (m),
+        not on the prism surface.
+      bounds: (x1, x2, y1, y2, z1, z2) (m), x1 < x2, y1 < y2, z1 < z2, the longest edge at most 1000
+        times the shortest.
       rho: float, nonzero density (kg m^-3).
 
     Output:
@@ -308,7 +309,7 @@ def prism_gradients(points, bounds, rho):
         times the diagonal of the prism.
 
     Raises:
-      ValueError as in prism_gravity, and for a point on the surface of the prism.
+      ValueError for a point on the surface of the prism (on a face, an edge or a corner).
     """
     p, single = _check_points(points)
     b, rho = _check_bounds(bounds, rho)
@@ -460,7 +461,8 @@ def invert_basin_depths(x_edges, y_edges, gz_obs, drho0, lam):
     """Depths of a basin of columns (density contrast drho0 exp(-lam z)) from its gravity anomaly.
 
     Inputs:
-      x_edges, y_edges: 1-D float arrays (nx + 1 and ny + 1 entries), strictly increasing, nx ny <= 100.
+      x_edges, y_edges: 1-D float arrays of nx + 1 and ny + 1 entries (nx, ny >= 1), strictly increasing,
+        nx ny <= 100.
       gz_obs: float array (nx, ny), the vertical attraction (m s^-2) of all columns at the cell centres on
         the surface z = 0; it is that of a basin whose every depth satisfies 1e-3 w_min <= depth <= 3 w_min
         (w_min the smallest cell width, in x or y), depth <= 5e4 m and lam depth <= 2.
@@ -471,9 +473,9 @@ def invert_basin_depths(x_edges, y_edges, gz_obs, drho0, lam):
       depths: numpy array (nx, ny) in m (also when nx or ny is 1), each with a relative error below 1e-8.
 
     Raises:
-      ValueError for invalid edges, nx ny > 100, gz_obs of the wrong shape, drho0 = 0, lam outside
-      [0, 1e-2], an observation without the sign of drho0, or (lam > 0) an observation of at least
-      2 pi G |drho0| / lam.
+      ValueError for edges that are not strictly increasing, nx ny > 100, gz_obs of the wrong shape,
+      drho0 = 0, lam outside [0, 1e-2], an observation that is zero or of the sign opposite to drho0,
+      or (lam > 0) an observation of at least 2 pi G |drho0| / lam.
     """
     xe = np.asarray(x_edges, float)
     ye = np.asarray(y_edges, float)

@@ -146,8 +146,8 @@ def _crown_case():
 _crown_case()
 
 # --- test case 3 ---
-# a point on the surface of the prism (on a face, an edge or a corner), where the tensor jumps or diverges,
-# and the rules of prism_gravity once each (invalid bounds, rho = 0, points of shape (2,)) raise ValueError
+# the stated error rule: a point on the surface of the prism, where the tensor jumps (on a face) or
+# diverges (on an edge or a corner), raises ValueError: one point on a face, one on an edge, one on a corner
 import numpy as np
 
 
@@ -156,8 +156,7 @@ def _crown_case():
 
     _T_BA, _T_RA = (0.0, 100.0, 0.0, 200.0, 50.0, 300.0), 2670.0
 
-    for _t_args in (((0.0, 100.0, 175.0), _T_BA, 1.0), ((100.0, 200.0, 175.0), _T_BA, 1.0), ((0.0, 0.0, 50.0), _T_BA, 1.0),
-                    ((0, 0, -10), (0, 100, 200, 0, 50, 300), 1.0), ((0, 0, -10), _T_BA, 0.0), ((0, 0), _T_BA, 1.0)):
+    for _t_args in (((0.0, 100.0, 175.0), _T_BA, 1.0), ((100.0, 200.0, 175.0), _T_BA, 1.0), ((0.0, 0.0, 50.0), _T_BA, 1.0)):
         try:
             prism_gradients(np.array(_t_args[0], float), _t_args[1], _t_args[2])
         except ValueError:

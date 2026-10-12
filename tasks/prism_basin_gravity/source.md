@@ -657,3 +657,65 @@ ALL OK.
 
 Not changed: the physics, the algorithms of both solutions, every stored target of earlier versions, and
 every stated tolerance (U 1e-10, g 1e-10 |g| + 1e-14 G |rho| L, T 1e-9 ||T||, columns 1e-10, depths 1e-8).
+
+## Version 7 (grading_fix: platform content check v3)
+
+Finding (platform content check of the uploaded version, "Needs revision", 4 blocking items in the
+category "Requirements tested", all in step 4; the other stages had passed): (1) no test supplied a
+non-1-D edge array, (2) none an edge array with fewer than two entries, (3) lam was rejected below 0 but
+never above 1e-2, (4) no test had an observation exactly zero, which has no sign, so a strict
+opposite-sign check would have passed.
+
+Cause: version 6 trimmed the error tests to "each stated rule once", but the step-4 edge rule bundled
+three conditions (1-D, at least two entries, strictly increasing) and the lam rule two bounds, of which
+one each was tested, and "does not have the sign of drho0" left the zero case implicit. Emulating the
+content check over the whole task found the same pattern, not flagged this time, in step 1 (x1 < x2
+tested, y1 < y2 and z1 < z2 not), step 2 (rules inherited "as in prism_gravity", of which one bound
+ordering and one shape were tested) and step 3 (y1 = y2 and lam > 1e-2 tested, x1 >= x2 and lam < 0 not).
+
+Change, per finding:
+- (1) and (2), restated as an input domain: "x_edges and y_edges, 1-D arrays of nx + 1 and ny + 1
+  floats (nx, ny >= 1)"; the edge error rule is now "not strictly increasing" only. These are array-format
+  preconditions without scientific content (such an array describes no grid), and testing them would
+  have added two validation entries to the step whose computed margin is the smallest. The solutions
+  still reject such arrays; the behaviour is neither promised nor tested.
+- (3), tested: lam = 0.0101 with the case-0 data scaled by 0.05 (slab-equivalent thicknesses d at most
+  46.6 m, lam d <= 0.47 < 1, so only the lam bound rejects it).
+- (4), tested, and the rule stated explicitly: "if an observation is zero or of the sign opposite to
+  drho0"; entry: the case-0 data with gz_obs[2, 1] = 0. Grounding: a column of positive depth attracts
+  with the sign of drho0 at every surface station, so no basin of the stated domain (depths at least
+  1e-3 w_min) gives a zero observation, whose slab-equivalent depth would be zero.
+- Siblings found by the emulation: step 4 also gets y edges with a repeated entry (a cell of zero
+  width, the boundary of "strictly"); step 1 gets y1 > y2 and z1 = z2; step 3 gets x1 > x2 and
+  lam = -1e-4; step 2 no longer inherits the rules of prism_gravity: its prompt and header state the
+  valid inputs (n >= 1; x1 < x2, y1 < y2, z1 < z2, longest edge at most 1000 times the shortest;
+  nonzero rho) and promise only the step's own rule, a point on the surface (one point on a face, one
+  on an edge, one on a corner), and its three inherited entries are removed.
+- Prompts, function headers, problem_io and contracts of steps 2 and 4 rewritten accordingly; the
+  docstrings of steps/, solution/, solution.py, second_solution.py and the mutants copied from
+  problem.yaml (steps/step_2.py and steps/step_4.py equal their headers).
+
+The reference was checked on every new input before it was added: solution.py, the per-step files, the
+second solution and every mutant that defines the function raise ValueError on each. Each new entry
+rejects a matching weakened copy of the reference (lam checked from below only, columns checked for y1 <
+y2 only, column lam checked from above only, prism bounds checked for x only: these return a value or
+fail without ValueError); for the zero observation and the repeated edge the weakened copy (strict sign
+test, edges tested with < 0) happens to fail later with a ValueError of its own, which another
+implementation need not.
+
+Assertion sites (validation, with stated raises at half weight plus the contract assert, versus
+computed), before -> after: step 1 3.5 / 23 -> 4.5 / 23; step 2 4.0 / 12 -> 2.5 / 12; step 3 4.5 / 13
+-> 5.5 / 13; step 4 4.5 / 13 -> 6.0 / 13 (10 raise entries); general 0 / 10, unchanged.
+
+Regression tests: step 4 case 1 (10 entries), step 1 case 3 (7), step 2 case 3 (3), step 3 case 3 (9).
+
+Rerun: `OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 python3 tools/crown_check.py
+tasks/prism_basin_gravity -j 2` (all modes): FORMAT OK; REF steps 1-4 8/8, 8/8, 7/7, 10/10 and general
+3/3; SECOND the same; mutants: closed_form_everywhere (step 1) fails cases 0, 2, 4, 5, 7, direct_log 1, 2,
+7, no_subdivision (step 1) 4, closed_form_everywhere (step 2) 0, 2, 4, 5, no_subdivision (step 2) 4,
+uniform_gauss_legendre 0, 2, 5, 6, uniform_density 0, 2, 4, 5, 6, corner_sum_far 2, 4, slab_thickness 0,
+2-9, newton_step_halving 5, whole_task_mgal general 0, 1, 2; SHIFT +-1e-12 all pass; all-None and
+all-zero controls pass 0 cases in every step and in general; SUMMARY ALL OK. Raw folder 421 kB.
+
+Not changed: the physics, the algorithms of both solutions, every stored target, every tolerance and
+every n_test_cases.

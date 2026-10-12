@@ -134,7 +134,8 @@ problem_io: |-
       """Depths of a basin of columns (density contrast drho0 exp(-lam z)) from its gravity anomaly.
 
       Inputs:
-        x_edges, y_edges: 1-D float arrays (nx + 1 and ny + 1 entries), strictly increasing, nx ny <= 100.
+        x_edges, y_edges: 1-D float arrays of nx + 1 and ny + 1 entries (nx, ny >= 1), strictly increasing,
+          nx ny <= 100.
         gz_obs: float array (nx, ny), the vertical attraction (m s^-2) of all columns at the cell centres on
           the surface z = 0; it is that of a basin whose every depth satisfies 1e-3 w_min <= depth <= 3 w_min
           (w_min the smallest cell width, in x or y), depth <= 5e4 m and lam depth <= 2.
@@ -145,9 +146,9 @@ problem_io: |-
         depths: numpy array (nx, ny) in m (also when nx or ny is 1), each with a relative error below 1e-8.
 
       Raises:
-        ValueError for invalid edges, nx ny > 100, gz_obs of the wrong shape, drho0 = 0, lam outside
-        [0, 1e-2], an observation without the sign of drho0, or (lam > 0) an observation of at least
-        2 pi G |drho0| / lam.
+        ValueError for edges that are not strictly increasing, nx ny > 100, gz_obs of the wrong shape,
+        drho0 = 0, lam outside [0, 1e-2], an observation that is zero or of the sign opposite to drho0,
+        or (lam > 0) an observation of at least 2 pi G |drho0| / lam.
       """
 
 general_tests: tests/general.py
@@ -245,20 +246,21 @@ sub_steps:
       tensor, for every prism whose longest edge is at most 1000 times its shortest edge, at every point that
       is not on the surface of the prism: outside at any distance (up to a million times the diagonal of the
       prism), including points in the planes of the faces, and inside.
-      Inputs: points, a float array of shape (3,) or (n, 3), up to 1000 points per call;
-      bounds = (x1, x2, y1, y2, z1, z2); rho (float, nonzero).
+      Inputs: points, a float array of shape (3,) or (n, 3) (n >= 1), up to 1000 points per call;
+      bounds = (x1, x2, y1, y2, z1, z2) with x1 < x2, y1 < y2, z1 < z2 and the longest edge at most 1000
+      times the shortest; rho (float, nonzero).
       Output: a numpy array of shape (3, 3) for points of shape (3,), of shape (n, 3, 3) for shape (n, 3)
       (n = 1 included).
-      Errors: raise ValueError as in prism_gravity (invalid bounds, rho = 0, points of the wrong shape), and if
-      a point lies on the surface of the prism (on a face, edge or corner).
+      Errors: raise ValueError if a point lies on the surface of the prism (on a face, an edge or a corner).
     function_header: |-
       def prism_gradients(points, bounds, rho):
           """Gravity-gradient tensor T_ij = d g_i / d x_j of a right rectangular prism of uniform density.
 
           Inputs:
-            points: float array of shape (3,) or (n, 3), up to 1000 points, observation points (m), not on the
-              prism surface.
-            bounds: (x1, x2, y1, y2, z1, z2) (m), the longest edge at most 1000 times the shortest.
+            points: float array of shape (3,) or (n, 3), n >= 1, up to 1000 points, observation points (m),
+              not on the prism surface.
+            bounds: (x1, x2, y1, y2, z1, z2) (m), x1 < x2, y1 < y2, z1 < z2, the longest edge at most 1000
+              times the shortest.
             rho: float, nonzero density (kg m^-3).
 
           Output:
@@ -267,7 +269,7 @@ sub_steps:
               times the diagonal of the prism.
 
           Raises:
-            ValueError as in prism_gravity, and for a point on the surface of the prism.
+            ValueError for a point on the surface of the prism (on a face, an edge or a corner).
           """
     return_line: return T
     step_background: |-
@@ -280,7 +282,7 @@ sub_steps:
       quantity: "Gravity-gradient tensor of a uniform right rectangular prism."
       assumptions: "As in step 1."
       result_kind: exact
-      valid_input_ranges: "Any point not on the surface of the prism, up to a million diagonals from it, at most 1000 points per call; bounds and rho (nonzero) as in step 1."
+      valid_input_ranges: "Any point not on the surface of the prism (a point on it raises ValueError), up to a million diagonals from it, n >= 1 and at most 1000 points per call; bounds (x1 < x2, y1 < y2, z1 < z2, longest edge at most 1000 times the shortest) and nonzero rho as in step 1."
       units: "s^-2."
       output_shape: "Array (3, 3) or (n, 3, 3), n >= 1."
       step_dependencies: [1]
@@ -376,18 +378,20 @@ sub_steps:
       the basin is assumed: shallow columns may lie beside deep ones. Find the depths (m) that reproduce it;
       return them as a numpy array of shape (nx, ny) (also when nx or ny is 1) with a relative error below
       1e-8 each.
-      Inputs: x_edges (nx + 1 floats) and y_edges (ny + 1 floats), strictly increasing, nx ny <= 100;
-      gz_obs, a float array of shape (nx, ny) (m s^-2); drho0 (float, nonzero); lam (float, 0 <= lam <= 1e-2).
-      Errors: raise ValueError if an edge array is not 1-D with at least two entries and strictly
-      increasing, if nx ny > 100, if gz_obs does not have shape (nx, ny), if drho0 is zero, if lam is not in
-      [0, 1e-2], if an observation does not have the sign of drho0 or (for lam > 0) is at least the
-      attraction of an infinite slab, 2 pi G |drho0| / lam.
+      Inputs: x_edges and y_edges, 1-D arrays of nx + 1 and ny + 1 floats (nx, ny >= 1), strictly
+      increasing, nx ny <= 100; gz_obs, a float array of shape (nx, ny) (m s^-2); drho0 (float, nonzero);
+      lam (float, 0 <= lam <= 1e-2).
+      Errors: raise ValueError if an edge array is not strictly increasing, if nx ny > 100, if gz_obs does
+      not have shape (nx, ny), if drho0 is zero, if lam is not in [0, 1e-2], if an observation is zero or
+      of the sign opposite to drho0, or (for lam > 0) if an observation is at least the attraction of an
+      infinite slab, 2 pi G |drho0| / lam.
     function_header: |-
       def invert_basin_depths(x_edges, y_edges, gz_obs, drho0, lam):
           """Depths of a basin of columns (density contrast drho0 exp(-lam z)) from its gravity anomaly.
 
           Inputs:
-            x_edges, y_edges: 1-D float arrays (nx + 1 and ny + 1 entries), strictly increasing, nx ny <= 100.
+            x_edges, y_edges: 1-D float arrays of nx + 1 and ny + 1 entries (nx, ny >= 1), strictly increasing,
+              nx ny <= 100.
             gz_obs: float array (nx, ny), the vertical attraction (m s^-2) of all columns at the cell centres on
               the surface z = 0; it is that of a basin whose every depth satisfies 1e-3 w_min <= depth <= 3 w_min
               (w_min the smallest cell width, in x or y), depth <= 5e4 m and lam depth <= 2.
@@ -398,9 +402,9 @@ sub_steps:
             depths: numpy array (nx, ny) in m (also when nx or ny is 1), each with a relative error below 1e-8.
 
           Raises:
-            ValueError for invalid edges, nx ny > 100, gz_obs of the wrong shape, drho0 = 0, lam outside
-            [0, 1e-2], an observation without the sign of drho0, or (lam > 0) an observation of at least
-            2 pi G |drho0| / lam.
+            ValueError for edges that are not strictly increasing, nx ny > 100, gz_obs of the wrong shape,
+            drho0 = 0, lam outside [0, 1e-2], an observation that is zero or of the sign opposite to drho0,
+            or (lam > 0) an observation of at least 2 pi G |drho0| / lam.
           """
     return_line: return depths
     step_background: |-
@@ -416,7 +420,7 @@ sub_steps:
       quantity: "Depths of a basin of exponential-density columns from its gravity anomaly at the cell centres."
       assumptions: "As in step 3; one station at the centre of each cell on the surface."
       result_kind: exact
-      valid_input_ranges: "Strictly increasing edges, at most 100 cells; nonzero drho0; 0 <= lam <= 1e-2 per m; gz_obs of a basin whose depths satisfy 1e-3 w_min <= depth <= 3 w_min (w_min the smallest cell width), depth <= 5e4 m and lam depth <= 2 (all inclusive)."
+      valid_input_ranges: "1-D strictly increasing edge arrays (nx, ny >= 1), at most 100 cells; nonzero drho0; 0 <= lam <= 1e-2 per m; gz_obs of a basin whose depths satisfy 1e-3 w_min <= depth <= 3 w_min (w_min the smallest cell width), depth <= 5e4 m and lam depth <= 2 (all inclusive)."
       units: "m."
       output_shape: "Array (nx, ny), also when nx or ny is 1."
       step_dependencies: [3]

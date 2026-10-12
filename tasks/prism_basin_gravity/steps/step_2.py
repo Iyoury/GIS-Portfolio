@@ -8,9 +8,10 @@ def prism_gradients(points, bounds, rho):
     """Gravity-gradient tensor T_ij = d g_i / d x_j of a right rectangular prism of uniform density.
 
     Inputs:
-      points: float array of shape (3,) or (n, 3), up to 1000 points, observation points (m), not on the
-        prism surface.
-      bounds: (x1, x2, y1, y2, z1, z2) (m), the longest edge at most 1000 times the shortest.
+      points: float array of shape (3,) or (n, 3), n >= 1, up to 1000 points, observation points (m),
+        not on the prism surface.
+      bounds: (x1, x2, y1, y2, z1, z2) (m), x1 < x2, y1 < y2, z1 < z2, the longest edge at most 1000
+        times the shortest.
       rho: float, nonzero density (kg m^-3).
 
     Output:
@@ -19,6 +20,6 @@ def prism_gradients(points, bounds, rho):
         times the diagonal of the prism.
 
     Raises:
-      ValueError as in prism_gravity, and for a point on the surface of the prism.
+      ValueError for a point on the surface of the prism (on a face, an edge or a corner).
     """
     raise NotImplementedError
