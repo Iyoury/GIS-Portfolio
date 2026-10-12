@@ -106,5 +106,7 @@ starting points, use judgement and flag what does not fit. Update prompt, refere
   author's own text (tools/set_author_meta.py): affiliation "Independent Researcher"; relevant_experience = B.Sc.
   Georesources and Environment (FST Fes, 2016), graduate certificate in geomatics (Universite Laval), GIS analyst
   at Morocco's Ministry of Energy and Mines (2016-2018), independent geospatial consultancy (Craton Geodonnees,
-  Quebec, Abitibi drilling databases). Reuse it for new tasks.
+  Quebec, Abitibi drilling databases). Reuse it for new tasks. author_name Ayoub Bousfiha, author_email iyoury.ab@gmail.com, author_profile
+  https://www.linkedin.com/in/ayoub-bousfiha-674a75219, conflicts_of_interest None (author's file, 2026-10-12);
+  research_advisor and referred_by optional and left out.
 - layered-surface-wave and basin-backstripping: not in the repo (zips never received).
