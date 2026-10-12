@@ -115,8 +115,9 @@ metadata:
     for the geometric errors; P errors aligned with the residual sign reach 0.93 of the step 6 rms_residual limit at
     rms_residual = 1e-4 K (0.32 for every other step 6 output) and 0.72 of the step 7 log-likelihood limit on the
     precise region (0.30 for every other step 7 or whole-task output); P errors irregular in depth and time reach 0.62
-    of a step 7 limit (phi, case 4; 0.18 elsewhere) but 2.6, 1.8 and 1.3 of the step 6 g limit in cases 1, 2 and 5 (at
-    most 0.52 in the other step 6 cases), because an error irregular in t perturbs RSS(t) itself. Along the
+    of a step 7 limit (phi, case 4; 0.19 elsewhere) but 2.6, 1.8 and 1.3 of the step 6 g limit in cases 1, 2 and 5 (T0
+    1.6 in case 1; at most 0.53 in the other step 6 cases), because an error irregular in t perturbs RSS(t) itself, so
+    the step 6 accuracy is stated for step 5 errors smooth in t_end. Along the
     amplitude-timing ridge of the short-glaciation regions the g limit binds before the t_end limit (effective t_end
     accuracy about 1e-3). With exact inputs the reference reaches at most 1.7e-3 of a step 6 limit and 0.019 of a step 7
     or whole-task limit (interval ends included), the second solution, which uses its own steps 1-5, 9e-4 and 0.009.
@@ -654,7 +655,7 @@ sub_steps:
       5e-4 (g is never 0 in a returned result: g = 0 at the minimum would make RSS(t) constant, without threshold
       crossings); the four standard errors within a relative 5e-3; t_end_low and t_end_high within a relative 5e-4;
       rms_residual within a relative 1e-3; n_used exact. These limits include the errors propagated from the stated
-      accuracies of steps 1, 2 and 5.
+      accuracies of steps 1, 2 and 5 for step 5 errors that vary smoothly with t_end.
       Errors: ValueError if fewer than 5 readings have TVD >= z_min; if hist_dT_shape[0] == hist_dT_shape[1] (t_end
       then has no effect); if the minimum of RSS(t) over [t_lo, t_hi] is attained at t_lo or t_hi; or if a nearest
       threshold crossing does not exist inside [t_lo, t_hi].
@@ -711,7 +712,8 @@ sub_steps:
           q0, g and t_end within a relative 5e-4; the standard errors within a
           relative 5e-3; t_end_low and t_end_high within a relative 5e-4;
           rms_residual within a relative 1e-3; n_used exact. These limits include
-          the errors propagated from the stated accuracies of steps 1, 2 and 5.
+          the errors propagated from the stated accuracies of steps 1, 2 and 5
+          for step 5 errors that vary smoothly with t_end.
 
           Raises
           ------
@@ -734,7 +736,7 @@ sub_steps:
     n_test_cases: 7
     contract:
       quantity: "Joint least-squares estimate of the surface heat flow q0, reference surface temperature T0, glacial amplitude g and end of the last glaciation t_end from one borehole log, with Wald standard errors, the profile-likelihood 95 % interval of t_end, the rms residual and the number of readings used."
-      assumptions: "Minimum-curvature trajectory; horizontal layers logged in MD; one-dimensional conduction with uniform heat production and volumetric heat capacity; glacial signal from the layered-column perturbation (step 5) of a piecewise-constant history whose first boundary t_end is unknown; unweighted least squares on the readings with TVD >= z_min; t_end the global minimizer of the profile RSS on [t_lo, t_hi]; Wald covariance s^2 (J^T J)^-1 with J = [1, R, P, g dP/dt_end] and s^2 = RSS_min/(n_used - 4); interval from the F(1, n_used - 4) 0.95 quantile, bounded by the nearest crossings; the stated accuracy includes the propagated accuracies of steps 1, 2 and 5."
+      assumptions: "Minimum-curvature trajectory; horizontal layers logged in MD; one-dimensional conduction with uniform heat production and volumetric heat capacity; glacial signal from the layered-column perturbation (step 5) of a piecewise-constant history whose first boundary t_end is unknown; unweighted least squares on the readings with TVD >= z_min; t_end the global minimizer of the profile RSS on [t_lo, t_hi]; Wald covariance s^2 (J^T J)^-1 with J = [1, R, P, g dP/dt_end] and s^2 = RSS_min/(n_used - 4); interval from the F(1, n_used - 4) 0.95 quantile, bounded by the nearest crossings; the stated accuracy includes the propagated accuracies of steps 1, 2 and 5 (step 5 errors smooth in t_end)."
       result_kind: approximate
       valid_input_ranges: "Survey, layers and history as in steps 1, 2 and 5 with layer tops and log depths within the survey; heat_production finite and >= 0; m >= 2 shape values with s_0 != s_1 and m - 1 interval ends; 0 < t_lo < t_hi < hist_t_years[0]; at least 5 readings with TVD >= z_min; logs with rms_residual >= 1e-4 K and q0 > 0; holes up to a few km with inclinations below 90 degrees (an end-point minimum or an interval not contained in the bounds raises ValueError)."
       units: "T0 in deg C, q0 in W m^-2, g in K, t_end, its standard error and interval in years, the other standard errors in the units of their parameters, rms_residual in K, n_used dimensionless."

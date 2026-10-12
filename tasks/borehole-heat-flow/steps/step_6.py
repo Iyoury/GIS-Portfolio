@@ -57,7 +57,8 @@ def deglaciation_heat_flow_inversion(survey_md, survey_inc, survey_azi, log_md, 
     q0, g and t_end within a relative 5e-4; the standard errors within a
     relative 5e-3; t_end_low and t_end_high within a relative 5e-4;
     rms_residual within a relative 1e-3; n_used exact. These limits include
-    the errors propagated from the stated accuracies of steps 1, 2 and 5.
+    the errors propagated from the stated accuracies of steps 1, 2 and 5
+    for step 5 errors that vary smoothly with t_end.
 
     Raises
     ------
