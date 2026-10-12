@@ -62,8 +62,9 @@ All data are synthetic and built inside each test case (no data file). Each case
   the phi_h score n (sum u_i r_(i-1) + phi r_1^2) - |u|^2 phi/(1 - phi^2) vanishes; c_h in the span of the projected
   L P_h and L g dP_h/dt_end, one hole closing the weighted shared scores in closed form. Every score of the exact
   log-likelihood vanishes at the generating values (below 6e-9 standard deviations by central differences in all
-  4H + 2 parameters). Dense scans (600 logarithmic times per region plus 101 near t_end, grid over g and every phi,
-  Newton polish) find no value above l_max (largest excess 5.5e-12). Standard errors from the expected information
+  4H + 2 parameters). Dense scans find no value above l_max beyond 7.5e-12: 600 logarithmic times plus 101 near
+  t_end (grid over g and every phi, Newton polish) per original region, and 300 + 41 (cases 0, 6) or 200 + 41 (case 4,
+  precise region) for the regions rebuilt at the domain ends. Standard errors from the expected information
   of the whitened oracle Jacobians, l_max from the generating residuals, the chi-square quantile from math.erf.
 
 | Region | Holes: n_used (s mK, phi) | g, t_end | 95 % interval (yr) | Feature |
@@ -76,17 +77,22 @@ All data are synthetic and built inside each test case (no data file). Each case
 | step 6 | 8 of 10 readings (4.5, 0.0); 137 (8.0, 0.50); m = 2 | 7.0, 10000 | 8980.7-11239.8 | smallest hole; 7 readings raise |
 | step 7 | 37 (3.0, 0.90); 136 (10.0, 0.40) | 7.5, 11000 | 8694.3-14519.6 | first reading matters |
 | whole 0 | 220 (10.0, 0.80); 109 (3.4, 0.30); 136 (18.0, 0.55) | 5.0, 9800 | 9562.2-10040.9 | deep region |
-| whole 1 | 24 (2.2, 0.40); 220 (20.0, 0.65) | 6.0, 9000 | 8834.1-9169.5 | offset and order invariances |
+| whole 1 | 24 (2.2, 0.40); 220 (20.0, 0.65) | 6.0, 9000 | 8834.1-9169.5 | offset, order, sign of g |
 | whole 2 | 326 (5.0, 0.50); 137 (9.1, 0.70); 136 (15.1, 0.30) | 7.4, 11070 | 9983.2-12584.3 | 2nd max 18.17 ka 1.25 below |
 
 Whole-task region 2: the statistic falls below the quantile again over 17767-18444 years, outside the interval.
 
-Error budgets (reference run with P off by 1e-8 K per K in smooth, irregular and residual-aligned patterns, TVD
-off by 1e-6 m, R and S by a relative 1e-9): at most 0.31 of a step 6 limit (0.45 at rms 1e-4 K); at most 0.61 of a
-step 7 limit on the test regions (0.72 for the aligned pattern on the log-likelihood) and 0.77 on regions rebuilt
-at the ends of the domain; smooth errors below 0.023 of every limit. At s_h = 1e-4 K the irregular pattern moved
-phi by 3.5 times its limit, hence the 1e-3 K floor of the domain. Along the amplitude-timing ridge of the
-short-glaciation regions (d ln g/d ln t_end about 2.05) the g limit binds first.
+Error budgets (re-measured 2026-10-12 on every current step 6, step 7 and whole-task call; reference with P off by
+1e-8 K per K of max|dT| smooth in z and t, aligned with the residual sign or irregular in z and t, or with the TVD
+off by 1e-6 m and R, S by a relative 1e-9): smooth and geometric errors at most 0.11 of a step 6 limit (rms_residual,
+case 6) and 0.046 of a step 7 or whole-task limit; aligned 0.93 of the step 6 rms_residual limit at rms 1e-4 K (0.32
+for the other step 6 outputs) and 0.72 of the step 7 log-likelihood limit (case 4, precise region; 0.30 otherwise);
+irregular 0.62 of a step 7 limit (phi, case 4; 0.18 otherwise) but 2.65, 1.81 and 1.29 of the step 6 g limit in
+cases 1, 2 and 5 (t_end 1.89, 1.38, 0.92; at most 0.52 in cases 0, 3, 4, 6): an error irregular in t perturbs RSS(t)
+itself. Exact inputs: reference 1.7e-3 (step 6) and 0.019 (step 7, whole task), second solution (its own steps 1-5)
+9e-4 and 0.009. At s_h = 1e-4 K (design region) the irregular pattern moved phi by 3.5 times its limit, hence the
+1e-3 K floor of the domain. Along the amplitude-timing ridge of the short-glaciation regions (d ln g/d ln t_end about
+2.05) the g limit binds first.
 
 ## Revision history
 
@@ -113,67 +119,44 @@ short-glaciation regions (d ln g/d ln t_end about 2.05) the g limit binds first.
   review) passed every case in rounds 1-3 (two solvers on 71 cases, 84 of 84 case runs, three solvers on 79 cases);
   it finds specification gaps but does not predict the platform band. Item 16: the step 6 prompt no longer lists the Jacobian columns or hints at variable
   projection. Each round reran crown_check in all modes (ALL OK).
-- Version 10 upload refused (2026-10-12): domain mismatch and domain not accepted (domain set to physics),
-  incomplete metadata block (author fields; author_profile and conflicts_of_interest pending from the author), and
-  "too large to store" (1752 KB; limit 800 KB; raw folder 1530 KiB).
-  Cause of the size: duplicated oracle code with long comments in every self-contained case of steps 6-7 and the
-  whole task (383 KiB), 53 mutant files (750 KiB; the whole-task ones full solution copies) and a 161 KiB source.md.
-  Change (edit_label unchanged): (1) mutants reduced to a representative set, stripped of docstrings and comments
-  (the MUTANT markers kept): linear TVD, arithmetic conductivity, years not converted, heat-production sign, mean-
-  diffusivity erfc, double-precision Gaver-Stehfest, step 6 half-space perturbation and local search without scan,
-  step 7 independent errors and conditional likelihood, whole-task MD as depth and independent errors; (2) tests:
-  every case keeps its assertions, inputs and targets; the oracle library of each case was rewritten compactly
-  (2-space indentation, no comments, unused helpers pruned; the step 7 profile maximized over the phi_h by
-  Nelder-Mead instead of damped Newton steps, over g by a 4001-point grid with bounded Brent refinement instead of
-  derivative bisection; phi-score roots by Brent; step 6 crossings by Brent instead of Illinois steps, the t density
-  integrated by quad); file preambles moved into the case-0 headers (the parser counts text before the first case);
-  (3) problem.yaml: mutant lists and the three explanations condensed (prompts, headers, return lines and contracts
-  unchanged); (4) this file condensed. Regression (every old and new case of steps 6, 7 and the whole task
-  instrumented at the points its assertions evaluate): same data (largest difference 7e-15 K), targets within about
-  3e-12 relative (sigma_amplitude, step 6 cases 1, 2, 5), thresholds within 5e-13, oracle profile values within about
-  3e-6 (step 7 case 4, precise log; 1e-7 to 4e-7 elsewhere); every above/below-threshold outcome is unchanged and the
-  smallest |l_p - threshold| at a checked point is 4.0e-3 (step 7 case 2), about 1500 times the largest difference.
-  Rerun: crown_check ref, second, mut, shift and controls ALL OK; format also listed 58 non-finite literals present
-  before the shrink (next item). The shrink had dropped the erfc oracle of step 6 case 2 (the branch-cut oracle,
-  within 3.1e-16 of erfc on that column, was used) and left a removed mutant named in verification_explanation.
+- Version 10 upload refused (2026-10-12): domain not accepted (set to physics), incomplete author metadata, and
+  "too large to store" (1752 KB; limit 800 KB). Cause: oracle code with long comments repeated in every case of
+  steps 6-7 and the whole task (383 KiB), 53 mutant files (750 KiB) and a 161 KiB source.md. Change (edit_label
+  unchanged): mutants reduced to the representative set of problem.yaml, without docstrings; every test case keeps
+  its inputs, targets and assertions, its oracle library rewritten compactly (step 7 profile over the phi_h by
+  Nelder-Mead and over g by a 4001-point grid with bounded Brent; crossings and phi-score roots by Brent; the t
+  density integrated by quad); file preambles moved into the case-0 headers; the explanations and this file
+  condensed. Regression (old and new cases instrumented where their assertions evaluate): data within 7e-15 K,
+  targets within 3e-12 relative, thresholds within 5e-13, oracle profile values within 3e-6 (step 7 case 4, precise
+  log; 4e-7 elsewhere); every above/below-threshold outcome unchanged (smallest margin 4.0e-3, step 7 case 2).
+  Rerun: crown_check ref, second, mut, shift, controls ALL OK; format listed 58 non-finite literals (next item). The
+  shrink had dropped the erfc oracle of step 6 case 2 (branch-cut oracle used, 3.1e-16 from erfc) and left a
+  removed mutant named in verification_explanation.
 - Content-check preparation (2026-10-12, edit_label unchanged). Finding: 58 non-finite literals (platform check
-  "Edge-case inputs", blocking): 29 NaN test inputs (steps 1-5: 19; step 6 and step 7 case 6: 5 each) and 29 test
-  sentinels (math.inf as the bottom of the last layer in the layer sums, -math.inf for |phi| >= 1 in the step 7 and
-  whole-task profiles). Cause: the prompts promised ValueError for non-finite inputs and the validation cases tested
-  it. Change: NaN entries removed from the validation cases of steps 1-7 (step 6 keeps 24 invalid inputs, step 7
-  29) and the non-finite clauses from the prompts, function headers, problem_io and scaffolds (the references keep
-  their checks, now neither stated nor graded); the last layer's bottom is max(z, last top) (same arithmetic) and the
-  profile returns -1e300 for |phi| >= 1 (Nelder-Mead only compares values: same path); step 6 case 2 again uses
-  math.erfc and its closed-form time derivative (UHole, as UBore in step 7 case 2: data change 3.6e-15 K, targets
-  3e-12 relative); the removed step 6 mutant is no longer named. Regression: data, targets, thresholds and
-  oracle profile values of every step 6, step 7 and whole-task case are bitwise identical before and after, except
-  step 6 case 2 (3.0e-12 relative, the erfc change). Rerun: crown_check in all modes, ALL OK (format: only the two
-  pending metadata keys); raw folder below 600 KiB.
-- Pre-upload content-check emulation (2026-10-12, last version; edit_label stays difficulty_increase). Finding: an
-  emulation of the platform content check on steps 1-7 and the whole task found (1) validation outweighing computed
-  values (counted as the platform does, raises at half weight): step 6 17 vs 12, step 7 22.5 vs 14, step 5 10 vs 11,
-  repeated type/shape asserts in steps 1-3; (2) stated but untested behaviour: one-element array outputs, a single-
-  layer column, m = 2 histories, heat_production = 0, the domain ends rms_residual = 1e-4 K (step 6), s_h = 1e-3 and
-  0.03 K and phi_h = -0.9 and 0.95 (step 7), the equal-MD tie rule, the nearest-crossing rule only in general.py;
-  (3) grounding: relative accuracy of the step 4 standard errors although exact data make them 0, zero tolerance for
-  an all-zero dT, relative limits on g and q0 without q0 > 0 or g != 0. Cause: long error lists (dimensionality,
-  lengths, list types, key sets, history layout) tested one by one, and domain statements without endpoint cases.
-  Change: stated errors reduced to the scientific rules (query outside the survey, dogleg near 180 degrees; k <= 0;
-  kappa <= 0; n < 4, A < 0, unresolvable design; k or rho_c <= 0; step 6: < 5 used readings, unresolvable at t_end,
-  s_0 = s_1, end-point minimum, uncontained interval; step 7: < 8 used readings, end-point maximum, uncontained
-  interval), each tested once, the other conditions stated as input ranges (references still check them) in prompts,
-  headers, problem_io, scaffolds and contracts; one output-contract assert per step (one-element arrays included);
-  step 4 case 4 rebuilt at rms_residual = 1e-6 K (QR standard errors), the standard-error accuracy now stated for
-  rms_residual >= 1e-6 K; single-layer column (step 5); step 6 case 6 at rms 1e-4 K with m = 2; A = 0 in step 6
-  and 7 case 2 (A S is added back exactly); step 7 case 0 hole 3 at s_h = 30.0 mK and case 4 precise hole 2 at
-  1.000 mK (noise / sqrt(1 + 6.25/n)); step 7 case 6 with m = 2; step 7 case 3 also runs the whole 2 region; distinct
-  MDs required instead of the tie rule; phi domain narrowed to the tested -0.3 to 0.9 (inside the budget regions);
-  dT "not all zero", q0 > 0 and why g != 0 (g = 0 would make the profile constant) stated. After: validation vs
-  computed 2.5/23, 1.5/24, 1.5/15, 5/20, 2/12, 4.5/12, 3.5/17. Regression: every changed case run with the
-  reference, solution.py and the second solution (worst error/limit 0.018, second solution 0.009); oracle scans of
-  the changed regions (step 6 case 6: 6000 times; step 7 cases 0, 4, 6: 241-341 times) find the extremum at t_end
-  (largest excess 7.5e-12) and one interval. Rerun: crown_check in all modes on the final files (one thread,
-  -j 4): ALL OK, FORMAT OK; every mutant still fails (step 4 sign mutant now also case 4); raw folder below 600 KiB.
+  "Edge-case inputs", blocking): 29 NaN test inputs and 29 test sentinels (math.inf as the bottom of the last layer,
+  -math.inf for |phi| >= 1 in the step 7 and whole-task profiles). Cause: the prompts promised ValueError for
+  non-finite inputs. Change: NaN inputs and the non-finite clauses removed (prompts, headers, problem_io, scaffolds;
+  the references keep their checks, neither stated nor graded); the last layer's bottom is max(z, last top) and the
+  profile returns -1e300 for |phi| >= 1 (same arithmetic, same Nelder-Mead path); step 6 case 2 again uses math.erfc
+  (data change 3.6e-15 K); the removed step 6 mutant no longer named. Regression: data, targets, thresholds and
+  oracle profile values of every step 6, step 7 and whole-task case bitwise identical except step 6 case 2 (3.0e-12
+  relative). Rerun: crown_check all modes ALL OK (format: two pending metadata keys).
+- Pre-upload content-check emulation (2026-10-12, last version; edit_label stays difficulty_increase). Findings
+  (emulation of the platform content check): (1) validation outweighing computed values (raises at half weight: step
+  6 17 vs 12, step 7 22.5 vs 14, step 5 10 vs 11) and repeated type/shape asserts in steps 1-3; (2) stated but
+  untested behaviour (one-element outputs, a single-layer column, m = 2, heat_production = 0, the domain ends of
+  rms_residual, s_h and phi_h, the equal-MD tie rule, the nearest-crossing rule outside general.py); (3) grounding:
+  relative accuracy of step 4 standard errors that exact data make 0, zero tolerance for an all-zero dT, relative
+  limits on g and q0 without q0 > 0 or g != 0. Cause: long error lists tested one by one; domain statements without
+  endpoint cases. Change: stated errors reduced to the scientific rules, each tested once, the other conditions
+  stated as input ranges; one output-contract assert per step; step 4 case 4 at rms_residual = 1e-6 K; single-layer
+  column (step 5); step 6 case 6 at rms 1e-4 K with m = 2; A = 0 in step 6 and 7 case 2; step 7 case 0 hole 3 at
+  30.0 mK, case 4 precise hole 2 at 1.000 mK, case 6 with m = 2, case 3 also on the whole 2 region; distinct MDs
+  instead of the tie rule; phi domain -0.3 to 0.9; dT "not all zero", q0 > 0 and g != 0 stated. After: validation
+  vs computed 2.5/23, 1.5/24, 1.5/15, 5/20, 2/12, 4.5/12, 3.5/17. Regression: changed cases with the reference,
+  solution.py and the second solution (worst error/limit 0.018 and 0.009); oracle scans of the changed regions (step
+  6 case 6: 6000 times; step 7 cases 0, 4, 6: 241-341 times) find the extremum at t_end (excess 7.5e-12) and one
+  interval. Rerun: crown_check all modes (one thread, -j 4): ALL OK, FORMAT OK; every mutant still fails.
 - Content-check emulation 2 (2026-10-12, last version; edit_label unchanged). Findings: (1) step 4: the reference
   solved the normal equations (condition number squared) and missed its own limits near the resolvability threshold
   (80-digit check: g off by 0.6 K at a scaled singular value s_min of 3e-8, 1.9e-3 K at 1e-6); the near-threshold
@@ -189,3 +172,20 @@ short-glaciation regions (d ln g/d ln t_end about 2.05) the g limit binds first.
   within 1.1e-12; reference worst error/limit 8.8e-3 (second solution 1.5e-3); normal equations fail cases 5 (rms
   3.4e-7 K) and 7; arccos fails case 20, reference and second solution within 2.0e-9 m. Rerun: crown_check all modes
   (one thread, -j 4): ALL OK, FORMAT OK.
+- Content-check emulation 3 (2026-10-12, last version; edit_label unchanged). Findings: (1) verification_explanation
+  and this file quoted stale scan counts (600 times, excess 5.5e-12), exact-input maxima (0.014, 0.006) and budget
+  figures measured before the domain-end regions were rebuilt; (2) the step 6 rule "not separately resolvable at
+  t_end" could not be isolated (an unresolvable design makes RSS(t) constant, so the end-point rule fires first);
+  (3) step 7 states g on the whole real line, but every region had g > 0; (4) the step 7 reference rejects a hole
+  whose [1, R] is unresolvable, a condition no longer stated; (5) problem_description_main did not say which
+  parameters carry standard errors. Cause: texts not updated after the regions were rebuilt and the error rules
+  trimmed. Change: (1) figures restated; the budget re-measured on every current call (above); (2) the clause
+  dropped from the step 6 prompt, header and scaffold, the step 6 case 6 input (unchanged) relabelled as the
+  end-point rule; (3) general case 1 adds a call with negated shape values on the same data: g -> -g, every other
+  output unchanged (twice the single-output tolerances); (4) step 7 domain (prompt, header, problem_io, scaffold,
+  contract): the used readings of a hole lie at distinct depths, so the raise is an out-of-domain guard; (5)
+  "standard errors of the regression parameters". The re-measured budget shows that a P error irregular in t at the
+  full step 5 accuracy exceeds the step 6 g and t_end limits in cases 1, 2 and 5; reported for decision, prompts and
+  tolerances unchanged. Regression: general case 1 passes with the reference, solution.py and the second solution;
+  on the relabelled input the reference raises the end-point error (the second solution its resolvability guard).
+  Rerun: crown_check in all modes (one thread, -j 4): ALL OK, FORMAT OK; every mutant still fails.

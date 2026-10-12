@@ -79,52 +79,53 @@ metadata:
     Targets of steps 1-5 come from closed forms (straight and constant-build holes, a constant-azimuth segment with
     inclination linear in MD, hand-computed layer sums, R = z/k1 and S = z^2/(2 k1) at shallow depths under a deep
     stack, erfc forms with math.erfc down to centimetre depths, the Carslaw-Jaeger image series for a layer over a
-    half-space), from independent computations in the tests (adaptive quadrature of the arc tangent and of 1/k and
-    z/k, numpy.linalg.lstsq) and from mpmath values stored inline for three multilayer columns (90-digit transfer-
-    matrix transforms with mpmath's Talbot inversion; the 50-layer column at 270 to 390 digits with Talbot and
-    Gaver-Stehfest inversion). Steps 6 and 7 build every borehole forward (64-point Gauss-Legendre TVD, exact layer
-    sums) and take P and dP/dt_end from an oracle shared with neither solution, the branch-cut (real-axis) form of
-    the Laplace inversion of the layered column with real transfer matrices, which reproduces the stored 90-digit
-    values to 9e-16 K and erfc to 7e-16 (a uniform column uses math.erfc). Step 6 data are the model at the
-    generating T0, q0, g, t_end plus a seeded residual orthogonal to the Jacobian [1, R, P, g dP/dt_end], so these
-    values are the exact least-squares solution with RSS_min = |r|^2; the Wald errors follow from the oracle
-    Jacobian, the F quantile from the Student t density, and the interval ends are the oracle profile's nearest
-    crossings. Step 7 data are built in whitened space, u_h = L(phi_h) r_h = b_h + c_h, with b_h orthogonal to the
-    whitened oracle Jacobian and turned on its sphere until the phi_h score vanishes and c_h closing the shared
-    scores, so that every score of the exact log-likelihood vanishes at the generating values (central differences:
-    below 6e-9 standard deviations); dense scans of the oracle profile (600 logarithmic times over the bounds of
-    every region and 101 near t_end, a grid over g and every phi, then a Newton polish) find no value above l_max
-    (largest excess 5.5e-12). The standard errors come from the expected information of the whitened oracle
-    Jacobians, l_max from the generating residuals, the chi-square quantile from math.erf; the interval ends are
-    checked on the oracle profile (maximum over g on a 4001-point grid between the holes' own optima refined by
-    bounded Brent, over the phi_h by Nelder-Mead from the nearest solved t): a threshold crossing lies within a
-    relative 5e-4 of each returned end and the profile stays above the threshold at 5 interior points on each side.
-    The cases cover several regimes and log qualities, short glaciations with a second profile maximum, uniform
-    columns with the collar reading at z_min = 0, end-point maxima with near-boundary valid controls, uncontained
-    intervals, a log listed as two runs, the smallest valid hole with the shortest history (m = 2), innovation
-    standard deviations at both ends of the stated domain (1 and 30 mK), a strongly correlated log (phi = 0.9), a
-    region whose statistic falls below the quantile again outside the interval (step 7 and whole task) and, in the
-    whole-task cases, offset, hole-order and reading-order invariances. The second solution uses different methods
-    throughout (circular-arc TVD, ramp sums and integration by parts for R and S, Duhamel quadrature, QR least
-    squares, one global linear system per node with the Weideman-Trefethen contour, Levenberg-Marquardt for step 6,
-    the innovations decomposition with Fisher scoring for step 7), copies no test oracle and passes every case. The
-    tolerances of steps 6 and 7 come from error budgets: with P in error by 1e-8 K per K (smooth, irregular, or
-    aligned with the residual sign), the TVD by 1e-6 m and R, S by a relative 1e-9, the reference stays within a
-    third of every step 6 limit (half at rms_residual = 1e-4 K) and within 0.61 of every step 7 limit on the test
-    regions (0.72 of the log-likelihood limit for the aligned pattern on the precise region, 0.77 on regions rebuilt
-    at the ends of the domain); errors smooth in depth stay below 0.023 of every limit, while the aligned pattern is
-    adversarial and was measured on these regions only. Along the amplitude-timing ridge of the short-glaciation
-    regions the g limit binds before the t_end limit (effective t_end accuracy about 1e-3), so the limits are
-    justified by the combined budget. With exact inputs the reference reaches at most 3.2e-3 of a step 6 limit and
-    0.014 of a step 7 limit, the second solution 3.2e-4 and 0.006. Named mutants (linear TVD between stations;
-    arithmetic-mean conductivity; years not converted; heat-production sign; erfc with the mean diffusivity and
-    Gaver-Stehfest in double precision; for step 6 the half-space perturbation and a local search
-    without scan; for step 7 independent errors and the conditional likelihood; whole-task
-    MD as depth and independent errors) each fail at least one case of their target tests. Every case was run alone
-    in a fresh process with tools/crown_check.py for the references, solution.py, the second solution, the mutants,
-    the all-None and all-zero controls (no case passes) and every reference output scaled by 1 +- 1e-12 (all cases
-    pass).
-
+    half-space), from independent computations in the tests (adaptive quadrature of the arc tangent and of 1/k and z/k,
+    numpy.linalg.lstsq) and from mpmath values stored inline for three multilayer columns (90-digit transfer-matrix
+    transforms with mpmath's Talbot inversion; the 50-layer column at 270 to 390 digits with Talbot and Gaver-Stehfest
+    inversion). Steps 6 and 7 build every borehole forward (64-point Gauss-Legendre TVD, exact layer sums) and take P
+    and dP/dt_end from an oracle shared with neither solution, the branch-cut (real-axis) form of the Laplace inversion
+    of the layered column with real transfer matrices, which reproduces the stored 90-digit values to 9e-16 K and erfc
+    to 7e-16 (a uniform column uses math.erfc). Step 6 data are the model at the generating T0, q0, g, t_end plus a
+    seeded residual orthogonal to the Jacobian [1, R, P, g dP/dt_end], so these values are the exact least-squares
+    solution with RSS_min = |r|^2; the Wald errors follow from the oracle Jacobian, the F quantile from the Student t
+    density, and the interval ends are the oracle profile's nearest crossings. Step 7 data are built in whitened space,
+    u_h = L(phi_h) r_h = b_h + c_h, with b_h orthogonal to the whitened oracle Jacobian and turned on its sphere until
+    the phi_h score vanishes and c_h closing the shared scores, so that every score of the exact log-likelihood vanishes
+    at the generating values (central differences: below 6e-9 standard deviations); dense scans of the oracle profile
+    find no value above l_max beyond 7.5e-12: 600 logarithmic times over the bounds and 101 near t_end, a grid over g
+    and every phi, then a Newton polish, for the regions kept from their construction, and 241 to 341 times (logarithmic
+    plus 41 within 2 % of t_end) for the regions rebuilt at the domain ends (step 7 cases 0, 4 and 6); the step 6
+    profiles were scanned at 6000 times per case. The standard errors come from the expected information of the whitened
+    oracle Jacobians, l_max from the generating residuals, the chi-square quantile from math.erf; the interval ends are
+    checked on the oracle profile (maximum over g on a 4001-point grid between the holes' own optima refined by bounded
+    Brent, over the phi_h by Nelder-Mead from the nearest solved t): a threshold crossing lies within a relative 5e-4 of
+    each returned end and the profile stays above the threshold at 5 interior points on each side. The cases cover
+    several regimes and log qualities, short glaciations with a second profile maximum, uniform columns with the collar
+    reading at z_min = 0, end-point maxima with near-boundary valid controls, uncontained intervals, a log listed as two
+    runs, the smallest valid hole with the shortest history (m = 2), innovation standard deviations at both ends of the
+    stated domain (1 and 30 mK), a strongly correlated log (phi = 0.9), a region whose statistic falls below the
+    quantile again outside the interval (step 7 and whole task) and, in the whole-task cases, offset, hole-order and
+    reading-order invariances and the sign of g under negated shape values. The second solution uses different methods
+    throughout (circular-arc TVD, ramp sums and integration by parts for R and S, Duhamel quadrature, QR least squares,
+    one global linear system per node with the Weideman-Trefethen contour, Levenberg-Marquardt for step 6, the
+    innovations decomposition with Fisher scoring for step 7), copies no test oracle and passes every case. The
+    tolerances of steps 6 and 7 come from error budgets, re-measured on every current step 6, step 7 and whole-task
+    call: with P in error by 1e-8 K per K, or the TVD by 1e-6 m with R, S by a relative 1e-9, the reference stays within
+    0.11 of every step 6 limit and 0.046 of every step 7 or whole-task limit for P errors smooth in depth and time and
+    for the geometric errors; P errors aligned with the residual sign reach 0.93 of the step 6 rms_residual limit at
+    rms_residual = 1e-4 K (0.32 for every other step 6 output) and 0.72 of the step 7 log-likelihood limit on the
+    precise region (0.30 for every other step 7 or whole-task output); P errors irregular in depth and time reach 0.62
+    of a step 7 limit (phi, case 4; 0.18 elsewhere) but 2.6, 1.8 and 1.3 of the step 6 g limit in cases 1, 2 and 5 (at
+    most 0.52 in the other step 6 cases), because an error irregular in t perturbs RSS(t) itself. Along the
+    amplitude-timing ridge of the short-glaciation regions the g limit binds before the t_end limit (effective t_end
+    accuracy about 1e-3). With exact inputs the reference reaches at most 1.7e-3 of a step 6 limit and 0.019 of a step 7
+    or whole-task limit (interval ends included), the second solution, which uses its own steps 1-5, 9e-4 and 0.009.
+    Named mutants (linear TVD between stations; arithmetic-mean conductivity; years not converted; heat-production sign;
+    erfc with the mean diffusivity and Gaver-Stehfest in double precision; for step 6 the half-space perturbation and a
+    local search without scan; for step 7 independent errors and the conditional likelihood; whole-task MD as depth and
+    independent errors) each fail at least one case of their target tests. Every case was run alone in a fresh process
+    with tools/crown_check.py for the references, solution.py, the second solution, the mutants, the all-None and
+    all-zero controls (no case passes) and every reference output scaled by 1 +- 1e-12 (all cases pass).
 required_dependencies: |-
   import numpy as np
   import math
@@ -137,8 +138,8 @@ problem_description_main: |-
   uniform radiogenic heat production and volumetric heat capacity, and the shape of the last-glacial
   ground-surface temperature history common to the region, estimate the time t_end at which the last glaciation
   ended and the glacial amplitude g, together with the steady-state surface heat flow q0, the reference surface
-  temperature T0 and the noise parameters of every log, with standard errors and a likelihood-ratio 95 % interval
-  for t_end.
+  temperature T0 and the noise parameters of every log, with the standard errors of the regression parameters (g,
+  t_end and every T0 and q0; none for the noise parameters) and a likelihood-ratio 95 % interval for t_end.
 
   Conventions used throughout. Depth z is true vertical depth (TVD, m, positive down) below the collar. The
   borehole path between survey stations is the minimum-curvature arc (constant-rate rotation of the unit
@@ -162,8 +163,8 @@ problem_description_main: |-
   nonlinear least squares, with Wald standard errors and the profile-likelihood interval of t_end. Step 7
   (regional_deglaciation_inversion) is the top-level function of the task: it combines several holes that share g
   and t_end but differ in geotherm, column and log quality, by maximum likelihood with serially correlated
-  (first-order autoregressive) noise of unknown parameters in every hole, and reports the standard errors from the
-  expected Fisher information and the likelihood-ratio interval of t_end.
+  (first-order autoregressive) noise of unknown parameters in every hole, and reports the standard errors of the
+  regression parameters from the expected Fisher information and the likelihood-ratio interval of t_end.
 problem_io: |-
   def regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape, t_end_bounds):
       """Regional maximum-likelihood estimate of the glacial amplitude g and the end of the glaciation t_end
@@ -211,7 +212,8 @@ problem_io: |-
       (standard errors), "phi" (maximum-likelihood phi_h), "innovation_sd"
       (maximum-likelihood s_h, K) as Python floats and "n_used" (int, readings
       used in the hole).
-      Domain: at least 8 used readings per hole; maximum-likelihood s_h from
+      Domain: at least 8 used readings per hole, at distinct depths (distinct
+      MDs, inclinations below 90 degrees); maximum-likelihood s_h from
       1e-3 K to 0.03 K and phi_h from -0.3 to 0.9, and q0_h > 0, in every hole.
       Accuracy: g and t_end within a relative 2e-3 (g != 0 in a returned
       result); every q0 within a relative 5e-4; every T0 within 2e-3 K; the
@@ -653,10 +655,9 @@ sub_steps:
       crossings); the four standard errors within a relative 5e-3; t_end_low and t_end_high within a relative 5e-4;
       rms_residual within a relative 1e-3; n_used exact. These limits include the errors propagated from the stated
       accuracies of steps 1, 2 and 5.
-      Errors: ValueError if fewer than 5 readings have TVD >= z_min; if T0, q0 and g are not separately resolvable
-      at t_end (criterion of step 4); if hist_dT_shape[0] == hist_dT_shape[1] (t_end then has no effect); if the
-      minimum of RSS(t) over [t_lo, t_hi] is attained at t_lo or t_hi; or if a nearest threshold crossing does not
-      exist inside [t_lo, t_hi].
+      Errors: ValueError if fewer than 5 readings have TVD >= z_min; if hist_dT_shape[0] == hist_dT_shape[1] (t_end
+      then has no effect); if the minimum of RSS(t) over [t_lo, t_hi] is attained at t_lo or t_hi; or if a nearest
+      threshold crossing does not exist inside [t_lo, t_hi].
       Earlier functions you may use: true_vertical_depth (step 1), layer_integrals (step 2), fit_heat_flow (step 4)
       and layered_paleoclimate_perturbation (step 5).
     function_header: |-
@@ -714,8 +715,7 @@ sub_steps:
 
           Raises
           ------
-          ValueError for fewer than 5 readings with TVD >= z_min, T0, q0 and g
-          not separately resolvable at t_end (criterion of step 4),
+          ValueError for fewer than 5 readings with TVD >= z_min,
           hist_dT_shape[0] == hist_dT_shape[1], a minimum of RSS(t) over
           [t_lo, t_hi] attained at t_lo or t_hi, or a nearest threshold crossing
           that does not exist inside [t_lo, t_hi].
@@ -786,7 +786,8 @@ sub_steps:
       estimates are the maximizers at that t_end, and l_max = l_p(t_end).
       The likelihood is unbounded when a hole can be fitted exactly; to keep it bounded with a margin and to leave
       readings for the two noise parameters, every hole must keep at least 8 used readings. The domain is that of noisy
-      logs: maximum-likelihood s_h from 1e-3 K to 0.03 K and phi_h from -0.3 to 0.9, and q0_h > 0, in every hole.
+      logs: maximum-likelihood s_h from 1e-3 K to 0.03 K and phi_h from -0.3 to 0.9, and q0_h > 0, in every hole, and
+      the used readings of a hole lie at distinct depths (as distinct MDs and inclinations below 90 degrees imply).
       Standard errors: the square roots of the diagonal of the inverse of the expected (Fisher) information matrix of the
       regression parameters (T0_h and q0_h of every hole, g and t_end, with t_end in years), evaluated at the
       maximum-likelihood estimates with the noise parameters phi_h and s_h held at their maximum-likelihood values;
@@ -858,7 +859,8 @@ sub_steps:
           (standard errors), "phi" (maximum-likelihood phi_h), "innovation_sd"
           (maximum-likelihood s_h, K) as Python floats and "n_used" (int, readings
           used in the hole).
-          Domain: at least 8 used readings per hole; maximum-likelihood s_h from
+          Domain: at least 8 used readings per hole, at distinct depths (distinct
+          MDs, inclinations below 90 degrees); maximum-likelihood s_h from
           1e-3 K to 0.03 K and phi_h from -0.3 to 0.9, and q0_h > 0, in every hole.
           Accuracy: g and t_end within a relative 2e-3 (g != 0 in a returned
           result); every q0 within a relative 5e-4; every T0 within 2e-3 K; the
@@ -894,7 +896,7 @@ sub_steps:
       quantity: "Regional exact maximum-likelihood estimate of the glacial amplitude g and of the end of the last glaciation t_end shared by several boreholes whose log noise is a stationary AR(1) sequence with its own lag-one correlation and innovation standard deviation in every hole, with every hole's T0, q0, phi and s, standard errors from the expected Fisher information, the 95 % likelihood-ratio interval of t_end and the maximized log-likelihood."
       assumptions: "Every hole as in step 6 (minimum-curvature trajectory, horizontal layers logged in MD, one-dimensional conduction with uniform heat production, the layered-column perturbation of step 5 with the hole's own rho_c, inclusive z_min cut on TVD); amplitude and history (shape, known interval ends, unknown t_end) shared by all holes; in every hole the used readings ordered by increasing MD (distinct within a hole) carry a stationary Gaussian AR(1) error sequence in the reading index with unknown lag-one correlation phi_h and innovation standard deviation s_h, the holes independent; exact likelihood (first reading of every hole included) maximized with g unrestricted and t_end the global maximizer of the profile log-likelihood on [t_lo, t_hi]; standard errors from the inverse expected Fisher information of the regression parameters at the estimates with phi_h and s_h at their estimates; interval ends where 2 (l_max - l_p) equals the chi-square(1) 0.95 quantile, l_p re-maximized over all other parameters including the noise parameters, nearest crossings; the stated accuracy includes the propagated accuracies of steps 1, 2 and 5."
       result_kind: approximate
-      valid_input_ranges: "At least 2 holes, each valid for step 6 with at least 8 readings with TVD >= z_min (fewer raise ValueError), log_md in any order with distinct values within a hole; history and bounds as in step 6 (s_0 != s_1); noisy logs with maximum-likelihood s_h from 1e-3 K to 0.03 K, phi_h from -0.3 to 0.9 and q0_h > 0 in every hole; an end-point maximum or an interval not contained in the bounds raises ValueError."
+      valid_input_ranges: "At least 2 holes, each valid for step 6 with at least 8 readings with TVD >= z_min (fewer raise ValueError), log_md in any order with distinct values within a hole, so that the used readings of a hole lie at distinct depths (inclinations below 90 degrees); history and bounds as in step 6 (s_0 != s_1); noisy logs with maximum-likelihood s_h from 1e-3 K to 0.03 K, phi_h from -0.3 to 0.9 and q0_h > 0 in every hole; an end-point maximum or an interval not contained in the bounds raises ValueError."
       units: "g in K; t_end, its standard error and interval in years; T0 in deg C; q0 in W m^-2; standard errors in the units of their parameters; phi dimensionless; innovation_sd in K; log_likelihood dimensionless (natural logarithm of the joint density of the temperatures in deg C); n_used dimensionless."
       output_shape: "dict with seven Python floats (g, t_end, sigma_g, sigma_t_end, t_end_low, t_end_high, log_likelihood) and 'holes', a list in the input order of dicts with six Python floats (T0, q0, sigma_T0, sigma_q0, phi, innovation_sd) and the int n_used."
       step_dependencies: [1, 2, 5]

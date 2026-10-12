@@ -49,7 +49,8 @@ def _crown_case():
     def _t_check_entries(P, N, s, u, v, rows, dps=50):
         # every listed row against the extended-precision binomial law; relative 1e-10 for entries
         # >= 1e-250, absolute 1e-250 below
-        assert isinstance(P, np.ndarray) and P.shape == (N + 1, N + 1), getattr(P, "shape", None)
+        assert isinstance(P, np.ndarray) and P.shape == (N + 1, N + 1) and np.issubdtype(P.dtype, np.floating), \
+            (getattr(P, "shape", None), getattr(P, "dtype", None))
         with _t_mp.workdps(dps):
             s_, u_, v_ = _t_mp.mpf(s), _t_mp.mpf(u), _t_mp.mpf(v)
             for i in rows:

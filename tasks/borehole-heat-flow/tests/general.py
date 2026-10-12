@@ -247,7 +247,8 @@ _crown_case()
 
 # --- test case 1 ---
 # two holes: exact solution; a 0.75 K offset of one log moves only its T0; reversing the holes permutes the per-hole
-# results; a permuted log changes nothing (computed outputs compared with twice the single-output accuracy).
+# results; a permuted log changes nothing; negated shape values (same data) give -g and leave every other output
+# unchanged (g < 0 is in the domain). Computed outputs compared with twice the single-output accuracy.
 def _crown_case():
   import math
   import numpy as np
@@ -493,10 +494,12 @@ def _crown_case():
   r2 = regional_deglaciation_inversion(holes2, T_K, SHAPE, B)
   r3 = regional_deglaciation_inversion(list(reversed(reg.holes)), T_K, SHAPE, B)
   r4 = regional_deglaciation_inversion(holes4, T_K, SHAPE, B)
-  for rr, order, shift in ((r2, (0, 1), (0.0, 0.75)), (r3, (1, 0), (0.0, 0.0)), (r4, (0, 1), (0.0, 0.0))):
+  r5 = regional_deglaciation_inversion(reg.holes, T_K, [-v for v in SHAPE], B)
+  for rr, order, shift, sg in ((r2, (0, 1), (0.0, 0.75), 1.0), (r3, (1, 0), (0.0, 0.0), 1.0), (r4, (0, 1), (0.0, 0.0), 1.0),
+      (r5, (0, 1), (0.0, 0.0), -1.0)):
     for key, tol in (("g", 4e-3), ("t_end", 4e-3), ("sigma_g", 2e-2), ("sigma_t_end", 2e-2), ("t_end_low", 1e-3),
         ("t_end_high", 1e-3)):
-      assert abs(float(rr[key]) / float(r[key]) - 1.0) < tol, (key, rr[key], r[key])
+      assert abs((sg if key == "g" else 1.0) * float(rr[key]) / float(r[key]) - 1.0) < tol, (key, rr[key], r[key])
     assert abs(float(rr["log_likelihood"]) - float(r["log_likelihood"])) < 0.2
     for i, j in enumerate(order):
       a, b = rr["holes"][i], r["holes"][j]

@@ -617,36 +617,86 @@ problem.yaml):
   sites: type/shape/exception checks, a stated raise at half weight, against computed-value checks); no relative
   requirement on an exactly zero output; every stated output shape and inclusive endpoint exercised with values.
   No platform report on this task yet; the rules were applied proactively.
-- Cause (audit of version 14): (1) the tests contained no non-finite literal and the visible text no finiteness
-  promise; the references, the second solution and the mutants contained an internal np.isfinite check with the
-  message "must be finite" ahead of the range checks. (2) Validation sites were heavy in the raise lists (7 to 10
-  entries per step, several testing the same rule) and in repeated type/shape/len checks (steps 2, 3, 5, 6, 7 repeated
-  the contract check in value asserts). Emulated count (asserts made only of type/shape/len/dtype checks 1, mixed
-  shape-and-value asserts 0.5 validation + 1 computed, each raise entry 0.5), validation / computed, before -> after:
-  step 1 4.5/13 -> 4/14, step 2 5.5/12 -> 3/14, step 3 6.5/14 -> 4/15, step 4 4.5/10 -> 4/12, step 5 7.5/12 -> 3.5/14,
-  step 6 6/14 -> 3.5/15, step 7 7/20 -> 5/23, general 0/28 unchanged. (3) No relative requirement applies to an exact
-  zero: entries of P, pi and the quasi-stationary distribution below 1e-250 have the absolute rule, the exact zeros
-  of the mode on absorbing states have the 1e-250 rule, the transient entries of the mode are nonzero (strict sign
-  alternation of the last eigenvector of a totally positive block), and p_fix, p_loss, the times, the gap, the rate
-  and lambda_min are positive in the domain. (4) Every endpoint was already exercised with values; the
-  (N + 1, N + 1) shape of step 1 was checked only at N >= 40.
+- Cause (audit of version 14, commit 9a6c5ee): (1) Non-finite inputs and promises: every raise list contained a
+  non-finite input (float("nan") in steps 1, 3, 4, 6 and 7, float("inf") in steps 2, 5 and 7), and 15 lines of
+  problem.yaml (problem_description_main, the step prompts and the function_header docstrings, with their copies in the
+  scaffolds, solution.py, solution/step_1..7.py, second_solution.py and the mutants) promised a ValueError when "s, u or
+  v is not finite"; the references, the second solution and the mutants carried an explicit np.isfinite check with
+  the message "must be finite" ahead of the range checks. (2) Validation weight: the raise lists had 8, 9, 9, 8, 8, 8
+  and 18 entries (steps 1 to 7), several testing the same rule; asserts made only of type/shape/len/dtype checks were
+  2 of 13, 2 of 9, 3 of 14, 4 of 9, 3 of 8, 8 of 20 and 10 of 27 asserts (the contract check repeated in several
+  cases); the steps had 5, 4, 5, 5, 5, 5 and 6 cases. (3) No relative requirement applies to an exact zero: entries of
+  P, pi and the quasi-stationary distribution below 1e-250 have the absolute rule, the exact zeros of the mode on
+  absorbing states have the 1e-250 rule, the transient entries of the mode are nonzero (strict sign alternation of the
+  last eigenvector of a totally positive block), and p_fix, p_loss, the times, the gap, the rate and lambda_min are
+  positive in the domain. (4) Every endpoint was already exercised with values; the (N + 1, N + 1) shape of step 1 was
+  checked only at N >= 40.
 - Change:
-  - Code: the redundant np.isfinite checks are removed from solution.py, solution/step_1..7.py, second_solution.py and
-    every mutant (step 2: `np.isfinite(s) and` dropped from the range test). A NaN fails every range comparison and
-    +-inf lies outside every range, so non-finite s, u, v still raise ValueError (checked once on nine calls of
-    solution.py and second_solution.py, outside the tests). No copy of the code or text mentions finiteness.
-  - Raise lists: each stated rule once, just outside the domain. Removed entries: step 1 N = 0 and N = 2.5 (now
-    N = 10.0, an integer-valued float), s = 0.6 -> -0.51, u = -1e-3 -> -1e-6, v = 0.2 -> 0.11 (7 -> 6 entries);
-    step 2 N = 401 and i0 = 0, s = 0.7 -> 0.51 (7 -> 5); step 3 N = 401, v = 1e-13, u = 0.2 -> v = 0.11, s = -0.6 -> -0.51
-    (8 -> 6); step 4 N = 0, N = 500 -> 401, s = 0.6 -> 0.51 (7 -> 6); step 5 N = 0 and v = 0, v = 0.15 -> 0.11 (8 -> 6);
-    step 6 N = 0 and v = 0.2, s = 0.6 -> 0.51 (7 -> 5); step 7 N = 0, u = -1e-12 and (400, -0.5, 0.1, 1e-200), with
-    v = 1e-200 kept at N = 10 for the stated rule 0 < v < 1e-12, s = 0.6 -> 0.51 (10 -> 8).
-  - One contract check per step: step 1 case 2 (shape, now also at N = 1 with v = 0: a (2, 2) matrix with an exact
-    zero), step 2 case 1, step 3 case 0 (float numpy array of shape (2,) at N = 1; the shape asserts of cases 2 and 5
-    removed, entries read by position), step 4 case 0, step 5 case 0 (len checks of cases 1, 2, 5, 7, 8, 9 removed,
-    entries read by index), step 6 case 0 (shape (1,) at N = 1; the shape parts of cases 2, 3, 5 removed), step 7 case 0
-    (the type assert of case 1 removed). Value asserts read entries by index, so a wrong shape still fails them.
-  - New computed-value cases with independent targets:
+  - Text: the "is not finite or" clauses are removed from the 15 lines of problem.yaml and from every copy of the
+    docstrings; the stated errors are now the integer rules and the ranges only.
+  - Code: the np.isfinite checks are removed from solution.py, solution/step_1..7.py, second_solution.py and every
+    mutant (step 2: `np.isfinite(s) and` dropped from the range test). A NaN fails every range comparison and +-inf
+    lies outside every range, so non-finite s, u, v still raise ValueError (checked once on nine calls of solution.py
+    and second_solution.py, outside the tests). No copy of the code or text mentions finiteness.
+  - Raise lists (no non-finite input left; each stated rule once, just outside the domain), version 14 -> 15:
+    step 1, 8 -> 6 entries: N = 0 and s = nan removed, N = 2.5 -> 10.0 (an integer-valued float), s = 0.6 -> -0.51,
+    u = -1e-3 -> -1e-6, v = 0.2 -> 0.11; step 2, 9 -> 5: N = 401, i0 = 2.0, i0 = 0 and s = inf removed,
+    s = 0.7 -> 0.51; step 3, 9 -> 6: N = 401, v = 1e-13, u = 0.2 and u = nan removed, v = 0.11 added,
+    s = -0.6 -> -0.51; step 4, 8 -> 6: N = 0 and s = nan removed, N = 500 -> 401, s = 0.6 -> 0.51; step 5, 8 -> 6:
+    N = 0 and u = inf removed, v = 0 -> u = 0, v = 0.15 -> 0.11; step 6, 8 -> 5: N = 0, v = 0.2 and s = nan removed,
+    s = 0.6 -> 0.51; step 7, 18 -> 8: N = 0, s = -0.6, u = -1e-12, v = -1e-12, u = 0.2, s = nan, u = inf,
+    v = 5e-13, (400, -0.5, 0.1, 1e-200) and (3, 0.2, 9.9e-13, 0) removed, (10, 0.1, 0, 1e-300) -> (10, 0.1, 0.01,
+    1e-200) for the stated rule 0 < v < 1e-12, s = 0.6 -> 0.51 (N = 401, N = 5.0, N = True, v = 0.11, u = 1e-13 and
+    N = 1 without mutation kept).
+  - One contract check per step (asserts made only of type/shape/len/dtype checks: 2, 2, 3, 4, 3, 8, 10 -> 1 each):
+    step 1 case 2 (type, shape and float dtype, now also at N = 1 with v = 0: a (2, 2) matrix with an exact zero; the
+    shape check of case 3 removed), step 2 case 1 (that of case 2 removed), step 3 case 0 (float numpy array; the shape
+    asserts of cases 2 and 3 removed, entries read by position), step 4 case 0 (those of cases 1, 2, 3 removed), step 5
+    case 0 (those of cases 1 and 2 removed), step 6 case 0 (type and shape in one assert; cases 1, 2, 3 no longer
+    repeat them), step 7 case 0 (cases 1 to 4 no longer repeat them). Value asserts read entries by index, so a wrong
+    shape still fails them.
+  - New computed-value cases with independent targets (case counts 5, 4, 5, 5, 5, 5, 6 -> 8, 8, 8, 11, 12, 7, 8):
+    - step 1 case 5: every entry of small matrices in exact rational arithmetic (Python fractions from the exact binary
+      values of the inputs), mutation in both directions, one way only (exact zeros) and a rate at its floor 1e-12;
+      relative 1e-10, exact zeros within 1e-250.
+    - step 1 case 6: allele relabeling, P(s, u, v)[i, j] = P(s', v, u)[N - i, N - j] with s' = -s / (1 + s), at
+      N = 400 with u = 1e-12 (rows near i = N, where 1 - p_mut is of order u, against the relabeled rows near i = 0);
+      two computed outputs, 2.1e-10 relative or 2e-250 absolute.
+    - step 2 case 4: N = 2 with selection in closed form, p_fix = (1 + s)**2 / (1 + (1 + s)**2) and
+      t_fix = t_loss = (2 + s)**2 / (1 + (1 + s)**2).
+    - step 2 case 5: p_fix, p_loss and the conditional times of small N for every i0, from the absorbing-chain systems
+      solved exactly with Python fractions.
+    - step 2 case 6: first-step identities on the outputs for every i0 (h harmonic with its boundary values, and
+      g = h t with g(i) = h(i) + sum_j P[i, j] g(j)), all terms nonnegative, down to p_fix of about 4e-90.
+    - step 3 case 5: the stationary distribution of small N in exact rational arithmetic, a mutation rate at its
+      floor 1e-12 included.
+    - step 3 case 6: stationarity of the output entry by entry, (pi P)_j = pi_j, on every entry of at least 1e-235 at
+      N = 400, s = -0.5, u = v = 1e-12 (entries spanning more than 200 decades).
+    - step 4 case 5: the gap of small populations with selection as the smallest root of the characteristic
+      polynomial of I - P (principal-minor sums in exact rational arithmetic, roots in mpmath at 80 digits), gaps of
+      order 1e-12 included.
+    - step 4 case 6: origin-fixation limit, gap = N v pi_A + N u pi_a with rare mutation in both directions
+      (corrections below 1e-9 relative), pi_A and pi_a from the mutation-free absorbing chain.
+    - step 4 case 7: one rare and one frequent mutation rate, and moderate rates, by inverse iteration on
+      I - P + 1 pi^T in extended precision.
+    - step 4 case 8: N = 400, s = 0.5, u = 1e-12, v = 3e-12 (gap about 7e-10) by the same inverse iteration with one
+      plain LU factorization in mpmath at 400 digits.
+    - step 4 case 9: neutral drift with rare mutation, gap = u + v exactly (2e-12 to 2e-11).
+    - step 5 case 5: the hitting times of small N in exact rational arithmetic, with u = v = 2**-30 (t_up about 1e9).
+    - step 5 case 6: the commute-time identity t_up + t_down = 1 / (pi_0 e) with frequent mutation.
+    - step 5 case 7: neutral drift with rare and frequent mutation, and A deleterious with v at its floor, against
+      plain LU of the hitting-time systems in extended precision.
+    - step 5 case 8: N = 400 with rare mutation and strong selection (t_up about 4.4e248) by Gaussian elimination in
+      mpmath at 400 digits.
+    - step 5 case 9: first-passage times from the fundamental matrix Z = (I - P + 1 pi^T)^-1 of the ergodic chain,
+      (Z[b, b] - Z[a, b]) / pi_b, in mpmath at 80 digits (t_up about 9e15 included).
+    - step 5 case 10: the commute-time identity with rare mutation and strong selection (times about 1e16 and 8e19
+      against about 1e11).
+    - step 6 case 5: N = 2 in closed form (the 2 x 2 restricted matrix, Perron root and left eigenvector in mpmath at
+      50 digits, v down to 1e-12).
+    - step 7 case 6: selection without mutation (both end states absorbing, N = 2 included), a rate at its floor
+      1e-12 with the other 0, and frequent mutation in both directions, against the matrix in extended precision;
+      exact zeros of the mode on absorbing states within 1e-250.
     - step 1 case 7: the binomial ratio identity P[i, j + 1] (j + 1) q_i = P[i, j] (N - j) p_i, with p_i and q_i formed
       from the model without subtraction, on every pair of neighbouring entries whose exact value exceeds 1e-238
       (log-gamma estimate) in every row of N = 400 at three corners of (s, u, v) (about 1.4e5 pairs each), plus

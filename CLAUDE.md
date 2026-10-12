@@ -116,3 +116,7 @@ starting points, use judgement and flag what does not fit. Update prompt, refere
   https://www.linkedin.com/in/ayoub-bousfiha-674a75219, conflicts_of_interest None (author's file, 2026-10-12);
   research_advisor and referred_by optional and left out.
 - layered-surface-wave and basin-backstripping: not in the repo (zips never received).
+- Content-check sweep 2 (2026-10-12): all 9 tasks without non-finite literals or finiteness promises, per-step
+  validation trimmed, computed cases added; independent verifiers PASS. Zips sent: electron, prism, activation
+  (zips3); josephson, sto3g, stoner, ising (zips4). Upload advice given: stoner, WF, activation only after their
+  in-flight rollouts return; josephson, ising, sto3g only if sent back; borehole once ready (last version, Physics).

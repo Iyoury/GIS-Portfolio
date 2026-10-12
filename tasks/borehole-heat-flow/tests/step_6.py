@@ -909,7 +909,8 @@ _crown_case()
 # --- test case 6 ---
 # five used readings (n_used - 4 = 1, F(1, 1) = 161.4) at the domain floor rms_residual = 1e-4 K, with the shortest
 # history (m = 2: glaciation, then post-glacial), is the smallest valid inversion; the stated error rules raise
-# ValueError (four used readings, all readings at one depth, s_0 == s_1). Targets: exact construction as in case 0.
+# ValueError (four used readings; s_0 == s_1; the end-point rule: all readings at one depth make RSS(t) constant, whose
+# minimum is attained at t_lo). Targets: exact construction as in case 0.
 def _crown_case():
   import math
   import numpy as np
@@ -1054,12 +1055,12 @@ def _crown_case():
     d = [a.copy() if isinstance(a, np.ndarray) else a for a in h.args] + [B, 200.0]
     if name == "four_readings":
       d[ix["z_min"]] = 400.0
-    elif name == "one_depth":
+    elif name == "constant_profile_end_point":
       d[ix["log_md"]] = np.full(7, 760.0)
     else:
       d[ix["hist_dT_shape"]] = np.array([-1.0, -1.0])
     return d
-  for name in ["four_readings", "one_depth", "equal_first_shapes"]:
+  for name in ["four_readings", "constant_profile_end_point", "equal_first_shapes"]:
     try:
       deglaciation_heat_flow_inversion(*bad(name))
     except ValueError:

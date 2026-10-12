@@ -54,7 +54,8 @@ def regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape, t_end_bo
     (standard errors), "phi" (maximum-likelihood phi_h), "innovation_sd"
     (maximum-likelihood s_h, K) as Python floats and "n_used" (int, readings
     used in the hole).
-    Domain: at least 8 used readings per hole; maximum-likelihood s_h from
+    Domain: at least 8 used readings per hole, at distinct depths (distinct
+    MDs, inclinations below 90 degrees); maximum-likelihood s_h from
     1e-3 K to 0.03 K and phi_h from -0.3 to 0.9, and q0_h > 0, in every hole.
     Accuracy: g and t_end within a relative 2e-3 (g != 0 in a returned
     result); every q0 within a relative 5e-4; every T0 within 2e-3 K; the
