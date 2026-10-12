@@ -112,3 +112,18 @@ Ce que les sondes locales ont appris :
   l'instrument mesure, pas l'approximation d'interprétation.
 - Les instances sont sélectionnées pour que les données décident (déplacement ou échange d'un
   dyke à ≥ 4σ) ; c'est dit dans le README et dans les limites.
+
+## Leçon du cas flux de chaleur (`borehole-heat-flow`)
+
+Sujet choisi sur la règle « chaîne de réduction sans retour » tirée des neuf tâches passées :
+cinq corrections standard (Horner avec le registre de forage, anisotropie et pendage, zone
+d'écoulement, paléoclimat, production de chaleur), portes calibrées, indépendante à 0,12 mW/m² de
+la référence. La sonde Opus locale (effort par défaut) a tout appliqué en 10 commandes. La règle
+était incomplète : une correction **annoncée dans les données** (log lithologique, débitmètre,
+histoire de surface fournie) est une étape de lecture pour un agent fort, même sans résidu à
+minimiser. Ce que les tâches passées avaient en plus, ce sont des **artefacts d'instrument
+silencieux**, nombreux, à découvrir par le contrôle qualité des enregistrements bruts (bouteille
+de zéro vide, saut d'horloge, MNT biaisé, sauts de gravimètre, retours nuageux). Règle complétée :
+le bon sujet est le dépouillement d'enregistrements **bruts** d'instruments, avec une dizaine de
+défauts réalistes non étiquetés, chacun décalant le résultat hors porte, et des métadonnées qui
+permettent de les trouver (journal de bord, certificats, dates) sans les nommer.
