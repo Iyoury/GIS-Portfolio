@@ -81,6 +81,14 @@ starting points, use judgement and flag what does not fit. Update prompt, refere
 - A failed content check returns the task as "Needs revision" (a send-back): on a task's LAST allowed version
   that closes it, so emulate the content check (all categories, per-step counts) before uploading a last version.
 - Warning "tasks/_id_mapping.json is absent; falling back to delivered ids" is harmless (the version still maps).
+- Pipeline after the content check (seen 2026-10-12): an exploit probe (an agent told to pass the tests without
+  solving; any credit -> judge) then a blocking difficulty probe: a quick model solves the task end to end twice;
+  2/2 = "too easy", sent back before any rollout ("Difficulty misses in a row: 1 of 3"; the miss that reaches the
+  limit closes the task). Each report has a collapsed "Why each step gave way" feedback: ask the author to paste it.
+  activation v14 and electron v3 failed it (2/2) after passing the content check.
+- AfterQuery warning (2026-10-12): too many submissions fail validation and review; each run is costly. Upload only
+  versions that are complete, content-check clean (emulated) and hard enough (blind quick-solver probe:
+  tools/visible_spec.py + a fast model writing cand.py from the visible text only + tools/grade_candidate.py).
 
 ## Validation before every zip
 
@@ -116,6 +124,9 @@ starting points, use judgement and flag what does not fit. Update prompt, refere
   https://www.linkedin.com/in/ayoub-bousfiha-674a75219, conflicts_of_interest None (author's file, 2026-10-12);
   research_advisor and referred_by optional and left out.
 - layered-surface-wave and basin-backstripping: not in the repo (zips never received).
+- 2026-10-12 later: activation v14 and electron v3 "too easy" by the difficulty probe (2/2, miss 1 of 3); prism v3
+  content check failed (4 untested step 4 error rules). Redesign/fix workflows run with blind quick-solver probes;
+  design briefs in the scratchpad probe/<task>/DESIGN.md.
 - Content-check sweep 2 (2026-10-12): all 9 tasks without non-finite literals or finiteness promises, per-step
   validation trimmed, computed cases added; independent verifiers PASS. Zips sent: electron, prism, activation
   (zips3); josephson, sto3g, stoner, ising, wright-fisher and borehole v10 final (zips4; borehole crown_check ALL OK,
