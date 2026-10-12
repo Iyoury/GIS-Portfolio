@@ -78,6 +78,8 @@ starting points, use judgement and flag what does not fit. Update prompt, refere
   them, even when the prompt says "raise ValueError if not finite"; drop such tests AND the prompt clauses.
   "Science outweighs validation" counts assertion sites per step (stated raises at half weight): computed values
   must clearly dominate; add computed cases with independent targets rather than more validation.
+- A failed content check returns the task as "Needs revision" (a send-back): on a task's LAST allowed version
+  that closes it, so emulate the content check (all categories, per-step counts) before uploading a last version.
 - Warning "tasks/_id_mapping.json is absent; falling back to delivered ids" is harmless (the version still maps).
 
 ## Validation before every zip
