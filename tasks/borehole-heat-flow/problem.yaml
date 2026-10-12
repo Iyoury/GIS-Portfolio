@@ -739,19 +739,17 @@ sub_steps:
       hist_t_years[-1] the ground was in steady state. The end of the glaciation t_end (years before present) is
       unknown. With the layer tops converted to TVD by true_vertical_depth (step 1), the present-day perturbation of
       the unit-amplitude history is P(z; t_end) = layered_paleoclimate_perturbation(z, layer tops in TVD, layer_k,
-      rho_c, [t_end, hist_t_years[0], ..., hist_t_years[m-2]], hist_dT_shape) (step 5); dP/dt_end is its derivative
-      with respect to t_end in years.
+      rho_c, [t_end, hist_t_years[0], ..., hist_t_years[m-2]], hist_dT_shape) (step 5).
       Model: a reading is used if its TVD (step 1) is >= z_min (the cut is applied to vertical depth, not to MD, and a
       reading exactly at z_min is used); n_used is the number of used readings. A used reading at TVD z obeys
       T = T0 + q0 R(z) - A S(z) + g P(z; t_end) + noise, with R and S from layer_integrals (step 2) on the layer tops
       in TVD. The unknowns are T0 (deg C), q0 (W m^-2), g (K) and t_end (years).
-      Estimate: (T0, q0, g, t_end) minimize the residual sum of squares over the used readings. At a fixed t the model
-      is linear, and the profile RSS(t) is the residual sum of squares of the ordinary least-squares fit of T0, q0 and
-      g at that t (the fit of fit_heat_flow, step 4). t_end is the global minimizer of RSS(t) over the closed interval
-      [t_lo, t_hi]; T0, q0 and g are the least-squares values at t_end, and RSS_min = RSS(t_end).
+      Estimate: (T0, q0, g, t_end) minimize the residual sum of squares over the used readings. The profile RSS(t) is
+      the smallest residual sum of squares over T0, q0 and g with t_end fixed at t. t_end is the global minimizer of
+      RSS(t) over the closed interval [t_lo, t_hi]; T0, q0 and g are the least-squares values at t_end, and RSS_min = RSS(t_end).
       Uncertainties: the standard errors of T0, q0, g and t_end are the linearized (Wald) ones, the square roots of
       the diagonal of s^2 (J^T J)^-1 with s^2 = RSS_min / (n_used - 4), where J is the n_used x 4 Jacobian of the
-      model with respect to (T0, q0, g, t_end) at the estimate, with the columns 1, R, P(z; t_end) and g dP/dt_end.
+      model with respect to (T0, q0, g, t_end) at the estimate (t_end in years).
       The profile-likelihood 95 % interval [t_end_low, t_end_high] of t_end uses the threshold
       RSS_min (1 + F / (n_used - 4)), where F is the 0.95 quantile of the Fisher distribution with 1 and n_used - 4
       degrees of freedom (scipy.stats.f.ppf(0.95, 1, n_used - 4)); t_end_low and t_end_high are the points where
@@ -818,8 +816,8 @@ sub_steps:
           -------
           dict: "T0" (deg C), "q0" (W m^-2), "amplitude" (g, K), "t_end" (years),
           "sigma_T0", "sigma_q0", "sigma_amplitude", "sigma_t_end" (Wald standard
-          errors: s^2 (J^T J)^-1, s^2 = RSS_min / (n_used - 4), J with columns 1,
-          R, P, g dP/dt_end at the estimate, t_end in years), "t_end_low",
+          errors: s^2 (J^T J)^-1, s^2 = RSS_min / (n_used - 4), J the Jacobian of
+          the model in (T0, q0, g, t_end) at the estimate, t_end in years), "t_end_low",
           "t_end_high" (years: crossings of RSS(t) with RSS_min (1 + F /
           (n_used - 4)), F = scipy.stats.f.ppf(0.95, 1, n_used - 4), nearest to
           t_end below and above it), "rms_residual" (K, sqrt(RSS_min / n_used)) as

@@ -47,8 +47,8 @@ def deglaciation_heat_flow_inversion(survey_md, survey_inc, survey_azi, log_md, 
     -------
     dict: "T0" (deg C), "q0" (W m^-2), "amplitude" (g, K), "t_end" (years),
     "sigma_T0", "sigma_q0", "sigma_amplitude", "sigma_t_end" (Wald standard
-    errors: s^2 (J^T J)^-1, s^2 = RSS_min / (n_used - 4), J with columns 1,
-    R, P, g dP/dt_end at the estimate, t_end in years), "t_end_low",
+    errors: s^2 (J^T J)^-1, s^2 = RSS_min / (n_used - 4), J the Jacobian of
+    the model in (T0, q0, g, t_end) at the estimate, t_end in years), "t_end_low",
     "t_end_high" (years: crossings of RSS(t) with RSS_min (1 + F /
     (n_used - 4)), F = scipy.stats.f.ppf(0.95, 1, n_used - 4), nearest to
     t_end below and above it), "rms_residual" (K, sqrt(RSS_min / n_used)) as

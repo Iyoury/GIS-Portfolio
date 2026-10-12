@@ -1915,3 +1915,15 @@ items 12 and 13 (independent errors, six readings, noise_sd, the round-2 cases a
        whole-task cases (error / stated limit, worst output): reference 0.0143 (g, case 2); second solution 0.0019
        (phi, case 1). Scratch scripts are kept outside the upload: design4.py, fullscan4.py and budget4.py, plus the
        round-3 verifier's verify_region.py, phi_modes.py and se_elasticity.py run on the new case.
+
+### Version 10, item 16 (recipe trims in the step 6 prompt, 2026-10-12)
+- Finding: the platform's new too-easy feedback labels prompts that supply the central formula ("Key formula
+  given") or the algorithm ("Prompt reads as a recipe"). The step 6 prompt listed the Jacobian columns
+  (1, R, P, g dP/dt_end) and said that "at a fixed t the model is linear" (pointing at variable projection).
+- Cause: over-specification inherited from round 1; neither statement is a convention needed for uniqueness.
+- Change: the prompt and the docstring copies (problem.yaml function_header, steps/step_6.py) now define the
+  standard errors through "the Jacobian of the model with respect to (T0, q0, g, t_end) at the estimate (t_end in
+  years)" and the profile RSS(t) as "the smallest residual sum of squares over T0, q0 and g with t_end fixed at t";
+  the sentence defining dP/dt_end was removed. The quantities graded are unchanged (same definitions, unique).
+- Regression: no code or test changed; crown_check format rerun (OK). The mutant jacobian_without_amplitude
+  (a Jacobian column without the factor g) remains a plausible derivation error and still fails its cases.
