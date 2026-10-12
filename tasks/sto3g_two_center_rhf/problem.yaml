@@ -54,10 +54,15 @@ metadata:
   verification_explanation: >-
     Every test computes its own target without calling the reference, and every step test calls only
     the function of its own step (general case 0 also checks the variational link E <= fci_energy of
-    step 4 with slack 2e-9): F_n from the regularized incomplete gamma function in 40-digit mpmath, and
+    step 4 with slack 2e-9): F_n from the regularized incomplete gamma function in 40-digit mpmath (also
+    from the defining integral by mpmath quadrature, the Taylor series and the large-t closed form), and
     the integrals of steps 2-4 by real-space shell-theorem radial Gauss-Legendre quadrature, with RHF
     from an angle scan that refines every local minimum and full CI as a generalized eigenproblem in the
-    non-orthogonal singlet product basis. For step 5 the tests rebuild the full-CI curve from their own re-implementation of the
+    non-orthogonal singlet product basis. Steps 2-5 also check closed-form special cases and exact
+    relations: one-centre integrals, the separated-atom limit at R = 100 bohr (integrals, full-CI and RHF
+    energies), the scaling of the integrals when every length is divided by a factor, the mirror
+    symmetry of the two atoms and the dependence of the levels on the masses only through the reduced
+    mass. For step 5 the tests rebuild the full-CI curve from their own re-implementation of the
     closed-form s-Gaussian integrals (vectorized over R) with that generalized-eigenproblem CI, take the
     limit from adaptive-quadrature one-centre integrals and solve the radial equation by second-order
     finite differences on three grids with two Richardson extrapolations (the near-threshold case is also

@@ -170,4 +170,5 @@ short-glaciation regions (d ln g/d ln t_end about 2.05) the g limit binds first.
   computed 2.5/23, 1.5/24, 1.5/15, 5/20, 2/12, 4.5/12, 3.5/17. Regression: every changed case run with the
   reference, solution.py and the second solution (worst error/limit 0.018, second solution 0.009); oracle scans of
   the changed regions (step 6 case 6: 6000 times; step 7 cases 0, 4, 6: 241-341 times) find the extremum at t_end
-  (largest excess 7.5e-12) and one interval. Rerun: see the end of this item.
+  (largest excess 7.5e-12) and one interval. Rerun: crown_check in all modes on the final files (one thread,
+  -j 4): ALL OK, FORMAT OK; every mutant still fails (step 4 sign mutant now also case 4); raw folder below 600 KiB.

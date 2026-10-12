@@ -67,7 +67,10 @@ metadata:
     Every test case computes its own target without calling the reference: steps 1 and 2 use a
     20000-point grid search for the extrema of e on the circle refined by bisection, with h_sw from a
     golden-section search along the equilibrium curve (no astroid formula), plus the closed-form barriers
-    at psi = 0 and pi/2; steps 3 and 4 use the closed erfc / erf forms at psi = 0 and pi/2 and, at other
+    at psi = 0 and pi/2, the exact parametric form h(theta) = -sin(2 theta) / (2 sin(theta - psi)) of the
+    equilibrium curve (step 1) and, at psi = pi/4, where e' = 0 is a quadratic in sin(theta - pi/4), the
+    closed-form branch and barriers (steps 1 and 2) with the escape integral, median and mean built on them by
+    adaptive quadrature (steps 3 and 4); steps 3 and 4 use the closed erfc / erf forms at psi = 0 and pi/2 and, at other
     angles, an adaptive quadrature or one ODE run on the grid barriers and a Newton step that must not
     move the returned median (step 4 case 5, three particles at angles above pi/4 whose switching field has
     two windows, holds the rate at its value 1e-7 below h_sw over the last 1e-7, where the grid no longer
