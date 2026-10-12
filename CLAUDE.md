@@ -91,6 +91,9 @@ starting points, use judgement and flag what does not fit. Update prompt, refere
   information, likelihood-ratio interval). Blind solvers 7/7 passed (proxy optimistic, see above).
 - wright_fisher_relaxation v11 and activation_chains v12: queued for rollouts on the platform when last seen.
 - stoner_wohlfarth_ensemble v12 (eased: budgets, step-6 hints, tolerance 1e-5): awaiting rollouts when last seen.
-- All tasks: authoring-guide conformance passes 1-2 (2026-10-10/11); relevant_experience is a TODO placeholder
-  the author must fill; affiliation "Independent Researcher" pending confirmation.
+- All tasks: authoring-guide conformance passes 1-2 (2026-10-10/11). Author metadata filled 2026-10-12 with the
+  author's own text (tools/set_author_meta.py): affiliation "Independent Researcher"; relevant_experience = B.Sc.
+  Georesources and Environment (FST Fes, 2016), graduate certificate in geomatics (Universite Laval), GIS analyst
+  at Morocco's Ministry of Energy and Mines (2016-2018), independent geospatial consultancy (Craton Geodonnees,
+  Quebec, Abitibi drilling databases). Reuse it for new tasks.
 - layered-surface-wave and basin-backstripping: not in the repo (zips never received).

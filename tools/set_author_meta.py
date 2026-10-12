@@ -26,10 +26,12 @@ def main():
         p = f.rstrip("/") + "/problem.yaml"
         t = open(p).read()
         if exp is not None:
-            t, n = re.subn(r"^relevant_experience:.*$", "relevant_experience: " + json.dumps(exp), t, flags=re.M)
+            line = "relevant_experience: " + json.dumps(exp, ensure_ascii=False)
+            t, n = re.subn(r"^relevant_experience:.*$", lambda m: line, t, flags=re.M)
             assert n == 1, (p, n)
         if aff is not None:
-            t, n = re.subn(r"^affiliation:.*$", "affiliation: " + json.dumps(aff), t, flags=re.M)
+            aline = "affiliation: " + json.dumps(aff, ensure_ascii=False)
+            t, n = re.subn(r"^affiliation:.*$", lambda m: aline, t, flags=re.M)
             assert n == 1, (p, n)
         open(p, "w").write(t)
         print("updated", p)
