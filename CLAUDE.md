@@ -118,5 +118,6 @@ starting points, use judgement and flag what does not fit. Update prompt, refere
 - layered-surface-wave and basin-backstripping: not in the repo (zips never received).
 - Content-check sweep 2 (2026-10-12): all 9 tasks without non-finite literals or finiteness promises, per-step
   validation trimmed, computed cases added; independent verifiers PASS. Zips sent: electron, prism, activation
-  (zips3); josephson, sto3g, stoner, ising (zips4). Upload advice given: stoner, WF, activation only after their
+  (zips3); josephson, sto3g, stoner, ising, wright-fisher and borehole v10 final (zips4; borehole crown_check ALL OK,
+  614371 bytes, step 6 propagation sentence limited to step 5 errors smooth in t_end). Upload advice given: stoner, WF, activation only after their
   in-flight rollouts return; josephson, ising, sto3g only if sent back; borehole once ready (last version, Physics).
