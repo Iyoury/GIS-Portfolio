@@ -127,3 +127,40 @@ de zéro vide, saut d'horloge, MNT biaisé, sauts de gravimètre, retours nuageu
 le bon sujet est le dépouillement d'enregistrements **bruts** d'instruments, avec une dizaine de
 défauts réalistes non étiquetés, chacun décalant le résultat hors porte, et des métadonnées qui
 permettent de les trouver (journal de bord, certificats, dates) sans les nommer.
+
+## Leçon de la similarité (`borehole-heat-flow`, rejeté avant la vérification)
+
+Le bundle a été rejeté par le contrôle de similarité (« trop proche d'une tâche existante ») avant
+toute épreuve. Un sujet de manuel (flux de chaleur en forage, Horner, Bullard) a toutes les chances
+d'avoir déjà été pris par un autre auteur. Règle : choisir un sujet **rare** dont la chaîne de
+réduction est longue par nature (un instrument, une campagne, un contractant), et le vérifier
+contre la liste de ses propres tâches avant de construire ; un concept de manuel, même bien fait,
+peut être perdu sur la similarité seule.
+
+## Leçon du cas spectrométrie gamma aéroportée (`airborne-radiometric-reduction`)
+
+Construit sur la règle complétée : la base de données brute d'un contractant (spectres de 1 s à
+256 canaux, canaux auxiliaires, pads, ligne test à cinq hauteurs dans les deux sens, vols haute
+altitude, passages sur l'eau), la chaîne IAEA standard, et cinq défauts silencieux que rien
+n'étiquette (retard de position, dérive de gain sur quatre lignes, décrochages et pics du
+radar-altimètre, bouffée de radon sous inversion, ligne avortée et revolée). Ce que la
+construction a appris :
+
+- Les **fenêtres doivent être définies en canaux** dans les métadonnées : entre « canaux
+  entiers » et « énergies exactes » l'écart sur un rapport de stripping atteint 0,07, plus que la
+  porte. Toute convention qui peut se lire de deux façons doit être fixée par les données.
+- La vérité d'une constante **mesurée sur le terrain** doit être sa valeur apparente (ce qu'un
+  calcul sans bruit donne avec la méthode du praticien), pas celle du modèle ponctuel : l'empreinte
+  au sol grandit avec la hauteur sur un sol hétérogène et décale les coefficients d'atténuation de
+  quelques pour cent. Sinon la référence échoue sur une porte que ses propres données ne permettent
+  pas d'atteindre.
+- Vérifier les **débordements de type** des données générées (spectres de pads en uint16 saturés
+  à 65 535 : rapports de stripping faussés de 0,02 avant correction).
+- Les portes par **moyennes ligne-unité** (≥ 40 enregistrements) laissent passer le bruit
+  statistique des enregistrements de 1 s et attrapent toute erreur systématique sur quelques
+  lignes ou un vol ; le bruit de la fenêtre U a imposé un détecteur de 33,6 L et un plancher de
+  0,6 ppm, à calibrer sur six graines avant de fixer quoi que ce soit.
+- Un estimateur indépendant qui compare l'aéroporté aux lectures au sol pour le retard est biaisé
+  par la géométrie des contacts (l'empreinte voit les unités voisines) ; seule la comparaison des
+  passages opposés annule cette géométrie. Une implémentation indépendante doit être différente
+  dans l'estimateur, pas dans le principe physique quand il n'y en a qu'un de juste.
