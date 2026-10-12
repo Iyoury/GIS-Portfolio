@@ -90,6 +90,35 @@ values (k, N_A).
 - **Two corner states of the complete equation of state** (version 3): (rho, T, Ye) = (2e13, 1e7, 0.5)
   and (2e-10, 1e11, 0.5); psi and c_V are the stored (rho_Ye, T) targets, P, u, s and the densities come
   from 40-digit mpmath quadrature at that psi (see Version 3).
+- **Sommerfeld expansion** (version 5) for strongly degenerate gases. With mu = psi theta (rest energy
+  included, units m_e c^2), int_1^inf H f deps = int_1^mu H deps + sum_k 2 (1 - 2^{1-2k}) zeta(2k)
+  theta^{2k} H^{(2k-1)}(mu), with H = eps p (n), p^3/3 (P/m_e c^2) and (eps - 1) eps p (u/m_e c^2). The
+  zero-temperature integrals are in closed form (p^3/3; [m (2m^2 - 5) p + 3 ln(m + p)]/24;
+  m (2m^2 - 1) p/8 - ln(m + p)/8 - p^3/3), the derivatives of H by mpmath.diffs, terms to k = 8, 60 digits.
+  s = (dP/dT) at constant mu; psi from n = rho_Ye N_A; c_V = (k/(pi^2 lambda^3)) (u_theta - u_mu n_theta /
+  n_mu). Neglected: positrons and the lower end of the integral, both below e^{-190} at the states used,
+  and the terms beyond k = 8 (k = 6 and k = 8 agree within 1e-22 for every new target). It reproduces
+  the stored 40-digit targets of the degenerate states: n_minus, P, u, s at (T, psi) = (1e7, 1.3e5),
+  (1e7, 2.8e4), (1e8, 600), (2e7, 1e6), (1e11, 1e6) and (1e11, 50) within 8e-25; psi and c_V at
+  (rho_Ye, T) = (1e13, 1e7), (1e11, 1e7), (1e9, 1e8) within 2e-19, and (1e5, 1e7), (4e5, 1.2e7) (E_F
+  about 60 and 120 k T) within 4e-16.
+- **Bessel-function series of the Fermi-Dirac integrals** (version 5), exact for psi < 1/theta:
+  1/(e^x + 1) = sum_j (-1)^{j+1} e^{-jx}, ln(1 + e^{-x}) = sum_j (-1)^{j+1} e^{-jx}/j (x > 0), with
+  int p^2 e^{-a eps} dp = K2(a)/a, int p^2 eps e^{-a eps} dp = K1(a)/a + 3 K2(a)/a^2 and
+  int p^2 eps^2 e^{-a eps} dp = K0(a)/a + 5 K1(a)/a^2 + 12 K2(a)/a^3 (a = j/theta). P from the grand
+  potential, s from the Euler relation in 50-digit arithmetic, psi by a root search on the series and c_V =
+  u_T - u_psi n_T/n_psi from the term-by-term derivatives (d/dtheta of a moment = a/theta times the next
+  moment), terms until below 1e-45. It reproduces the stored 40-digit targets at (T, psi) =
+  (3e9, 1.37e-16), (5e9, 0.0213) and (1e10, 2.29e-8) within 3e-25, and those at (1e8, 20) within 2e-25
+  except n_plus = 1.8e-7 cm^-3, which differs by 3.3e-15 (it was taken in version 1 from the
+  Maxwell-Juettner formula, which the series confirms to 1e-35 when evaluated with the decimal constants;
+  the difference is far inside the 1e-10 tolerance).
+- **Classical gas with thermal pairs** (version 5), in the tests: when both species are Maxwell-Juettner,
+  psi = asinh(rho_Ye N_A / 2B) with B = theta K2(1/theta)/(pi^2 lambda^3), n_-+ = B e^{+-psi}, P = (n_- + n_+)
+  kT, u = m_e c^2 [(n_- + n_+) E/N - n_net], s = k [(n_- + n_+)(E/(N theta) + 1) - psi n_net] and
+  c_V = (2k/(pi^2 lambda^3 theta^2)) [F cosh psi - (E^2/N) tanh psi sinh psi] (N, E, F the three moments
+  above at a = 1/theta). Used where the electron occupation exponent exceeds 27; the closed forms then agree
+  with the exact Bessel series within 3.3e-13.
 - **General case 1** (version 4) has no stored target. At (rho, T, Ye) = (1e6, 3e9, 0.5) it checks
   identities of the returned equation of state (charge neutrality, the Euler relation, c_V = du/dT =
   T ds/dT at constant rho Ye), each within its first-order error budget (see Version 4).
@@ -548,3 +577,80 @@ cause, the change, the regression test and what was rerun.
   - Repeat runs: solution.py and second_solution.py were each run three times in clean processes (once
     with one BLAS/OpenMP thread) on 62 calls covering all five functions and every test state; the
     outputs were bitwise identical. The methods use no random numbers.
+
+## Version 5 (grading_fix: platform content check, edge-case inputs and science vs validation)
+
+No reference algorithm, input domain, tolerance or existing stored target was changed. Each item gives
+the finding, its cause, the change, the regression test and what was rerun.
+
+- 1. Non-finite inputs in the tests (platform content check of v2, blocking, steps 1-5).
+  - Finding: "This step's tests pass inputs at representation limits: a non-finite value float("nan") /
+    float("inf"). Each should be an input the science meets and the prompt states how to handle." The
+    prompts did state "raise ValueError if T or psi is not finite"; the check still reported it.
+  - Cause: the validation cases of steps 1-5 passed NaN and infinity to the evaluated functions. No
+    equation-of-state calculation meets a non-finite density or temperature, so the platform does not
+    accept them as scientific edge cases even when the prompt states the behaviour.
+  - Change: removed every non-finite input (step 1: (nan, 1), (1e9, inf); step 2: (nan, 1), (1e9, nan);
+    step 3: (nan, 1e9), (1, inf); step 4: (nan, 1e9), (1, nan); step 5: (nan, 1e9, 0.5), (1e6, inf, 0.5),
+    (1e6, 1e9, nan)) and the "not finite" clauses from every agent-visible text and copy: problem_io, the
+    five step prompts and function headers in problem.yaml, steps/*.py, solution/*.py, solution.py and
+    the mutant docstrings. The solutions still reject non-finite input internally; no text promises it. The
+    contracts never mentioned it. Redundant range entries were trimmed (step 1: psi = -1 next to psi = 0;
+    step 5: T = 5e6 K, already covered by steps 1-4, and the non-finite entries). Remaining raise entries:
+    4, 4, 4, 4 and 5 for steps 1-5, all range or Ye conditions stated in the prompts.
+  - Regression test: grep of the task folder finds no float("nan"), float("inf"), np.nan, np.inf,
+    math.nan or math.inf in tests/ and no "not finite" in any visible text.
+- 2. Science outweighs validation (platform content check of v2, blocking, step 4).
+  - Finding: "This step's tests check validation, exception, type or shape behaviour 3 times (6 expecting a
+    raise, 6 of them stated in the prompt and counted at half weight) and computed values 1 times."
+  - Cause: step 4 had one computed-value case (twelve states in one loop) and one validation case. Steps 2,
+    3 and 5 had the same pattern (one or two computed cases, each with a single assertion over many states,
+    plus separate type/shape assertions), so their counts were close too.
+  - Change (counts are assertion sites; a raise entry stated in the prompt counts one half):
+    - Step 4 (computed 1 / validation 3 before; 7 / 2 after): new case 0, classical gas without pairs at
+      (rho_Ye, T) = (1e-10, 1e7), (1e-10, 1e8), (1e-8, 1.2e8): c_V = n k d/dtheta [K1(1/theta)/K2(1/theta)
+      + 3 theta] in closed form, evaluated in the test; new case 1, classical gas with thermal pairs at
+      T = 1.4e8 K, rho_Ye = 1e-10 and 1e-9 (pair creation raises c_V by 1.5e-5 and 1.5e-7), closed form
+      evaluated in the test; new case 2, Sommerfeld targets at (1e13, 1e9), (2e6, 1e7), (1e11, 5e7); new
+      case 3, Bessel-series targets at (1e-10, 1e9) and (1e4, 2e9) (Fermi-Dirac corrections 1.2e-3 and
+      1.6e-2 of c_V); the twelve 40-digit states split by regime into cases 4 (five degenerate gases), 5
+      (five pair plasmas) and 6 (two partly degenerate or classical gases). n_test_cases 2 -> 8.
+    - Step 3 (computed 2 / validation 3 before; 6 / 2 after): new case 1, Sommerfeld psi at the same three
+      degenerate states; new case 2, Bessel-series psi at the same two pair plasmas; the twelve 40-digit
+      states split into cases 3 (degenerate), 4 (pair plasmas) and 5 (partly degenerate or classical).
+      n_test_cases 3 -> 7.
+    - Step 2 (computed 2 / validation 5 before, of which 2 type/shape assertions; 18 / 8 after, of which 6
+      type/shape assertions in the six computed cases): P, u and s are now asserted separately; new case 1,
+      Sommerfeld P, u, s at (T, psi) = (3e7, 2e4), (1e9, 300), (5e9, 200); new case 2, Bessel-series P, u, s
+      at (1e9, 1) and (2e9, 0.3) (Fermi-Dirac corrections 6e-4 to 1.1e-2); the twelve 40-digit states split
+      into cases 3 (degenerate), 4 (pair plasmas) and 5 (classical and partly degenerate). n_test_cases
+      3 -> 7.
+    - Step 5 (computed 5 / validation 10.5 before, of which 6 type/shape assertions; 10 / 3.5 after): the
+      Python-float check is folded into each value assertion and the exact key set is checked once (case
+      0); the four 40-digit states split into cases 0 and 1; new case 2, the complete equation of state of
+      a classical gas with thermal pairs in closed form, evaluated in the test, at (rho, T, Ye) =
+      (2e-10, 1.4e8, 0.5) and (1e-8, 1.2e8, 1); new case 3, Sommerfeld targets for all seven quantities
+      at (2e13, 1e9, 0.5) and (4e6, 1e7, 0.5). n_test_cases 4 -> 7.
+    - Step 1 (computed 14 / validation 6.5 before; 14 / 5 after) and the general tests (two computed cases,
+      no validation) needed no new case.
+  - Target provenance: the new targets come from the Sommerfeld expansion, the Bessel series and the
+    classical closed forms described under Targets; none uses the reference or the second solution. The
+    reference agrees with them to 1.6e-14 (Sommerfeld and Bessel targets) and 3.3e-13 (classical closed
+    forms, which omit Fermi corrections up to 3.2e-13); the second solution to 9.3e-15 and 3.3e-13. The
+    generator scripts (mpmath) were kept outside the task folder.
+  - Regression test: each new case rejects at least one shipped mutant or control: entropy_from_euler fails
+    step 2 cases 1 and 3; positrons_ignored fails step 3 cases 2, 4 and 5; positron_fluctuations_ignored
+    fails step 4 cases 1, 3, 5 and 6; schur_complement fails step 4 case 4; cv_at_fixed_psi fails step 5
+    cases 0-5; all-None and all-zero controls pass no case.
+- Rerun after these changes:
+  - tools/crown_check.py, all modes, every case alone in a fresh process, one BLAS/OpenMP thread, -j 2:
+    - FORMAT OK.
+    - REF: steps 1-5 pass 5/5, 7/7, 7/7, 8/8 and 7/7, general passes 2/2.
+    - SECOND: steps 1-5 and general all pass.
+    - Mutants: net_by_subtraction fails 3/5 (cases 1, 2, 4), entropy_from_euler 2/7 (cases 1, 3),
+      positrons_ignored 3/7 (cases 2, 4, 5), schur_complement 1/8 (case 4), positron_fluctuations_ignored
+      4/8 (cases 1, 3, 5, 6), cv_at_fixed_psi 6/7 (cases 0-5) and whole_task_classical_occupation 1/2
+      general (case 0).
+    - SHIFT +-1e-12: every step case and every general case pass.
+    - Controls: all-None and all-zero pass 0 cases of every step and of general.
+    - SUMMARY ALL OK.

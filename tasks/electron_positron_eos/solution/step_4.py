@@ -97,7 +97,7 @@ def specific_heat(rho_Ye, T):
         density including the rest energies; relative error below 1e-8.
 
     Raises:
-      ValueError if rho_Ye or T is not finite or is outside its range.
+      ValueError if rho_Ye or T is outside its range.
     '''
     psi = degeneracy_parameter(rho_Ye, T)
     T, psi, theta = _epeos_check_T_psi(T, psi)

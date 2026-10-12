@@ -16,6 +16,6 @@ def degeneracy_parameter(rho_Ye, T):
         relative error below 1e-10.
 
     Raises:
-      ValueError if rho_Ye or T is not finite or is outside its range.
+      ValueError if rho_Ye or T is outside its range.
     '''
     raise NotImplementedError

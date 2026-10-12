@@ -22,6 +22,6 @@ def fixation_statistics(N, s, i0):
 
     Raises:
       ValueError if N is not an integer in [2, 400], if i0 is not an integer in [1, N - 1], or if s
-      is not finite or is outside [-0.5, 0.5].
+      is outside [-0.5, 0.5].
     '''
     raise NotImplementedError

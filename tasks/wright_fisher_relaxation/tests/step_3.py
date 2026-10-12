@@ -119,8 +119,8 @@ def _crown_case():
         return abs(a - b) / abs(b)
 
     def _t_check(pi, target, tol=1e-8):
+        # values only (the array shape is checked in cases 0 and 2)
         pi = np.asarray(pi)
-        assert pi.shape == (len(target),), pi.shape
         for a, b in zip(pi, target):
             if b >= 1e-250:
                 assert _t_rel(a, b) < tol, (a, b)
@@ -152,20 +152,102 @@ def _crown_case():
 _crown_case()
 
 # --- test case 4 ---
-# N not an integer in [1, 400], or s, u, v not finite or out of range (u, v >= 1e-12)
+# N not an integer in [1, 400], or s, u, v out of range (u, v >= 1e-12; u = 0: the chain is not irreducible)
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
     for _t_bad in ((0, 0.1, 0.01, 0.01), (401, 0.1, 0.01, 0.01), (12.0, 0.1, 0.01, 0.01), (True, 0.1, 0.01, 0.01), (10, -0.6, 0.01, 0.01), (10, 0.1, 0.0, 0.01),
-                   (10, 0.1, 0.01, 1e-13), (10, 0.1, 0.2, 0.01), (10, 0.1, float("nan"), 0.01)):
+                   (10, 0.1, 0.01, 1e-13), (10, 0.1, 0.2, 0.01)):
         try:
             stationary_distribution(*_t_bad)
         except ValueError:
             pass
         else:
             raise AssertionError("stationary_distribution%r must raise ValueError" % (_t_bad,))
+
+
+_crown_case()
+
+# --- test case 5 ---
+# exact rational arithmetic: for small N the normalized system pi (I - P) = 0, sum(pi) = 1 is solved exactly
+# with Python fractions (the transition matrix from the exact binary values of the inputs), including a mutation
+# rate at its floor 1e-12
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+    from fractions import Fraction as _t_F
+    from math import comb as _t_comb
+
+    def _t_P_exact(N, s, u, v):
+        # transition matrix in exact rational arithmetic
+        s, u, v = _t_F(s), _t_F(u), _t_F(v)
+        rows = []
+        for i in range(N + 1):
+            ps = (1 + s) * i / (N + s * i)
+            pm = (1 - u) * ps + v * (1 - ps)
+            rows.append([_t_comb(N, j) * pm ** j * (1 - pm) ** (N - j) for j in range(N + 1)])
+        return rows
+
+    def _t_solve_exact(A, b):
+        # Gauss-Jordan elimination in exact rational arithmetic
+        n = len(A)
+        M = [list(A[r]) + [b[r]] for r in range(n)]
+        for c in range(n):
+            p = next(r for r in range(c, n) if M[r][c] != 0)
+            M[c], M[p] = M[p], M[c]
+            for r in range(n):
+                if r != c and M[r][c] != 0:
+                    f = M[r][c] / M[c][c]
+                    M[r] = [x - f * y for x, y in zip(M[r], M[c])]
+        return [M[r][n] / M[r][r] for r in range(n)]
+
+    for N, s, u, v in ((6, 0.25, 0.03125, 0.015625), (5, -0.5, 0.0625, 0.0009765625), (4, 0.3, 1e-12, 0.1)):
+        P = _t_P_exact(N, s, u, v)
+        n = N + 1
+        A = [[1] * n] + [[(1 if i == j else 0) - P[i][j] for i in range(n)] for j in range(1, n)]
+        target = np.array([float(x) for x in _t_solve_exact(A, [1] + [0] * N)])
+        got = np.asarray(stationary_distribution(N, s, u, v), dtype=float)
+        assert got.shape == target.shape and bool(np.all(np.abs(got - target) < 1e-8 * target)), (N, s, u, v, got, target)
+
+
+_crown_case()
+
+# --- test case 6 ---
+# stationarity of the output itself, entry by entry: (pi P)_j = pi_j. Every term of (pi P)_j is nonnegative, so
+# the identity holds to the relative accuracy of the entries even where pi_j is more than 200 decades below the
+# largest entry (N = 400, s = -0.5, u = v = 1e-12); checked on every entry of at least 1e-235 (an entry of the
+# output above 1e-235 has an exact value of at least about 1e-235, and the entries below 1e-250, each within
+# 1e-250, change (pi P)_j by at most 4.1e-248), with the matrix in double precision from logarithms (relative error
+# about 1e-13): one output against a sum of outputs, each within 1e-8, 2.1e-8; and sum(pi) = 1 to 1e-8
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+    from scipy.special import gammaln as _t_g
+
+    def _t_matrix(N, s, u, v):
+        # transition matrix in double precision from logarithms, complements formed directly
+        i = np.arange(N + 1.0)
+        den = N + s * i
+        ps, qs = (1 + s) * i / den, (N - i) / den
+        pm, qm = (1 - u) * ps + v * qs, u * ps + (1 - v) * qs
+        j = np.arange(N + 1.0)[None, :]
+        with np.errstate(divide="ignore", invalid="ignore"):
+            lp = np.where(j > 0, j * np.log(pm)[:, None], 0.0)
+            lq = np.where(j < N, (N - j) * np.log(qm)[:, None], 0.0)
+        return np.exp(_t_g(N + 1.0) - _t_g(j + 1.0) - _t_g(N - j + 1.0) + lp + lq)
+
+    for N, s, u, v in ((400, -0.5, 1e-12, 1e-12), (300, 0.3, 1e-3, 1e-10), (200, 0.0, 1e-12, 0.1)):
+        pi = np.asarray(stationary_distribution(N, s, u, v), dtype=float)
+        rhs = pi @ _t_matrix(N, s, u, v)
+        big = pi >= 1e-235
+        assert np.all(np.abs(pi[big] - rhs[big]) <= 2.1e-8 * pi[big]), (N, s, u, v, np.nonzero(big)[0].size)
+        assert abs(pi.sum() - 1.0) < 1e-8, (N, s, u, v, pi.sum())
 
 
 _crown_case()

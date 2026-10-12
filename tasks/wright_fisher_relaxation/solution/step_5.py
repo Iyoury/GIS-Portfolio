@@ -25,7 +25,7 @@ def substitution_times(N, s, u, v):
         inputs at N = 400).
 
     Raises:
-      ValueError if N is not an integer in [1, 400], or if s, u or v is not finite or is outside its
+      ValueError if N is not an integer in [1, 400], or if s, u or v is outside its
       range.
     '''
     if isinstance(N, (bool, np.bool_)) or not isinstance(N, (int, np.integer)):

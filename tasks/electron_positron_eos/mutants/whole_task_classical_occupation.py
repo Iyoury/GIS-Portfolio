@@ -114,7 +114,7 @@ def pair_densities(T, psi):
         otherwise within 1e-250 cm^-3.
 
     Raises:
-      ValueError if T or psi is not finite, if T is outside [1e7, 1e11] or psi is not in (0, 1e6].
+      ValueError if T is outside [1e7, 1e11] or psi is not in (0, 1e6].
     '''
     T, psi, theta = _epeos_check_T_psi(T, psi)
     E, w, xm = _epeos_nodes(theta, psi)
@@ -144,7 +144,7 @@ def pair_thermodynamics(T, psi):
         (erg K^-1 cm^-3). Each with a relative error below 1e-10.
 
     Raises:
-      ValueError if T or psi is not finite, if T is outside [1e7, 1e11] or psi is not in (0, 1e6].
+      ValueError if T is outside [1e7, 1e11] or psi is not in (0, 1e6].
     '''
     T, psi, theta = _epeos_check_T_psi(T, psi)
     E, w, xm = _epeos_nodes(theta, psi)
@@ -170,7 +170,7 @@ def degeneracy_parameter(rho_Ye, T):
         relative error below 1e-10.
 
     Raises:
-      ValueError if rho_Ye or T is not finite or is outside its range.
+      ValueError if rho_Ye or T is outside its range.
     '''
     rho_Ye, T = float(rho_Ye), float(T)
     if not (math.isfinite(rho_Ye) and math.isfinite(T)):
@@ -230,7 +230,7 @@ def specific_heat(rho_Ye, T):
         density including the rest energies; relative error below 1e-8.
 
     Raises:
-      ValueError if rho_Ye or T is not finite or is outside its range.
+      ValueError if rho_Ye or T is outside its range.
     '''
     psi = degeneracy_parameter(rho_Ye, T)
     T, psi, theta = _epeos_check_T_psi(T, psi)
@@ -277,8 +277,7 @@ def electron_positron_eos(rho, T, Ye):
         about 1e-13 relative.
 
     Raises:
-      ValueError if rho, T or Ye is not finite, if Ye is not in (0, 1], or if T or rho Ye is outside
-      its range.
+      ValueError if Ye is not in (0, 1], or if T or rho Ye is outside its range.
     '''
     rho, T, Ye = float(rho), float(T), float(Ye)
     if not (math.isfinite(rho) and math.isfinite(T) and math.isfinite(Ye)):

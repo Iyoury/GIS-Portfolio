@@ -23,7 +23,7 @@ def fastest_mode(N, s, u, v):
 
     Raises:
       ValueError if N is not an integer in [1, 400] (bool and float are not accepted), if s, u or v
-      is not finite or is outside its range (0 < u < 1e-12 and 0 < v < 1e-12 included), or if N = 1
+      is outside its range (0 < u < 1e-12 and 0 < v < 1e-12 included), or if N = 1
       and u = v = 0.
     '''
     if isinstance(N, (bool, np.bool_)) or not isinstance(N, (int, np.integer)):

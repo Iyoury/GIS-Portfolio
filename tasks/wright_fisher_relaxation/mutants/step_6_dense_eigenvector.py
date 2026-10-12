@@ -23,7 +23,7 @@ def quasi_stationary(N, s, v):
 
     Raises:
       ValueError if N is not an integer in [1, 400] (bool and float are not accepted), or if s or v is
-      not finite or is outside its range.
+      outside its range.
     '''
     if isinstance(N, (bool, np.bool_)) or not isinstance(N, (int, np.integer)):
         raise ValueError("N must be an integer")

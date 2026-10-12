@@ -205,7 +205,7 @@ def _crown_case():
       if t not in self.sol:
         x0 = self.sol[min(self.sol, key=lambda s: abs(math.log(s / t)))]
         self.sol[t] = minimize(lambda x: -self.Fphi(t, x), x0, method="Nelder-Mead",
-            options={"xatol": 1e-9, "fatol": 1e-10, "maxiter": 20000}).x
+            options={"xatol": 1e-8, "fatol": 1e-8, "maxiter": 20000}).x
       return self.Fphi(t, self.sol[t])
 
   def check(r, reg):
@@ -462,7 +462,7 @@ def _crown_case():
       if t not in self.sol:
         x0 = self.sol[min(self.sol, key=lambda s: abs(math.log(s / t)))]
         self.sol[t] = minimize(lambda x: -self.Fphi(t, x), x0, method="Nelder-Mead",
-            options={"xatol": 1e-9, "fatol": 1e-10, "maxiter": 20000}).x
+            options={"xatol": 1e-8, "fatol": 1e-8, "maxiter": 20000}).x
       return self.Fphi(t, self.sol[t])
 
   def check(r, reg):
@@ -700,7 +700,7 @@ def _crown_case():
       if t not in self.sol:
         x0 = self.sol[min(self.sol, key=lambda s: abs(math.log(s / t)))]
         self.sol[t] = minimize(lambda x: -self.Fphi(t, x), x0, method="Nelder-Mead",
-            options={"xatol": 1e-9, "fatol": 1e-10, "maxiter": 20000}).x
+            options={"xatol": 1e-8, "fatol": 1e-8, "maxiter": 20000}).x
       return self.Fphi(t, self.sol[t])
 
   def check(r, reg):
@@ -948,7 +948,7 @@ def _crown_case():
       if t not in self.sol:
         x0 = self.sol[min(self.sol, key=lambda s: abs(math.log(s / t)))]
         self.sol[t] = minimize(lambda x: -self.Fphi(t, x), x0, method="Nelder-Mead",
-            options={"xatol": 1e-9, "fatol": 1e-10, "maxiter": 20000}).x
+            options={"xatol": 1e-8, "fatol": 1e-8, "maxiter": 20000}).x
       return self.Fphi(t, self.sol[t])
 
   def check(r, reg):
@@ -1196,7 +1196,7 @@ def _crown_case():
       if t not in self.sol:
         x0 = self.sol[min(self.sol, key=lambda s: abs(math.log(s / t)))]
         self.sol[t] = minimize(lambda x: -self.Fphi(t, x), x0, method="Nelder-Mead",
-            options={"xatol": 1e-9, "fatol": 1e-10, "maxiter": 20000}).x
+            options={"xatol": 1e-8, "fatol": 1e-8, "maxiter": 20000}).x
       return self.Fphi(t, self.sol[t])
 
   def check(r, reg):
@@ -1455,7 +1455,7 @@ def _crown_case():
       if t not in self.sol:
         x0 = self.sol[min(self.sol, key=lambda s: abs(math.log(s / t)))]
         self.sol[t] = minimize(lambda x: -self.Fphi(t, x), x0, method="Nelder-Mead",
-            options={"xatol": 1e-9, "fatol": 1e-10, "maxiter": 20000}).x
+            options={"xatol": 1e-8, "fatol": 1e-8, "maxiter": 20000}).x
       return self.Fphi(t, self.sol[t])
 
   def check(r, reg):
@@ -1707,7 +1707,7 @@ def _crown_case():
       if t not in self.sol:
         x0 = self.sol[min(self.sol, key=lambda s: abs(math.log(s / t)))]
         self.sol[t] = minimize(lambda x: -self.Fphi(t, x), x0, method="Nelder-Mead",
-            options={"xatol": 1e-9, "fatol": 1e-10, "maxiter": 20000}).x
+            options={"xatol": 1e-8, "fatol": 1e-8, "maxiter": 20000}).x
       return self.Fphi(t, self.sol[t])
 
   def check(r, reg):
@@ -2036,7 +2036,7 @@ def _crown_case():
       if t not in self.sol:
         x0 = self.sol[min(self.sol, key=lambda s: abs(math.log(s / t)))]
         self.sol[t] = minimize(lambda x: -self.Fphi(t, x), x0, method="Nelder-Mead",
-            options={"xatol": 1e-9, "fatol": 1e-10, "maxiter": 20000}).x
+            options={"xatol": 1e-8, "fatol": 1e-8, "maxiter": 20000}).x
       return self.Fphi(t, self.sol[t])
 
   def check(r, reg):

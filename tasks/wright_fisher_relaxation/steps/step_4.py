@@ -19,7 +19,7 @@ def relaxation_rate(N, s, u, v):
            below 1e-8, however small the gap is.
 
     Raises:
-      ValueError if N is not an integer in [1, 400], or if s, u or v is not finite or is outside its
+      ValueError if N is not an integer in [1, 400], or if s, u or v is outside its
       range.
     '''
     raise NotImplementedError

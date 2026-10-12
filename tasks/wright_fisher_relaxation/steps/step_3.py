@@ -19,7 +19,7 @@ def stationary_distribution(N, s, u, v):
           entries within 1e-250 of the exact value.
 
     Raises:
-      ValueError if N is not an integer in [1, 400], or if s, u or v is not finite or is outside its
+      ValueError if N is not an integer in [1, 400], or if s, u or v is outside its
       range.
     '''
     raise NotImplementedError

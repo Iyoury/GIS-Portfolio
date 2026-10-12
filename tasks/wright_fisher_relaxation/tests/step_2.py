@@ -90,9 +90,8 @@ def _crown_case():
         return abs(a - b) / abs(b)
 
     def _t_check(out, target, tol=1e-8):
-        assert isinstance(out, tuple) and len(out) == 4 and all(isinstance(x, float) for x in out), out
-        for a, b in zip(out, target):
-            assert _t_rel(a, b) < tol, (out, target)
+        # values only (the return type is checked in case 1)
+        assert len(out) == 4 and all(_t_rel(a, b) < tol for a, b in zip(out, target)), (out, target)
 
     for N, s, s2 in ((400, 0.5, -1.0 / 3.0), (400, 0.25, -0.2), (250, -0.1, 1.0 / 9.0)):
         for i0 in (1, N // 3, N - 1):
@@ -117,19 +116,129 @@ def _crown_case():
 _crown_case()
 
 # --- test case 3 ---
-# N not an integer in [2, 400], i0 outside [1, N - 1], or s not finite or out of range
+# N not an integer in [2, 400], i0 not an integer in [1, N - 1] (i0 = 0 and i0 = N are absorbing), or s out of
+# range
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for _t_bad in ((1, 0.1, 1), (401, 0.1, 1), (10.0, 0.1, 1), (10, 0.1, True), (10, 0.1, 2.0), (10, 0.1, 0), (10, 0.1, 10), (10, 0.7, 3), (10, float("inf"), 3)):
+    for _t_bad in ((1, 0.1, 1), (401, 0.1, 1), (10.0, 0.1, 1), (10, 0.1, True), (10, 0.1, 0), (10, 0.1, 10), (10, 0.7, 3)):
         try:
             fixation_statistics(*_t_bad)
         except ValueError:
             pass
         else:
             raise AssertionError("fixation_statistics%r must raise ValueError" % (_t_bad,))
+
+
+_crown_case()
+
+# --- test case 4 ---
+# N = 2 with selection, closed form: from one copy the frequency after selection is p' = (1 + s) / (2 + s)
+# (q' = 1 / (2 + s)), so the next generation has 0, 1 or 2 copies with probabilities q'**2, 2 p' q', p'**2.
+# Hence p_fix = (1 + s)**2 / (1 + (1 + s)**2) and p_loss = 1 / (1 + (1 + s)**2), and the number of generations
+# spent in i = 1 is geometric whatever the outcome, t_fix = t_loss = 1 / (p'**2 + q'**2)
+# = (2 + s)**2 / (1 + (1 + s)**2)
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+    for _t_s in (-0.5, -0.25, 0.1, 0.5):
+        w = (1.0 + _t_s) ** 2
+        t = (2.0 + _t_s) ** 2 / (1.0 + w)
+        target = (w / (1.0 + w), 1.0 / (1.0 + w), t, t)
+        out = fixation_statistics(2, _t_s, 1)
+        assert len(out) == 4 and all(abs(a - b) < 1e-8 * b for a, b in zip(out, target)), (_t_s, out, target)
+
+
+_crown_case()
+
+# --- test case 5 ---
+# exact rational arithmetic: for small N the absorbing-chain systems (I - Q) h = r and (I - Q) g = h are solved
+# exactly with Python fractions (the transition matrix from the exact binary values of the inputs), giving
+# p_fix, p_loss and the conditional times g / h exactly, for every initial count i0 = 1, ..., N - 1
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+    from fractions import Fraction as _t_F
+    from math import comb as _t_comb
+
+    def _t_P_exact(N, s, u, v):
+        # transition matrix in exact rational arithmetic
+        s, u, v = _t_F(s), _t_F(u), _t_F(v)
+        rows = []
+        for i in range(N + 1):
+            ps = (1 + s) * i / (N + s * i)
+            pm = (1 - u) * ps + v * (1 - ps)
+            rows.append([_t_comb(N, j) * pm ** j * (1 - pm) ** (N - j) for j in range(N + 1)])
+        return rows
+
+    def _t_solve_exact(A, b):
+        # Gauss-Jordan elimination in exact rational arithmetic
+        n = len(A)
+        M = [list(A[r]) + [b[r]] for r in range(n)]
+        for c in range(n):
+            p = next(r for r in range(c, n) if M[r][c] != 0)
+            M[c], M[p] = M[p], M[c]
+            for r in range(n):
+                if r != c and M[r][c] != 0:
+                    f = M[r][c] / M[c][c]
+                    M[r] = [x - f * y for x, y in zip(M[r], M[c])]
+        return [M[r][n] / M[r][r] for r in range(n)]
+
+    for N, s in ((8, -0.5), (8, 0.375), (5, 0.3)):
+        P = _t_P_exact(N, s, 0, 0)
+        A = [[(1 if a == b else 0) - P[a][b] for b in range(1, N)] for a in range(1, N)]
+        hf = _t_solve_exact(A, [P[a][N] for a in range(1, N)])
+        hl = _t_solve_exact(A, [P[a][0] for a in range(1, N)])
+        gf, gl = _t_solve_exact(A, hf), _t_solve_exact(A, hl)
+        for i0 in range(1, N):
+            k = i0 - 1
+            target = [float(x) for x in (hf[k], hl[k], gf[k] / hf[k], gl[k] / hl[k])]
+            out = fixation_statistics(N, s, i0)
+            assert len(out) == 4 and all(abs(a - b) < 1e-8 * b for a, b in zip(out, target)), (N, s, i0, out, target)
+
+
+_crown_case()
+
+# --- test case 6 ---
+# first-step analysis on the outputs, for every initial count i0 = 1, ..., N - 1: the fixation probability h is
+# harmonic for the chain, h(i) = sum_j P[i, j] h(j) with h(0) = 0 and h(N) = 1 (h(0) = 1, h(N) = 0 for loss),
+# and g = h t, with t the conditional time, satisfies g(i) = h(i) + sum_{0 < j < N} P[i, j] g(j). Every term is
+# nonnegative, so both identities hold entrywise to the relative accuracy of the outputs, however small h is
+# (p_fix down to about 4e-90 for s = -0.5, p_loss down to about 1.6e-44 for s = 0.4). The matrix is built in
+# double precision from logarithms (relative error about 1e-13). Tolerances: 2.1e-8 for h (one output against a
+# sum of outputs, each within 1e-8); 4.2e-8 for g (each g = h t carries the errors of h and of t)
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+    from scipy.special import gammaln as _t_g
+
+    def _t_matrix(N, s):
+        # transition matrix without mutation in double precision, from logarithms, complements formed directly
+        i = np.arange(N + 1.0)
+        den = N + s * i
+        pm, qm = (1 + s) * i / den, (N - i) / den
+        j = np.arange(N + 1.0)[None, :]
+        with np.errstate(divide="ignore", invalid="ignore"):
+            lp = np.where(j > 0, j * np.log(pm)[:, None], 0.0)
+            lq = np.where(j < N, (N - j) * np.log(qm)[:, None], 0.0)
+        return np.exp(_t_g(N + 1.0) - _t_g(j + 1.0) - _t_g(N - j + 1.0) + lp + lq)
+
+    for N, s in ((150, -0.5), (150, 0.4)):
+        P = _t_matrix(N, s)[1:N]
+        out = np.array([fixation_statistics(N, s, i0) for i0 in range(1, N)], dtype=float)
+        for h_in, t_in, ends in ((out[:, 0], out[:, 2], (0.0, 1.0)), (out[:, 1], out[:, 3], (1.0, 0.0))):
+            h = np.concatenate(([ends[0]], h_in, [ends[1]]))
+            g = np.concatenate(([0.0], h_in * t_in, [0.0]))
+            assert np.all(np.abs(h_in - P @ h) <= 2.1e-8 * h_in), (N, s, ends)
+            assert np.all(np.abs(g[1:N] - (h_in + P @ g)) <= 4.2e-8 * g[1:N]), (N, s, ends)
 
 
 _crown_case()

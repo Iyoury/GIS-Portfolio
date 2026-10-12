@@ -18,8 +18,7 @@ def electron_positron_eos(rho, T, Ye):
         about 1e-13 relative.
 
     Raises:
-      ValueError if rho, T or Ye is not finite, if Ye is not in (0, 1], or if T or rho Ye is outside
-      its range.
+      ValueError if Ye is not in (0, 1], or if T or rho Ye is outside its range.
     '''
     rho, T, Ye = float(rho), float(T), float(Ye)
     if not (math.isfinite(rho) and math.isfinite(T) and math.isfinite(Ye)):

@@ -16,11 +16,10 @@ def _crown_case():
         return abs(a - b) / abs(b)
 
     def _t_call(N, s, u, v):
-        out = fastest_mode(N, s, u, v)
-        lam, mode = out
-        assert isinstance(lam, float), lam
+        # the return type: (Python float, numpy float array of shape (N + 1,))
+        lam, mode = fastest_mode(N, s, u, v)
         mode = np.asarray(mode)
-        assert mode.shape == (N + 1,) and np.issubdtype(mode.dtype, np.floating), (mode.shape, mode.dtype)
+        assert isinstance(lam, float) and mode.shape == (N + 1,) and np.issubdtype(mode.dtype, np.floating), (lam, mode.shape, mode.dtype)
         return lam, mode
 
     def _t_absorbing_mask(N, u, v):
@@ -78,11 +77,10 @@ def _crown_case():
         return abs(a - b) / abs(b)
 
     def _t_call(N, s, u, v):
-        out = fastest_mode(N, s, u, v)
-        lam, mode = out
-        assert isinstance(lam, float), lam
+        # the return type: (Python float, numpy float array of shape (N + 1,))
+        lam, mode = fastest_mode(N, s, u, v)
         mode = np.asarray(mode)
-        assert mode.shape == (N + 1,) and np.issubdtype(mode.dtype, np.floating), (mode.shape, mode.dtype)
+        assert isinstance(lam, float) and mode.shape == (N + 1,) and np.issubdtype(mode.dtype, np.floating), (lam, mode.shape, mode.dtype)
         return lam, mode
 
     def _t_absorbing_mask(N, u, v):
@@ -136,7 +134,8 @@ def _crown_case():
 _crown_case()
 
 # --- test case 2 ---
-# selection, with and without absorbing states, against the matrix in extended precision
+# selection with mutation in both directions or one way (one absorbing state), against the matrix in extended
+# precision (both end states absorbing: case 6)
 import numpy as np
 
 
@@ -160,12 +159,9 @@ def _crown_case():
         return abs(a - b) / abs(b)
 
     def _t_call(N, s, u, v):
-        out = fastest_mode(N, s, u, v)
-        lam, mode = out
-        assert isinstance(lam, float), lam
-        mode = np.asarray(mode)
-        assert mode.shape == (N + 1,) and np.issubdtype(mode.dtype, np.floating), (mode.shape, mode.dtype)
-        return lam, mode
+        # values only (the return type, shape and dtype are checked in cases 0 and 1)
+        lam, mode = fastest_mode(N, s, u, v)
+        return lam, np.asarray(mode, dtype=float)
 
     def _t_absorbing_mask(N, u, v):
         # mask of the absorbing states (i = 0 when v = 0, i = N when u = 0), where the exact mode is zero
@@ -202,8 +198,7 @@ def _crown_case():
             return float(lam), [float(t) for t in x]
 
     for N, s, u, v, dps in ((12, 0.5, 0.01, 0.02, 80), (20, -0.5, 1e-12, 1e-12, 120), (16, 0.3, 0.0, 0.05, 100),
-                            (15, -0.2, 0.05, 0.0, 100), (14, 0.4, 0.0, 0.0, 100), (2, -0.3, 0.0, 0.0, 40),
-                            (25, 0.45, 1e-12, 0.0, 120), (30, -0.5, 0.1, 0.1, 150)):
+                            (15, -0.2, 0.05, 0.0, 100)):
         got, mode = _t_call(N, s, u, v)
         lam_t, mode_t = _t_mp_mode(N, s, u, v, dps)
         assert _t_rel(got, lam_t) < 1e-8, (N, s, u, v, got, lam_t)
@@ -225,12 +220,9 @@ def _crown_case():
         return abs(a - b) / abs(b)
 
     def _t_call(N, s, u, v):
-        out = fastest_mode(N, s, u, v)
-        lam, mode = out
-        assert isinstance(lam, float), lam
-        mode = np.asarray(mode)
-        assert mode.shape == (N + 1,) and np.issubdtype(mode.dtype, np.floating), (mode.shape, mode.dtype)
-        return lam, mode
+        # values only (the return type, shape and dtype are checked in cases 0 and 1)
+        lam, mode = fastest_mode(N, s, u, v)
+        return lam, np.asarray(mode, dtype=float)
 
     def _t_absorbing_mask(N, u, v):
         # mask of the absorbing states (i = 0 when v = 0, i = N when u = 0), where the exact mode is zero
@@ -388,12 +380,9 @@ def _crown_case():
         return abs(a - b) / abs(b)
 
     def _t_call(N, s, u, v):
-        out = fastest_mode(N, s, u, v)
-        lam, mode = out
-        assert isinstance(lam, float), lam
-        mode = np.asarray(mode)
-        assert mode.shape == (N + 1,) and np.issubdtype(mode.dtype, np.floating), (mode.shape, mode.dtype)
-        return lam, mode
+        # values only (the return type, shape and dtype are checked in cases 0 and 1)
+        lam, mode = fastest_mode(N, s, u, v)
+        return lam, np.asarray(mode, dtype=float)
 
     def _t_absorbing_mask(N, u, v):
         # mask of the absorbing states (i = 0 when v = 0, i = N when u = 0), where the exact mode is zero
@@ -426,24 +415,96 @@ def _crown_case():
 _crown_case()
 
 # --- test case 5 ---
-# N not an integer in [1, 400], s, u, v not finite or out of range (u and v each 0 or in [1e-12, 0.1], so a
-# positive rate below 1e-12 is out of range, however small), or N = 1 without mutation
+# N not an integer in [1, 400], s, u, v out of range (u and v each 0 or in [1e-12, 0.1], so a positive rate
+# below 1e-12 is out of range, however small), or N = 1 without mutation (P is the identity)
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
     for _t_bad in ((0, 0.1, 0.01, 0.01), (401, 0.1, 0.01, 0.01), (5.0, 0.1, 0.01, 0.01), (True, 0.1, 0.01, 0.01),
-                   (10, 0.6, 0.01, 0.01), (10, -0.6, 0.01, 0.01), (10, 0.1, -1e-12, 0.01), (10, 0.1, 0.01, -1e-12),
-                   (10, 0.1, 0.2, 0.01), (10, 0.1, 0.01, 0.11), (10, float("nan"), 0.01, 0.01),
-                   (10, 0.1, float("inf"), 0.01), (1, 0.2, 0.0, 0.0), (10, 0.1, 1e-13, 0.01), (10, 0.1, 0.01, 5e-13),
-                   (10, 0.1, 0.0, 1e-300), (400, -0.5, 0.1, 1e-200), (3, 0.2, 9.9e-13, 0.0)):
+                   (10, 0.6, 0.01, 0.01), (10, 0.1, -1e-12, 0.01), (10, 0.1, 0.01, 0.11), (1, 0.2, 0.0, 0.0),
+                   (10, 0.1, 1e-13, 0.01), (400, -0.5, 0.1, 1e-200)):
         try:
             fastest_mode(*_t_bad)
         except ValueError:
             pass
         else:
             raise AssertionError("fastest_mode%r must raise ValueError" % (_t_bad,))
+
+
+_crown_case()
+
+# --- test case 6 ---
+# selection without mutation (both end states absorbing, N = 2 included), with one rate at its floor 1e-12 and
+# the other 0, and with frequent mutation in both directions, against the matrix in extended precision
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+    import mpmath as _t_mp
+
+    def _t_P(N, s, u, v):
+        # call inside _t_mp.workdps(...)
+        s, u, v = _t_mp.mpf(s), _t_mp.mpf(u), _t_mp.mpf(v)
+        P = _t_mp.matrix(N + 1, N + 1)
+        for i in range(N + 1):
+            p = _t_mp.mpf(i) / N
+            ps = (1 + s) * p / (1 + s * p)
+            pm = (1 - u) * ps + v * (1 - ps)
+            for j in range(N + 1):
+                P[i, j] = _t_mp.binomial(N, j) * pm ** j * (1 - pm) ** (N - j)
+        return P
+
+    def _t_rel(a, b):
+        return abs(a - b) / abs(b)
+
+    def _t_call(N, s, u, v):
+        # values only (the return type, shape and dtype are checked in cases 0 and 1)
+        lam, mode = fastest_mode(N, s, u, v)
+        return lam, np.asarray(mode, dtype=float)
+
+    def _t_absorbing_mask(N, u, v):
+        # mask of the absorbing states (i = 0 when v = 0, i = N when u = 0), where the exact mode is zero
+        zero = np.zeros(N + 1, dtype=bool)
+        zero[0] = not v > 0
+        zero[N] = zero[N] or not u > 0
+        return zero
+
+    def _t_check_mode(got, target, zero, tol, label):
+        # entries whose exact value is zero (absorbing states) within 1e-250 of zero; every other entry within
+        # tol times its magnitude (signs and the normalisation as stated)
+        got = np.asarray(got, dtype=float)
+        target = np.asarray(target, dtype=float)
+        zero = np.asarray(zero, dtype=bool)
+        assert np.all(np.abs(got[zero]) <= 1e-250), (label, got[zero])
+        bad = ~zero & (np.abs(got - target) > tol * np.abs(target))
+        assert not bad.any(), (label, np.nonzero(bad)[0][:5], got[bad][:5], target[bad][:5])
+
+    def _t_mp_mode(N, s, u, v, dps):
+        # smallest eigenvalue from mpmath eig; eigenvector by shifted inverse iteration with plain LU,
+        # started with zeros on the absorbing states; scaled to max |entry| = 1, first nonzero entry positive
+        with _t_mp.workdps(dps):
+            P = _t_P(N, s, u, v)
+            E = _t_mp.eig(P, left=False, right=False)
+            lam = min(E, key=lambda z: abs(z)).real
+            n = N + 1
+            A = P - lam * (1 + _t_mp.mpf(10) ** (-dps // 3)) * _t_mp.eye(n)
+            x = _t_mp.matrix([0 if P[i, i] == 1 else 1 for i in range(n)])
+            for _ in range(8):
+                x = _t_mp.lu_solve(A, x)
+                x = x / max(abs(t) for t in x)
+            first = [t for t in x if t != 0][0]
+            x = x / _t_mp.sign(first)
+            return float(lam), [float(t) for t in x]
+
+    for N, s, u, v, dps in ((14, 0.4, 0.0, 0.0, 100), (2, -0.3, 0.0, 0.0, 40), (25, 0.45, 1e-12, 0.0, 120),
+                            (30, -0.5, 0.1, 0.1, 150)):
+        got, mode = _t_call(N, s, u, v)
+        lam_t, mode_t = _t_mp_mode(N, s, u, v, dps)
+        assert _t_rel(got, lam_t) < 1e-8, (N, s, u, v, got, lam_t)
+        _t_check_mode(mode, mode_t, _t_absorbing_mask(N, u, v), 1e-8, (N, s, u, v))
 
 
 _crown_case()

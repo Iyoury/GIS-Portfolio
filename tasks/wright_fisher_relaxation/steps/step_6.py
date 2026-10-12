@@ -23,6 +23,6 @@ def quasi_stationary(N, s, v):
 
     Raises:
       ValueError if N is not an integer in [1, 400] (bool and float are not accepted), or if s or v is
-      not finite or is outside its range.
+      outside its range.
     '''
     raise NotImplementedError

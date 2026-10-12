@@ -105,7 +105,7 @@ def pair_thermodynamics(T, psi):
         (erg K^-1 cm^-3). Each with a relative error below 1e-10.
 
     Raises:
-      ValueError if T or psi is not finite, if T is outside [1e7, 1e11] or psi is not in (0, 1e6].
+      ValueError if T is outside [1e7, 1e11] or psi is not in (0, 1e6].
     '''
     T, psi, theta = _epeos_check_T_psi(T, psi)
     E, w, xm = _epeos_nodes(theta, psi)

@@ -84,8 +84,7 @@ def _crown_case():
 
     def _t_check_entries(P, N, s, u, v, rows, dps=50):
         # every listed row against the extended-precision binomial law; relative 1e-10 for entries
-        # >= 1e-250, absolute 1e-250 below
-        assert isinstance(P, np.ndarray) and P.shape == (N + 1, N + 1), getattr(P, "shape", None)
+        # >= 1e-250, absolute 1e-250 below (the array shape is checked in case 2)
         with _t_mp.workdps(dps):
             s_, u_, v_ = _t_mp.mpf(s), _t_mp.mpf(u), _t_mp.mpf(v)
             for i in rows:
@@ -118,20 +117,73 @@ def _crown_case():
 _crown_case()
 
 # --- test case 4 ---
-# N not an integer in [1, 400], or s, u, v not finite or out of range, raise ValueError
+# N not an integer in [1, 400], or s, u, v out of range, raise ValueError
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
     for _t_bad in ((0, 0.1, 0.01, 0.01), (401, 0.1, 0.01, 0.01), (2.5, 0.1, 0.01, 0.01), (True, 0.1, 0.01, 0.01), (10, 0.6, 0.01, 0.01),
-                   (10, 0.1, -1e-3, 0.01), (10, 0.1, 0.01, 0.2), (10, float("nan"), 0.01, 0.01)):
+                   (10, 0.1, -1e-3, 0.01), (10, 0.1, 0.01, 0.2)):
         try:
             wf_transition_matrix(*_t_bad)
         except ValueError:
             pass
         else:
             raise AssertionError("wf_transition_matrix%r must raise ValueError" % (_t_bad,))
+
+
+_crown_case()
+
+# --- test case 5 ---
+# exact rational arithmetic: every entry of small matrices computed exactly with Python fractions from the
+# exact binary values of the inputs (no rounding at all), with mutation in both directions, one way only (u = 0:
+# i = N absorbing, exact zeros in its row) and one rate at its floor 1e-12; relative 1e-10, exact zeros within
+# 1e-250
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+    from fractions import Fraction as _t_F
+    from math import comb as _t_comb
+
+    def _t_P_exact(N, s, u, v):
+        # transition matrix in exact rational arithmetic
+        s, u, v = _t_F(s), _t_F(u), _t_F(v)
+        rows = []
+        for i in range(N + 1):
+            ps = (1 + s) * i / (N + s * i)
+            pm = (1 - u) * ps + v * (1 - ps)
+            rows.append([_t_comb(N, j) * pm ** j * (1 - pm) ** (N - j) for j in range(N + 1)])
+        return rows
+
+    for N, s, u, v in ((9, 0.25, 0.015625, 0.03125), (7, -0.5, 0.0, 0.0625), (6, 0.3, 0.1, 1e-12)):
+        T = np.array([[float(x) for x in row] for row in _t_P_exact(N, s, u, v)])
+        P = np.asarray(wf_transition_matrix(N, s, u, v), dtype=float)
+        ok = P.shape == T.shape and bool(np.all(np.where(T > 0, np.abs(P - T) <= 1e-10 * T, np.abs(P) <= 1e-250)))
+        assert ok, (N, s, u, v)
+
+
+_crown_case()
+
+# --- test case 6 ---
+# relabeling the alleles: a has relative fitness 1 / (1 + s) = 1 + s' with s' = -s / (1 + s), and the two
+# mutation rates exchange roles, so P(s, u, v)[i, j] = P(s', v, u)[N - i, N - j] exactly. At N = 400 with
+# u = 1e-12 the rows near i = N, where 1 - p_mut is of order u, must agree with the relabeled rows near i = 0,
+# where the same probability is the small frequency itself. Two computed outputs, each within 1e-10 of the exact
+# entry (or within 1e-250 of an exact entry below 1e-250): they agree to 2.1e-10 relative or to 2e-250
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+    for N, s, s2, u, v in ((400, 0.5, -1.0 / 3.0, 1e-12, 0.05), (250, -0.2, 0.25, 0.0, 0.1), (300, 0.3, -0.3 / 1.3, 0.02, 1e-12)):
+        a = np.asarray(wf_transition_matrix(N, s, u, v), dtype=float)
+        b = np.asarray(wf_transition_matrix(N, s2, v, u), dtype=float)[::-1, ::-1]
+        d = np.abs(a - b)
+        ok = (d <= 2.1e-10 * np.maximum(np.abs(a), np.abs(b))) | (d <= 2e-250)
+        assert ok.all(), (N, s, u, v, np.argwhere(~ok)[:5])
 
 
 _crown_case()

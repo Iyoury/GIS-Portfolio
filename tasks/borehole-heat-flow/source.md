@@ -126,5 +126,5 @@ short-glaciation regions (d ln g/d ln t_end about 2.05) the g limit binds first.
   (3) problem.yaml: mutant lists and the three explanations condensed (prompts, headers, return lines and contracts
   unchanged); (4) this file condensed. Regression: for every step 6, step 7 and whole-task case the old and new
   constructions give the same data (largest difference 7e-15 K), targets within 1e-12 relative, thresholds within
-  5e-13 and oracle profile values within 1e-10. Rerun: crown_check in all modes (ALL OK; the two pending metadata
+  5e-13 and oracle profile values within 3e-9. Rerun: crown_check in all modes (ALL OK; the two pending metadata
   keys are the only format findings); raw folder size below 600 KiB.

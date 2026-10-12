@@ -19,7 +19,7 @@ def wf_transition_matrix(N, s, u, v):
          entry whose exact value is at least 1e-250; smaller entries within 1e-250 of the exact value.
 
     Raises:
-      ValueError if N is not an integer in [1, 400], or if s, u or v is not finite or is outside
+      ValueError if N is not an integer in [1, 400], or if s, u or v is outside
       its range.
     '''
     if isinstance(N, (bool, np.bool_)) or not isinstance(N, (int, np.integer)):
@@ -68,7 +68,7 @@ def fixation_statistics(N, s, i0):
 
     Raises:
       ValueError if N is not an integer in [2, 400], if i0 is not an integer in [1, N - 1], or if s
-      is not finite or is outside [-0.5, 0.5].
+      is outside [-0.5, 0.5].
     '''
     for name, value in (("N", N), ("i0", i0)):
         if isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, np.integer)):
@@ -140,7 +140,7 @@ def stationary_distribution(N, s, u, v):
           entries within 1e-250 of the exact value.
 
     Raises:
-      ValueError if N is not an integer in [1, 400], or if s, u or v is not finite or is outside its
+      ValueError if N is not an integer in [1, 400], or if s, u or v is outside its
       range.
     '''
     if isinstance(N, (bool, np.bool_)) or not isinstance(N, (int, np.integer)):
@@ -186,7 +186,7 @@ def relaxation_rate(N, s, u, v):
            below 1e-8, however small the gap is.
 
     Raises:
-      ValueError if N is not an integer in [1, 400], or if s, u or v is not finite or is outside its
+      ValueError if N is not an integer in [1, 400], or if s, u or v is outside its
       range.
     '''
     if isinstance(N, (bool, np.bool_)) or not isinstance(N, (int, np.integer)):
@@ -274,7 +274,7 @@ def substitution_times(N, s, u, v):
         inputs at N = 400).
 
     Raises:
-      ValueError if N is not an integer in [1, 400], or if s, u or v is not finite or is outside its
+      ValueError if N is not an integer in [1, 400], or if s, u or v is outside its
       range.
     '''
     if isinstance(N, (bool, np.bool_)) or not isinstance(N, (int, np.integer)):
@@ -341,7 +341,7 @@ def quasi_stationary(N, s, v):
 
     Raises:
       ValueError if N is not an integer in [1, 400] (bool and float are not accepted), or if s or v is
-      not finite or is outside its range.
+      outside its range.
     '''
     if isinstance(N, (bool, np.bool_)) or not isinstance(N, (int, np.integer)):
         raise ValueError("N must be an integer")
@@ -428,7 +428,7 @@ def fastest_mode(N, s, u, v):
 
     Raises:
       ValueError if N is not an integer in [1, 400] (bool and float are not accepted), if s, u or v
-      is not finite or is outside its range (0 < u < 1e-12 and 0 < v < 1e-12 included), or if N = 1
+      is outside its range (0 < u < 1e-12 and 0 < v < 1e-12 included), or if N = 1
       and u = v = 0.
     '''
     if isinstance(N, (bool, np.bool_)) or not isinstance(N, (int, np.integer)):
