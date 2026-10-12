@@ -74,6 +74,10 @@ starting points, use judgement and flag what does not fit. Update prompt, refere
   solution_explanation, verification_explanation (tools/metadata_block.py).
 - Note "n_test_cases_mismatch" appeared on every step while markers matched n_test_cases; the files had a
   comment preamble before "# --- test case 0 ---" -> no text at all before the first marker (crown_check flags it).
+- Content check (2026-10-12, blocking "Edge-case inputs"): no NaN/inf inputs in tests unless the science needs
+  them, even when the prompt says "raise ValueError if not finite"; drop such tests AND the prompt clauses.
+  "Science outweighs validation" counts assertion sites per step (stated raises at half weight): computed values
+  must clearly dominate; add computed cases with independent targets rather than more validation.
 - Warning "tasks/_id_mapping.json is absent; falling back to delivered ids" is harmless (the version still maps).
 
 ## Validation before every zip
