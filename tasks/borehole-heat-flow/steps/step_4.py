@@ -24,9 +24,9 @@ def fit_heat_flow(T, R, S, P, A):
 
     Raises
     ------
-    ValueError for unequal lengths, n < 4, non-finite values, A < 0 or
-    non-finite, or an unresolvable design: one of the columns 1, R, P is all
-    zero, or the smallest singular value of the n x 3 matrix [1, R, P] with
-    each column scaled to unit length is below 1e-8 (e.g. P proportional to R).
+    ValueError for unequal lengths, n < 4, A < 0, or an unresolvable design:
+    one of the columns 1, R, P is all zero, or the smallest singular value of
+    the n x 3 matrix [1, R, P] with each column scaled to unit length is below
+    1e-8 (e.g. P proportional to R).
     """
     raise NotImplementedError

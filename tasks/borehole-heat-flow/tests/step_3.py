@@ -220,29 +220,21 @@ import numpy as np
 
 def _crown_case():
     import numpy as np
-    for case in ["t0", "order", "t_nan", "dT_nan", "kappa", "kappa_nan", "len", "two_d", "zneg", "znan"]:
+    for case in ["t0", "order", "kappa", "len", "two_d", "zneg"]:
         _t_msg = " (case %r)" % (case,)
         z, t, d, k = 100.0, [1e3, 1e4], [0.5, -1.0], 1e-6
         if case == "t0":
             t = [0.0, 1e4]
         elif case == "order":
             t = [1e4, 1e3]
-        elif case == "t_nan":
-            t = [1e3, float("nan")]
-        elif case == "dT_nan":
-            d = [0.5, float("nan")]
         elif case == "kappa":
             k = 0.0
-        elif case == "kappa_nan":
-            k = float("nan")
         elif case == "len":
             d = [0.5]
         elif case == "two_d":
             t, d = [[1e3, 1e4]], [[0.5, -1.0]]
-        elif case == "zneg":
-            z = -1.0
         else:
-            z = float("nan")
+            z = -1.0
         try:
             paleoclimate_perturbation(z, t, d, k)
         except ValueError:

@@ -66,8 +66,8 @@ def regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape, t_end_bo
     ------
     ValueError if holes is not a list or tuple of at least 2 dicts with exactly
     these keys; for a hole with log arrays that are not 1-D of equal length, a
-    non-finite temperature, a negative or non-finite heat production, any error
-    of an earlier step, fewer than 8 readings with TVD >= z_min, or T0_h and
+    negative heat production, any error of an earlier step, fewer than 8
+    readings with TVD >= z_min, or T0_h and
     q0_h not separately resolvable (smallest singular value of the n_h x 2
     matrix [1, R_h] with unit-length columns below 1e-8); for an invalid
     history or invalid bounds (rules of step 6, including hist_dT_shape[0] ==

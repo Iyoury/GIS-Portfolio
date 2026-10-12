@@ -279,23 +279,17 @@ import numpy as np
 
 def _crown_case():
     import numpy as np
-    for case in ["k0", "knan", "tops", "tops_nan", "first", "neg", "znan", "len", "two_d"]:
+    for case in ["k0", "tops", "first", "neg", "len", "two_d"]:
         _t_msg = " (case %r)" % (case,)
         tops, k, z = [0.0, 100.0], [2.0, 3.0], 50.0
         if case == "k0":
             k = [2.0, 0.0]
         elif case == "tops":
             tops = [0.0, 0.0]
-        elif case == "tops_nan":
-            tops, k = [0.0, float("nan"), 500.0], [2.0, 3.0, 2.5]
         elif case == "first":
             tops = [10.0, 100.0]
-        elif case == "knan":
-            k = [2.0, float("nan")]
         elif case == "neg":
             z = -5.0
-        elif case == "znan":
-            z = float("nan")
         elif case == "len":
             k = [2.0]
         else:

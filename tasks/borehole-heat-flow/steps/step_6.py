@@ -61,11 +61,11 @@ def deglaciation_heat_flow_inversion(survey_md, survey_inc, survey_azi, log_md, 
 
     Raises
     ------
-    ValueError for invalid log arrays or a non-finite temperature, an invalid
-    history (hist_dT_shape 1-D with >= 2 entries, hist_t_years 1-D with one
-    entry fewer, finite, positive, strictly increasing), hist_dT_shape[0] ==
-    hist_dT_shape[1], invalid t_end_bounds, heat_production negative or
-    non-finite, any error of an earlier step, fewer than 5 readings with TVD
+    ValueError for invalid log arrays, an invalid history (hist_dT_shape
+    1-D with >= 2 entries, hist_t_years 1-D with one entry fewer, positive,
+    strictly increasing), hist_dT_shape[0] == hist_dT_shape[1], invalid
+    t_end_bounds, a negative heat_production, any error of an earlier
+    step, fewer than 5 readings with TVD
     >= z_min, T0, q0 and g not separately resolvable at t_end (criterion of
     step 4), a minimum of RSS(t) over [t_lo, t_hi] attained at t_lo or t_hi,
     or a nearest threshold crossing that does not exist inside [t_lo, t_hi].

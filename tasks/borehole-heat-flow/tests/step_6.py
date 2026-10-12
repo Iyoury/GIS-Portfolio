@@ -30,7 +30,7 @@ def _crown_case():
 
   def g_RS(z, tops, k):  # exact layer sums
     R = S = 0.0
-    for top, bot, kk in zip(tops, list(tops[1:]) + [math.inf], k):
+    for top, bot, kk in zip(tops, list(tops[1:]) + [max(z, tops[-1])], k):
       b = min(max(z, top), bot)
       R += (b - top) / kk
       S += (b - top) * (b + top) / (2 * kk)
@@ -183,7 +183,7 @@ def _crown_case():
 
   def g_RS(z, tops, k):  # exact layer sums
     R = S = 0.0
-    for top, bot, kk in zip(tops, list(tops[1:]) + [math.inf], k):
+    for top, bot, kk in zip(tops, list(tops[1:]) + [max(z, tops[-1])], k):
       b = min(max(z, top), bot)
       R += (b - top) / kk
       S += (b - top) * (b + top) / (2 * kk)
@@ -326,7 +326,7 @@ def _crown_case():
 
   def g_RS(z, tops, k):  # exact layer sums
     R = S = 0.0
-    for top, bot, kk in zip(tops, list(tops[1:]) + [math.inf], k):
+    for top, bot, kk in zip(tops, list(tops[1:]) + [max(z, tops[-1])], k):
       b = min(max(z, top), bot)
       R += (b - top) / kk
       S += (b - top) * (b + top) / (2 * kk)
@@ -429,7 +429,14 @@ def _crown_case():
         ("rms_residual", 1e-3)):
       assert abs(float(r[key]) / ex[key] - 1.0) < tol, (key, r[key], ex[key])
     return ex
-  h = Hole((np.array([0.0, 600.0, 1200.0]), np.zeros(3), np.zeros(3)), ([0, 400, 900], [3.1, 3.1, 3.1]),
+
+  class UHole(Hole):  # uniform column: erfc and its closed-form time derivative
+    def U(self, t, deriv=False):
+      kap, tau = self.uk / self.rc, t * YEAR
+      if deriv:
+        return np.array([v / (2.0 * math.sqrt(math.pi * kap) * tau ** 1.5) * math.exp(-v * v / (4 * kap * tau)) for v in self.zk]) * YEAR
+      return np.array([math.erfc(v / (2.0 * math.sqrt(kap * tau))) for v in self.zk])
+  h = UHole((np.array([0.0, 600.0, 1200.0]), np.zeros(3), np.zeros(3)), ([0, 400, 900], [3.1, 3.1, 3.1]),
       0.7e-6, 2.2e6, 5.5, 0.044, 6.2, 10500.0, [0.0, -1.0, 0.3], [9.0e4, 1.15e5], 0.0, 0.006, 99,
       log_step=10.0, log_top=0.0, uniform_k=3.1)
   r = deglaciation_heat_flow_inversion(*h.args, (2000.0, 80000.0), 0.0)
@@ -469,7 +476,7 @@ def _crown_case():
 
   def g_RS(z, tops, k):  # exact layer sums
     R = S = 0.0
-    for top, bot, kk in zip(tops, list(tops[1:]) + [math.inf], k):
+    for top, bot, kk in zip(tops, list(tops[1:]) + [max(z, tops[-1])], k):
       b = min(max(z, top), bot)
       R += (b - top) / kk
       S += (b - top) * (b + top) / (2 * kk)
@@ -620,7 +627,7 @@ def _crown_case():
 
   def g_RS(z, tops, k):  # exact layer sums
     R = S = 0.0
-    for top, bot, kk in zip(tops, list(tops[1:]) + [math.inf], k):
+    for top, bot, kk in zip(tops, list(tops[1:]) + [max(z, tops[-1])], k):
       b = min(max(z, top), bot)
       R += (b - top) / kk
       S += (b - top) * (b + top) / (2 * kk)
@@ -781,7 +788,7 @@ def _crown_case():
 
   def g_RS(z, tops, k):  # exact layer sums
     R = S = 0.0
-    for top, bot, kk in zip(tops, list(tops[1:]) + [math.inf], k):
+    for top, bot, kk in zip(tops, list(tops[1:]) + [max(z, tops[-1])], k):
       b = min(max(z, top), bot)
       R += (b - top) / kk
       S += (b - top) * (b + top) / (2 * kk)
@@ -930,7 +937,7 @@ def _crown_case():
 
   def g_RS(z, tops, k):  # exact layer sums
     R = S = 0.0
-    for top, bot, kk in zip(tops, list(tops[1:]) + [math.inf], k):
+    for top, bot, kk in zip(tops, list(tops[1:]) + [max(z, tops[-1])], k):
       b = min(max(z, top), bot)
       R += (b - top) / kk
       S += (b - top) * (b + top) / (2 * kk)
@@ -1052,8 +1059,6 @@ def _crown_case():
     elif name == "log_two_d":
       d[ix["log_md"]] = d[ix["log_md"]][None, :]
       d[ix["log_temp"]] = d[ix["log_temp"]][None, :]
-    elif name == "temp_nan":
-      d[ix["log_temp"]][4] = float("nan")
     elif name == "one_interval":
       d[ix["hist_dT_shape"]] = np.array([-1.0])
       d[ix["hist_t_years"]] = np.array([], float)
@@ -1061,10 +1066,6 @@ def _crown_case():
       d[ix["hist_t_years"]] = np.array([9.0e4, 1.2e5, 1.5e5])
     elif name == "times_not_increasing":
       d[ix["hist_t_years"]] = np.array([9.0e4, 9.0e4])
-    elif name == "times_nan":
-      d[ix["hist_t_years"]] = np.array([9.0e4, float("nan")])
-    elif name == "shape_nan":
-      d[ix["hist_dT_shape"]] = np.array([0.0, -1.0, float("nan")])
     elif name == "times_nonpositive":
       d[ix["hist_t_years"]] = np.array([-9.0e4, 1.2e5])
     elif name == "equal_first_shapes":
@@ -1083,14 +1084,10 @@ def _crown_case():
       d[ix["hist_dT_shape"]] = np.array([[0.0, -1.0, 0.25]])
     elif name == "times_two_d":
       d[ix["hist_t_years"]] = np.array([[9.0e4, 1.2e5]])
-    elif name == "bounds_nan":
-      d[ix["t_end_bounds"]] = (float("nan"), 60000.0)
     elif name == "bounds_three":
       d[ix["t_end_bounds"]] = (3000.0, 30000.0, 60000.0)
     elif name == "A_negative":
       d[ix["heat_production"]] = -1e-6
-    elif name == "A_nan":
-      d[ix["heat_production"]] = float("nan")
     elif name == "rho_c_zero":
       d[ix["rho_c"]] = 0.0
     elif name == "k_zero":
@@ -1106,11 +1103,11 @@ def _crown_case():
     elif name == "one_depth":
       d[ix["log_md"]] = np.full(7, 760.0)
     return d
-  for name in ["four_readings", "log_len", "log_two_d", "temp_nan", "one_interval", "times_count",
-      "times_not_increasing", "times_nan", "shape_nan", "times_nonpositive", "equal_first_shapes",
+  for name in ["four_readings", "log_len", "log_two_d", "one_interval", "times_count",
+      "times_not_increasing", "times_nonpositive", "equal_first_shapes",
       "bounds_lo_zero", "bounds_reversed", "bounds_beyond_glaciation", "bounds_at_glaciation_start",
-      "bounds_equal", "shape_two_d", "times_two_d", "bounds_nan", "bounds_three",
-      "A_negative", "A_nan", "rho_c_zero", "k_zero", "k_count", "top_beyond_hole", "log_beyond_hole",
+      "bounds_equal", "shape_two_d", "times_two_d", "bounds_three",
+      "A_negative", "rho_c_zero", "k_zero", "k_count", "top_beyond_hole", "log_beyond_hole",
       "survey_start", "one_depth"]:
     try:
       deglaciation_heat_flow_inversion(*bad(name))

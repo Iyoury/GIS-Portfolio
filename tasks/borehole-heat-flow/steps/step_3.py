@@ -32,9 +32,8 @@ def paleoclimate_perturbation(z, t_years, dT, kappa):
 
     Raises
     ------
-    ValueError if t_years and dT are not 1-D of equal length, if they
-    contain a non-finite value, if t_years[0] <= 0 or t_years does not
-    increase strictly, if kappa is non-finite or <= 0, or if any depth is
-    non-finite or negative.
+    ValueError if t_years and dT are not 1-D of equal length, if
+    t_years[0] <= 0 or t_years does not increase strictly, if kappa <= 0, or
+    if any depth is negative.
     """
     raise NotImplementedError

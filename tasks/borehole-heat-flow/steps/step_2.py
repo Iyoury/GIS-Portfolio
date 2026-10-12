@@ -20,9 +20,8 @@ def layer_integrals(layer_top_tvd, layer_k, z):
 
     Raises
     ------
-    ValueError if the layer arrays are not 1-D of equal length, if any top is
-    non-finite, if the first top is not 0 or tops do not increase strictly,
-    if any conductivity is non-finite or <= 0, or if any depth is non-finite
-    or negative.
+    ValueError if the layer arrays are not 1-D of equal length, if the first
+    top is not 0 or tops do not increase strictly, if any conductivity is
+    <= 0, or if any depth is negative.
     """
     raise NotImplementedError

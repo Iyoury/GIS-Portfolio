@@ -234,7 +234,7 @@ def _crown_case():
             alpha *= target / s
         return P, s
 
-    for case in ["short", "len", "zeroP", "P_prop_R", "P_nearly_prop_R", "negA", "nanA", "nan"]:
+    for case in ["short", "len", "zeroP", "P_prop_R", "P_nearly_prop_R", "negA"]:
         _t4_t_msg = " (case %r)" % (case,)
         _t4_T, _t4_R, _t4_S, _t4_P = _t4_synthetic(0.0)
         A = 1e-6
@@ -249,12 +249,8 @@ def _crown_case():
         elif case == "P_nearly_prop_R":
             _t4_P, s = _t4_t_nearly_proportional_P(_t4_R, 3e-9)
             assert 0.0 < s < 1e-8          # premise checked by the test's own singular values
-        elif case == "negA":
-            A = -1e-6
-        elif case == "nanA":
-            A = float("nan")
         else:
-            _t4_T = _t4_T.copy(); _t4_T[4] = np.nan
+            A = -1e-6
         try:
             fit_heat_flow(_t4_T, _t4_R, _t4_S, _t4_P, A)
         except ValueError:

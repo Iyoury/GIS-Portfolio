@@ -614,15 +614,13 @@ import numpy as np
 def _crown_case():
     import math
     import numpy as np
-    for case in ["beyond", "negative", "nan", "start", "order", "lengths", "one_station", "two_d", "inc_neg", "inc_180", "dogleg_180", "dogleg_near_180", "md_nan", "inc_nan", "azi_nan"]:
+    for case in ["beyond", "negative", "start", "order", "lengths", "one_station", "two_d", "inc_neg", "inc_180", "dogleg_180", "dogleg_near_180"]:
         _t_msg = " (case %r)" % (case,)
         md, inc, azi, q = [0.0, 100.0, 200.0], [10.0, 12.0, 14.0], [0.0, 0.0, 0.0], 50.0
         if case == "beyond":
             q = 250.0
         elif case == "negative":
             q = -1.0
-        elif case == "nan":
-            q = float("nan")
         elif case == "start":
             md = [5.0, 100.0, 200.0]
         elif case == "order":
@@ -639,15 +637,9 @@ def _crown_case():
             inc = [10.0, 180.0, 14.0]
         elif case == "dogleg_180":
             inc, azi = [10.0, 170.0, 20.0], [0.0, 180.0, 0.0]
-        elif case == "dogleg_near_180":
+        else:
             # opposite azimuths: dogleg = I1 + I2 = 180 deg - 5e-7 rad, inside the 1e-6 rad band
             inc, azi = [10.0, 170.0 - math.degrees(5e-7), 20.0], [0.0, 180.0, 0.0]
-        elif case == "md_nan":
-            md = [0.0, float("nan"), 200.0]
-        elif case == "inc_nan":
-            inc = [10.0, float("nan"), 14.0]
-        else:
-            azi = [0.0, float("nan"), 0.0]
         try:
             true_vertical_depth(md, inc, azi, q)
         except ValueError:

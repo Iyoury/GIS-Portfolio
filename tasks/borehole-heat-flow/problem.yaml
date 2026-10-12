@@ -6,6 +6,8 @@ metadata:
   author_name: "Ayoub Bousfiha"
   author_email: "iyoury.ab@gmail.com"
   author_organization: "Independent Researcher"
+  author_profile: "https://www.linkedin.com/in/ayoub-bousfiha-674a75219"
+  conflicts_of_interest: "None"
   relevant_experience: "B.Sc. in Georesources and Environment (FST Fes, 2016), known as Geological Engineering in Canada, and a graduate certificate in geomatics from Université Laval (reference frames, rotations, least-squares adjustment). GIS analyst at Morocco's Ministry of Energy and Mines (2016-2018) on exploration databases, and now running an independent geospatial consultancy (Craton Géodonnées) in Quebec that works with the drilling databases of Abitibi exploration programs."
   subfield: "Geothermics: regional borehole paleoclimate inversion, layered transient conduction, maximum likelihood, AR(1) noise"
   tags:
@@ -98,7 +100,7 @@ metadata:
     relative 5e-4 of each returned end and the profile stays above the threshold at 5 interior points on each side.
     The cases cover several regimes and log qualities, short glaciations with a second profile maximum, uniform
     columns with the collar reading at z_min = 0, end-point maxima with near-boundary valid controls, uncontained
-    intervals, a log listed as two runs, the smallest valid hole with 33 invalid inputs, a strongly correlated log
+    intervals, a log listed as two runs, the smallest valid hole with 29 invalid inputs, a strongly correlated log
     (phi = 0.9) and, in the whole-task cases, offset, hole-order and reading-order invariances and a region whose
     statistic falls below the quantile again outside the interval. The second solution uses different methods
     throughout (circular-arc TVD, ramp sums and integration by parts for R and S, Duhamel quadrature, QR least
@@ -114,8 +116,8 @@ metadata:
     justified by the combined budget. With exact inputs the reference reaches at most 3.2e-3 of a step 6 limit and
     0.014 of a step 7 limit, the second solution 3.2e-4 and 0.006. Named mutants (linear TVD between stations;
     arithmetic-mean conductivity; years not converted; heat-production sign; erfc with the mean diffusivity and
-    Gaver-Stehfest in double precision; for step 6 the half-space perturbation, standard errors without the t_end
-    column and a local search without scan; for step 7 independent errors and the conditional likelihood; whole-task
+    Gaver-Stehfest in double precision; for step 6 the half-space perturbation and a local search
+    without scan; for step 7 independent errors and the conditional likelihood; whole-task
     MD as depth and independent errors) each fail at least one case of their target tests. Every case was run alone
     in a fresh process with tools/crown_check.py for the references, solution.py, the second solution, the mutants,
     the all-None and all-zero controls (no case passes) and every reference output scaled by 1 +- 1e-12 (all cases
@@ -219,8 +221,8 @@ problem_io: |-
       ------
       ValueError if holes is not a list or tuple of at least 2 dicts with exactly
       these keys; for a hole with log arrays that are not 1-D of equal length, a
-      non-finite temperature, a negative or non-finite heat production, any error
-      of an earlier step, fewer than 8 readings with TVD >= z_min, or T0_h and
+      negative heat production, any error of an earlier step, fewer than 8
+      readings with TVD >= z_min, or T0_h and
       q0_h not separately resolvable (smallest singular value of the n_h x 2
       matrix [1, R_h] with unit-length columns below 1e-8); for an invalid
       history or invalid bounds (rules of step 6, including hist_dT_shape[0] ==
@@ -264,10 +266,10 @@ sub_steps:
       model; linear interpolation of TVD, of the angles or of the tangent between stations is not allowed.
       Returns: a Python float for a scalar md_query, otherwise a numpy float array with the shape of md_query.
       Absolute accuracy: 1e-6 m.
-      Errors: ValueError if the survey arrays are not 1-D of equal length with >= 2 stations, contain a
-      non-finite value, do not start at MD 0 or do not increase strictly, if any inclination is outside
-      [0, 180), if the dogleg between two consecutive stations is within 1e-6 rad of 180 degrees (opposite
-      directions: the arc is not defined), or if a query depth is non-finite or outside [0, survey_md[-1]].
+      Errors: ValueError if the survey arrays are not 1-D of equal length with >= 2 stations, do not start
+      at MD 0 or do not increase strictly, if any inclination is outside [0, 180), if the dogleg between two
+      consecutive stations is within 1e-6 rad of 180 degrees (opposite directions: the arc is not defined),
+      or if a query depth is outside [0, survey_md[-1]].
     function_header: |-
       def true_vertical_depth(survey_md, inc_deg, azi_deg, md_query):
           """True vertical depth (m, positive down) at measured depths md_query.
@@ -292,11 +294,10 @@ sub_steps:
           Raises
           ------
           ValueError if the survey arrays are not 1-D of equal length, have fewer
-          than 2 stations, contain a non-finite value, do not start at MD 0 or do
-          not increase strictly, if any inclination is outside [0, 180), if the
-          dogleg between two consecutive stations is within 1e-6 rad of 180 degrees
-          (opposite directions: the arc is undefined), or if any query depth is
-          non-finite or outside [0, survey_md[-1]].
+          than 2 stations, do not start at MD 0 or do not increase strictly, if any
+          inclination is outside [0, 180), if the dogleg between two consecutive
+          stations is within 1e-6 rad of 180 degrees (opposite directions: the arc
+          is undefined), or if any query depth is outside [0, survey_md[-1]].
           """
     return_line: "    return tvd"
     step_background: |-
@@ -335,9 +336,8 @@ sub_steps:
       (m) for the given layers.
       Returns: tuple (R, S); two Python floats for a scalar z, otherwise two numpy float arrays with the shape
       of z. Relative accuracy: 1e-9 (absolute 1e-12 at z = 0, where R = S = 0).
-      Errors: ValueError if the layer arrays are not 1-D of equal length, any top is non-finite, the first
-      top is not 0 or tops do not increase strictly, any conductivity is non-finite or <= 0, or any depth is
-      non-finite or negative.
+      Errors: ValueError if the layer arrays are not 1-D of equal length, the first top is not 0 or tops do
+      not increase strictly, any conductivity is <= 0, or any depth is negative.
     function_header: |-
       def layer_integrals(layer_top_tvd, layer_k, z):
           """Depth functions R(z), S(z) of the steady layered geotherm T = T0 + q0 R - A S.
@@ -357,10 +357,9 @@ sub_steps:
 
           Raises
           ------
-          ValueError if the layer arrays are not 1-D of equal length, if any top is
-          non-finite, if the first top is not 0 or tops do not increase strictly,
-          if any conductivity is non-finite or <= 0, or if any depth is non-finite
-          or negative.
+          ValueError if the layer arrays are not 1-D of equal length, if the first
+          top is not 0 or tops do not increase strictly, if any conductivity is
+          <= 0, or if any depth is negative.
           """
     return_line: "    return (R, S)"
     step_background: |-
@@ -399,9 +398,8 @@ sub_steps:
       z = 0 the result is the present surface departure dT[0].
       Returns: a Python float for a scalar z, otherwise a numpy float array with the shape of z (any number of
       dimensions). Absolute accuracy: 1e-6 K per kelvin of the largest |dT[i]|.
-      Errors: ValueError if t_years and dT are not 1-D of equal length, contain a non-finite value,
-      t_years[0] <= 0 or t_years does not increase strictly, kappa is non-finite or <= 0, or any depth is
-      non-finite or negative.
+      Errors: ValueError if t_years and dT are not 1-D of equal length, t_years[0] <= 0 or t_years does not
+      increase strictly, kappa is <= 0, or any depth is negative.
     function_header: |-
       def paleoclimate_perturbation(z, t_years, dT, kappa):
           """Present-day temperature perturbation (K) at depth z.
@@ -430,10 +428,9 @@ sub_steps:
 
           Raises
           ------
-          ValueError if t_years and dT are not 1-D of equal length, if they
-          contain a non-finite value, if t_years[0] <= 0 or t_years does not
-          increase strictly, if kappa is non-finite or <= 0, or if any depth is
-          non-finite or negative.
+          ValueError if t_years and dT are not 1-D of equal length, if
+          t_years[0] <= 0 or t_years does not increase strictly, if kappa <= 0, or
+          if any depth is negative.
           """
     return_line: "    return dT_z"
     step_background: |-
@@ -479,8 +476,7 @@ sub_steps:
       a Python float.
       Accuracy: T0 and g within 1e-9 K and q0 within 1e-12 W m^-2 of the exact least-squares solution, the
       three standard errors within a relative 1e-6, and rms_residual within 1e-9 K.
-      Errors: ValueError for unequal lengths, n < 4, non-finite values, A < 0 or non-finite, or an
-      unresolvable design as defined above.
+      Errors: ValueError for unequal lengths, n < 4, A < 0, or an unresolvable design as defined above.
     function_header: |-
       def fit_heat_flow(T, R, S, P, A):
           """Least-squares fit of  T = T0 + q0 R - A S + g P.
@@ -504,10 +500,10 @@ sub_steps:
 
           Raises
           ------
-          ValueError for unequal lengths, n < 4, non-finite values, A < 0 or
-          non-finite, or an unresolvable design: one of the columns 1, R, P is all
-          zero, or the smallest singular value of the n x 3 matrix [1, R, P] with
-          each column scaled to unit length is below 1e-8 (e.g. P proportional to R).
+          ValueError for unequal lengths, n < 4, A < 0, or an unresolvable design:
+          one of the columns 1, R, P is all zero, or the smallest singular value of
+          the n x 3 matrix [1, R, P] with each column scaled to unit length is below
+          1e-8 (e.g. P proportional to R).
           """
     return_line: "    return result"
     step_background: |-
@@ -548,10 +544,10 @@ sub_steps:
       Returns: a Python float for a scalar z, otherwise a numpy float array with the shape of z. Absolute
       accuracy: 1e-8 K per kelvin of the largest |dT[i]|, at every depth and for every history, layering and
       conductivity contrast. It must handle up to 1000 depths, 50 layers and 20 history intervals in one call.
-      Errors: ValueError if the layer arrays are not 1-D of equal length with at least one layer, any top is
-      non-finite, the first top is not 0 or the tops do not increase strictly, any conductivity is non-finite
-      or <= 0, rho_c is non-finite or <= 0, t_years and dT are not 1-D of equal length, contain a non-finite
-      value, t_years[0] <= 0 or t_years does not increase strictly, or any depth is non-finite or negative.
+      Errors: ValueError if the layer arrays are not 1-D of equal length with at least one layer, the first
+      top is not 0 or the tops do not increase strictly, any conductivity is <= 0, rho_c is <= 0, t_years and
+      dT are not 1-D of equal length, t_years[0] <= 0 or t_years does not increase strictly, or any depth is
+      negative.
     function_header: |-
       def layered_paleoclimate_perturbation(z, layer_tops, layer_k, rho_c, t_years, dT):
           """Present-day temperature perturbation (K) at depth z in a layered column.
@@ -580,11 +576,9 @@ sub_steps:
 
           Raises
           ------
-          ValueError for invalid layers (not 1-D of equal length, no layer, a
-          non-finite top, first top not 0, tops not strictly increasing,
-          non-finite or non-positive conductivity), rho_c non-finite or <= 0, an
-          invalid history (as in step 3), or a depth that is non-finite or
-          negative.
+          ValueError for invalid layers (not 1-D of equal length, no layer, first
+          top not 0, tops not strictly increasing, a non-positive conductivity),
+          rho_c <= 0, an invalid history (as in step 3), or a negative depth.
           """
     return_line: "    return dT_z"
     step_background: |-
@@ -659,11 +653,10 @@ sub_steps:
       5e-4; the four standard errors within a relative 5e-3; t_end_low and t_end_high within a relative 5e-4;
       rms_residual within a relative 1e-3; n_used exact. These limits include the errors propagated from the stated
       accuracies of steps 1, 2 and 5.
-      Errors: ValueError if log_md and log_temp are not 1-D arrays of equal length or log_temp contains a non-finite
-      value; if hist_dT_shape is not 1-D with at least 2 entries, hist_t_years is not 1-D with exactly
-      len(hist_dT_shape) - 1 entries, either contains a non-finite value, hist_t_years[0] <= 0 or hist_t_years does
-      not increase strictly; if hist_dT_shape[0] == hist_dT_shape[1] (t_end then has no effect); if t_end_bounds is
-      not two finite numbers with 0 < t_lo < t_hi < hist_t_years[0]; if heat_production is negative or non-finite; if
+      Errors: ValueError if log_md and log_temp are not 1-D arrays of equal length; if hist_dT_shape is not 1-D with
+      at least 2 entries, hist_t_years is not 1-D with exactly len(hist_dT_shape) - 1 entries, hist_t_years[0] <= 0
+      or hist_t_years does not increase strictly; if hist_dT_shape[0] == hist_dT_shape[1] (t_end then has no effect);
+      if t_end_bounds is not two numbers with 0 < t_lo < t_hi < hist_t_years[0]; if heat_production is negative; if
       any earlier step raises (invalid survey, layer tops or log depths beyond the last survey station, invalid
       conductivities or rho_c); if fewer than 5 readings have TVD >= z_min; if T0, q0 and g are not separately
       resolvable at t_end (criterion of step 4); if the minimum of RSS(t) over [t_lo, t_hi] is attained at t_lo or
@@ -725,11 +718,11 @@ sub_steps:
 
           Raises
           ------
-          ValueError for invalid log arrays or a non-finite temperature, an invalid
-          history (hist_dT_shape 1-D with >= 2 entries, hist_t_years 1-D with one
-          entry fewer, finite, positive, strictly increasing), hist_dT_shape[0] ==
-          hist_dT_shape[1], invalid t_end_bounds, heat_production negative or
-          non-finite, any error of an earlier step, fewer than 5 readings with TVD
+          ValueError for invalid log arrays, an invalid history (hist_dT_shape
+          1-D with >= 2 entries, hist_t_years 1-D with one entry fewer, positive,
+          strictly increasing), hist_dT_shape[0] == hist_dT_shape[1], invalid
+          t_end_bounds, a negative heat_production, any error of an earlier
+          step, fewer than 5 readings with TVD
           >= z_min, T0, q0 and g not separately resolvable at t_end (criterion of
           step 4), a minimum of RSS(t) over [t_lo, t_hi] attained at t_lo or t_hi,
           or a nearest threshold crossing that does not exist inside [t_lo, t_hi].
@@ -820,14 +813,14 @@ sub_steps:
       within 0.1 (absolute); n_used exact. These limits include the errors propagated from the stated accuracies of
       steps 1, 2 and 5.
       Errors: ValueError if holes is not a list or tuple of at least 2 dicts that each have exactly the ten keys above;
-      for any hole, if log_md and log_temp are not 1-D arrays of equal length, log_temp contains a non-finite value, the
-      heat production is negative or non-finite, an earlier step raises (invalid survey, layer tops or log depths beyond
+      for any hole, if log_md and log_temp are not 1-D arrays of equal length, the heat
+      production is negative, an earlier step raises (invalid survey, layer tops or log depths beyond
       the last survey station, invalid conductivities or rho_c), fewer than 8 readings have TVD >= z_min, or T0_h and
       q0_h are not separately resolvable (the smallest singular value of the n_h x 2 matrix [1, R_h] with each column
       scaled to unit length is below 1e-8, for example when all used readings are at one depth); for the history and the
       bounds, by the rules of step 6 (hist_dT_shape 1-D with at least 2 entries, hist_t_years 1-D with exactly
-      len(hist_dT_shape) - 1 entries, both finite, hist_t_years[0] > 0 and strictly increasing, hist_dT_shape[0] !=
-      hist_dT_shape[1], t_end_bounds two finite numbers with 0 < t_lo < t_hi < hist_t_years[0]); if the maximum of l_p
+      len(hist_dT_shape) - 1 entries, hist_t_years[0] > 0 and strictly increasing, hist_dT_shape[0] !=
+      hist_dT_shape[1], t_end_bounds two numbers with 0 < t_lo < t_hi < hist_t_years[0]); if the maximum of l_p
       over [t_lo, t_hi] is attained at t_lo or t_hi; or if a nearest crossing does not exist inside [t_lo, t_hi].
       Earlier functions you may use: true_vertical_depth (step 1), layer_integrals (step 2) and
       layered_paleoclimate_perturbation (step 5).
@@ -890,8 +883,8 @@ sub_steps:
           ------
           ValueError if holes is not a list or tuple of at least 2 dicts with exactly
           these keys; for a hole with log arrays that are not 1-D of equal length, a
-          non-finite temperature, a negative or non-finite heat production, any error
-          of an earlier step, fewer than 8 readings with TVD >= z_min, or T0_h and
+          negative heat production, any error of an earlier step, fewer than 8
+          readings with TVD >= z_min, or T0_h and
           q0_h not separately resolvable (smallest singular value of the n_h x 2
           matrix [1, R_h] with unit-length columns below 1e-8); for an invalid
           history or invalid bounds (rules of step 6, including hist_dT_shape[0] ==

@@ -32,10 +32,8 @@ def layered_paleoclimate_perturbation(z, layer_tops, layer_k, rho_c, t_years, dT
 
     Raises
     ------
-    ValueError for invalid layers (not 1-D of equal length, no layer, a
-    non-finite top, first top not 0, tops not strictly increasing,
-    non-finite or non-positive conductivity), rho_c non-finite or <= 0, an
-    invalid history (as in step 3), or a depth that is non-finite or
-    negative.
+    ValueError for invalid layers (not 1-D of equal length, no layer, first
+    top not 0, tops not strictly increasing, a non-positive conductivity),
+    rho_c <= 0, an invalid history (as in step 3), or a negative depth.
     """
     raise NotImplementedError

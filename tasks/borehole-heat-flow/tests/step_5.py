@@ -287,7 +287,7 @@ import numpy as np
 
 def _crown_case():
     import numpy as np
-    for case in ["top0", "order", "k0", "knan", "len", "rc", "rcnan", "t0", "t_order", "dT_nan", "hist_len", "zneg", "znan", "two_d", "empty", "top_nan", "t_nan", "hist_two_d"]:
+    for case in ["top0", "order", "k0", "len", "rc", "t0", "t_order", "hist_len", "zneg", "two_d", "empty", "hist_two_d"]:
         _t_msg = " (case %r)" % (case,)
         z, tops, k, rc, t, d = 100.0, [0.0, 200.0], [2.0, 3.0], 2.5e6, [1e3, 1e4], [0.5, -1.0]
         if case == "top0":
@@ -297,20 +297,14 @@ def _crown_case():
             k = [2.0, 3.0, 2.5]
         elif case == "k0":
             k = [2.0, 0.0]
-        elif case == "knan":
-            k = [2.0, float("nan")]
         elif case == "len":
             k = [2.0]
         elif case == "rc":
             rc = 0.0
-        elif case == "rcnan":
-            rc = float("nan")
         elif case == "t0":
             t = [0.0, 1e4]
         elif case == "t_order":
             t = [1e4, 1e3]
-        elif case == "dT_nan":
-            d = [0.5, float("nan")]
         elif case == "hist_len":
             d = [0.5]
         elif case == "zneg":
@@ -319,14 +313,8 @@ def _crown_case():
             tops, k = [[0.0, 200.0]], [[2.0, 3.0]]          # equal shapes, but not 1-D
         elif case == "empty":
             tops, k = [], []                                 # no layer at all
-        elif case == "top_nan":
-            tops, k = [0.0, float("nan"), 500.0], [2.0, 3.0, 2.5]
-        elif case == "t_nan":
-            t = [1e3, float("nan")]
-        elif case == "hist_two_d":
-            t, d = [[1e3, 1e4]], [[0.5, -1.0]]               # equal shapes, but not 1-D
         else:
-            z = float("nan")
+            t, d = [[1e3, 1e4]], [[0.5, -1.0]]               # equal shapes, but not 1-D
         try:
             layered_paleoclimate_perturbation(z, tops, k, rc, t, d)
         except ValueError:

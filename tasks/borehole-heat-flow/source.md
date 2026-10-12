@@ -52,7 +52,7 @@ All data are synthetic and built inside each test case (no data file). Each case
   contrasted hole (38, F 4.13 against 3.84, asymmetric 7728-10729 yr); uniform column with the collar reading at
   z_min = 0 (121); short glaciation with a second minimum at 23.97 ka (0.54 Delta above RSS_min) and a second call
   whose bounds contain both basins; end-point minima and a precise log with the minimum 55 years inside either
-  bound; uncontained intervals; five readings (F(1, 1) = 161.4) and 29 invalid inputs.
+  bound; uncontained intervals; five readings (F(1, 1) = 161.4) and 24 invalid inputs.
 - Step 7 and whole task: in whitened space u_h = L(phi_h) r_h = b_h + c_h (readings by MD, L the Prais-Winsten
   matrix); b_h orthogonal to the whitened oracle Jacobian with |b_h|^2 = n_h noise_h^2, turned on its sphere until
   the phi_h score n (sum u_i r_(i-1) + phi r_1^2) - |u|^2 phi/(1 - phi^2) vanishes; c_h in the span of the projected
@@ -69,7 +69,7 @@ All data are synthetic and built inside each test case (no data file). Each case
 | step 2 | uniform 121 (6.0, 0.50) with the collar reading; 57 (15.8, 0.25) | 6.2, 10500 | 8374.3-14770.2 | erfc oracle |
 | step 3 | 326 (2.5, 0.60); 137 (5.1, 0.45); 136 (10.1, 0.75) | 7.8, 11100 | 10496.5-11837.4 | 2nd max 17.9 ka, 9.95 below |
 | step 4 | step 0 region; precise 326, 137, 136 at 1 mK | 7.8, 11500 | precise 11445.5-11559.3 | end points, 77-yr controls |
-| step 6 | 8 of 10 readings (4.5, 0.0); 137 (8.0, 0.50) | 7.0, 10000 | 8976.6-11245.6 | smallest hole, 33 invalid |
+| step 6 | 8 of 10 readings (4.5, 0.0); 137 (8.0, 0.50) | 7.0, 10000 | 8976.6-11245.6 | smallest hole, 29 invalid |
 | step 7 | 37 (3.0, 0.90); 136 (10.0, 0.40) | 7.5, 11000 | 8694.3-14519.6 | first reading matters |
 | whole 0 | 220 (10.0, 0.80); 109 (3.4, 0.30); 136 (18.0, 0.55) | 5.0, 9800 | 9562.2-10040.9 | deep region |
 | whole 1 | 24 (2.2, 0.40); 220 (20.0, 0.65) | 6.0, 9000 | 8834.1-9169.5 | offset and order invariances |
@@ -124,7 +124,24 @@ short-glaciation regions (d ln g/d ln t_end about 2.05) the g limit binds first.
   derivative bisection; phi-score roots by Brent; step 6 crossings by Brent instead of Illinois steps, the t density
   integrated by quad); file preambles moved into the case-0 headers (the parser counts text before the first case);
   (3) problem.yaml: mutant lists and the three explanations condensed (prompts, headers, return lines and contracts
-  unchanged); (4) this file condensed. Regression: for every step 6, step 7 and whole-task case the old and new
-  constructions give the same data (largest difference 7e-15 K), targets within 1e-12 relative, thresholds within
-  5e-13 and oracle profile values within 3e-9. Rerun: crown_check in all modes (ALL OK; the two pending metadata
-  keys are the only format findings); raw folder size below 600 KiB.
+  unchanged); (4) this file condensed. Regression (every old and new case of steps 6, 7 and the whole task
+  instrumented at the points its assertions evaluate): same data (largest difference 7e-15 K), targets within about
+  3e-12 relative (sigma_amplitude, step 6 cases 1, 2, 5), thresholds within 5e-13, oracle profile values within about
+  3e-6 (step 7 case 4, precise log; 1e-7 to 4e-7 elsewhere); every above/below-threshold outcome is unchanged and the
+  smallest |l_p - threshold| at a checked point is 4.0e-3 (step 7 case 2), about 1500 times the largest difference.
+  Rerun: crown_check ref, second, mut, shift and controls ALL OK; format also listed 58 non-finite literals present
+  before the shrink (next item). The shrink had dropped the erfc oracle of step 6 case 2 (the branch-cut oracle,
+  within 3.1e-16 of erfc on that column, was used) and left a removed mutant named in verification_explanation.
+- Content-check preparation (2026-10-12, edit_label unchanged). Finding: 58 non-finite literals (platform check
+  "Edge-case inputs", blocking): 29 NaN test inputs (steps 1-5: 19; step 6 and step 7 case 6: 5 each) and 29 test
+  sentinels (math.inf as the bottom of the last layer in the layer sums, -math.inf for |phi| >= 1 in the step 7 and
+  whole-task profiles). Cause: the prompts promised ValueError for non-finite inputs and the validation cases tested
+  it. Change: NaN entries removed from the validation cases of steps 1-7 (step 6 keeps 24 invalid inputs, step 7
+  29) and the non-finite clauses from the prompts, function headers, problem_io and scaffolds (the references keep
+  their checks, now neither stated nor graded); the last layer's bottom is max(z, last top) (same arithmetic) and the
+  profile returns -1e300 for |phi| >= 1 (Nelder-Mead only compares values: same path); step 6 case 2 again uses
+  math.erfc and its closed-form time derivative (UHole, as UBore in step 7 case 2: data change 3.6e-15 K, targets
+  3e-12 relative); the removed step 6 mutant is no longer named. Regression: data, targets, thresholds and
+  oracle profile values of every step 6, step 7 and whole-task case are bitwise identical before and after, except
+  step 6 case 2 (3.0e-12 relative, the erfc change). Rerun: crown_check in all modes, ALL OK (format: only the two
+  pending metadata keys); raw folder below 600 KiB.

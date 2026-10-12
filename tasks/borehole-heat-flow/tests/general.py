@@ -27,7 +27,7 @@ def _crown_case():
 
   def g_RS(z, tops, k):  # exact layer sums
     R = S = 0.0
-    for top, bot, kk in zip(tops, list(tops[1:]) + [math.inf], k):
+    for top, bot, kk in zip(tops, list(tops[1:]) + [max(z, tops[-1])], k):
       b = min(max(z, top), bot)
       R += (b - top) / kk
       S += (b - top) * (b + top) / (2 * kk)
@@ -182,7 +182,7 @@ def _crown_case():
 
     def Fphi(self, t, ph):  # maximum over T0_h, q0_h, s_h and g
       if max(abs(p) for p in ph) >= 1.0:
-        return -math.inf
+        return -1e300
       co = []
       for h, bo in enumerate(self.bores):
         Q = np.linalg.qr(white(bo.X, ph[h]))[0]
@@ -274,7 +274,7 @@ def _crown_case():
 
   def g_RS(z, tops, k):  # exact layer sums
     R = S = 0.0
-    for top, bot, kk in zip(tops, list(tops[1:]) + [math.inf], k):
+    for top, bot, kk in zip(tops, list(tops[1:]) + [max(z, tops[-1])], k):
       b = min(max(z, top), bot)
       R += (b - top) / kk
       S += (b - top) * (b + top) / (2 * kk)
@@ -429,7 +429,7 @@ def _crown_case():
 
     def Fphi(self, t, ph):  # maximum over T0_h, q0_h, s_h and g
       if max(abs(p) for p in ph) >= 1.0:
-        return -math.inf
+        return -1e300
       co = []
       for h, bo in enumerate(self.bores):
         Q = np.linalg.qr(white(bo.X, ph[h]))[0]
@@ -538,7 +538,7 @@ def _crown_case():
 
   def g_RS(z, tops, k):  # exact layer sums
     R = S = 0.0
-    for top, bot, kk in zip(tops, list(tops[1:]) + [math.inf], k):
+    for top, bot, kk in zip(tops, list(tops[1:]) + [max(z, tops[-1])], k):
       b = min(max(z, top), bot)
       R += (b - top) / kk
       S += (b - top) * (b + top) / (2 * kk)
@@ -693,7 +693,7 @@ def _crown_case():
 
     def Fphi(self, t, ph):  # maximum over T0_h, q0_h, s_h and g
       if max(abs(p) for p in ph) >= 1.0:
-        return -math.inf
+        return -1e300
       co = []
       for h, bo in enumerate(self.bores):
         Q = np.linalg.qr(white(bo.X, ph[h]))[0]
