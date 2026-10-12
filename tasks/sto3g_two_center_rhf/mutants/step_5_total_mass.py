@@ -177,15 +177,15 @@ def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
               0.01 cm^-1 for each level.
 
     Raises:
-      ValueError if a charge is not finite or not in [1, 2], if a mass is not finite or not in
-      [1, 10] u, or if fewer than five bound vibrational levels lie below the dissociation limit.
+      ValueError if a charge is not in [1, 2], if a mass is not in [1, 10] u, or if fewer
+      than five bound vibrational levels lie below the dissociation limit.
     '''
     for z in (ZA, ZB):
         if not (np.isfinite(z) and 1.0 <= z <= 2.0):
-            raise ValueError("nuclear charges must be finite and between 1 and 2")
+            raise ValueError("nuclear charges must be between 1 and 2")
     for m in (massA, massB):
         if not (np.isfinite(m) and 1.0 <= m <= 10.0):
-            raise ValueError("nuclear masses must be finite and between 1 and 10 u")
+            raise ValueError("nuclear masses must be between 1 and 10 u")
     # Dissociation limit in this basis: as R -> infinity all cross integrals vanish and the lowest singlet
     # is the lowest of the three fragment arrangements (both electrons on A, both on B, one on each), whose
     # energies at large R are E_j + q_A q_B / R. Once the cross integrals have died out (Gaussian decay)

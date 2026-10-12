@@ -24,8 +24,8 @@ def ensemble_switching(psis, weights, a, f0, rate):
 
     Raises:
       ValueError if psis and weights are not 1-D arrays of the same nonzero length, if
-      a psi is outside [0, pi/2], if a weight is negative or not finite, if the weights
-      add up to zero, if a, f0 or rate is not a positive finite number, if a is outside
+      a psi is outside [0, pi/2], if a weight is negative, if the weights
+      add up to zero, if a, f0 or rate is not positive, if a is outside
       [40, 1000] or if f0 / rate is outside [1e5, 1e13].
     '''
     psis = np.asarray(psis, dtype=float)
@@ -35,10 +35,10 @@ def ensemble_switching(psis, weights, a, f0, rate):
     if not np.all((psis >= 0.0) & (psis <= 0.5 * np.pi)):
         raise ValueError("every psi must be between 0 and pi/2")
     if not np.all(np.isfinite(weights)) or np.any(weights < 0.0) or weights.sum() <= 0.0:
-        raise ValueError("weights must be finite, nonnegative and not all zero")
+        raise ValueError("weights must be nonnegative real numbers, not all zero")
     for name, value in (("a", a), ("f0", f0), ("rate", rate)):
         if not (np.isfinite(value) and value > 0.0):
-            raise ValueError("%s must be a positive finite number" % name)
+            raise ValueError("%s must be a positive number" % name)
     if not (40.0 <= a <= 1000.0 and 1e5 <= f0 / rate <= 1e13):
         raise ValueError("need 40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13")
     w = weights / weights.sum()

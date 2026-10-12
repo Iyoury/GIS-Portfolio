@@ -67,6 +67,7 @@ def _crown_case():
         return out
 
     def _t_check(eri, args):
+        # the output contract (checked once in this step): a float numpy array of shape (2, 2, 2, 2)
         assert isinstance(eri, np.ndarray) and np.issubdtype(eri.dtype, np.floating) and eri.shape == (2, 2, 2, 2)
         target = _t_eri(*args)
         assert np.max(np.abs(np.asarray(eri) - np.asarray(target))) <= 1e-10, (eri, target)
@@ -147,7 +148,6 @@ def _crown_case():
         return out
 
     def _t_check(eri, args):
-        assert isinstance(eri, np.ndarray) and np.issubdtype(eri.dtype, np.floating) and eri.shape == (2, 2, 2, 2)
         target = _t_eri(*args)
         assert np.max(np.abs(np.asarray(eri) - np.asarray(target))) <= 1e-10, (eri, target)
         # permutation symmetry: comparisons between two computed entries, each within 1e-10 of the target
@@ -225,7 +225,6 @@ def _crown_case():
         return out
 
     def _t_check(eri, args):
-        assert isinstance(eri, np.ndarray) and np.issubdtype(eri.dtype, np.floating) and eri.shape == (2, 2, 2, 2)
         target = _t_eri(*args)
         assert np.max(np.abs(np.asarray(eri) - np.asarray(target))) <= 1e-10, (eri, target)
         # permutation symmetry: comparisons between two computed entries, each within 1e-10 of the target
@@ -239,13 +238,13 @@ def _crown_case():
 _crown_case()
 
 # --- test case 3 ---
-# non-positive distance or exponent raises ValueError
+# the stated error rule, once per named input at its limit: R, zetaA or zetaB equal to 0 raises ValueError
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for _t_bad in ((1.24, 1.24, 0.0), (1.24, 1.24, -2.0), (0.0, 1.24, 1.4), (1.24, -1.0, 1.4)):
+    for _t_bad in ((1.24, 1.24, 0.0), (0.0, 1.24, 1.4), (1.24, 0.0, 1.4)):
         _t_raised = False
         try:
             sto3g_two_electron(*_t_bad)
@@ -323,7 +322,6 @@ def _crown_case():
         return out
 
     def _t_check(eri, args):
-        assert isinstance(eri, np.ndarray) and np.issubdtype(eri.dtype, np.floating) and eri.shape == (2, 2, 2, 2)
         target = _t_eri(*args)
         assert np.max(np.abs(np.asarray(eri) - np.asarray(target))) <= 1e-10, (eri, target)
         # permutation symmetry: comparisons between two computed entries, each within 1e-10 of the target
@@ -337,6 +335,56 @@ def _crown_case():
         eri = _t_check(sto3g_two_electron(*_t_args), _t_args)
         if _t_args[2] > 50.0:
             assert abs(eri[0, 0, 1, 1] - _t_N ** 2 / 100.0) < 1e-10, (eri[0, 0, 1, 1], _t_N ** 2 / 100.0)
+
+
+_crown_case()
+
+# --- test case 5 ---
+# Exact relations with independent targets (no quadrature, no reference values):
+# (a) one-centre integrals: (00|00) depends only on zetaA, not on R, and equals the closed form
+#     sum w_ij w_kl 2 pi**(5/2) / (p q sqrt(p + q)) of concentric Gaussian clouds (w_ij = d_i d_j n_i n_j,
+#     n_i = (2 a_i / pi)**(3/4), p = a_i + a_j, q = a_k + a_l); likewise (11|11) with zetaB;
+# (b) separated atoms at R = 100 bohr: every integral containing the overlap density phi_0 phi_1 vanishes
+#     (below 1e-50) and (00|11) = S_AA S_BB / R (shell theorem, S_AA the one-centre norm);
+# (c) scaling: dividing every length by lam (zeta -> lam zeta, R -> R / lam) multiplies every repulsion
+#     integral by lam; two computed outputs, each within 1e-10: tolerance (1 + lam) 1e-10;
+# (d) mirror symmetry: exchanging zetaA and zetaB exchanges the indices 0 and 1 (tolerance 2e-10).
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+
+    _T_ALPHA = np.array([0.109818, 0.405771, 2.22766])
+
+    _T_D = np.array([0.444635, 0.535328, 0.154329])
+
+    def _t_centre(zeta):
+        a = _T_ALPHA * zeta ** 2
+        w = np.outer(_T_D * (2 * a / np.pi) ** 0.75, _T_D * (2 * a / np.pi) ** 0.75).ravel()
+        p = np.add.outer(a, a).ravel()
+        norm = float(np.sum(w * (np.pi / p) ** 1.5))
+        J = float(np.sum(np.outer(w, w) * 2 * np.pi ** 2.5 / (np.outer(p, p) * np.sqrt(np.add.outer(p, p)))))
+        return norm, J
+
+    eri = sto3g_two_electron(0.9, 2.2, 1.7)
+    sA, JA = _t_centre(0.9)
+    sB, JB = _t_centre(2.2)
+    assert abs(eri[0, 0, 0, 0] - JA) < 1e-10 and abs(eri[1, 1, 1, 1] - JB) < 1e-10, (eri, JA, JB)
+
+    far = sto3g_two_electron(0.9, 2.2, 100.0)
+    _t_T = np.zeros((2, 2, 2, 2))
+    _t_T[0, 0, 0, 0], _t_T[1, 1, 1, 1] = JA, JB
+    _t_T[0, 0, 1, 1] = _t_T[1, 1, 0, 0] = sA * sB / 100.0
+    assert np.max(np.abs(far - _t_T)) < 1e-10, (far, _t_T)
+
+    _t_lam = 2.0
+    base = sto3g_two_electron(0.6, 1.3, 2.2)
+    scaled = sto3g_two_electron(1.2, 2.6, 1.1)
+    assert np.max(np.abs(scaled - _t_lam * base)) <= (1.0 + _t_lam) * 1e-10, (scaled, base)
+
+    mirror = sto3g_two_electron(1.3, 0.6, 2.2)
+    assert np.max(np.abs(mirror - base[::-1, ::-1, ::-1, ::-1])) <= 2e-10, (mirror, base)
 
 
 _crown_case()

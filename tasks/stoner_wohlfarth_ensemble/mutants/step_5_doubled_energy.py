@@ -21,12 +21,12 @@ def brown_relaxation(sigma, h):
                  relative error below 1e-5.
 
     Raises:
-      ValueError if sigma or h is not finite, if sigma is outside [0, 60] or if |h| > 0.9.
+      ValueError if sigma is outside [0, 60] or if |h| > 0.9.
     '''
     sigma = float(sigma)
     h = float(h)
     if not (np.isfinite(sigma) and np.isfinite(h)):
-        raise ValueError("sigma and h must be finite")
+        raise ValueError("sigma and h must be real numbers")
     if not (0.0 <= sigma <= 60.0) or abs(h) > 0.9:
         raise ValueError("need 0 <= sigma <= 60 and |h| <= 0.9")
     # MUTANT: barrier energy taken as 2 sigma (1 - z^2 - 2 h z) (E = 2 K V e read as K V e times 2)

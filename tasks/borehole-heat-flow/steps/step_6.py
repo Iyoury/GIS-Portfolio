@@ -53,21 +53,18 @@ def deglaciation_heat_flow_inversion(survey_md, survey_inc, survey_azi, log_md, 
     (n_used - 4)), F = scipy.stats.f.ppf(0.95, 1, n_used - 4), nearest to
     t_end below and above it), "rms_residual" (K, sqrt(RSS_min / n_used)) as
     Python floats, and "n_used" (int, number of readings used).
-    Accuracy (logs with rms_residual >= 1e-4 K): T0 within 2e-3 K; q0, g and
-    t_end within a relative 5e-4; the standard errors within a relative 5e-3;
-    t_end_low and t_end_high within a relative 5e-4; rms_residual within a
-    relative 1e-3; n_used exact. These limits include the errors propagated
-    from the stated accuracies of steps 1, 2 and 5.
+    Accuracy (logs with rms_residual >= 1e-4 K, q0 > 0): T0 within 2e-3 K;
+    q0, g and t_end within a relative 5e-4; the standard errors within a
+    relative 5e-3; t_end_low and t_end_high within a relative 5e-4;
+    rms_residual within a relative 1e-3; n_used exact. These limits include
+    the errors propagated from the stated accuracies of steps 1, 2 and 5.
 
     Raises
     ------
-    ValueError for invalid log arrays, an invalid history (hist_dT_shape
-    1-D with >= 2 entries, hist_t_years 1-D with one entry fewer, positive,
-    strictly increasing), hist_dT_shape[0] == hist_dT_shape[1], invalid
-    t_end_bounds, a negative heat_production, any error of an earlier
-    step, fewer than 5 readings with TVD
-    >= z_min, T0, q0 and g not separately resolvable at t_end (criterion of
-    step 4), a minimum of RSS(t) over [t_lo, t_hi] attained at t_lo or t_hi,
-    or a nearest threshold crossing that does not exist inside [t_lo, t_hi].
+    ValueError for fewer than 5 readings with TVD >= z_min, T0, q0 and g
+    not separately resolvable at t_end (criterion of step 4),
+    hist_dT_shape[0] == hist_dT_shape[1], a minimum of RSS(t) over
+    [t_lo, t_hi] attained at t_lo or t_hi, or a nearest threshold crossing
+    that does not exist inside [t_lo, t_hi].
     """
     raise NotImplementedError

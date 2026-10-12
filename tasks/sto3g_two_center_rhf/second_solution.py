@@ -21,7 +21,7 @@ def boys_function(n_max, t):
         raise ValueError("n_max must be an integer from 0 to 16")
     t_arr = np.asarray(t, dtype=float)
     if not np.all(np.isfinite(t_arr)) or np.any(t_arr < 0.0) or np.any(t_arr > 1e6):
-        raise ValueError("t must be finite with 0 <= t <= 1e6")
+        raise ValueError("t must satisfy 0 <= t <= 1e6")
     flat = t_arr.ravel()
     top = np.where(flat > 169.0, 13.0 / np.sqrt(np.maximum(flat, 169.0)), 1.0)
     panels = 8
@@ -266,10 +266,10 @@ def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
     # (no shooting, no node counting); fewer than five eigenvalues below the limit raise ValueError.
     for z in (ZA, ZB):
         if not (np.isfinite(z) and 1.0 <= z <= 2.0):
-            raise ValueError("nuclear charges must be finite and between 1 and 2")
+            raise ValueError("nuclear charges must be between 1 and 2")
     for m in (massA, massB):
         if not (np.isfinite(m) and 1.0 <= m <= 10.0):
-            raise ValueError("nuclear masses must be finite and between 1 and 10 u")
+            raise ValueError("nuclear masses must be between 1 and 10 u")
     sA, hA, jA = _k_atom(ZA, zetaA)
     sB, hB, jB = _k_atom(ZB, zetaB)
     # both electrons on A, both on B, or one on each: energies E_j + c_j / R at large R

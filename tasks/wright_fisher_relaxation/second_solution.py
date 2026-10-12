@@ -28,8 +28,6 @@ def wf_transition_matrix(N, s, u, v):
     if not 1 <= N <= 400:
         raise ValueError("need 1 <= N <= 400")
     s, u, v = float(s), float(u), float(v)
-    if not (np.isfinite(s) and np.isfinite(u) and np.isfinite(v)):
-        raise ValueError("s, u and v must be finite")
     if not (-0.5 <= s <= 0.5 and 0.0 <= u <= 0.1 and 0.0 <= v <= 0.1):
         raise ValueError("need -0.5 <= s <= 0.5 and 0 <= u, v <= 0.1")
     # Other method: each row is built from the mode outwards with the ratio
@@ -251,7 +249,7 @@ def fixation_statistics(N, s, i0):
     if not 2 <= N <= 400 or not 1 <= i0 <= N - 1:
         raise ValueError("need 2 <= N <= 400 and 1 <= i0 <= N - 1")
     s = float(s)
-    if not (np.isfinite(s) and -0.5 <= s <= 0.5):
+    if not (-0.5 <= s <= 0.5):
         raise ValueError("need -0.5 <= s <= 0.5")
     # Other method: without mutation the interior states are left within O(N) generations, so the
     # fundamental matrix G = (I - Q)^-1 of the interior states is the Neumann series of Q itself; the
@@ -293,8 +291,6 @@ def stationary_distribution(N, s, u, v):
     if not 1 <= N <= 400:
         raise ValueError("need 1 <= N <= 400")
     s, u, v = float(s), float(u), float(v)
-    if not (np.isfinite(s) and np.isfinite(u) and np.isfinite(v)):
-        raise ValueError("s, u and v must be finite")
     if not (-0.5 <= s <= 0.5 and 1e-12 <= u <= 0.1 and 1e-12 <= v <= 0.1):
         raise ValueError("need -0.5 <= s <= 0.5 and 1e-12 <= u, v <= 0.1")
     # Other method: pi on the hubs from the tree theorem of the hub skeleton, pi elsewhere as the expected
@@ -330,8 +326,6 @@ def relaxation_rate(N, s, u, v):
     if not 1 <= N <= 400:
         raise ValueError("need 1 <= N <= 400")
     s, u, v = float(s), float(u), float(v)
-    if not (np.isfinite(s) and np.isfinite(u) and np.isfinite(v)):
-        raise ValueError("s, u and v must be finite")
     if not (-0.5 <= s <= 0.5 and 1e-12 <= u <= 0.1 and 1e-12 <= v <= 0.1):
         raise ValueError("need -0.5 <= s <= 0.5 and 1e-12 <= u, v <= 0.1")
     # Other method: inverse iteration on I - P where every solve of (I - P) x = y (pi . y = 0) is done by the
@@ -399,8 +393,6 @@ def substitution_times(N, s, u, v):
     if not 1 <= N <= 400:
         raise ValueError("need 1 <= N <= 400")
     s, u, v = float(s), float(u), float(v)
-    if not (np.isfinite(s) and np.isfinite(u) and np.isfinite(v)):
-        raise ValueError("s, u and v must be finite")
     if not (-0.5 <= s <= 0.5 and 1e-12 <= u <= 0.1 and 1e-12 <= v <= 0.1):
         raise ValueError("need -0.5 <= s <= 0.5 and 1e-12 <= u, v <= 0.1")
     # Other method: the chain killed at the target, watched on the remaining hubs; the time spent per visit
@@ -446,8 +438,6 @@ def quasi_stationary(N, s, v):
     if not 1 <= N <= 400:
         raise ValueError("need 1 <= N <= 400")
     s, v = float(s), float(v)
-    if not (np.isfinite(s) and np.isfinite(v)):
-        raise ValueError("s and v must be finite")
     if not (-0.5 <= s <= 0.5 and 1e-12 <= v <= 0.1):
         raise ValueError("need -0.5 <= s <= 0.5 and 1e-12 <= v <= 0.1")
     # Other method: inverse iteration for the left Perron vector, y (I - Q) = x solved by the hub
@@ -520,8 +510,6 @@ def fastest_mode(N, s, u, v):
     if not 1 <= N <= 400:
         raise ValueError("need 1 <= N <= 400")
     s, u, v = float(s), float(u), float(v)
-    if not (np.isfinite(s) and np.isfinite(u) and np.isfinite(v)):
-        raise ValueError("s, u and v must be finite")
     if not (-0.5 <= s <= 0.5 and 0.0 <= u <= 0.1 and 0.0 <= v <= 0.1):
         raise ValueError("need -0.5 <= s <= 0.5 and 0 <= u, v <= 0.1")
     if 0.0 < u < 1e-12 or 0.0 < v < 1e-12:

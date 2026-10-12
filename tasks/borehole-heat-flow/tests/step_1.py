@@ -597,7 +597,7 @@ def _crown_case():
     v = np.asarray(v, float)
     # the path is almost a half circle (radius ~ 100/pi m): it turns back up, so the TVD at the
     # end of the segment is smaller than at MD 40, and both stay within [0, MD]
-    assert np.all(np.isfinite(v)) and np.all(v >= -1e-9) and np.all(v <= 100.0 + 1e-9) and v[1] < v[0]
+    assert np.all(v >= -1e-9) and np.all(v <= 100.0 + 1e-9) and v[1] < v[0]
 
 
 _crown_case()

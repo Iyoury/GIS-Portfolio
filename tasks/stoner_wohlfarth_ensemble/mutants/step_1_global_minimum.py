@@ -20,12 +20,12 @@ def branch_magnetization(h, psi):
          |h + h_sw(psi)| >= 1e-3.
 
     Raises:
-      ValueError if psi is outside [0, pi/2] or h is not finite.
+      ValueError if psi is outside [0, pi/2].
     '''
     h = float(h)
     psi = float(psi)
     if not np.isfinite(h) or not (0.0 <= psi <= 0.5 * np.pi):
-        raise ValueError("h must be finite and psi must be between 0 and pi/2")
+        raise ValueError("h must be a real number and psi must be between 0 and pi/2")
     # Switching field: e' = 0 and e'' = 0 together give the astroid
     # h_sw = (cos(psi)**(2/3) + sin(psi)**(2/3))**(-3/2).
     # cos(pi/2) is 6e-17 in floating point, which alone would put h_sw 2e-11 below 1

@@ -33,7 +33,8 @@ def _crown_case():
         # descending branch: while two minima exist the particle is still in the one on the side of
         # the positive easy direction (cos(theta) > 0); with a single minimum there is no choice
         mins = _t_minima(h, psi)
-        assert len(mins) in (1, 2), (h, psi, mins)
+        if len(mins) not in (1, 2):
+            raise RuntimeError("grid search failed: %r" % ((h, psi, mins),))
         return float(np.cos(max(mins, key=np.cos) - psi))
 
     for _t_h, _t_p in ((2.0, 0.4), (0.0, 0.7), (-0.3, 0.35), (0.6, 1.3), (-0.2, 1.0)):
@@ -113,7 +114,8 @@ def _crown_case():
         # descending branch: while two minima exist the particle is still in the one on the side of
         # the positive easy direction (cos(theta) > 0); with a single minimum there is no choice
         mins = _t_minima(h, psi)
-        assert len(mins) in (1, 2), (h, psi, mins)
+        if len(mins) not in (1, 2):
+            raise RuntimeError("grid search failed: %r" % ((h, psi, mins),))
         return float(np.cos(max(mins, key=np.cos) - psi))
 
     for _t_p in (0.2, np.pi / 6, np.pi / 4, 1.0, 1.4):
@@ -161,7 +163,8 @@ def _crown_case():
         # descending branch: while two minima exist the particle is still in the one on the side of
         # the positive easy direction (cos(theta) > 0); with a single minimum there is no choice
         mins = _t_minima(h, psi)
-        assert len(mins) in (1, 2), (h, psi, mins)
+        if len(mins) not in (1, 2):
+            raise RuntimeError("grid search failed: %r" % ((h, psi, mins),))
         return float(np.cos(max(mins, key=np.cos) - psi))
 
     for _t_h, _t_p in ((-0.99, 0.0), (-1.01, 0.0), (0.5, np.pi / 2), (-0.5, np.pi / 2), (-0.9985, np.pi / 2),
@@ -213,7 +216,8 @@ def _crown_case():
         # descending branch: while two minima exist the particle is still in the one on the side of
         # the positive easy direction (cos(theta) > 0); with a single minimum there is no choice
         mins = _t_minima(h, psi)
-        assert len(mins) in (1, 2), (h, psi, mins)
+        if len(mins) not in (1, 2):
+            raise RuntimeError("grid search failed: %r" % ((h, psi, mins),))
         return float(np.cos(max(mins, key=np.cos) - psi))
 
     for _t_h, _t_p in ((-0.3, 0.2), (-0.45, 1.2), (-0.6, 0.15), (-1.7, 0.9), (3.0, 1.1)):
@@ -224,19 +228,93 @@ def _crown_case():
 _crown_case()
 
 # --- test case 4 ---
-# psi outside [0, pi/2] or a field that is not finite raises ValueError
+# psi outside [0, pi/2] (on either side) raises ValueError
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for _t_bad in ((0.3, -0.1), (0.3, 1.6), (float("nan"), 0.5), (float("inf"), 0.5)):
+    for _t_bad in ((0.3, -0.01), (0.3, np.pi / 2 + 0.01)):
         try:
             branch_magnetization(*_t_bad)
         except ValueError:
             pass
         else:
             raise AssertionError("branch_magnetization%r must raise ValueError" % (_t_bad,))
+
+
+_crown_case()
+
+# --- test case 5 ---
+# exact parametric form of the equilibrium curve: e'(theta) = 0 gives h = -sin(2 theta) / (2 sin(theta - psi)),
+# so each angle theta of the followed minimum (between the fold angle, where tan(theta)**3 = -tan(psi), and
+# psi, with e'' > 0) fixes a field h and m = cos(theta - psi) without any root finding; the minimum left
+# after the jump is theta + pi at the field -h (the energy at h is the energy at -h shifted by pi).
+# h_sw = -h(fold angle). Fields at least 1.5e-3 away from the jump.
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+
+    def _t_h_of(t, psi):
+        return -np.sin(2.0 * t) / (2.0 * np.sin(t - psi))
+
+    _t_n = 0
+    for _t_p in (0.05, 0.3, 0.9, 1.3, 1.55, np.pi / 2 - 1e-6):
+        _t_fold = -np.arctan(np.tan(_t_p) ** (1.0 / 3.0))
+        _t_hsw = -_t_h_of(_t_fold, _t_p)
+        for _t_u in (0.004, 0.02, 0.08, 0.2, 0.35, 0.5, 0.65, 0.8, 0.9, 0.96, 0.99, 0.998):
+            t = _t_fold + _t_u * (_t_p - _t_fold)
+            h = _t_h_of(t, _t_p)
+            if np.cos(2.0 * t) + h * np.cos(t - _t_p) <= 0.0:
+                raise RuntimeError("not a minimum: %r" % ((_t_p, t, h),))
+            if h + _t_hsw >= 1.5e-3:
+                # still in the followed minimum
+                m = branch_magnetization(h, _t_p)
+                assert abs(m - np.cos(t - _t_p)) < 1e-8, (_t_p, h, m, np.cos(t - _t_p))
+                _t_n += 1
+            if h > _t_hsw + 1.5e-3:
+                # the reversed field -h is beyond -h_sw: the particle sits in the minimum theta + pi
+                m = branch_magnetization(-h, _t_p)
+                assert abs(m + np.cos(t - _t_p)) < 1e-8, (_t_p, -h, m, -np.cos(t - _t_p))
+                _t_n += 1
+    if _t_n < 60:
+        raise RuntimeError("too few points: %d" % _t_n)
+
+
+_crown_case()
+
+# --- test case 6 ---
+# psi = pi/4 in closed form (h_sw = 1/2 there). With u = theta - pi/4, e'(theta) = 0 reads
+# sin(u)**2 - h sin(u) - 1/2 = 0, so sin(u) = (h -+ sqrt(h**2 + 2)) / 2, and e'' = cos(u) (h - 2 sin(u)).
+# The followed minimum has sin(u) = (h - sqrt(h**2 + 2)) / 2 with cos(u) > 0 (it exists while h > -1/2);
+# after the jump the minimum has sin(u) = (h + sqrt(h**2 + 2)) / 2 with cos(u) < 0; m = cos(u), evaluated
+# with 40 digits. Fields include |h + h_sw| = 1e-3 (h = -0.499 and h = -0.501), the inclusive ends of the
+# accurate range.
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+    import mpmath as _t_mp
+
+    def _t_m45(h):
+        with _t_mp.workdps(40):
+            h = _t_mp.mpf(h)
+            r = _t_mp.sqrt(h * h + 2)
+            if h > -0.5:
+                s = (h - r) / 2
+                return float(_t_mp.sqrt(1 - s * s))
+            s = (h + r) / 2
+            return -float(_t_mp.sqrt(1 - s * s))
+
+    for _t_h in (6.0, 1.0, 0.5, 0.2, 0.0, -0.2, -0.4, -0.47, -0.499):
+        m = branch_magnetization(_t_h, np.pi / 4)
+        assert abs(m - _t_m45(_t_h)) < 1e-8, (_t_h, m, _t_m45(_t_h))
+    for _t_h in (-0.501, -0.53, -0.7, -1.0, -3.0):
+        m = branch_magnetization(_t_h, np.pi / 4)
+        assert abs(m - _t_m45(_t_h)) < 1e-8, (_t_h, m, _t_m45(_t_h))
 
 
 _crown_case()

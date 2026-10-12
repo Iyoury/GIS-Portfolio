@@ -5,9 +5,10 @@
 # |p| <= 60 Fourier modes), solved by its own matrix continued fraction. dv/di from the
 # fourth-order central difference [8 (f(i+h) - f(i-h)) - (f(i+2h) - f(i-2h))] / (12 h) with
 # h = 1e-3 (no analytic derivative).
-# Error budget of this target (13 tested points, against N = 220, |p| <= 110 with the same
-# stencil): v within 5e-5 of its tolerance 1e-7 |v| + 1e-12, dv/di within 1e-12 relative except
-# at the smallest tested voltage (v near 4.6e-9). Against the analytic dv/di of an expansion
+# Error budget of this target (all 14 points where it is used in step 6 and in the whole-task
+# tests, against N = 220, |p| <= 110 with the same stencil): v within 5e-5 of its tolerance
+# 1e-7 |v| + 1e-12, dv/di within 1.1e-12 relative except at the smallest tested voltage
+# (v near 4.6e-9, where it is within 1.8e-7). Against the analytic dv/di of an expansion
 # about v = 0 the stencil differs by below 1e-9 relative, except at that voltage, where the
 # stencil truncation (about 2.6e-7) and the rounding in the shifted basis (v is about 1e-7 of v0)
 # leave an error of about 3e-7 relative (about 3 per cent of the 1e-5 tolerance).

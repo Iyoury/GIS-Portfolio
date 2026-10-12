@@ -212,10 +212,10 @@ def _crown_case():
         ps, qs = (1 + s) * i / den, (N - i) / den
         pm, qm = (1 - u) * ps + v * qs, u * ps + (1 - v) * qs
         jj = np.arange(N + 1.0)[None, :]
-        with np.errstate(divide="ignore", invalid="ignore"):
-            # log10 of the exact entries (estimate), -inf or nan where an exact entry is zero
-            est = (_t_g(N + 1.0) - _t_g(jj + 1.0) - _t_g(N - jj + 1.0) + jj * np.log(pm)[:, None]
-                   + (N - jj) * np.log(qm)[:, None]) / np.log(10.0)
+        # log10 of the exact entries (estimate); a zero p_mut or q_mut is replaced by 1e-300, which puts every
+        # entry whose exact value is zero below 1e-300 and leaves the others unchanged
+        lpm, lqm = np.log(np.maximum(pm, 1e-300))[:, None], np.log(np.maximum(qm, 1e-300))[:, None]
+        est = (_t_g(N + 1.0) - _t_g(jj + 1.0) - _t_g(N - jj + 1.0) + jj * lpm + (N - jj) * lqm) / np.log(10.0)
         use = (est[:, 1:] > -238.0) & (est[:, :-1] > -238.0)
         j = np.arange(N, dtype=float)[None, :]
         lhs = P[:, 1:] * (j + 1.0) * qm[:, None]

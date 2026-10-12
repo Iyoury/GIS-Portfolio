@@ -28,8 +28,6 @@ def wf_transition_matrix(N, s, u, v):
     if not 1 <= N <= 400:
         raise ValueError("need 1 <= N <= 400")
     s, u, v = float(s), float(u), float(v)
-    if not (np.isfinite(s) and np.isfinite(u) and np.isfinite(v)):
-        raise ValueError("s, u and v must be finite")
     if not (-0.5 <= s <= 0.5 and 0.0 <= u <= 0.1 and 0.0 <= v <= 0.1):
         raise ValueError("need -0.5 <= s <= 0.5 and 0 <= u, v <= 0.1")
     i = np.arange(N + 1, dtype=float)
@@ -77,7 +75,7 @@ def fixation_statistics(N, s, i0):
     if not 2 <= N <= 400 or not 1 <= i0 <= N - 1:
         raise ValueError("need 2 <= N <= 400 and 1 <= i0 <= N - 1")
     s = float(s)
-    if not (np.isfinite(s) and -0.5 <= s <= 0.5):
+    if not (-0.5 <= s <= 0.5):
         raise ValueError("need -0.5 <= s <= 0.5")
     P = wf_transition_matrix(N, s, 0.0, 0.0)
     n = N + 1
@@ -149,8 +147,6 @@ def stationary_distribution(N, s, u, v):
     if not 1 <= N <= 400:
         raise ValueError("need 1 <= N <= 400")
     s, u, v = float(s), float(u), float(v)
-    if not (np.isfinite(s) and np.isfinite(u) and np.isfinite(v)):
-        raise ValueError("s, u and v must be finite")
     if not (-0.5 <= s <= 0.5 and 1e-12 <= u <= 0.1 and 1e-12 <= v <= 0.1):
         raise ValueError("need -0.5 <= s <= 0.5 and 1e-12 <= u, v <= 0.1")
     A = wf_transition_matrix(N, s, u, v).copy()
@@ -195,8 +191,6 @@ def relaxation_rate(N, s, u, v):
     if not 1 <= N <= 400:
         raise ValueError("need 1 <= N <= 400")
     s, u, v = float(s), float(u), float(v)
-    if not (np.isfinite(s) and np.isfinite(u) and np.isfinite(v)):
-        raise ValueError("s, u and v must be finite")
     if not (-0.5 <= s <= 0.5 and 1e-12 <= u <= 0.1 and 1e-12 <= v <= 0.1):
         raise ValueError("need -0.5 <= s <= 0.5 and 1e-12 <= u, v <= 0.1")
     P = wf_transition_matrix(N, s, u, v)
@@ -283,8 +277,6 @@ def substitution_times(N, s, u, v):
     if not 1 <= N <= 400:
         raise ValueError("need 1 <= N <= 400")
     s, u, v = float(s), float(u), float(v)
-    if not (np.isfinite(s) and np.isfinite(u) and np.isfinite(v)):
-        raise ValueError("s, u and v must be finite")
     if not (-0.5 <= s <= 0.5 and 1e-12 <= u <= 0.1 and 1e-12 <= v <= 0.1):
         raise ValueError("need -0.5 <= s <= 0.5 and 1e-12 <= u, v <= 0.1")
     P = wf_transition_matrix(N, s, u, v)
@@ -349,8 +341,6 @@ def quasi_stationary(N, s, v):
     if not 1 <= N <= 400:
         raise ValueError("need 1 <= N <= 400")
     s, v = float(s), float(v)
-    if not (np.isfinite(s) and np.isfinite(v)):
-        raise ValueError("s and v must be finite")
     if not (-0.5 <= s <= 0.5 and 1e-12 <= v <= 0.1):
         raise ValueError("need -0.5 <= s <= 0.5 and 1e-12 <= v <= 0.1")
     P = wf_transition_matrix(N, s, 0.0, v)
@@ -437,8 +427,6 @@ def fastest_mode(N, s, u, v):
     if not 1 <= N <= 400:
         raise ValueError("need 1 <= N <= 400")
     s, u, v = float(s), float(u), float(v)
-    if not (np.isfinite(s) and np.isfinite(u) and np.isfinite(v)):
-        raise ValueError("s, u and v must be finite")
     if not (-0.5 <= s <= 0.5 and 0.0 <= u <= 0.1 and 0.0 <= v <= 0.1):
         raise ValueError("need -0.5 <= s <= 0.5 and 0 <= u, v <= 0.1")
     if 0.0 < u < 1e-12 or 0.0 < v < 1e-12:

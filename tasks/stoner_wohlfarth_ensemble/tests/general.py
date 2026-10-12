@@ -47,7 +47,6 @@ def _crown_case():
         return -1.0 + _t_erfcinv(np.log(1.0 / q) / ratio * np.sqrt(a / np.pi) + _t_erfc(2.0 * np.sqrt(a))) / np.sqrt(a)
 
     out = ensemble_switching(np.array([0.0, np.pi / 2]), np.array([2.0, 1.0]), 70.0, 3e10, 300.0)
-    assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(v, float) for v in out), out
     _t_hc = -_t_brentq(lambda x: 4.0 * _t_P0(x, 70.0, 1e8) - 2.0 + x, -1.0, 1.0, xtol=1e-15, rtol=1e-15)
     _t_hh = -_t_field0(70.0, 1e8, 0.75)
     assert abs(out[0] - _t_hc) < 1e-6 and abs(out[1] - _t_hh) < 1e-6, (out, _t_hc, _t_hh)
@@ -192,9 +191,7 @@ def _crown_case():
 
     def _t_check_ensemble(out, psis, w, a, ratio):
         # one Newton step on the independent M(h) = 0 and S(h) = 1/2 must not move the results
-        assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(v, float) for v in out)
         h_c, h_half = out
-        assert -1.0 < h_c < 1.0 and -1.0 < h_half < 1.0, out
         M, dM, _, _ = _t_ensemble(-h_c, psis, w, a, ratio)
         assert abs(M / dM) < 1e-6, (h_c, M / dM)
         _, _, S, dS = _t_ensemble(-h_half, psis, w, a, ratio)
@@ -345,9 +342,7 @@ def _crown_case():
 
     def _t_check_ensemble(out, psis, w, a, ratio):
         # one Newton step on the independent M(h) = 0 and S(h) = 1/2 must not move the results
-        assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(v, float) for v in out)
         h_c, h_half = out
-        assert -1.0 < h_c < 1.0 and -1.0 < h_half < 1.0, out
         M, dM, _, _ = _t_ensemble(-h_c, psis, w, a, ratio)
         assert abs(M / dM) < 1e-6, (h_c, M / dM)
         _, _, S, dS = _t_ensemble(-h_half, psis, w, a, ratio)

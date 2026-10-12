@@ -55,7 +55,13 @@ metadata:
     spectrum, N = 1 and N = 2 closed forms, the exact allele-relabeling symmetry) and from extended-precision
     recomputation by a different method: the transition matrix from mpmath binomials with plain LU solves, mpmath
     eig and inverse iteration at 40 to 400 digits, the N = 400 targets of steps 2 to 7 computed once at 400 digits
-    and stored inline. The whole-task tests call every step, compare the final function (and the gap, passage
+    and stored inline. Further independent checks: the binomial ratio identity P[i, j + 1] (j + 1) q_i =
+    P[i, j] (N - j) p_i on every entry above 1e-238 of N = 400 matrices; the exact neutral stationary moments up to
+    the fourth (a triangular system solved in rational arithmetic); the origin-fixation limit of the one-way
+    absorption rate, N v pi_A with pi_A from an extended-precision LU solve; a t_up of about 3.45e290 generations at
+    N = 400, next to the excluded corner, from plain LU at 380 and 450 digits; and lambda_min and the mode of small chains
+    from the Faddeev-LeVerrier characteristic polynomial in rational arithmetic and a null-vector solve, without any
+    eigensolver or inverse iteration. The whole-task tests call every step, compare the final function (and the gap, passage
     times, stationary and quasi-stationary distributions) with extended precision, and check identities between the
     steps: the stationary distribution and, with u = 0, the quasi-stationary distribution are orthogonal to the
     fastest mode, lambda_min lies below 1 - gap and below 1 - rate, and with rare mutations gap = 1 / t_up + 1 / t_down,
@@ -566,7 +572,7 @@ sub_steps:
       lambda_k = (1 - u - v)**k N! / (N**k (N - k)!) (Feller 1951; Cannings 1974): the k-th mode is a
       polynomial of degree k in the allele frequency, damped by drift and mutation. With selection the
       spectrum has no closed form.
-    n_test_cases: 7
+    n_test_cases: 8
     contract:
       quantity: Smallest eigenvalue of the Wright-Fisher transition matrix and its right eigenvector.
       assumptions: Wright-Fisher chain of step 1 with u and v each either 0 or in [1e-12, 0.1]; absorbing states when u = 0 or v = 0; real positive eigenvalues.

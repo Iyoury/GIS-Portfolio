@@ -31,7 +31,7 @@ def fixation_statistics(N, s, i0):
     if not 2 <= N <= 400 or not 1 <= i0 <= N - 1:
         raise ValueError("need 2 <= N <= 400 and 1 <= i0 <= N - 1")
     s = float(s)
-    if not (np.isfinite(s) and -0.5 <= s <= 0.5):
+    if not (-0.5 <= s <= 0.5):
         raise ValueError("need -0.5 <= s <= 0.5")
     P = wf_transition_matrix(N, s, 0.0, 0.0)
     n = N + 1

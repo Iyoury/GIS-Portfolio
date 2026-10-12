@@ -31,9 +31,10 @@ All data are synthetic and built inside each test case (no data file). Each case
   under a deep stack, six random columns against quad of 1/k and z/k.
 - Step 3: erfc forms with math.erfc (down to 0.05 m under a 2-year interval), a multistep history checked by Duhamel
   convolution (5e-9 K), linearity and decay.
-- Step 4: exact recovery on noise-free designs (n = 4 included), numpy.linalg.lstsq with the OLS covariance, and a
-  P column with prescribed scaled singular values (3e-9 rejected, 3e-8 fitted).
-- Step 5: the erfc half-space, the Carslaw-Jaeger image series, 90-digit mpmath values (transfer-matrix transform,
+- Step 4: exact recovery on noise-free designs (n = 4 included), numpy.linalg.lstsq with the OLS covariance, a
+  P column with prescribed scaled singular values (3e-9 rejected, 3e-8 fitted), and a residual orthogonal to
+  [1, R, P] with rms exactly 1e-6 K (standard errors from a QR factorization of the design).
+- Step 5: the erfc half-space (also a single-layer column), the Carslaw-Jaeger image series, 90-digit mpmath values (transfer-matrix transform,
   mpmath Talbot) for a five-layer Abitibi column and a contrasted column (five of them recomputed by forward transfer
   matrices at 40 digits: 5e-17 K), and six depths of a 50-layer column computed at 267-392 digits with fixed Talbot
   of degree 60 and 90 and Gaver-Stehfest with 60 terms (agreement 2e-16).
@@ -49,10 +50,11 @@ All data are synthetic and built inside each test case (no data file). Each case
   oracle Jacobian; F(1, nu) quantile from the integrated Student t density (agrees with scipy.stats.f.ppf to 6e-13);
   interval ends = the oracle profile's nearest crossings (outward march, root finder). Dense scans (6000 times per
   case) find no point below RSS_min. Cases: inclined 7-layer hole (326 readings, 11132.9-11891.8 yr); short
-  contrasted hole (38, F 4.13 against 3.84, asymmetric 7728-10729 yr); uniform column with the collar reading at
-  z_min = 0 (121); short glaciation with a second minimum at 23.97 ka (0.54 Delta above RSS_min) and a second call
+  contrasted hole (38, F 4.13 against 3.84, asymmetric 7728-10729 yr); uniform column without heat production, the
+  collar reading at z_min = 0 (121); short glaciation with a second minimum at 23.97 ka (0.54 Delta above RSS_min) and a second call
   whose bounds contain both basins; end-point minima and a precise log with the minimum 55 years inside either
-  bound; uncontained intervals; five readings (F(1, 1) = 161.4) and 24 invalid inputs.
+  bound; uncontained intervals; five readings (F(1, 1) = 161.4) at rms 1e-4 K with a two-value history (m = 2,
+  8725.6-11680.7 yr; 6000-point scan: single excursion below the threshold) and the three stated error rules.
 - Step 7 and whole task: in whitened space u_h = L(phi_h) r_h = b_h + c_h (readings by MD, L the Prais-Winsten
   matrix); b_h orthogonal to the whitened oracle Jacobian with |b_h|^2 = n_h noise_h^2, turned on its sphere until
   the phi_h score n (sum u_i r_(i-1) + phi r_1^2) - |u|^2 phi/(1 - phi^2) vanishes; c_h in the span of the projected
@@ -64,12 +66,12 @@ All data are synthetic and built inside each test case (no data file). Each case
 
 | Region | Holes: n_used (s mK, phi) | g, t_end | 95 % interval (yr) | Feature |
 |---|---|---|---|---|
-| step 0 | 163 (4.0, 0.35); 137 (12.3, 0.70); 136 (25.6, 0.85) | 7.8, 11500 | 10865.5-12178.1 | output types |
+| step 0 | 163 (4.0, 0.35); 137 (12.3, 0.70); 136 (30.0, 0.85) | 7.8, 11500 | 10864.8-12178.0 | types; s_h at 30 mK |
 | step 1, 5 | 24 (2.4, -0.30); 220 (20.0, 0.60) as two logging runs | 6.0, 9000 | 8861.8-9134.6 | MD order; case 5 containment |
-| step 2 | uniform 121 (6.0, 0.50) with the collar reading; 57 (15.8, 0.25) | 6.2, 10500 | 8374.3-14770.2 | erfc oracle |
-| step 3 | 326 (2.5, 0.60); 137 (5.1, 0.45); 136 (10.1, 0.75) | 7.8, 11100 | 10496.5-11837.4 | 2nd max 17.9 ka, 9.95 below |
-| step 4 | step 0 region; precise 326, 137, 136 at 1 mK | 7.8, 11500 | precise 11445.5-11559.3 | end points, 77-yr controls |
-| step 6 | 8 of 10 readings (4.5, 0.0); 137 (8.0, 0.50) | 7.0, 10000 | 8976.6-11245.6 | smallest hole, 29 invalid |
+| step 2 | uniform 121 (6.0, 0.50) with the collar reading; 57 (15.8, 0.25), A = 0 | 6.2, 10500 | 8374.3-14770.2 | erfc oracle |
+| step 3 | 326 (2.5, 0.60); 137 (5.1, 0.45); 136 (10.1, 0.75); then the whole 2 region | 7.8, 11100 | 10496.5-11837.4 | 2nd max 17.9 ka, 9.95 below |
+| step 4 | step 0 region (25.6 mK); precise 326, 137, 136 at 1.01, 1.00, 1.02 mK | 7.8, 11500 | precise 11446.0-11558.9 | end points, 77-yr controls |
+| step 6 | 8 of 10 readings (4.5, 0.0); 137 (8.0, 0.50); m = 2 | 7.0, 10000 | 8980.7-11239.8 | smallest hole; 7 readings raise |
 | step 7 | 37 (3.0, 0.90); 136 (10.0, 0.40) | 7.5, 11000 | 8694.3-14519.6 | first reading matters |
 | whole 0 | 220 (10.0, 0.80); 109 (3.4, 0.30); 136 (18.0, 0.55) | 5.0, 9800 | 9562.2-10040.9 | deep region |
 | whole 1 | 24 (2.2, 0.40); 220 (20.0, 0.65) | 6.0, 9000 | 8834.1-9169.5 | offset and order invariances |
@@ -145,3 +147,27 @@ short-glaciation regions (d ln g/d ln t_end about 2.05) the g limit binds first.
   oracle profile values of every step 6, step 7 and whole-task case are bitwise identical before and after, except
   step 6 case 2 (3.0e-12 relative, the erfc change). Rerun: crown_check in all modes, ALL OK (format: only the two
   pending metadata keys); raw folder below 600 KiB.
+- Pre-upload content-check emulation (2026-10-12, last version; edit_label stays difficulty_increase). Finding: an
+  emulation of the platform content check on steps 1-7 and the whole task found (1) validation outweighing computed
+  values (counted as the platform does, raises at half weight): step 6 17 vs 12, step 7 22.5 vs 14, step 5 10 vs 11,
+  repeated type/shape asserts in steps 1-3; (2) stated but untested behaviour: one-element array outputs, a single-
+  layer column, m = 2 histories, heat_production = 0, the domain ends rms_residual = 1e-4 K (step 6), s_h = 1e-3 and
+  0.03 K and phi_h = -0.9 and 0.95 (step 7), the equal-MD tie rule, the nearest-crossing rule only in general.py;
+  (3) grounding: relative accuracy of the step 4 standard errors although exact data make them 0, zero tolerance for
+  an all-zero dT, relative limits on g and q0 without q0 > 0 or g != 0. Cause: long error lists (dimensionality,
+  lengths, list types, key sets, history layout) tested one by one, and domain statements without endpoint cases.
+  Change: stated errors reduced to the scientific rules (query outside the survey, dogleg near 180 degrees; k <= 0;
+  kappa <= 0; n < 4, A < 0, unresolvable design; k or rho_c <= 0; step 6: < 5 used readings, unresolvable at t_end,
+  s_0 = s_1, end-point minimum, uncontained interval; step 7: < 8 used readings, end-point maximum, uncontained
+  interval), each tested once, the other conditions stated as input ranges (references still check them) in prompts,
+  headers, problem_io, scaffolds and contracts; one output-contract assert per step (one-element arrays included);
+  step 4 case 4 rebuilt at rms_residual = 1e-6 K (QR standard errors), the standard-error accuracy now stated for
+  rms_residual >= 1e-6 K; single-layer column (step 5); step 6 case 6 at rms 1e-4 K with m = 2; A = 0 in step 6
+  and 7 case 2 (A S is added back exactly); step 7 case 0 hole 3 at s_h = 30.0 mK and case 4 precise hole 2 at
+  1.000 mK (noise / sqrt(1 + 6.25/n)); step 7 case 6 with m = 2; step 7 case 3 also runs the whole 2 region; distinct
+  MDs required instead of the tie rule; phi domain narrowed to the tested -0.3 to 0.9 (inside the budget regions);
+  dT "not all zero", q0 > 0 and why g != 0 (g = 0 would make the profile constant) stated. After: validation vs
+  computed 2.5/23, 1.5/24, 1.5/15, 5/20, 2/12, 4.5/12, 3.5/17. Regression: every changed case run with the
+  reference, solution.py and the second solution (worst error/limit 0.018, second solution 0.009); oracle scans of
+  the changed regions (step 6 case 6: 6000 times; step 7 cases 0, 4, 6: 241-341 times) find the extremum at t_end
+  (largest excess 7.5e-12) and one interval. Rerun: see the end of this item.

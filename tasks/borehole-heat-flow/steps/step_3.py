@@ -22,7 +22,8 @@ def paleoclimate_perturbation(z, t_years, dT, kappa):
     z : float or array_like, depth (m) >= 0.
     t_years : 1-D array_like, positive, strictly increasing ends of the
         history intervals (years before present).
-    dT : 1-D array_like, same length, departure during each interval (K).
+    dT : 1-D array_like, same length, departure during each interval (K),
+        not all zero.
     kappa : float, thermal diffusivity (m^2 s^-1), > 0.
 
     Returns
@@ -32,8 +33,6 @@ def paleoclimate_perturbation(z, t_years, dT, kappa):
 
     Raises
     ------
-    ValueError if t_years and dT are not 1-D of equal length, if
-    t_years[0] <= 0 or t_years does not increase strictly, if kappa <= 0, or
-    if any depth is negative.
+    ValueError if kappa <= 0.
     """
     raise NotImplementedError

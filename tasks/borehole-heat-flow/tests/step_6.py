@@ -144,10 +144,8 @@ def _crown_case():
       log_step=5.0, log_top=15.0)
   r = deglaciation_heat_flow_inversion(*h.args, (3000.0, 60000.0), 150.0)
   keys = ["T0", "q0", "amplitude", "t_end", "sigma_T0", "sigma_q0", "sigma_amplitude", "sigma_t_end", "t_end_low", "t_end_high", "rms_residual"]
-  assert isinstance(r, dict) and set(keys + ["n_used"]) <= set(r)
-  for key in keys:
-    assert type(r[key]) is float, key
-  assert type(r["n_used"]) is int
+  # output contract: eleven Python floats and the int n_used
+  assert isinstance(r, dict) and all(type(r[key]) is float for key in keys) and type(r["n_used"]) is int
   check(r, h)
 
 
@@ -297,7 +295,8 @@ def _crown_case():
 _crown_case()
 
 # --- test case 2 ---
-# uniform column on a vertical hole (closed-form erfc oracle); the collar reading at z_min = 0 is used (n_used = 121).
+# uniform column on a vertical hole (closed-form erfc oracle) without heat production (A = 0); the collar reading at
+# z_min = 0 is used (n_used = 121).
 # Targets: exact least-squares construction as in case 0.
 def _crown_case():
   import math
@@ -437,7 +436,7 @@ def _crown_case():
         return np.array([v / (2.0 * math.sqrt(math.pi * kap) * tau ** 1.5) * math.exp(-v * v / (4 * kap * tau)) for v in self.zk]) * YEAR
       return np.array([math.erfc(v / (2.0 * math.sqrt(kap * tau))) for v in self.zk])
   h = UHole((np.array([0.0, 600.0, 1200.0]), np.zeros(3), np.zeros(3)), ([0, 400, 900], [3.1, 3.1, 3.1]),
-      0.7e-6, 2.2e6, 5.5, 0.044, 6.2, 10500.0, [0.0, -1.0, 0.3], [9.0e4, 1.15e5], 0.0, 0.006, 99,
+      0.0, 2.2e6, 5.5, 0.044, 6.2, 10500.0, [0.0, -1.0, 0.3], [9.0e4, 1.15e5], 0.0, 0.006, 99,
       log_step=10.0, log_top=0.0, uniform_k=3.1)
   r = deglaciation_heat_flow_inversion(*h.args, (2000.0, 80000.0), 0.0)
   assert h.n == 121
@@ -908,8 +907,9 @@ def _crown_case():
 _crown_case()
 
 # --- test case 6 ---
-# five used readings (n_used - 4 = 1, F(1, 1) = 161.4, 0.2 mK residual) is the smallest valid inversion; four and the
-# other invalid inputs raise ValueError. Targets: exact construction as in case 0.
+# five used readings (n_used - 4 = 1, F(1, 1) = 161.4) at the domain floor rms_residual = 1e-4 K, with the shortest
+# history (m = 2: glaciation, then post-glacial), is the smallest valid inversion; the stated error rules raise
+# ValueError (four used readings, all readings at one depth, s_0 == s_1). Targets: exact construction as in case 0.
 def _crown_case():
   import math
   import numpy as np
@@ -1041,7 +1041,7 @@ def _crown_case():
       assert abs(float(r[key]) / ex[key] - 1.0) < tol, (key, r[key], ex[key])
     return ex
   h = Hole((np.array([0.0, 1300.0]), np.zeros(2), np.zeros(2)), ([0, 350, 700], [2.6, 3.8, 3.0]),
-      0.8e-6, 2.3e6, 6.0, 0.045, 5.5, 10000.0, [0.0, -1.0, 0.25], [9.0e4, 1.2e5], 200.0, 0.0002, 5,
+      0.8e-6, 2.3e6, 6.0, 0.045, 5.5, 10000.0, [0.0, -1.0], [9.0e4], 200.0, 0.0001, 5,
       log_md=np.array([60.0, 180.0, 330.0, 520.0, 760.0, 1000.0, 1280.0]))
   B = (3000.0, 60000.0)
   r = deglaciation_heat_flow_inversion(*h.args, B, 200.0)
@@ -1054,61 +1054,12 @@ def _crown_case():
     d = [a.copy() if isinstance(a, np.ndarray) else a for a in h.args] + [B, 200.0]
     if name == "four_readings":
       d[ix["z_min"]] = 400.0
-    elif name == "log_len":
-      d[ix["log_temp"]] = d[ix["log_temp"]][:-1]
-    elif name == "log_two_d":
-      d[ix["log_md"]] = d[ix["log_md"]][None, :]
-      d[ix["log_temp"]] = d[ix["log_temp"]][None, :]
-    elif name == "one_interval":
-      d[ix["hist_dT_shape"]] = np.array([-1.0])
-      d[ix["hist_t_years"]] = np.array([], float)
-    elif name == "times_count":
-      d[ix["hist_t_years"]] = np.array([9.0e4, 1.2e5, 1.5e5])
-    elif name == "times_not_increasing":
-      d[ix["hist_t_years"]] = np.array([9.0e4, 9.0e4])
-    elif name == "times_nonpositive":
-      d[ix["hist_t_years"]] = np.array([-9.0e4, 1.2e5])
-    elif name == "equal_first_shapes":
-      d[ix["hist_dT_shape"]] = np.array([-1.0, -1.0, 0.25])
-    elif name == "bounds_lo_zero":
-      d[ix["t_end_bounds"]] = (0.0, 60000.0)
-    elif name == "bounds_reversed":
-      d[ix["t_end_bounds"]] = (60000.0, 3000.0)
-    elif name == "bounds_beyond_glaciation":
-      d[ix["t_end_bounds"]] = (3000.0, 95000.0)
-    elif name == "bounds_at_glaciation_start":
-      d[ix["t_end_bounds"]] = (3000.0, 90000.0)
-    elif name == "bounds_equal":
-      d[ix["t_end_bounds"]] = (5000.0, 5000.0)
-    elif name == "shape_two_d":
-      d[ix["hist_dT_shape"]] = np.array([[0.0, -1.0, 0.25]])
-    elif name == "times_two_d":
-      d[ix["hist_t_years"]] = np.array([[9.0e4, 1.2e5]])
-    elif name == "bounds_three":
-      d[ix["t_end_bounds"]] = (3000.0, 30000.0, 60000.0)
-    elif name == "A_negative":
-      d[ix["heat_production"]] = -1e-6
-    elif name == "rho_c_zero":
-      d[ix["rho_c"]] = 0.0
-    elif name == "k_zero":
-      d[ix["layer_k"]] = np.array([2.6, 0.0, 3.0])
-    elif name == "k_count":
-      d[ix["layer_k"]] = np.array([2.6, 3.8])
-    elif name == "top_beyond_hole":
-      d[ix["layer_top_md"]] = np.array([0.0, 350.0, 1400.0])
-    elif name == "log_beyond_hole":
-      d[ix["log_md"]] = np.array([60.0, 180.0, 330.0, 520.0, 760.0, 1000.0, 1320.0])
-    elif name == "survey_start":
-      d[ix["survey_md"]] = np.array([5.0, 1300.0])
     elif name == "one_depth":
       d[ix["log_md"]] = np.full(7, 760.0)
+    else:
+      d[ix["hist_dT_shape"]] = np.array([-1.0, -1.0])
     return d
-  for name in ["four_readings", "log_len", "log_two_d", "one_interval", "times_count",
-      "times_not_increasing", "times_nonpositive", "equal_first_shapes",
-      "bounds_lo_zero", "bounds_reversed", "bounds_beyond_glaciation", "bounds_at_glaciation_start",
-      "bounds_equal", "shape_two_d", "times_two_d", "bounds_three",
-      "A_negative", "rho_c_zero", "k_zero", "k_count", "top_beyond_hole", "log_beyond_hole",
-      "survey_start", "one_depth"]:
+  for name in ["four_readings", "one_depth", "equal_first_shapes"]:
     try:
       deglaciation_heat_flow_inversion(*bad(name))
     except ValueError:

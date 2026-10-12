@@ -20,7 +20,7 @@ def escape_barriers(h, psi):
       h_sw(psi) - |h| >= 1e-3.
 
     Raises:
-      ValueError if psi is outside [0, pi/2], if any h is not finite, or if any
+      ValueError if psi is outside [0, pi/2] or if any
       |h| >= h_sw(psi).
     '''
     raise NotImplementedError

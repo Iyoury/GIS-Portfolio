@@ -102,7 +102,7 @@ No target is copied from the reference solution. Every test computes its own tar
 | thermometric sensitivity kappa (step 4) | central difference of ln v in ln theta with step 1e-15 theta, the continued fraction evaluated at 60 + 1.8 / theta digits, at the theta returned by the candidate (since the second round of version 12; before: at the known theta) | about 1e-15 relative; compared with relative tolerance 1e-6 |
 | array criterion (step 5) | one Newton step on V(J) = v_crit with V and dV/dJ from the continued fractions must move j_star by less than the stated relative tolerance; r_diff and s_v compared with the continued-fraction sums at the returned j_star; for one junction j_star is known from the Bessel-integral voltage | j_star relative 1e-9 + 2e-9 / s, s = d ln V / d ln J of the continued-fraction array voltage (since the second round of version 12; before: relative 1e-9, see the version 12 note); r_diff and s_v relative 1e-8 |
 | array in linear response (step 5 case 6, since version 13) | v_crit = 1e-9: every junction in equilibrium, r_diff = sum r_k / I_0(c_k / theta0)**2, j_star = v_crit / r_diff, s_v = 2 theta0 r_diff (Lifson-Jackson D_k and the Einstein relation, i.e. the Johnson-Nyquist noise of the differential resistance), 40 digits | nonlinear corrections of relative order J**2, about 1e-18 at J of order 1e-9 |
-| v and dv/di with capacitance (step 6, general) | Kramers equation in Hermite functions centred at the shifted velocity v0 = 0.6 i (N = 120, |p| <= 60), its own matrix continued fraction; dv/di by the fourth-order five-point central difference (h = 1e-3); beta_c = 0 against the overdamped continued fraction; in the general test also rcsj_voltage(i, theta, 0) against mean_voltage | against N = 220, |p| <= 110 with the same stencil on the 13 tested points: v within 5e-5 of its tolerance, dv/di within 1.7e-7 relative at the smallest tested voltage (rounding in the shifted basis) and within 1e-12 elsewhere; against the analytic dv/di of the reference within about 3e-7 at that voltage (stencil truncation 2.6e-7 plus rounding) and 1e-9 elsewhere (version 12; before version 12: N = 150, |p| <= 72 and a central difference h = 1e-4, see the version 12 note) |
+| v and dv/di with capacitance (step 6, general) | Kramers equation in Hermite functions centred at the shifted velocity v0 = 0.6 i (N = 120, |p| <= 60), its own matrix continued fraction; dv/di by the fourth-order five-point central difference (h = 1e-3); beta_c = 0 against the overdamped continued fraction; in the general test also rcsj_voltage(i, theta, 0) against mean_voltage | against N = 220, |p| <= 110 with the same stencil on all 14 points where it is used (rechecked in version 13, including the 2 points of step 6 case 4): v within 5e-5 of its tolerance, dv/di within 1.8e-7 relative at the smallest tested voltage (rounding in the shifted basis) and within 1.1e-12 elsewhere; against the analytic dv/di of the reference within about 3e-7 at that voltage (stencil truncation 2.6e-7 plus rounding) and 1e-9 elsewhere (version 12; before version 12: N = 150, |p| <= 72 and a central difference h = 1e-4, see the version 12 note) |
 
 ## Version 3 changes
 
@@ -594,3 +594,85 @@ a fresh process, single-threaded BLAS (OMP_NUM_THREADS = OPENBLAS_NUM_THREADS = 
   the concatenated solution/step_*.py; every function header in problem.yaml matches the scaffold, the
   per-step solution, solution.py and the mutants that define that function, and problem_io matches the
   step 6 header.
+
+## Version 13 (grading_fix: platform content check)
+
+- Finding: the platform content check (2026-10-12) blocks non-finite literals in tests (float("nan"),
+  float("inf"), np.nan, np.inf, also inside internal helpers), even when a prompt promises a ValueError for
+  non-finite input, and it counts assertion sites per step: validation, type, shape and exception checks
+  (a raise stated in the prompt at half weight) against computed-value checks, which must clearly
+  dominate. No platform report had been received for this task; the rules were applied proactively.
+- Cause: the invalid-input case of every step listed NaN or infinite inputs (step 1: 3, step 2: 2,
+  step 3: 1, step 4: 2, step 5: 4, step 6: 6 entries), matching the "not finite" clauses of the prompts;
+  the contract check (a tuple of Python floats) was repeated in the helper of every case of steps 3 to 6
+  and of the whole-task tests, the step 3 and step 5 helpers repeated a range check of the output, and the
+  invalid-input lists tested some stated rules several times (14 entries in step 5, 13 in step 6).
+  Counted as the content check does (each listed invalid input as a stated raise at 0.5), computed :
+  validation sites were step 1 11 : 5.5, step 2 5 : 4.5, step 3 14 : 5 (plus 3 range checks),
+  step 4 16 : 10, step 5 16 : 12 (plus 5 range checks), step 6 11 : 9.5, whole task 6 : 3.
+- Change:
+  - Texts: the "not finite" clauses are removed from every agent-visible copy (step_description_prompt
+    and function_header of steps 1 to 6, problem_io, steps/, solution/, solution.py and the mutants'
+    docstrings; second_solution.py has no docstring copy). The step 5 inputs now read "entries > 0" and
+    its error rule "if a ratio theta0 / c_k is outside [0.02, 50]" (a theta0 <= 0 already gives such a
+    ratio, so the separate "theta0 not finite and positive" clause was dropped). The solutions still raise
+    on non-finite input internally. No tolerance, domain or other requirement changed; every function
+    header still matches the scaffold, the per-step solution, solution.py and the mutants, and problem_io
+    matches the step 6 header.
+  - Validation tests: every non-finite entry removed; each stated error rule is tested once just beyond
+    its limit (step 1: i = 10.01, theta = 0.0199 and 50.5; step 2: i = -10.01, theta = 0.0199 and 50.5;
+    step 3: theta = 0.0199 and 1.01; step 4: i = 0, i = 10.01, v = i and v = sqrt(i**2 - 1) at i = 2, plus
+    the two endpoint-rule probes of case 3; step 5: length mismatch, 2-D arrays, empty arrays, an r_k = 0,
+    max/min = 5.05, theta0 / c_k = 0.0195 and 50.5, v_crit = 0 and v_crit above 0.5 sum(c_k r_k); step 6:
+    |i| = 2.51, theta = 0.099 and 2.01, beta_c = 0.05 and 2.01). The contract check is kept once per step
+    (case 0) and in general case 0, the step 3 and step 5 range checks once (case 0).
+  - New computed cases with independent targets:
+    - step 1 case 5 (independent_recomputation): v and dv/di at 8 points (Arrhenius regime, crossover,
+      running state at theta = 0.02, two reversed biases, the inclusive corner i = 10, theta = 50, linear
+      response at theta = 2) against the closed form in modified Bessel functions of imaginary order,
+      v = (theta / pi) sinh(pi i / theta) / |I_{j i / theta}(1 / theta)|**2, in mpmath at 40 digits, with
+      dv/di by mpmath numerical differentiation of the same closed form at 60 digits. The closed form uses
+      no recurrence and no quadrature; on these points it reproduces the continued-fraction v exactly in
+      double precision and dv/di to 8e-15 relative. The reference is within 4e-15 relative of v and 2.6e-14 of dv/di.
+    - step 2 case 5 (independent_recomputation and an exact symmetry): D_eff at (1.05, 0.02) (giant
+      diffusion at the weakest noise), (0.97, 0.2), (1.5, 1.0), (4.0, 5.0) and (0.3, 50) against the
+      continued-fraction homogenization target, and D_eff(-1.2, 0.07) = D_eff(1.2, 0.07) between two computed
+      outputs at 2e-9 (twice the single-output tolerance). Reference within 4.5e-16.
+    - step 5 case 6 (special_case): the equilibrium linear response at v_crit = 1e-9 for two arrays
+      (c = (1, 2, 0.6), r = (1, 0.5, 1.5), theta0 = 0.5; c = (0.4, 2), r = (2, 1), theta0 = 1, max/min = 5):
+      r_diff = sum r_k / I_0(c_k / theta0)**2, j_star = v_crit / r_diff and s_v = 2 theta0 r_diff, i.e. the
+      Lifson-Jackson D_k and the Einstein relation of each junction, which together give the Johnson-Nyquist
+      noise of the differential resistance (fluctuation-dissipation theorem), at 40 digits; the nonlinear
+      corrections are of relative order J**2 (about 1e-18). Reference within 3.8e-11 (j_star; tolerance
+      3e-9), 2.2e-16 (r_diff) and 8.9e-16 (s_v). The squared_voltage_scale mutant fails it.
+    - step 6 case 4 (independent_recomputation and an exact symmetry): (0.95, 0.15, 1.8) near the bistable
+      range and (0.6, 0.25, 0.7) at the locked-to-running crossover against the shifted-basis Kramers
+      target, and v(-i) = -v(i), r_d(-i) = r_d(i) at (0.95, 0.15, 1.8) at twice the single-output
+      tolerances. The Kramers target was rechecked against N = 220, |p| <= 110 on all 14 points where it is
+      used (12 earlier ones and these 2): v within 4.9e-5 of its tolerance, dv/di within 1.8e-7 relative at
+      the smallest tested voltage and within 1.1e-12 elsewhere (the comment of step 6 case 0 and general
+      case 0 said 1e-12; it now says 1.1e-12, the measured 1.01e-12 at (-0.4, 0.15, 1.5)). At the two new
+      points the reference differs from the stencil dv/di by 2.2e-10 and 2.6e-11.
+  - Counts after the change (same counting, computed : validation): step 1 13 : 2.5, step 2 7 : 2.5,
+    step 3 14 : 2 (plus 1 range check), step 4 16 : 4, step 5 19 : 5.5 (plus 1), step 6 15 : 3.5, whole
+    task 6 : 1. n_test_cases: 6, 6, 4, 5, 7, 5 (general 2).
+  - Checked again, no change needed: no relative requirement applies to an exactly zero output (v = 0 at
+    i = 0 has the absolute rule |v| <= 1e-12 in steps 1 and 6, tested; every other graded output is
+    nonzero on its domain); the inclusive endpoints are exercised with values (steps 1 and 2: |i| = 10,
+    theta = 0.02 and 50; step 3: theta = 0.02 and 1; step 4: i = 10 and the endpoint rule at theta = 0.02
+    and 50; step 5: max/min = 5, theta0 / c_k = 0.02 and 50, v_crit = 0.5 sum(c_k r_k); step 6: |i| = 2.5,
+    theta = 0.1 and 2, beta_c = 0, 0.1 and 2); every output is a tuple of Python floats, checked once per
+    step.
+- Regression test: the new cases above (each mutant of steps 1, 2, 5 and 6 also fails its step's new
+  case); FORMAT now reports no non-finite literal.
+- Rerun (version 13, on the final files): tools/crown_check.py, all modes, every case alone in a fresh
+  process, single-threaded BLAS (OMP_NUM_THREADS = OPENBLAS_NUM_THREADS = MKL_NUM_THREADS = 1), -j 2:
+  FORMAT OK (no non-finite literal, n_test_cases match); REF step 1 6/6, step 2 6/6, step 3 4/4, step 4 5/5,
+  step 5 7/7, step 6 5/5, general 2/2; SECOND the same; mutants: forward_slips_only fails cases 0-3 and 5,
+  kramers_rate 0-3 and 5, einstein_relation 1-3 and 5, einstein_peak 0-2, kramers_inversion 0-2,
+  inverted_sensitivity 0-3, arrhenius_sensitivity 0-3, squared_voltage_scale 1-4 and 6, no_inertia,
+  velocity_noise_not_scaled and missing_thermal_velocity 0-2 and 4, whole-task velocity_noise_not_scaled
+  both general cases; SHIFT +-1e-12 every case passes (general with every evaluated function shifted);
+  all-None and all-zero controls pass 0 cases everywhere; SUMMARY ALL OK. Also rerun: the Kramers-target
+  convergence check on its 14 points, the closed-form check of step 1 case 5 against the continued
+  fraction, and the docstring-copy comparison (every header matches all its copies).

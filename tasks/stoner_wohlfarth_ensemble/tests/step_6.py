@@ -141,7 +141,6 @@ def _crown_case():
         # one Newton step on the independent M(h) = 0 and S(h) = 1/2 must not move the results
         assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(v, float) for v in out)
         h_c, h_half = out
-        assert -1.0 < h_c < 1.0 and -1.0 < h_half < 1.0, out
         M, dM, _, _ = _t_ensemble(-h_c, psis, w, a, ratio)
         assert abs(M / dM) < 1e-6, (h_c, M / dM)
         _, _, S, dS = _t_ensemble(-h_half, psis, w, a, ratio)
@@ -292,9 +291,7 @@ def _crown_case():
 
     def _t_check_ensemble(out, psis, w, a, ratio):
         # one Newton step on the independent M(h) = 0 and S(h) = 1/2 must not move the results
-        assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(v, float) for v in out)
         h_c, h_half = out
-        assert -1.0 < h_c < 1.0 and -1.0 < h_half < 1.0, out
         M, dM, _, _ = _t_ensemble(-h_c, psis, w, a, ratio)
         assert abs(M / dM) < 1e-6, (h_c, M / dM)
         _, _, S, dS = _t_ensemble(-h_half, psis, w, a, ratio)
@@ -444,9 +441,7 @@ def _crown_case():
 
     def _t_check_ensemble(out, psis, w, a, ratio):
         # one Newton step on the independent M(h) = 0 and S(h) = 1/2 must not move the results
-        assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(v, float) for v in out)
         h_c, h_half = out
-        assert -1.0 < h_c < 1.0 and -1.0 < h_half < 1.0, out
         M, dM, _, _ = _t_ensemble(-h_c, psis, w, a, ratio)
         assert abs(M / dM) < 1e-6, (h_c, M / dM)
         _, _, S, dS = _t_ensemble(-h_half, psis, w, a, ratio)
@@ -596,9 +591,7 @@ def _crown_case():
 
     def _t_check_ensemble(out, psis, w, a, ratio):
         # one Newton step on the independent M(h) = 0 and S(h) = 1/2 must not move the results
-        assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(v, float) for v in out)
         h_c, h_half = out
-        assert -1.0 < h_c < 1.0 and -1.0 < h_half < 1.0, out
         M, dM, _, _ = _t_ensemble(-h_c, psis, w, a, ratio)
         assert abs(M / dM) < 1e-6, (h_c, M / dM)
         _, _, S, dS = _t_ensemble(-h_half, psis, w, a, ratio)
@@ -755,9 +748,7 @@ def _crown_case():
 
     def _t_check_ensemble(out, psis, w, a, ratio):
         # one Newton step on the independent M(h) = 0 and S(h) = 1/2 must not move the results
-        assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(v, float) for v in out)
         h_c, h_half = out
-        assert -1.0 < h_c < 1.0 and -1.0 < h_half < 1.0, out
         M, dM, _, _ = _t_ensemble(-h_c, psis, w, a, ratio)
         assert abs(M / dM) < 1e-6, (h_c, M / dM)
         _, _, S, dS = _t_ensemble(-h_half, psis, w, a, ratio)
@@ -933,9 +924,7 @@ def _crown_case():
 
     def _t_check_ensemble(out, psis, w, a, ratio):
         # one Newton step on the independent M(h) = 0 and S(h) = 1/2 must not move the results
-        assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(v, float) for v in out)
         h_c, h_half = out
-        assert -1.0 < h_c < 1.0 and -1.0 < h_half < 1.0, out
         M, dM, _, _ = _t_ensemble(-h_c, psis, w, a, ratio)
         assert abs(M / dM) < 1e-6, (h_c, M / dM)
         _, _, S, dS = _t_ensemble(-h_half, psis, w, a, ratio)
@@ -953,21 +942,61 @@ def _crown_case():
 _crown_case()
 
 # --- test case 7 ---
-# every invalid input of the prompt raises ValueError: arrays that are not 1-D of the
-# same nonzero length, a psi outside [0, pi/2], a negative or nonfinite weight, weights adding up to
-# zero, a, f0 or rate not positive and finite, a or f0 / rate outside the domain
+# each stated error rule once: arrays of different lengths, 2-D arrays, empty arrays, a psi above pi/2, a
+# negative weight, weights adding up to zero, a rate that is not positive, a above 1000, f0 / rate above 1e13
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for _t_bad in ((np.array([0.1, 0.2]), np.array([1.0]), 100.0, 1e9, 1.0), (np.array([[0.1, 0.2]]), np.array([[1.0, 1.0]]), 100.0, 1e9, 1.0), (np.array([]), np.array([]), 100.0, 1e9, 1.0), (np.array([0.1, 0.2]), np.array([1.0, np.inf]), 100.0, 1e9, 1.0), (np.array([0.1, 0.2]), np.array([1.0, np.nan]), 100.0, 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 100.0, 1e9, 0.0), (np.array([0.1]), np.array([1.0]), 100.0, -1e9, 1.0), (np.array([0.1]), np.array([1.0]), float("nan"), 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 100.0, 1e9, np.inf), (np.array([0.1, 1.7]), np.array([1.0, 1.0]), 100.0, 1e9, 1.0), (np.array([0.1, 0.2]), np.array([1.0, -1.0]), 100.0, 1e9, 1.0), (np.array([0.1, 0.2]), np.array([0.0, 0.0]), 100.0, 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 30.0, 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 100.0, 1e14, 1.0), (np.array([-0.1]), np.array([1.0]), 100.0, 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 1001.0, 1e9, 1.0), (np.array([0.1]), np.array([1.0]), 100.0, 1e4, 1.0)):
+    for _t_bad in ((np.array([0.1, 0.2]), np.array([1.0]), 100.0, 1e9, 1.0),
+                   (np.array([[0.1, 0.2]]), np.array([[1.0, 1.0]]), 100.0, 1e9, 1.0),
+                   (np.array([]), np.array([]), 100.0, 1e9, 1.0),
+                   (np.array([0.1, np.pi / 2 + 0.01]), np.array([1.0, 1.0]), 100.0, 1e9, 1.0),
+                   (np.array([0.1, 0.2]), np.array([1.0, -1.0]), 100.0, 1e9, 1.0),
+                   (np.array([0.1, 0.2]), np.array([0.0, 0.0]), 100.0, 1e9, 1.0),
+                   (np.array([0.1]), np.array([1.0]), 100.0, 1e9, 0.0),
+                   (np.array([0.1]), np.array([1.0]), 1000.5, 1e9, 1.0),
+                   (np.array([0.1]), np.array([1.0]), 100.0, 1.01e13, 1.0)):
         try:
             ensemble_switching(*_t_bad)
         except ValueError:
             pass
         else:
             raise AssertionError("ensemble_switching%r must raise ValueError" % (_t_bad,))
+
+
+_crown_case()
+
+# --- test case 8 ---
+# an easy-axis particle (psi = 0, weight 3) with a hard-axis particle (psi = pi/2, weight 1) at the two
+# corners of the domain not used above (a = 1000 with f0 / rate = 1e13, a = 40 with f0 / rate = 1e5).
+# At psi = pi/2 both minima have sin(theta) = h, so that particle has the field-axis magnetization h in
+# either minimum, and it has left its original minimum within about rate / f0 below h = 1 (its survival
+# probability at the fields below is exp(-1e5 * 0.1) or smaller, zero in double precision). With P0 the
+# closed-form survival probability at psi = 0 (both barriers (1 + h)**2 / 2, an erfc difference), the
+# ensemble magnetization is (3/4) (2 P0 - 1) + h / 4 and the switched weight 1/4 + (3/4) (1 - P0):
+# h_c solves 3 (2 P0(-h_c) - 1) - h_c = 0 and h_half has P0(-h_half) = 2/3 (root finding to 1e-15); the two
+# fields differ (by 3e-4 and 7e-3) because of the reversible rotation of the hard-axis particle.
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+    from scipy.optimize import brentq as _t_brentq
+    from scipy.special import erfc as _t_erfc
+
+    def _t_P0(h, a, ratio):
+        I = np.sqrt(np.pi / a) * (_t_erfc(np.sqrt(a) * (1.0 + h)) - _t_erfc(2.0 * np.sqrt(a)))
+        return float(np.exp(-ratio * I))
+
+    for _t_a, _t_f0, _t_rate in ((1000.0, 1e13, 1.0), (40.0, 1e8, 1e3)):
+        ratio = _t_f0 / _t_rate
+        _t_hc = -_t_brentq(lambda x: 3.0 * (2.0 * _t_P0(x, _t_a, ratio) - 1.0) + x, -1.0 + 1e-12, 0.0, xtol=1e-15)
+        _t_hh = -_t_brentq(lambda x: _t_P0(x, _t_a, ratio) - 2.0 / 3.0, -1.0 + 1e-12, 0.0, xtol=1e-15)
+        out = ensemble_switching(np.array([0.0, np.pi / 2]), np.array([3.0, 1.0]), _t_a, _t_f0, _t_rate)
+        assert abs(out[0] - _t_hc) < 1e-6, (_t_a, ratio, out, _t_hc)
+        assert abs(out[1] - _t_hh) < 1e-6, (_t_a, ratio, out, _t_hh)
 
 
 _crown_case()

@@ -21,6 +21,6 @@ def brown_relaxation(sigma, h):
                  relative error below 1e-5.
 
     Raises:
-      ValueError if sigma or h is not finite, if sigma is outside [0, 60] or if |h| > 0.9.
+      ValueError if sigma is outside [0, 60] or if |h| > 0.9.
     '''
     raise NotImplementedError

@@ -77,11 +77,9 @@ def _crown_case():
         return abs(a - b) / abs(b)
 
     def _t_call(N, s, u, v):
-        # the return type: (Python float, numpy float array of shape (N + 1,))
+        # values only (the return type, shape and dtype are checked in case 0)
         lam, mode = fastest_mode(N, s, u, v)
-        mode = np.asarray(mode)
-        assert isinstance(lam, float) and mode.shape == (N + 1,) and np.issubdtype(mode.dtype, np.floating), (lam, mode.shape, mode.dtype)
-        return lam, mode
+        return lam, np.asarray(mode, dtype=float)
 
     def _t_absorbing_mask(N, u, v):
         # mask of the absorbing states (i = 0 when v = 0, i = N when u = 0), where the exact mode is zero
@@ -159,7 +157,7 @@ def _crown_case():
         return abs(a - b) / abs(b)
 
     def _t_call(N, s, u, v):
-        # values only (the return type, shape and dtype are checked in cases 0 and 1)
+        # values only (the return type, shape and dtype are checked in case 0)
         lam, mode = fastest_mode(N, s, u, v)
         return lam, np.asarray(mode, dtype=float)
 
@@ -220,7 +218,7 @@ def _crown_case():
         return abs(a - b) / abs(b)
 
     def _t_call(N, s, u, v):
-        # values only (the return type, shape and dtype are checked in cases 0 and 1)
+        # values only (the return type, shape and dtype are checked in case 0)
         lam, mode = fastest_mode(N, s, u, v)
         return lam, np.asarray(mode, dtype=float)
 
@@ -380,7 +378,7 @@ def _crown_case():
         return abs(a - b) / abs(b)
 
     def _t_call(N, s, u, v):
-        # values only (the return type, shape and dtype are checked in cases 0 and 1)
+        # values only (the return type, shape and dtype are checked in case 0)
         lam, mode = fastest_mode(N, s, u, v)
         return lam, np.asarray(mode, dtype=float)
 
@@ -415,16 +413,17 @@ def _crown_case():
 _crown_case()
 
 # --- test case 5 ---
-# N not an integer in [1, 400], s, u, v out of range (u and v each 0 or in [1e-12, 0.1], so a positive rate
-# below 1e-12 is out of range, however small), or N = 1 without mutation (P is the identity)
+# each stated error rule once, just outside the domain: N above 400, N a float (even integer-valued), N a bool,
+# s above 0.5, v above 0.1, a positive u and a positive v below the floor 1e-12 (u and v are each 0 or in
+# [1e-12, 0.1], so a positive rate below 1e-12 is out of range, however small), and N = 1 without mutation (P is the
+# identity)
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for _t_bad in ((0, 0.1, 0.01, 0.01), (401, 0.1, 0.01, 0.01), (5.0, 0.1, 0.01, 0.01), (True, 0.1, 0.01, 0.01),
-                   (10, 0.6, 0.01, 0.01), (10, 0.1, -1e-12, 0.01), (10, 0.1, 0.01, 0.11), (1, 0.2, 0.0, 0.0),
-                   (10, 0.1, 1e-13, 0.01), (400, -0.5, 0.1, 1e-200)):
+    for _t_bad in ((401, 0.1, 0.01, 0.01), (5.0, 0.1, 0.01, 0.01), (True, 0.1, 0.01, 0.01), (10, 0.51, 0.01, 0.01),
+                   (10, 0.1, 0.01, 0.11), (10, 0.1, 1e-13, 0.01), (10, 0.1, 0.01, 1e-200), (1, 0.2, 0.0, 0.0)):
         try:
             fastest_mode(*_t_bad)
         except ValueError:
@@ -461,7 +460,7 @@ def _crown_case():
         return abs(a - b) / abs(b)
 
     def _t_call(N, s, u, v):
-        # values only (the return type, shape and dtype are checked in cases 0 and 1)
+        # values only (the return type, shape and dtype are checked in case 0)
         lam, mode = fastest_mode(N, s, u, v)
         return lam, np.asarray(mode, dtype=float)
 
@@ -505,6 +504,81 @@ def _crown_case():
         lam_t, mode_t = _t_mp_mode(N, s, u, v, dps)
         assert _t_rel(got, lam_t) < 1e-8, (N, s, u, v, got, lam_t)
         _t_check_mode(mode, mode_t, _t_absorbing_mask(N, u, v), 1e-8, (N, s, u, v))
+
+
+_crown_case()
+
+# --- test case 7 ---
+# small populations with selection and absorbing states, without any eigensolver or inverse iteration: the
+# characteristic polynomial det(lambda I - P) by the Faddeev-LeVerrier recursion in exact rational arithmetic
+# (Python fractions, the transition matrix from the exact binary values of the inputs), lambda_min as its smallest
+# root (mpmath polyroots at 120 digits; the roots of a totally nonnegative transition matrix are real and those
+# below 1 simple), and the mode as the solution of (P - lambda_min I) x = 0 with the row of the first transient state
+# replaced by x_t = 1 (a nonsingular system for a simple eigenvalue whose left and right eigenvectors are nonzero
+# at t), by plain LU in mpmath at 120 digits; then scaled as stated. Includes one absorbing state (v = 0 or u = 0),
+# both (u = v = 0) and the floor 1e-12 next to a zero rate
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+    import mpmath as _t_mp
+    from fractions import Fraction as _t_F
+    from math import comb as _t_comb
+
+    def _t_P_exact(N, s, u, v):
+        # transition matrix in exact rational arithmetic
+        s, u, v = _t_F(s), _t_F(u), _t_F(v)
+        rows = []
+        for i in range(N + 1):
+            ps = (1 + s) * i / (N + s * i)
+            pm = (1 - u) * ps + v * (1 - ps)
+            rows.append([_t_comb(N, j) * pm ** j * (1 - pm) ** (N - j) for j in range(N + 1)])
+        return rows
+
+    def _t_charpoly(A):
+        # Faddeev-LeVerrier: coefficients c_0 = 1, c_1, ..., c_n of lambda**n + c_1 lambda**(n - 1) + ... + c_n
+        n = len(A)
+        M = [[_t_F(0)] * n for _ in range(n)]
+        c = [_t_F(1)]
+        for k in range(1, n + 1):
+            AM = [[sum(A[i][l] * M[l][j] for l in range(n)) for j in range(n)] for i in range(n)]
+            M = [[AM[i][j] + (c[-1] if i == j else 0) for j in range(n)] for i in range(n)]
+            AM = [[sum(A[i][l] * M[l][j] for l in range(n)) for j in range(n)] for i in range(n)]
+            c.append(-sum(AM[i][i] for i in range(n)) / k)
+        return c
+
+    def _t_target(N, s, u, v):
+        P = _t_P_exact(N, s, u, v)
+        c = _t_charpoly(P)
+        with _t_mp.workdps(120):
+            roots = _t_mp.polyroots([_t_mp.mpf(x.numerator) / x.denominator for x in c], maxsteps=500, extraprec=400)
+            lam = min(_t_mp.re(r) for r in roots)
+            n = N + 1
+            t = 0 if v > 0 else 1
+            A = _t_mp.matrix(n, n)
+            for i in range(n):
+                for j in range(n):
+                    A[i, j] = _t_mp.mpf(P[i][j].numerator) / P[i][j].denominator - (lam if i == j else 0)
+            rhs = _t_mp.matrix(n, 1)
+            for j in range(n):
+                A[t, j] = 1 if j == t else 0
+            rhs[t] = 1
+            x = _t_mp.lu_solve(A, rhs)
+            x = x / max(abs(z) for z in x)
+            return float(lam), [float(z) for z in x]
+
+    for N, s, u, v in ((6, 0.375, 0.0625, 0.0), (5, -0.5, 0.0, 1e-12), (4, 0.5, 0.0, 0.0), (7, -0.25, 0.09375, 0.03125)):
+        lam, mode = fastest_mode(N, s, u, v)
+        mode = np.asarray(mode, dtype=float)
+        lam_t, mode_t = _t_target(N, s, u, v)
+        mode_t = np.asarray(mode_t)
+        zero = np.zeros(N + 1, dtype=bool)
+        zero[0], zero[N] = not v > 0, not u > 0
+        assert abs(lam - lam_t) < 1e-8 * lam_t, (N, s, u, v, lam, lam_t)
+        assert np.all(np.abs(mode[zero]) <= 1e-250), (N, s, u, v, mode[zero])
+        bad = ~zero & (np.abs(mode - mode_t) > 1e-8 * np.abs(mode_t))
+        assert not bad.any(), (N, s, u, v, mode, mode_t)
 
 
 _crown_case()

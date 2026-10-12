@@ -20,7 +20,7 @@ def escape_barriers(h, psi):
       h_sw(psi) - |h| >= 1e-3.
 
     Raises:
-      ValueError if psi is outside [0, pi/2], if any h is not finite, or if any
+      ValueError if psi is outside [0, pi/2] or if any
       |h| >= h_sw(psi).
     '''
     h_arr = np.asarray(h, dtype=float)
@@ -28,7 +28,7 @@ def escape_barriers(h, psi):
     if not (0.0 <= psi <= 0.5 * np.pi):
         raise ValueError("psi must be between 0 and pi/2")
     if not np.all(np.isfinite(h_arr)):
-        raise ValueError("h must be finite")
+        raise ValueError("h must be real numbers")
     # cos(pi/2) is 6e-17 in floating point, which alone would put h_sw 2e-11 below 1
     h_sw = 1.0 if psi == 0.5 * np.pi else (np.cos(psi) ** (2.0 / 3.0) + np.sin(psi) ** (2.0 / 3.0)) ** -1.5
     if np.any(np.abs(h_arr) >= h_sw):

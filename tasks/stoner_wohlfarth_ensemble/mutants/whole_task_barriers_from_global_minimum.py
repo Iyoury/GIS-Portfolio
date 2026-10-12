@@ -20,12 +20,12 @@ def branch_magnetization(h, psi):
          |h + h_sw(psi)| >= 1e-3.
 
     Raises:
-      ValueError if psi is outside [0, pi/2] or h is not finite.
+      ValueError if psi is outside [0, pi/2].
     '''
     h = float(h)
     psi = float(psi)
     if not np.isfinite(h) or not (0.0 <= psi <= 0.5 * np.pi):
-        raise ValueError("h must be finite and psi must be between 0 and pi/2")
+        raise ValueError("h must be a real number and psi must be between 0 and pi/2")
     # Switching field: e' = 0 and e'' = 0 together give the astroid
     # h_sw = (cos(psi)**(2/3) + sin(psi)**(2/3))**(-3/2).
     # cos(pi/2) is 6e-17 in floating point, which alone would put h_sw 2e-11 below 1
@@ -73,7 +73,7 @@ def escape_barriers(h, psi):
       h_sw(psi) - |h| >= 1e-3.
 
     Raises:
-      ValueError if psi is outside [0, pi/2], if any h is not finite, or if any
+      ValueError if psi is outside [0, pi/2] or if any
       |h| >= h_sw(psi).
     '''
     h_arr = np.asarray(h, dtype=float)
@@ -81,7 +81,7 @@ def escape_barriers(h, psi):
     if not (0.0 <= psi <= 0.5 * np.pi):
         raise ValueError("psi must be between 0 and pi/2")
     if not np.all(np.isfinite(h_arr)):
-        raise ValueError("h must be finite")
+        raise ValueError("h must be real numbers")
     # cos(pi/2) is 6e-17 in floating point, which alone would put h_sw 2e-11 below 1
     h_sw = 1.0 if psi == 0.5 * np.pi else (np.cos(psi) ** (2.0 / 3.0) + np.sin(psi) ** (2.0 / 3.0)) ** -1.5
     if np.any(np.abs(h_arr) >= h_sw):
@@ -145,17 +145,17 @@ def survival_probability(h, psi, a, f0, rate):
          1e-6 below h_sw(psi).
 
     Raises:
-      ValueError if psi is outside [0, pi/2], if h is not finite, if a, f0 or rate is
-      not a positive finite number, if a is outside [40, 1000] or if f0 / rate is
+      ValueError if psi is outside [0, pi/2], if a, f0 or rate is
+      not positive, if a is outside [40, 1000] or if f0 / rate is
       outside [1e5, 1e13].
     '''
     h = float(h)
     psi = float(psi)
     if not np.isfinite(h) or not (0.0 <= psi <= 0.5 * np.pi):
-        raise ValueError("h must be finite and psi must be between 0 and pi/2")
+        raise ValueError("h must be a real number and psi must be between 0 and pi/2")
     for name, value in (("a", a), ("f0", f0), ("rate", rate)):
         if not (np.isfinite(value) and value > 0.0):
-            raise ValueError("%s must be a positive finite number" % name)
+            raise ValueError("%s must be a positive number" % name)
     if not (40.0 <= a <= 1000.0 and 1e5 <= f0 / rate <= 1e13):
         raise ValueError("need 40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13")
     # cos(pi/2) is 6e-17 in floating point, which alone would put h_sw 2e-11 below 1
@@ -197,15 +197,15 @@ def switching_field_statistics(psi, a, f0, rate):
       which the particle leaves its original minimum. Absolute errors below 1e-7.
 
     Raises:
-      ValueError if psi is outside [0, pi/2], if a, f0 or rate is not a positive finite
-      number, if a is outside [40, 1000] or if f0 / rate is outside [1e5, 1e13].
+      ValueError if psi is outside [0, pi/2], if a, f0 or rate is not positive, if a is
+      outside [40, 1000] or if f0 / rate is outside [1e5, 1e13].
     '''
     psi = float(psi)
     if not (0.0 <= psi <= 0.5 * np.pi):
         raise ValueError("psi must be between 0 and pi/2")
     for name, value in (("a", a), ("f0", f0), ("rate", rate)):
         if not (np.isfinite(value) and value > 0.0):
-            raise ValueError("%s must be a positive finite number" % name)
+            raise ValueError("%s must be a positive number" % name)
     if not (40.0 <= a <= 1000.0 and 1e5 <= f0 / rate <= 1e13):
         raise ValueError("need 40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13")
     # cos(pi/2) is 6e-17 in floating point, which alone would put h_sw 2e-11 below 1
@@ -308,12 +308,12 @@ def brown_relaxation(sigma, h):
                  relative error below 1e-5.
 
     Raises:
-      ValueError if sigma or h is not finite, if sigma is outside [0, 60] or if |h| > 0.9.
+      ValueError if sigma is outside [0, 60] or if |h| > 0.9.
     '''
     sigma = float(sigma)
     h = float(h)
     if not (np.isfinite(sigma) and np.isfinite(h)):
-        raise ValueError("sigma and h must be finite")
+        raise ValueError("sigma and h must be real numbers")
     if not (0.0 <= sigma <= 60.0) or abs(h) > 0.9:
         raise ValueError("need 0 <= sigma <= 60 and |h| <= 0.9")
     # piecewise Chebyshev representation in theta (z = cos theta); every panel keeps its own
@@ -422,8 +422,8 @@ def ensemble_switching(psis, weights, a, f0, rate):
 
     Raises:
       ValueError if psis and weights are not 1-D arrays of the same nonzero length, if
-      a psi is outside [0, pi/2], if a weight is negative or not finite, if the weights
-      add up to zero, if a, f0 or rate is not a positive finite number, if a is outside
+      a psi is outside [0, pi/2], if a weight is negative, if the weights
+      add up to zero, if a, f0 or rate is not positive, if a is outside
       [40, 1000] or if f0 / rate is outside [1e5, 1e13].
     '''
     psis = np.asarray(psis, dtype=float)
@@ -433,10 +433,10 @@ def ensemble_switching(psis, weights, a, f0, rate):
     if not np.all((psis >= 0.0) & (psis <= 0.5 * np.pi)):
         raise ValueError("every psi must be between 0 and pi/2")
     if not np.all(np.isfinite(weights)) or np.any(weights < 0.0) or weights.sum() <= 0.0:
-        raise ValueError("weights must be finite, nonnegative and not all zero")
+        raise ValueError("weights must be nonnegative real numbers, not all zero")
     for name, value in (("a", a), ("f0", f0), ("rate", rate)):
         if not (np.isfinite(value) and value > 0.0):
-            raise ValueError("%s must be a positive finite number" % name)
+            raise ValueError("%s must be a positive number" % name)
     if not (40.0 <= a <= 1000.0 and 1e5 <= f0 / rate <= 1e13):
         raise ValueError("need 40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13")
     w = weights / weights.sum()

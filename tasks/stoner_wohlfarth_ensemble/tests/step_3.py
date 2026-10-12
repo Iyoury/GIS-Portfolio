@@ -324,19 +324,68 @@ def _crown_case():
 _crown_case()
 
 # --- test case 5 ---
-# bad angle, field, a, f0 or rate, or a or f0 / rate outside the domain, raises ValueError
+# each stated error rule once, just outside its limit: psi above pi/2, a rate that is not positive, a above
+# 1000 and f0 / rate above 1e13
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for _t_bad in ((-0.3, -0.1, 100.0, 1e9, 1.0), (-0.3, 1.6, 100.0, 1e9, 1.0), (float("nan"), 0.5, 100.0, 1e9, 1.0), (-0.3, 0.5, float("nan"), 1e9, 1.0), (-0.3, 0.5, 100.0, 0.0, 1.0), (-0.3, 0.5, 100.0, 1e9, float("inf")), (-0.3, 0.5, 39.0, 1e9, 1.0), (-0.3, 0.5, 1001.0, 1e9, 1.0), (-0.3, 0.5, 100.0, 1e4, 1.0), (-0.3, 0.5, 100.0, 1e13, 0.5)):
+    for _t_bad in ((-0.3, np.pi / 2 + 0.01, 100.0, 1e9, 1.0), (-0.3, 0.5, 100.0, 1e9, 0.0), (-0.3, 0.5, 1000.5, 1e9, 1.0), (-0.3, 0.5, 100.0, 1.01e13, 1.0)):
         try:
             survival_probability(*_t_bad)
         except ValueError:
             pass
         else:
             raise AssertionError("survival_probability%r must raise ValueError" % (_t_bad,))
+
+
+_crown_case()
+
+# --- test case 6 ---
+# psi = pi/4 (h_sw = 1/2) with closed-form barriers: with u = theta - pi/4 the extrema solve
+# sin(u)**2 - h sin(u) - 1/2 = 0, sin(u) = s1, s2 = (h -+ r) / 2, r = sqrt(h**2 + 2); the barriers from the
+# original minimum are c1 (r + 3h) / 2 and (c2 (r - 3h) + c1 (r + 3h)) / 4 with c = sqrt(1 - s**2), written
+# without cancellation ((r + 3h)(r - 3h) = 2 (1 - 2h)(1 + 2h), 1 + s1 = (1 + 2h) / (2 + h + r),
+# 1 - s2 = (1 - 2h) / (2 - h + r); checked against 40-digit values to 5e-16). The escape integral is an
+# adaptive quadrature with a purely relative tolerance. Three points of the domain, two of them corners;
+# fields across the switching window, at h = 0 and at h_sw - 1e-6 (the inclusive end of the accurate range).
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+    from scipy.integrate import quad as _t_quad
+    from scipy.optimize import brentq as _t_brentq
+
+    def _t_b45(h):
+        r = np.sqrt(h * h + 2.0)
+        q2 = 2.0 * (1.0 - 2.0 * h) * (1.0 + 2.0 * h)
+        if h >= 0.0:
+            A = r + 3.0 * h
+            D = q2 / A
+        else:
+            D = r - 3.0 * h
+            A = q2 / D
+        p1 = (1.0 + 2.0 * h) / (2.0 + h + r)
+        p2 = (1.0 - 2.0 * h) / (2.0 - h + r)
+        c1 = np.sqrt((2.0 - p1) * p1)
+        c2 = np.sqrt((2.0 - p2) * p2)
+        return 0.5 * c1 * A, 0.25 * (c2 * D + c1 * A)
+
+    def _t_U(h, a, ratio):
+        # (f0 / rate) times the escape integral from h up to h_sw = 1/2, exponent 2 a Delta_e
+        g = lambda x: sum(np.exp(-2.0 * a * b) for b in _t_b45(x))
+        return ratio * _t_quad(g, h, 0.5, epsabs=0.0, epsrel=1e-12, limit=1000)[0]
+
+    for _t_a, _t_f0, _t_rate in ((40.0, 1e10, 1e-3), (1000.0, 1e8, 1e3), (100.0, 1e9, 1.0)):
+        ratio = _t_f0 / _t_rate
+        hm = _t_brentq(lambda x: _t_U(x, _t_a, ratio) - np.log(2.0), -0.5 + 1e-12, 0.4, xtol=1e-14, rtol=1e-15)
+        w = 1.0 / np.sqrt(_t_a)
+        for x in (hm - 0.1 * w, hm - 0.03 * w, hm, hm + 0.03 * w, hm + 0.1 * w, 0.0, 0.5 - 1e-6):
+            p = survival_probability(x, np.pi / 4, _t_a, _t_f0, _t_rate)
+            target = float(np.exp(-_t_U(x, _t_a, ratio)))
+            assert abs(p - target) < 1e-8, (_t_a, ratio, x, p, target)
 
 
 _crown_case()

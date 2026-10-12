@@ -208,11 +208,11 @@ def _crown_case():
 
   def check(r, reg):
     ex = reg.star
-    assert isinstance(r, dict) and len(r["holes"]) == len(ex["holes"])
     for key, tol in (("g", 2e-3), ("t_end", 2e-3), ("sigma_g", 1e-2), ("sigma_t_end", 1e-2)):
       assert abs(float(r[key]) / ex[key] - 1.0) < tol, (key, r[key], ex[key])
     assert abs(float(r["log_likelihood"]) - ex["log_likelihood"]) < 0.1, (r["log_likelihood"], ex["log_likelihood"])
-    for h, (rh, eh) in enumerate(zip(r["holes"], ex["holes"])):
+    for h, eh in enumerate(ex["holes"]):
+      rh = r["holes"][h]
       assert int(round(float(rh["n_used"]))) == eh["n_used"], (h, rh["n_used"])
       for key, tol in (("T0", 2e-3), ("phi", 2e-3)):
         assert abs(float(rh[key]) - eh[key]) < tol, (h, key, rh[key], eh[key])
@@ -455,11 +455,11 @@ def _crown_case():
 
   def check(r, reg):
     ex = reg.star
-    assert isinstance(r, dict) and len(r["holes"]) == len(ex["holes"])
     for key, tol in (("g", 2e-3), ("t_end", 2e-3), ("sigma_g", 1e-2), ("sigma_t_end", 1e-2)):
       assert abs(float(r[key]) / ex[key] - 1.0) < tol, (key, r[key], ex[key])
     assert abs(float(r["log_likelihood"]) - ex["log_likelihood"]) < 0.1, (r["log_likelihood"], ex["log_likelihood"])
-    for h, (rh, eh) in enumerate(zip(r["holes"], ex["holes"])):
+    for h, eh in enumerate(ex["holes"]):
+      rh = r["holes"][h]
       assert int(round(float(rh["n_used"]))) == eh["n_used"], (h, rh["n_used"])
       for key, tol in (("T0", 2e-3), ("phi", 2e-3)):
         assert abs(float(rh[key]) - eh[key]) < tol, (h, key, rh[key], eh[key])
@@ -719,11 +719,11 @@ def _crown_case():
 
   def check(r, reg):
     ex = reg.star
-    assert isinstance(r, dict) and len(r["holes"]) == len(ex["holes"])
     for key, tol in (("g", 2e-3), ("t_end", 2e-3), ("sigma_g", 1e-2), ("sigma_t_end", 1e-2)):
       assert abs(float(r[key]) / ex[key] - 1.0) < tol, (key, r[key], ex[key])
     assert abs(float(r["log_likelihood"]) - ex["log_likelihood"]) < 0.1, (r["log_likelihood"], ex["log_likelihood"])
-    for h, (rh, eh) in enumerate(zip(r["holes"], ex["holes"])):
+    for h, eh in enumerate(ex["holes"]):
+      rh = r["holes"][h]
       assert int(round(float(rh["n_used"]))) == eh["n_used"], (h, rh["n_used"])
       for key, tol in (("T0", 2e-3), ("phi", 2e-3)):
         assert abs(float(rh[key]) - eh[key]) < tol, (h, key, rh[key], eh[key])

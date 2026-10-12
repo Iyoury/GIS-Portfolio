@@ -20,7 +20,7 @@ def switching_field_statistics(psi, a, f0, rate):
       which the particle leaves its original minimum. Absolute errors below 1e-7.
 
     Raises:
-      ValueError if psi is outside [0, pi/2], if a, f0 or rate is not a positive finite
-      number, if a is outside [40, 1000] or if f0 / rate is outside [1e5, 1e13].
+      ValueError if psi is outside [0, pi/2], if a, f0 or rate is not positive, if a is
+      outside [40, 1000] or if f0 / rate is outside [1e5, 1e13].
     '''
     raise NotImplementedError

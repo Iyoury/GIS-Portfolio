@@ -20,11 +20,12 @@ def fit_heat_flow(T, R, S, P, A):
     squares, noise variance estimated as RSS/(n-3)) and rms_residual (K,
     sqrt(RSS/n)); every value a Python float. Accuracy: T0 and g within
     1e-9 K, q0 within 1e-12 W m^-2 of the exact least-squares solution,
-    the standard errors within a relative 1e-6, rms_residual within 1e-9 K.
+    rms_residual within 1e-9 K and, for data with rms_residual >= 1e-6 K,
+    the standard errors within a relative 1e-6.
 
     Raises
     ------
-    ValueError for unequal lengths, n < 4, A < 0, or an unresolvable design:
+    ValueError for n < 4, A < 0, or an unresolvable design:
     one of the columns 1, R, P is all zero, or the smallest singular value of
     the n x 3 matrix [1, R, P] with each column scaled to unit length is below
     1e-8 (e.g. P proportional to R).

@@ -16,15 +16,15 @@ def boys_function(n_max, t):
          Relative error below 1e-11 for every entry; F_n(0) = 1 / (2n + 1).
 
     Raises:
-      ValueError if n_max is not an integer in [0, 16], or if any t is negative, not finite
-      or larger than 1e6.
+      ValueError if n_max is not an integer in [0, 16], or if any t is negative or larger
+      than 1e6.
     '''
     if isinstance(n_max, bool) or not isinstance(n_max, (int, np.integer)) or not (0 <= n_max <= 16):
         raise ValueError("n_max must be an integer from 0 to 16")
     n_max = int(n_max)
     t_arr = np.asarray(t, dtype=float)
     if not np.all(np.isfinite(t_arr)) or np.any(t_arr < 0.0) or np.any(t_arr > 1e6):
-        raise ValueError("t must be finite with 0 <= t <= 1e6")
+        raise ValueError("t must satisfy 0 <= t <= 1e6")
     flat = t_arr.ravel()
     F = np.empty((flat.size, n_max + 1))
     split = n_max + 25.0
@@ -382,15 +382,15 @@ def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
               0.01 cm^-1 for each level.
 
     Raises:
-      ValueError if a charge is not finite or not in [1, 2], if a mass is not finite or not in
-      [1, 10] u, or if fewer than five bound vibrational levels lie below the dissociation limit.
+      ValueError if a charge is not in [1, 2], if a mass is not in [1, 10] u, or if fewer
+      than five bound vibrational levels lie below the dissociation limit.
     '''
     for z in (ZA, ZB):
         if not (np.isfinite(z) and 1.0 <= z <= 2.0):
-            raise ValueError("nuclear charges must be finite and between 1 and 2")
+            raise ValueError("nuclear charges must be between 1 and 2")
     for m in (massA, massB):
         if not (np.isfinite(m) and 1.0 <= m <= 10.0):
-            raise ValueError("nuclear masses must be finite and between 1 and 10 u")
+            raise ValueError("nuclear masses must be between 1 and 10 u")
     # Dissociation limit in this basis: as R -> infinity all cross integrals vanish and the lowest singlet
     # is the lowest of the three fragment arrangements (both electrons on A, both on B, one on each), whose
     # energies at large R are E_j + q_A q_B / R. Once the cross integrals have died out (Gaussian decay)

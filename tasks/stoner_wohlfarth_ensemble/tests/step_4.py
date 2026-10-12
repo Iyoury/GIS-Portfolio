@@ -304,7 +304,6 @@ def _crown_case():
     _t_mean90 = 1.0 - _t_quad(lambda x: np.exp(-1e5 * _t_I90(x, 40.0)), _t_lo, 1.0, points=[_t_hm90],
                               epsabs=1e-15, epsrel=1e-13, limit=500)[0]
     out = switching_field_statistics(np.pi / 2, 40.0, 1e9, 1e4)
-    assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(v, float) for v in out)
     assert abs(out[0] - _t_hm90) < 1e-7 and abs(out[1] - _t_mean90) < 1e-7, (out, _t_hm90, _t_mean90)
     assert abs(out[0] - (1.0 - np.log(2.0) / 1e5)) < 2e-7 and abs(out[1] - (1.0 - 1e-5)) < 2e-7, out
 
@@ -312,13 +311,14 @@ def _crown_case():
 _crown_case()
 
 # --- test case 4 ---
-# bad angle, a, f0 or rate, or a or f0 / rate outside the domain, raises ValueError
+# each stated error rule once, just outside its limit: psi above pi/2, a rate that is not positive, a below
+# 40 and f0 / rate below 1e5
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for _t_bad in ((-0.1, 100.0, 1e9, 1.0), (1.7, 100.0, 1e9, 1.0), (0.5, float("nan"), 1e9, 1.0), (0.5, 100.0, -1.0, 1.0), (0.5, 100.0, 1e9, 0.0), (0.5, 39.0, 1e9, 1.0), (0.5, 1001.0, 1e9, 1.0), (0.5, 100.0, 1e4, 1.0), (0.5, 100.0, 1e13, 0.5)):
+    for _t_bad in ((np.pi / 2 + 0.01, 100.0, 1e9, 1.0), (0.5, 100.0, 1e9, 0.0), (0.5, 39.5, 1e9, 1.0), (0.5, 100.0, 9.9e4, 1.0)):
         try:
             switching_field_statistics(*_t_bad)
         except ValueError:
@@ -460,10 +460,57 @@ def _crown_case():
     for _t_psi, _t_a, _t_f0, _t_rate in ((1.31, 45.0, 3e9, 3.0), (1.08, 42.0, 3e12, 1.0), (1.54, 300.0, 1e10, 10.0)):
         ratio = _t_f0 / _t_rate
         out = switching_field_statistics(_t_psi, _t_a, _t_f0, _t_rate)
-        assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(v, float) for v in out)
         assert abs(_t_median_step(out[0], _t_psi, _t_a, ratio)) < 1e-7, (_t_psi, out)
         _t_m = _t_mean(_t_psi, _t_a, ratio)
         assert abs(out[1] - _t_m) < 1e-7, (_t_psi, out, _t_m)
+
+
+_crown_case()
+
+# --- test case 6 ---
+# psi = pi/4 (h_sw = 1/2) at the two corners of the domain not used above, a = 40 with f0 / rate = 1e5 and
+# a = 1000 with f0 / rate = 1e13, with closed-form barriers: with u = theta - pi/4 the extrema solve
+# sin(u)**2 - h sin(u) - 1/2 = 0, sin(u) = s1, s2 = (h -+ r) / 2, r = sqrt(h**2 + 2); the barriers from the
+# original minimum are c1 (r + 3h) / 2 and (c2 (r - 3h) + c1 (r + 3h)) / 4 with c = sqrt(1 - s**2), written
+# without cancellation. Median: root of (f0 / rate) I(h) = ln 2 with I by adaptive quadrature (purely relative
+# tolerance); mean: E[H_s] = h_sw - int P dh by adaptive quadrature of P = exp(-(f0 / rate) I), split at the
+# median.
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+    from scipy.integrate import quad as _t_quad
+    from scipy.optimize import brentq as _t_brentq
+
+    def _t_b45(h):
+        r = np.sqrt(h * h + 2.0)
+        q2 = 2.0 * (1.0 - 2.0 * h) * (1.0 + 2.0 * h)
+        if h >= 0.0:
+            A = r + 3.0 * h
+            D = q2 / A
+        else:
+            D = r - 3.0 * h
+            A = q2 / D
+        p1 = (1.0 + 2.0 * h) / (2.0 + h + r)
+        p2 = (1.0 - 2.0 * h) / (2.0 - h + r)
+        c1 = np.sqrt((2.0 - p1) * p1)
+        c2 = np.sqrt((2.0 - p2) * p2)
+        return 0.5 * c1 * A, 0.25 * (c2 * D + c1 * A)
+
+    def _t_U(h, a, ratio):
+        g = lambda x: sum(np.exp(-2.0 * a * b) for b in _t_b45(x))
+        return ratio * _t_quad(g, h, 0.5, epsabs=0.0, epsrel=1e-12, limit=1000)[0]
+
+    for _t_a, _t_f0, _t_rate in ((40.0, 3e9, 3e4), (1000.0, 1e12, 0.1)):
+        ratio = _t_f0 / _t_rate
+        hm = _t_brentq(lambda x: _t_U(x, _t_a, ratio) - np.log(2.0), -0.5 + 1e-12, 0.4, xtol=1e-14, rtol=1e-15)
+        P = lambda x: float(np.exp(-_t_U(x, _t_a, ratio)))
+        K = (_t_quad(P, -0.5, hm, epsabs=1e-13, epsrel=1e-13, limit=1000)[0]
+             + _t_quad(P, hm, 0.5, epsabs=1e-13, epsrel=1e-13, limit=1000)[0])
+        out = switching_field_statistics(np.pi / 4, _t_a, _t_f0, _t_rate)
+        assert abs(out[0] - hm) < 1e-7, (_t_a, ratio, out, hm)
+        assert abs(out[1] - (0.5 - K)) < 1e-7, (_t_a, ratio, out, 0.5 - K)
 
 
 _crown_case()

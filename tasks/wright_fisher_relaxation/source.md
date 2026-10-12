@@ -609,3 +609,86 @@ problem.yaml):
   FORMAT OK, with exactly the results listed above (ref, solution.py on every step file, second, the failing-case
   lists of every mutant, shift with every step output and every evaluated function in the whole-task tests scaled
   by 1 +- 1e-12, and the all-None and all-zero controls passing no case).
+
+## Version 15 (grading_fix: platform content-check rules, applied before any report on this task)
+
+- Finding: the platform content check now enforces (2026-10-12): no non-finite literal anywhere in the tests; no
+  finiteness promise in the visible text; computed values must clearly outweigh validation per step (assertion
+  sites: type/shape/exception checks, a stated raise at half weight, against computed-value checks); no relative
+  requirement on an exactly zero output; every stated output shape and inclusive endpoint exercised with values.
+  No platform report on this task yet; the rules were applied proactively.
+- Cause (audit of version 14): (1) the tests contained no non-finite literal and the visible text no finiteness
+  promise; the references, the second solution and the mutants contained an internal np.isfinite check with the
+  message "must be finite" ahead of the range checks. (2) Validation sites were heavy in the raise lists (7 to 10
+  entries per step, several testing the same rule) and in repeated type/shape/len checks (steps 2, 3, 5, 6, 7 repeated
+  the contract check in value asserts). Emulated count (asserts made only of type/shape/len/dtype checks 1, mixed
+  shape-and-value asserts 0.5 validation + 1 computed, each raise entry 0.5), validation / computed, before -> after:
+  step 1 4.5/13 -> 4/14, step 2 5.5/12 -> 3/14, step 3 6.5/14 -> 4/15, step 4 4.5/10 -> 4/12, step 5 7.5/12 -> 3.5/14,
+  step 6 6/14 -> 3.5/15, step 7 7/20 -> 5/23, general 0/28 unchanged. (3) No relative requirement applies to an exact
+  zero: entries of P, pi and the quasi-stationary distribution below 1e-250 have the absolute rule, the exact zeros
+  of the mode on absorbing states have the 1e-250 rule, the transient entries of the mode are nonzero (strict sign
+  alternation of the last eigenvector of a totally positive block), and p_fix, p_loss, the times, the gap, the rate
+  and lambda_min are positive in the domain. (4) Every endpoint was already exercised with values; the
+  (N + 1, N + 1) shape of step 1 was checked only at N >= 40.
+- Change:
+  - Code: the redundant np.isfinite checks are removed from solution.py, solution/step_1..7.py, second_solution.py and
+    every mutant (step 2: `np.isfinite(s) and` dropped from the range test). A NaN fails every range comparison and
+    +-inf lies outside every range, so non-finite s, u, v still raise ValueError (checked once on nine calls of
+    solution.py and second_solution.py, outside the tests). No copy of the code or text mentions finiteness.
+  - Raise lists: each stated rule once, just outside the domain. Removed entries: step 1 N = 0 and N = 2.5 (now
+    N = 10.0, an integer-valued float), s = 0.6 -> -0.51, u = -1e-3 -> -1e-6, v = 0.2 -> 0.11 (7 -> 6 entries);
+    step 2 N = 401 and i0 = 0, s = 0.7 -> 0.51 (7 -> 5); step 3 N = 401, v = 1e-13, u = 0.2 -> v = 0.11, s = -0.6 -> -0.51
+    (8 -> 6); step 4 N = 0, N = 500 -> 401, s = 0.6 -> 0.51 (7 -> 6); step 5 N = 0 and v = 0, v = 0.15 -> 0.11 (8 -> 6);
+    step 6 N = 0 and v = 0.2, s = 0.6 -> 0.51 (7 -> 5); step 7 N = 0, u = -1e-12 and (400, -0.5, 0.1, 1e-200), with
+    v = 1e-200 kept at N = 10 for the stated rule 0 < v < 1e-12, s = 0.6 -> 0.51 (10 -> 8).
+  - One contract check per step: step 1 case 2 (shape, now also at N = 1 with v = 0: a (2, 2) matrix with an exact
+    zero), step 2 case 1, step 3 case 0 (float numpy array of shape (2,) at N = 1; the shape asserts of cases 2 and 5
+    removed, entries read by position), step 4 case 0, step 5 case 0 (len checks of cases 1, 2, 5, 7, 8, 9 removed,
+    entries read by index), step 6 case 0 (shape (1,) at N = 1; the shape parts of cases 2, 3, 5 removed), step 7 case 0
+    (the type assert of case 1 removed). Value asserts read entries by index, so a wrong shape still fails them.
+  - New computed-value cases with independent targets:
+    - step 1 case 7: the binomial ratio identity P[i, j + 1] (j + 1) q_i = P[i, j] (N - j) p_i, with p_i and q_i formed
+      from the model without subtraction, on every pair of neighbouring entries whose exact value exceeds 1e-238
+      (log-gamma estimate) in every row of N = 400 at three corners of (s, u, v) (about 1.4e5 pairs each), plus
+      positivity there; tolerance 2.1e-10 (two outputs at 1e-10). Reference deviation at most 7.7e-13.
+    - step 2 case 7: neutral drift at N = 400: p_fix = i0 / N and p_loss = (N - i0) / N exactly (martingale), and
+      t_fix(i0) = t_loss(N - i0) (allele exchange), for i0 = 1, 2, 137, 200, 263, 398, 399.
+    - step 3 case 7: exact neutral stationary moments E_pi[i**k], k = 1..4, from the triangular system of the binomial
+      factorial moments (signed Stirling numbers), solved with Python fractions; checked against the brute-force
+      exact stationary vector at N = 4 and against the E[p (1 - p)] formula of case 1 (both exact agreement). At
+      N = 400 with u = v = 0.1, N = 400 with u = 0.1, v = 1e-12 (moments set by the small entries next to i = 0),
+      N = 250 and N = 37; tolerance 1.01e-8 (sums of nonnegative terms).
+    - step 4 case 10: the gap at the corners of the mutation range with the strongest selection (N = 30, s = 0.5,
+      u = 0.1, v = 1e-12 and N = 24, s = -0.5, u = 1e-12, v = 0.1) by inverse iteration with plain LU in mpmath at 60
+      digits (the method of case 7), and the neutral gap u + v = 0.2 at N = 400, u = v = 0.1.
+    - step 5 case 11: N = 400, s = -0.45, u = 0.1, v = 1e-12, next to the excluded corner: t_up from the hitting-time
+      system by plain mpmath LU at 380 and at 450 digits (identical to 40 digits: 3.452011881615877833e290, 253 s and
+      283 s) and t_down at 100 digits (12.41572647226185732); the reference agrees to 7.6e-14 and 9.5e-14.
+    - step 6 case 6: origin-fixation limit of the one-way absorption rate, rate = N v pi_A (1 + O(N v T)), pi_A by
+      plain mpmath LU at 60 digits; first-order perturbation of the Perron root only involves row 0 (left vector e_0,
+      right vector the loss probability). N = 60, s = 0.5 and N = 40, s = 0.3 with v = 1e-12: T = 12.5 and 12.2
+      generations (mean segregation time of one copy), N v T = 7.5e-10 and 4.9e-10; tolerance 1.1e-8; the measured
+      deviations of the reference are 1.8e-11 and 1.0e-11.
+    - step 7 case 7: lambda_min and the mode of N = 4 to 7 chains (one absorbing state, both, the floor 1e-12 next to
+      a zero rate) from the Faddeev-LeVerrier characteristic polynomial in exact rational arithmetic, the smallest
+      root by mpmath polyroots at 120 digits, and the null vector of P - lambda_min I with the row of the first
+      transient state replaced by x_t = 1 (plain LU at 120 digits); no eigensolver, no inverse iteration. Checked
+      against mpmath eig (agreement to 1e-16). At N = 5, s = -0.5, u = 0, v = 1e-12 the first transient entry of the
+      mode is 5.3e-13 and must be positive.
+  - n_test_cases: 8, 8, 8, 11, 12, 7, 8 (general 5, unchanged). verification_explanation lists the new evidence
+    (without naming test inputs).
+- Regression: the new cases reject step_1 cancelled_complement and mutation_before_selection (case 7), step_3
+  dense_eigenvector (case 7), step_4 neutral_gap (case 10), step_5 dense_solve (case 11), step_6
+  absorption_from_mutation and dense_eigenvector (case 6), and all four step-7 mutants (case 7); step 2 case 7 is
+  passed by both step-2 mutants (neutral drift does not separate them; they fail the cases listed below).
+- Rerun (after the last change to code, tests and problem.yaml): tools/crown_check.py on the whole folder, all
+  modes, every case alone in a fresh process (-j 2, one BLAS thread): SUMMARY ALL OK, FORMAT OK (no non-finite
+  literal in the tests). ref: 8/8, 8/8, 8/8, 11/11, 12/12, 7/7, 8/8 and general 5/5, and solution.py passes every step
+  file; second: the same counts, all pass. mut: step 1 cancelled_complement [0, 2, 3, 6, 7], mutation_before_selection
+  [0, 1, 2, 3, 5, 7]; step 2 loss_by_complement [1, 2, 6], unconditional_times [1, 2, 5, 6]; step 3 dense_eigenvector
+  [0, 2, 3, 5, 6, 7]; step 4 dense_eigenvalues [1, 2, 3, 5, 6, 7, 8, 9], neutral_gap [2, 5, 6, 7, 8, 10]; step 5
+  dense_solve [0, 1, 2, 3, 5, 7, 8, 9, 10, 11]; step 6 dense_eigenvector and absorption_from_mutation [1, 2, 3, 5, 6];
+  step 7 dense_eigenvalues, numerical_inverse and regularized_absorbing [0, 1, 2, 3, 4, 6, 7], largest_entry_positive
+  [1, 2, 3, 4, 6, 7]; the whole-task mutant fails general [0, 1, 2, 3, 4]. shift: every step output, and every
+  evaluated function in the whole-task tests, scaled by 1 +- 1e-12: every case passes. controls: all-None and all-zero
+  stubs pass no case of any step or of the general tests. Raw folder size 496 KB.

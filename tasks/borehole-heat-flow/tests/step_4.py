@@ -204,7 +204,7 @@ def _crown_case():
 _crown_case()
 
 # --- test case 6 ---
-# stated error rules: n < 4, A < 0, a zero P column, P proportional to R
+# stated error rules: n < 4, A < 0, a zero R or P column, P proportional to R
 import numpy as np
 
 
@@ -220,12 +220,14 @@ def _crown_case():
         T = 4.7 + 0.044 * R - 1.1e-6 * S + 7.0 * P + noise * rng.standard_normal(z.size)
         return T, R, S, P
 
-    for case in ["short", "zeroP", "P_prop_R", "negA"]:
+    for case in ["short", "zeroR", "zeroP", "P_prop_R", "negA"]:
         _t4_t_msg = " (case %r)" % (case,)
         _t4_T, _t4_R, _t4_S, _t4_P = _t4_synthetic(0.0)
         A = 1e-6
         if case == "short":
             _t4_T, _t4_R, _t4_S, _t4_P = _t4_T[:3], _t4_R[:3], _t4_S[:3], _t4_P[:3]
+        elif case == "zeroR":
+            _t4_R = np.zeros_like(_t4_R)
         elif case == "zeroP":
             _t4_P = np.zeros_like(_t4_P)
         elif case == "P_prop_R":

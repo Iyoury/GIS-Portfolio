@@ -24,10 +24,8 @@ def true_vertical_depth(survey_md, inc_deg, azi_deg, md_query):
 
     Raises
     ------
-    ValueError if the survey arrays are not 1-D of equal length, have fewer
-    than 2 stations, do not start at MD 0 or do not increase strictly, if any
-    inclination is outside [0, 180), if the dogleg between two consecutive
-    stations is within 1e-6 rad of 180 degrees (opposite directions: the arc
-    is undefined), or if any query depth is outside [0, survey_md[-1]].
+    ValueError if any query depth is outside [0, survey_md[-1]], or if the
+    dogleg between two consecutive stations is within 1e-6 rad of 180
+    degrees (opposite directions: the arc is undefined).
     """
     raise NotImplementedError

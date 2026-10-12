@@ -19,7 +19,7 @@ def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
               0.01 cm^-1 for each level.
 
     Raises:
-      ValueError if a charge is not finite or not in [1, 2], if a mass is not finite or not in
-      [1, 10] u, or if fewer than five bound vibrational levels lie below the dissociation limit.
+      ValueError if a charge is not in [1, 2], if a mass is not in [1, 10] u, or if fewer
+      than five bound vibrational levels lie below the dissociation limit.
     '''
     raise NotImplementedError

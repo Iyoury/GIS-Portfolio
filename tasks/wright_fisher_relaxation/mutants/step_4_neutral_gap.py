@@ -28,8 +28,6 @@ def relaxation_rate(N, s, u, v):
     if not 1 <= N <= 400:
         raise ValueError("need 1 <= N <= 400")
     s, u, v = float(s), float(u), float(v)
-    if not (np.isfinite(s) and np.isfinite(u) and np.isfinite(v)):
-        raise ValueError("s, u and v must be finite")
     if not (-0.5 <= s <= 0.5 and 1e-12 <= u <= 0.1 and 1e-12 <= v <= 0.1):
         raise ValueError("need -0.5 <= s <= 0.5 and 1e-12 <= u, v <= 0.1")
     # MUTANT: the neutral result 1 - lambda_2 = u + v used for every s

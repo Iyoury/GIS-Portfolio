@@ -120,7 +120,7 @@ def _crown_case():
         return abs(a - b) / abs(b)
 
     def _t_check(pi, target, tol=1e-8):
-        # values only (the array shape is checked in cases 0 and 2)
+        # values only (the return type and the array shape are checked in case 0)
         pi = np.asarray(pi)
         for a, b in zip(pi, target):
             if b >= 1e-250:

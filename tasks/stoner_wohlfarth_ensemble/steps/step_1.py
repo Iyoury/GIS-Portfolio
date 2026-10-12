@@ -20,6 +20,6 @@ def branch_magnetization(h, psi):
          |h + h_sw(psi)| >= 1e-3.
 
     Raises:
-      ValueError if psi is outside [0, pi/2] or h is not finite.
+      ValueError if psi is outside [0, pi/2].
     '''
     raise NotImplementedError

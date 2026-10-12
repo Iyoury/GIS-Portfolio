@@ -154,8 +154,8 @@ sub_steps:
       every integer n_max from 0 to 16 and every t from 0 to 1e6 (including t = 0, very small t,
       and the whole range in between). The input t is a float or a numpy array of any shape;
       return a float numpy array of shape np.shape(t) + (n_max + 1,), with F[..., n] = F_n(t).
-      Errors: raise ValueError if n_max is not an integer in [0, 16] or if any t is negative,
-      not finite or larger than 1e6.
+      Errors: raise ValueError if n_max is not an integer in [0, 16] or if any t is negative
+      or larger than 1e6.
     function_header: |-
       def boys_function(n_max, t):
           '''Boys functions F_n(t) = integral from 0 to 1 of u**(2n) exp(-t u**2) du for n = 0..n_max.
@@ -169,8 +169,8 @@ sub_steps:
                Relative error below 1e-11 for every entry; F_n(0) = 1 / (2n + 1).
 
           Raises:
-            ValueError if n_max is not an integer in [0, 16], or if any t is negative, not finite
-            or larger than 1e6.
+            ValueError if n_max is not an integer in [0, 16], or if any t is negative or larger
+            than 1e6.
           '''
     return_line: return F
     step_background: |-
@@ -179,7 +179,7 @@ sub_steps:
       catastrophically for small t, where the subtraction cancels; used downward it is stable,
       but it then needs an accurate starting value at the highest order. Robust codes switch
       between such representations depending on t.
-    n_test_cases: 5
+    n_test_cases: 7
     contract:
       quantity: "Boys functions F_0(t) .. F_nmax(t) = integral_0^1 u^(2n) exp(-t u^2) du."
       assumptions: "Real t >= 0."
@@ -246,7 +246,7 @@ sub_steps:
       nuclear-attraction integrals between primitive s Gaussians; the attraction integral
       contains F0. The contracted integrals are the coefficient-weighted sums of the
       primitive ones (Szabo and Ostlund, Appendix A).
-    n_test_cases: 6
+    n_test_cases: 7
     contract:
       quantity: Overlap matrix S and core Hamiltonian H = T + V_A + V_B over the two STO-3G 1s functions.
       assumptions: STO-3G exponents scaled by zeta**2, the six fixed numbers of the prompt, no renormalization of the contracted functions, point nuclei.
@@ -301,7 +301,7 @@ sub_steps:
       single Gaussians, and the repulsion between two Gaussian clouds has a closed form
       that contains F0. The integrals have the 8-fold symmetry
       (ij|kl) = (ji|kl) = (kl|ij) = ..., so only 6 of the 16 values are different here.
-    n_test_cases: 5
+    n_test_cases: 6
     contract:
       quantity: The 2x2x2x2 array of two-electron repulsion integrals (ij|kl) over the two STO-3G 1s functions.
       assumptions: Same basis as step 2.
@@ -363,7 +363,7 @@ sub_steps:
       E_fci <= E_rhf always. Near equilibrium the two differ by the correlation energy (about
       0.02 hartree for H2 in this basis). On stretching, RHF keeps a fixed 50 percent ionic weight
       for H2 and goes to a wrong limit, while full CI dissociates correctly.
-    n_test_cases: 8
+    n_test_cases: 9
     contract:
       quantity: "Lowest-singlet full-CI and closed-shell RHF total energies of two electrons in the two-function STO-3G basis."
       assumptions: "Non-orthogonal basis of steps 2-3, lowest singlet (spatially symmetric) state even where the triplet lies lower in this basis, variational RHF as the global minimum over closed-shell determinants, point-charge nuclear repulsion ZA ZB / R. At short R the two functions become nearly linearly dependent and double-precision rounding of the integrals is amplified in E_fci: for zeta = 0.5, against 50-digit values, the formulations checked in version 14 erred by up to 1.4e-10 at R = 0.1 bohr, up to 3e-10 at 0.05 and 2e-9 to 2.3e-7 at 0.02 bohr depending on the method, so the range starts at 0.1 bohr."
@@ -415,8 +415,8 @@ sub_steps:
       exponents the well sits at small R, with light nuclei and weak binding the states
       reach far out (with 1 u nuclei a level a fraction of a cm^-1 below the limit extends to
       about a hundred bohr, and further the closer it lies to the limit).
-      Errors: raise ValueError if a charge is not finite or not in [1, 2], if a mass is not
-      finite or not in [1, 10] u, or if fewer than five vibrational levels lie below E_inf
+      Errors: raise ValueError if a charge is not in [1, 2], if a mass is not in [1, 10] u,
+      or if fewer than five vibrational levels lie below E_inf
       (for example when the only well lies above the dissociation limit).
     function_header: |-
       def vibrational_levels(ZA, ZB, zetaA, zetaB, massA, massB):
@@ -434,8 +434,8 @@ sub_steps:
                     0.01 cm^-1 for each level.
 
           Raises:
-            ValueError if a charge is not finite or not in [1, 2], if a mass is not finite or not in
-            [1, 10] u, or if fewer than five bound vibrational levels lie below the dissociation limit.
+            ValueError if a charge is not in [1, 2], if a mass is not in [1, 10] u, or if fewer
+            than five bound vibrational levels lie below the dissociation limit.
           '''
     return_line: return levels
     step_background: |-
@@ -447,7 +447,7 @@ sub_steps:
       limit can be an ion pair such as H- + H+, whose -1/R tail leaves E_fci(60 bohr) 1/60
       hartree (about 3658 cm^-1) below the limit. A well that lies above the limit gives no
       bound levels. The levels are anharmonic: their spacing shrinks with v.
-    n_test_cases: 8
+    n_test_cases: 9
     contract:
       quantity: "Lowest five J = 0 vibrational levels on the full-CI potential curve, measured from the exact dissociation limit."
       assumptions: "Born-Oppenheimer curve E_fci of fci_energy (the reference evaluates it from the step 2 and 3 integrals with the same singlet CI), reduced mass of the nuclei, exact R -> infinity limit including charged-fragment (q_A q_B / R) tails, CODATA 2018 conversion factors given in the prompt."

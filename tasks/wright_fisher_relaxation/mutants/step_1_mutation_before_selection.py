@@ -28,8 +28,6 @@ def wf_transition_matrix(N, s, u, v):
     if not 1 <= N <= 400:
         raise ValueError("need 1 <= N <= 400")
     s, u, v = float(s), float(u), float(v)
-    if not (np.isfinite(s) and np.isfinite(u) and np.isfinite(v)):
-        raise ValueError("s, u and v must be finite")
     if not (-0.5 <= s <= 0.5 and 0.0 <= u <= 0.1 and 0.0 <= v <= 0.1):
         raise ValueError("need -0.5 <= s <= 0.5 and 0 <= u, v <= 0.1")
     i = np.arange(N + 1, dtype=float)

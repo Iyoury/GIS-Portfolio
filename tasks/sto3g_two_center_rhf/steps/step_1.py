@@ -16,7 +16,7 @@ def boys_function(n_max, t):
          Relative error below 1e-11 for every entry; F_n(0) = 1 / (2n + 1).
 
     Raises:
-      ValueError if n_max is not an integer in [0, 16], or if any t is negative, not finite
-      or larger than 1e6.
+      ValueError if n_max is not an integer in [0, 16], or if any t is negative or larger
+      than 1e6.
     '''
     raise NotImplementedError

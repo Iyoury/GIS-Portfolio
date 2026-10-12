@@ -20,15 +20,15 @@ def switching_field_statistics(psi, a, f0, rate):
       which the particle leaves its original minimum. Absolute errors below 1e-7.
 
     Raises:
-      ValueError if psi is outside [0, pi/2], if a, f0 or rate is not a positive finite
-      number, if a is outside [40, 1000] or if f0 / rate is outside [1e5, 1e13].
+      ValueError if psi is outside [0, pi/2], if a, f0 or rate is not positive, if a is
+      outside [40, 1000] or if f0 / rate is outside [1e5, 1e13].
     '''
     psi = float(psi)
     if not (0.0 <= psi <= 0.5 * np.pi):
         raise ValueError("psi must be between 0 and pi/2")
     for name, value in (("a", a), ("f0", f0), ("rate", rate)):
         if not (np.isfinite(value) and value > 0.0):
-            raise ValueError("%s must be a positive finite number" % name)
+            raise ValueError("%s must be a positive number" % name)
     if not (40.0 <= a <= 1000.0 and 1e5 <= f0 / rate <= 1e13):
         raise ValueError("need 40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13")
     # cos(pi/2) is 6e-17 in floating point, which alone would put h_sw 2e-11 below 1

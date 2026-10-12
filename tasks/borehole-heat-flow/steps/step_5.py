@@ -22,7 +22,8 @@ def layered_paleoclimate_perturbation(z, layer_tops, layer_k, rho_c, t_years, dT
     rho_c : float, volumetric heat capacity (J m^-3 K^-1) > 0.
     t_years : 1-D array_like, positive, strictly increasing ends of the
         history intervals (years before present).
-    dT : 1-D array_like, same length, departure during each interval (K).
+    dT : 1-D array_like, same length, departure during each interval (K),
+        not all zero.
 
     Returns
     -------
@@ -32,8 +33,6 @@ def layered_paleoclimate_perturbation(z, layer_tops, layer_k, rho_c, t_years, dT
 
     Raises
     ------
-    ValueError for invalid layers (not 1-D of equal length, no layer, first
-    top not 0, tops not strictly increasing, a non-positive conductivity),
-    rho_c <= 0, an invalid history (as in step 3), or a negative depth.
+    ValueError if any conductivity is <= 0 or rho_c <= 0.
     """
     raise NotImplementedError

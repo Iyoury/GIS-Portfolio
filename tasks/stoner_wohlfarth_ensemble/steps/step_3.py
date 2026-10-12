@@ -22,8 +22,8 @@ def survival_probability(h, psi, a, f0, rate):
          1e-6 below h_sw(psi).
 
     Raises:
-      ValueError if psi is outside [0, pi/2], if h is not finite, if a, f0 or rate is
-      not a positive finite number, if a is outside [40, 1000] or if f0 / rate is
+      ValueError if psi is outside [0, pi/2], if a, f0 or rate is
+      not positive, if a is outside [40, 1000] or if f0 / rate is
       outside [1e5, 1e13].
     '''
     raise NotImplementedError

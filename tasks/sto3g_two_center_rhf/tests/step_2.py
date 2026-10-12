@@ -66,11 +66,9 @@ def _crown_case():
         return S, H
 
     def _t_check(out, args):
-        assert isinstance(out, tuple) and len(out) == 2
+        # the output contract (checked once in this step): a tuple of two float arrays of shape (2, 2)
+        assert isinstance(out, tuple) and len(out) == 2 and all(isinstance(x, np.ndarray) and np.issubdtype(x.dtype, np.floating) and x.shape == (2, 2) for x in out), out
         S, H = out
-        assert isinstance(S, np.ndarray) and isinstance(H, np.ndarray)
-        assert np.issubdtype(S.dtype, np.floating) and np.issubdtype(H.dtype, np.floating), (S.dtype, H.dtype)
-        assert S.shape == (2, 2) and H.shape == (2, 2)
         S_t, H_t = _t_one(*args)
         assert np.max(np.abs(np.asarray(S) - np.asarray(S_t))) <= 1e-10, (S, S_t)
         assert np.max(np.abs(np.asarray(H) - np.asarray(H_t))) <= 1e-10, (H, H_t)
@@ -148,11 +146,7 @@ def _crown_case():
         return S, H
 
     def _t_check(out, args):
-        assert isinstance(out, tuple) and len(out) == 2
         S, H = out
-        assert isinstance(S, np.ndarray) and isinstance(H, np.ndarray)
-        assert np.issubdtype(S.dtype, np.floating) and np.issubdtype(H.dtype, np.floating), (S.dtype, H.dtype)
-        assert S.shape == (2, 2) and H.shape == (2, 2)
         S_t, H_t = _t_one(*args)
         assert np.max(np.abs(np.asarray(S) - np.asarray(S_t))) <= 1e-10, (S, S_t)
         assert np.max(np.abs(np.asarray(H) - np.asarray(H_t))) <= 1e-10, (H, H_t)
@@ -231,11 +225,7 @@ def _crown_case():
         return S, H
 
     def _t_check(out, args):
-        assert isinstance(out, tuple) and len(out) == 2
         S, H = out
-        assert isinstance(S, np.ndarray) and isinstance(H, np.ndarray)
-        assert np.issubdtype(S.dtype, np.floating) and np.issubdtype(H.dtype, np.floating), (S.dtype, H.dtype)
-        assert S.shape == (2, 2) and H.shape == (2, 2)
         S_t, H_t = _t_one(*args)
         assert np.max(np.abs(np.asarray(S) - np.asarray(S_t))) <= 1e-10, (S, S_t)
         assert np.max(np.abs(np.asarray(H) - np.asarray(H_t))) <= 1e-10, (H, H_t)
@@ -312,11 +302,7 @@ def _crown_case():
         return S, H
 
     def _t_check(out, args):
-        assert isinstance(out, tuple) and len(out) == 2
         S, H = out
-        assert isinstance(S, np.ndarray) and isinstance(H, np.ndarray)
-        assert np.issubdtype(S.dtype, np.floating) and np.issubdtype(H.dtype, np.floating), (S.dtype, H.dtype)
-        assert S.shape == (2, 2) and H.shape == (2, 2)
         S_t, H_t = _t_one(*args)
         assert np.max(np.abs(np.asarray(S) - np.asarray(S_t))) <= 1e-10, (S, S_t)
         assert np.max(np.abs(np.asarray(H) - np.asarray(H_t))) <= 1e-10, (H, H_t)
@@ -330,15 +316,14 @@ def _crown_case():
 _crown_case()
 
 # --- test case 4 ---
-# non-positive distance, charge or exponent raises ValueError
+# the stated error rule, once per named input at its limit: R, ZA, ZB, zetaA or zetaB equal to 0 raises ValueError
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for _t_bad in ((1.0, 1.0, 1.24, 1.24, 0.0), (1.0, 1.0, 1.24, 1.24, -1.0),
-                   (0.0, 1.0, 1.24, 1.24, 1.4), (1.0, 0.0, 1.24, 1.24, 1.4),
-                   (1.0, 1.0, 0.0, 1.24, 1.4), (1.0, 1.0, 1.24, 0.0, 1.4), (1.0, 1.0, 1.24, -1.0, 1.4)):
+    for _t_bad in ((1.0, 1.0, 1.24, 1.24, 0.0), (0.0, 1.0, 1.24, 1.24, 1.4), (1.0, 0.0, 1.24, 1.24, 1.4),
+                   (1.0, 1.0, 0.0, 1.24, 1.4), (1.0, 1.0, 1.24, 0.0, 1.4)):
         _t_raised = False
         try:
             sto3g_one_electron(*_t_bad)
@@ -415,11 +400,7 @@ def _crown_case():
         return S, H
 
     def _t_check(out, args):
-        assert isinstance(out, tuple) and len(out) == 2
         S, H = out
-        assert isinstance(S, np.ndarray) and isinstance(H, np.ndarray)
-        assert np.issubdtype(S.dtype, np.floating) and np.issubdtype(H.dtype, np.floating), (S.dtype, H.dtype)
-        assert S.shape == (2, 2) and H.shape == (2, 2)
         S_t, H_t = _t_one(*args)
         assert np.max(np.abs(np.asarray(S) - np.asarray(S_t))) <= 1e-10, (S, S_t)
         assert np.max(np.abs(np.asarray(H) - np.asarray(H_t))) <= 1e-10, (H, H_t)
@@ -430,6 +411,59 @@ def _crown_case():
     for _t_args in ((3.0, 3.0, 0.5, 0.5, 0.02), (1.0, 3.0, 3.0, 0.5, 0.02),
                     (3.0, 1.0, 3.0, 0.5, 100.0), (1.0, 1.0, 0.5, 0.5, 100.0)):
         assert _t_check(sto3g_one_electron(*_t_args), _t_args) is not None
+
+
+_crown_case()
+
+# --- test case 6 ---
+# Exact relations with independent targets (no quadrature, no reference values):
+# (a) one-centre norm: S[0, 0] = S[1, 1] = sum_ij d_i d_j (2 sqrt(a_i a_j) / (a_i + a_j))**(3/2) for every
+#     zeta and R (the zeta**2 scaling of the exponents cancels in the ratio);
+# (b) separated atoms at R = 100 bohr (every cross term below 1e-50, the cloud beyond the other nucleus
+#     below erfc(23)): S[0, 1] = H[0, 1] = 0 and H[0, 0] = T_A - ZA U_A - ZB S[0, 0] / R with the one-centre
+#     closed forms T_A = sum d_i d_j n_i n_j 3 a_i a_j / (a_i + a_j) (pi / (a_i + a_j))**(3/2) and
+#     U_A = sum d_i d_j n_i n_j 2 pi / (a_i + a_j), n_i = (2 a_i / pi)**(3/4), and the shell theorem for the
+#     other nucleus (likewise H[1, 1]);
+# (c) scaling: dividing every length by lam (zeta -> lam zeta, R -> R / lam) and multiplying the charges by
+#     lam leaves S unchanged and multiplies H by lam**2 (kinetic energy ~ length**-2, attraction ~ charge /
+#     length); two computed outputs, each within 1e-10: tolerances 2e-10 for S and (1 + lam**2) 1e-10 for H;
+# (d) mirror symmetry: exchanging the atoms (ZA <-> ZB, zetaA <-> zetaB) exchanges the indices 0 and 1.
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+
+    _T_ALPHA = np.array([0.109818, 0.405771, 2.22766])
+
+    _T_D = np.array([0.444635, 0.535328, 0.154329])
+
+    def _t_centre(zeta):
+        a = _T_ALPHA * zeta ** 2
+        w = np.outer(_T_D * (2 * a / np.pi) ** 0.75, _T_D * (2 * a / np.pi) ** 0.75)
+        p, ab = np.add.outer(a, a), np.multiply.outer(a, a)
+        return (float(np.sum(w * (np.pi / p) ** 1.5)), float(np.sum(w * 3 * ab / p * (np.pi / p) ** 1.5)),
+                float(np.sum(w * 2 * np.pi / p)))
+
+    _t_s0 = float(np.sum(np.outer(_T_D, _T_D) * (2 * np.sqrt(np.outer(_T_ALPHA, _T_ALPHA)) / np.add.outer(_T_ALPHA, _T_ALPHA)) ** 1.5))
+    S, H = sto3g_one_electron(1.0, 1.5, 0.6, 1.3, 2.2)
+    assert abs(S[0, 0] - _t_s0) < 1e-10 and abs(S[1, 1] - _t_s0) < 1e-10, (S, _t_s0)
+
+    _t_args = (1.7, 2.6, 0.8, 2.2, 100.0)
+    Sf, Hf = sto3g_one_electron(*_t_args)
+    sA, tA, uA = _t_centre(0.8)
+    sB, tB, uB = _t_centre(2.2)
+    assert abs(Sf[0, 1]) < 1e-10 and abs(Sf[1, 0]) < 1e-10 and abs(Hf[0, 1]) < 1e-10 and abs(Hf[1, 0]) < 1e-10, (Sf, Hf)
+    assert abs(Hf[0, 0] - (tA - 1.7 * uA - 2.6 * sA / 100.0)) < 1e-10, (Hf, tA - 1.7 * uA - 2.6 * sA / 100.0)
+    assert abs(Hf[1, 1] - (tB - 2.6 * uB - 1.7 * sB / 100.0)) < 1e-10, (Hf, tB - 2.6 * uB - 1.7 * sB / 100.0)
+
+    _t_lam = 2.0
+    S2, H2 = sto3g_one_electron(2.0, 3.0, 1.2, 2.6, 1.1)
+    assert np.max(np.abs(S2 - S)) <= 2e-10, (S2, S)
+    assert np.max(np.abs(H2 - _t_lam ** 2 * H)) <= (1.0 + _t_lam ** 2) * 1e-10, (H2, H)
+
+    Sm, Hm = sto3g_one_electron(1.5, 1.0, 1.3, 0.6, 2.2)
+    assert np.max(np.abs(Sm - S[::-1, ::-1])) <= 2e-10 and np.max(np.abs(Hm - H[::-1, ::-1])) <= 2e-10, (Sm, Hm, S, H)
 
 
 _crown_case()

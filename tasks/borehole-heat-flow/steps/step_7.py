@@ -17,16 +17,17 @@ def regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape, t_end_bo
     holes : list of H >= 2 dicts, one per borehole, each with exactly the keys
         "survey_md", "survey_inc", "survey_azi", "log_md", "log_temp",
         "layer_top_md", "layer_k", "heat_production", "rho_c" and "z_min",
-        with the meanings, units and rules of the arguments of the same names
-        of deglaciation_heat_flow_inversion (step 6); log_md need not be sorted.
+        with the meanings, units and valid ranges of the arguments of the same
+        names of deglaciation_heat_flow_inversion (step 6); log_md need not be
+        sorted, but its values are distinct within a hole.
     hist_t_years, hist_dT_shape, t_end_bounds : the glacial history of step 6,
         shared by every hole: the m - 1 known interval ends (years before
         present, positive, strictly increasing), the m >= 2 shape values
-        s_0 ... s_(m-1) (K per unit amplitude) and (t_lo, t_hi) in years with
-        0 < t_lo < t_hi < hist_t_years[0].
+        s_0 ... s_(m-1) (K per unit amplitude, s_0 != s_1) and (t_lo, t_hi) in
+        years with 0 < t_lo < t_hi < hist_t_years[0].
 
     Model: in hole h the readings with TVD z >= z_min_h, numbered i = 1 ... n_h
-    by increasing MD (readings at equal MD in input order), obey
+    by increasing MD, obey
     T = T0_h + q0_h R_h(z) - A_h S_h(z) + g P_h(z; t_end)
     + e_i, with P_h(z; t_end) = layered_paleoclimate_perturbation(z, the hole's
     layer tops in TVD, its layer_k, its rho_c, [t_end, *hist_t_years],
@@ -54,24 +55,19 @@ def regional_deglaciation_inversion(holes, hist_t_years, hist_dT_shape, t_end_bo
     (maximum-likelihood s_h, K) as Python floats and "n_used" (int, readings
     used in the hole).
     Domain: at least 8 used readings per hole; maximum-likelihood s_h from
-    1e-3 K to 0.03 K and phi_h from -0.9 to 0.95 in every hole.
-    Accuracy: g and t_end within a relative 2e-3; every q0 within a relative
-    5e-4; every T0 within 2e-3 K; the standard errors within a relative 1e-2;
-    t_end_low and t_end_high within a relative 5e-4; every phi within 2e-3;
+    1e-3 K to 0.03 K and phi_h from -0.3 to 0.9, and q0_h > 0, in every hole.
+    Accuracy: g and t_end within a relative 2e-3 (g != 0 in a returned
+    result); every q0 within a relative 5e-4; every T0 within 2e-3 K; the
+    standard errors within a relative 1e-2; t_end_low and t_end_high within a
+    relative 5e-4; every phi within 2e-3;
     every innovation_sd within a relative 3e-3; log_likelihood within 0.1;
     n_used exact. These limits include the errors propagated from the stated
     accuracies of steps 1, 2 and 5.
 
     Raises
     ------
-    ValueError if holes is not a list or tuple of at least 2 dicts with exactly
-    these keys; for a hole with log arrays that are not 1-D of equal length, a
-    negative heat production, any error of an earlier step, fewer than 8
-    readings with TVD >= z_min, or T0_h and
-    q0_h not separately resolvable (smallest singular value of the n_h x 2
-    matrix [1, R_h] with unit-length columns below 1e-8); for an invalid
-    history or invalid bounds (rules of step 6, including hist_dT_shape[0] ==
-    hist_dT_shape[1]); if the maximum of l_p over [t_lo, t_hi] is attained at
-    t_lo or t_hi; or if a nearest crossing does not exist inside [t_lo, t_hi].
+    ValueError if a hole has fewer than 8 readings with TVD >= its z_min, if
+    the maximum of l_p over [t_lo, t_hi] is attained at t_lo or t_hi, or if a
+    nearest crossing does not exist inside [t_lo, t_hi].
     """
     raise NotImplementedError

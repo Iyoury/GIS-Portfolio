@@ -16,15 +16,15 @@ def boys_function(n_max, t):
          Relative error below 1e-11 for every entry; F_n(0) = 1 / (2n + 1).
 
     Raises:
-      ValueError if n_max is not an integer in [0, 16], or if any t is negative, not finite
-      or larger than 1e6.
+      ValueError if n_max is not an integer in [0, 16], or if any t is negative or larger
+      than 1e6.
     '''
     if isinstance(n_max, bool) or not isinstance(n_max, (int, np.integer)) or not (0 <= n_max <= 16):
         raise ValueError("n_max must be an integer from 0 to 16")
     n_max = int(n_max)
     t_arr = np.asarray(t, dtype=float)
     if not np.all(np.isfinite(t_arr)) or np.any(t_arr < 0.0) or np.any(t_arr > 1e6):
-        raise ValueError("t must be finite with 0 <= t <= 1e6")
+        raise ValueError("t must satisfy 0 <= t <= 1e6")
     flat = t_arr.ravel()
     F = np.empty((flat.size, n_max + 1))
     split = n_max + 25.0

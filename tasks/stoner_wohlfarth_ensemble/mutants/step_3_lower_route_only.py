@@ -22,17 +22,17 @@ def survival_probability(h, psi, a, f0, rate):
          1e-6 below h_sw(psi).
 
     Raises:
-      ValueError if psi is outside [0, pi/2], if h is not finite, if a, f0 or rate is
-      not a positive finite number, if a is outside [40, 1000] or if f0 / rate is
+      ValueError if psi is outside [0, pi/2], if a, f0 or rate is
+      not positive, if a is outside [40, 1000] or if f0 / rate is
       outside [1e5, 1e13].
     '''
     h = float(h)
     psi = float(psi)
     if not np.isfinite(h) or not (0.0 <= psi <= 0.5 * np.pi):
-        raise ValueError("h must be finite and psi must be between 0 and pi/2")
+        raise ValueError("h must be a real number and psi must be between 0 and pi/2")
     for name, value in (("a", a), ("f0", f0), ("rate", rate)):
         if not (np.isfinite(value) and value > 0.0):
-            raise ValueError("%s must be a positive finite number" % name)
+            raise ValueError("%s must be a positive number" % name)
     if not (40.0 <= a <= 1000.0 and 1e5 <= f0 / rate <= 1e13):
         raise ValueError("need 40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13")
     # cos(pi/2) is 6e-17 in floating point, which alone would put h_sw 2e-11 below 1

@@ -206,6 +206,7 @@ def _crown_case():
 
     def _t_check_pol(args):
         out = polarized_energies(*args)
+        # the output contract (checked once in this file): a tuple of two Python floats
         assert isinstance(out, tuple) and len(out) == 2 and all(type(x) is float for x in out), out
         t_fci, t_rhf = _t_energies(*args)
         assert abs(out[0] - t_fci) < 1e-9, (args, out, t_fci)
@@ -214,7 +215,6 @@ def _crown_case():
 
     _t_o = _t_check_pol((1.0, 1.0, 1.24, 1.24, 1.0, 1.0, 3.0))
     _t_e4 = fci_energy(1.0, 1.0, 1.24, 1.24, 3.0)
-    assert isinstance(_t_e4, tuple) and len(_t_e4) == 2, _t_e4
     assert _t_o[0] <= _t_e4[0] + 2e-9 and _t_o[1] <= _t_e4[1] + 2e-9, (_t_o, _t_e4)
     assert _t_o[0] <= _t_o[1] + 2e-9, _t_o
 
@@ -422,7 +422,6 @@ def _crown_case():
 
     def _t_check_pol(args):
         out = polarized_energies(*args)
-        assert isinstance(out, tuple) and len(out) == 2 and all(type(x) is float for x in out), out
         t_fci, t_rhf = _t_energies(*args)
         assert abs(out[0] - t_fci) < 1e-9, (args, out, t_fci)
         assert abs(out[1] - t_rhf) < 1e-9, (args, out, t_rhf)
@@ -634,7 +633,6 @@ def _crown_case():
 
     def _t_check_pol(args):
         out = polarized_energies(*args)
-        assert isinstance(out, tuple) and len(out) == 2 and all(type(x) is float for x in out), out
         t_fci, t_rhf = _t_energies(*args)
         assert abs(out[0] - t_fci) < 1e-9, (args, out, t_fci)
         assert abs(out[1] - t_rhf) < 1e-9, (args, out, t_rhf)

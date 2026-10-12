@@ -128,7 +128,7 @@ def _crown_case():
         # is stretched or asymmetric): every local minimum of a fine scan over the whole period is refined
         grid = np.linspace(-0.5 * np.pi, 0.5 * np.pi, 2001)
         vals = np.array([e(t) for t in grid])
-        best = np.inf
+        best = 1e300   # finite start: every closed-shell energy here is far below it
         for i in range(len(grid)):
             if vals[i] <= vals[i - 1] and vals[i] <= vals[(i + 1) % len(grid)]:
                 res = minimize_scalar(e, bounds=(grid[i] - (grid[1] - grid[0]), grid[i] + (grid[1] - grid[0])),
@@ -148,8 +148,8 @@ def _crown_case():
 
     def _t_check(args):
         out = fci_energy(*args)
-        assert isinstance(out, tuple) and len(out) == 2, out
-        assert type(out[0]) is float and type(out[1]) is float, out
+        # the output contract (checked once in this step): a tuple of two Python floats
+        assert isinstance(out, tuple) and len(out) == 2 and type(out[0]) is float and type(out[1]) is float, out
         E_fci, E_rhf = out
         t_fci, t_rhf = _t_fci(*args), _t_energy(*args)
         assert abs(E_fci - t_fci) < 1e-9, (args, E_fci, t_fci)
@@ -283,7 +283,7 @@ def _crown_case():
         # is stretched or asymmetric): every local minimum of a fine scan over the whole period is refined
         grid = np.linspace(-0.5 * np.pi, 0.5 * np.pi, 2001)
         vals = np.array([e(t) for t in grid])
-        best = np.inf
+        best = 1e300   # finite start: every closed-shell energy here is far below it
         for i in range(len(grid)):
             if vals[i] <= vals[i - 1] and vals[i] <= vals[(i + 1) % len(grid)]:
                 res = minimize_scalar(e, bounds=(grid[i] - (grid[1] - grid[0]), grid[i] + (grid[1] - grid[0])),
@@ -303,8 +303,6 @@ def _crown_case():
 
     def _t_check(args):
         out = fci_energy(*args)
-        assert isinstance(out, tuple) and len(out) == 2, out
-        assert type(out[0]) is float and type(out[1]) is float, out
         E_fci, E_rhf = out
         t_fci, t_rhf = _t_fci(*args), _t_energy(*args)
         assert abs(E_fci - t_fci) < 1e-9, (args, E_fci, t_fci)
@@ -440,7 +438,7 @@ def _crown_case():
         # is stretched or asymmetric): every local minimum of a fine scan over the whole period is refined
         grid = np.linspace(-0.5 * np.pi, 0.5 * np.pi, 2001)
         vals = np.array([e(t) for t in grid])
-        best = np.inf
+        best = 1e300   # finite start: every closed-shell energy here is far below it
         for i in range(len(grid)):
             if vals[i] <= vals[i - 1] and vals[i] <= vals[(i + 1) % len(grid)]:
                 res = minimize_scalar(e, bounds=(grid[i] - (grid[1] - grid[0]), grid[i] + (grid[1] - grid[0])),
@@ -460,8 +458,6 @@ def _crown_case():
 
     def _t_check(args):
         out = fci_energy(*args)
-        assert isinstance(out, tuple) and len(out) == 2, out
-        assert type(out[0]) is float and type(out[1]) is float, out
         E_fci, E_rhf = out
         t_fci, t_rhf = _t_fci(*args), _t_energy(*args)
         assert abs(E_fci - t_fci) < 1e-9, (args, E_fci, t_fci)
@@ -596,7 +592,7 @@ def _crown_case():
         # is stretched or asymmetric): every local minimum of a fine scan over the whole period is refined
         grid = np.linspace(-0.5 * np.pi, 0.5 * np.pi, 2001)
         vals = np.array([e(t) for t in grid])
-        best = np.inf
+        best = 1e300   # finite start: every closed-shell energy here is far below it
         for i in range(len(grid)):
             if vals[i] <= vals[i - 1] and vals[i] <= vals[(i + 1) % len(grid)]:
                 res = minimize_scalar(e, bounds=(grid[i] - (grid[1] - grid[0]), grid[i] + (grid[1] - grid[0])),
@@ -616,8 +612,6 @@ def _crown_case():
 
     def _t_check(args):
         out = fci_energy(*args)
-        assert isinstance(out, tuple) and len(out) == 2, out
-        assert type(out[0]) is float and type(out[1]) is float, out
         E_fci, E_rhf = out
         t_fci, t_rhf = _t_fci(*args), _t_energy(*args)
         assert abs(E_fci - t_fci) < 1e-9, (args, E_fci, t_fci)
@@ -752,7 +746,7 @@ def _crown_case():
         # is stretched or asymmetric): every local minimum of a fine scan over the whole period is refined
         grid = np.linspace(-0.5 * np.pi, 0.5 * np.pi, 2001)
         vals = np.array([e(t) for t in grid])
-        best = np.inf
+        best = 1e300   # finite start: every closed-shell energy here is far below it
         for i in range(len(grid)):
             if vals[i] <= vals[i - 1] and vals[i] <= vals[(i + 1) % len(grid)]:
                 res = minimize_scalar(e, bounds=(grid[i] - (grid[1] - grid[0]), grid[i] + (grid[1] - grid[0])),
@@ -772,8 +766,6 @@ def _crown_case():
 
     def _t_check(args):
         out = fci_energy(*args)
-        assert isinstance(out, tuple) and len(out) == 2, out
-        assert type(out[0]) is float and type(out[1]) is float, out
         E_fci, E_rhf = out
         t_fci, t_rhf = _t_fci(*args), _t_energy(*args)
         assert abs(E_fci - t_fci) < 1e-9, (args, E_fci, t_fci)
@@ -910,7 +902,7 @@ def _crown_case():
         # is stretched or asymmetric): every local minimum of a fine scan over the whole period is refined
         grid = np.linspace(-0.5 * np.pi, 0.5 * np.pi, 2001)
         vals = np.array([e(t) for t in grid])
-        best = np.inf
+        best = 1e300   # finite start: every closed-shell energy here is far below it
         for i in range(len(grid)):
             if vals[i] <= vals[i - 1] and vals[i] <= vals[(i + 1) % len(grid)]:
                 res = minimize_scalar(e, bounds=(grid[i] - (grid[1] - grid[0]), grid[i] + (grid[1] - grid[0])),
@@ -930,8 +922,6 @@ def _crown_case():
 
     def _t_check(args):
         out = fci_energy(*args)
-        assert isinstance(out, tuple) and len(out) == 2, out
-        assert type(out[0]) is float and type(out[1]) is float, out
         E_fci, E_rhf = out
         t_fci, t_rhf = _t_fci(*args), _t_energy(*args)
         assert abs(E_fci - t_fci) < 1e-9, (args, E_fci, t_fci)
@@ -1067,7 +1057,7 @@ def _crown_case():
         # is stretched or asymmetric): every local minimum of a fine scan over the whole period is refined
         grid = np.linspace(-0.5 * np.pi, 0.5 * np.pi, 2001)
         vals = np.array([e(t) for t in grid])
-        best = np.inf
+        best = 1e300   # finite start: every closed-shell energy here is far below it
         for i in range(len(grid)):
             if vals[i] <= vals[i - 1] and vals[i] <= vals[(i + 1) % len(grid)]:
                 res = minimize_scalar(e, bounds=(grid[i] - (grid[1] - grid[0]), grid[i] + (grid[1] - grid[0])),
@@ -1087,8 +1077,6 @@ def _crown_case():
 
     def _t_check(args):
         out = fci_energy(*args)
-        assert isinstance(out, tuple) and len(out) == 2, out
-        assert type(out[0]) is float and type(out[1]) is float, out
         E_fci, E_rhf = out
         t_fci, t_rhf = _t_fci(*args), _t_energy(*args)
         assert abs(E_fci - t_fci) < 1e-9, (args, E_fci, t_fci)
@@ -1236,7 +1224,7 @@ def _crown_case():
         # is stretched or asymmetric): every local minimum of a fine scan over the whole period is refined
         grid = np.linspace(-0.5 * np.pi, 0.5 * np.pi, 2001)
         vals = np.array([e(t) for t in grid])
-        best = np.inf
+        best = 1e300   # finite start: every closed-shell energy here is far below it
         for i in range(len(grid)):
             if vals[i] <= vals[i - 1] and vals[i] <= vals[(i + 1) % len(grid)]:
                 res = minimize_scalar(e, bounds=(grid[i] - (grid[1] - grid[0]), grid[i] + (grid[1] - grid[0])),
@@ -1256,8 +1244,6 @@ def _crown_case():
 
     def _t_check(args):
         out = fci_energy(*args)
-        assert isinstance(out, tuple) and len(out) == 2, out
-        assert type(out[0]) is float and type(out[1]) is float, out
         E_fci, E_rhf = out
         t_fci, t_rhf = _t_fci(*args), _t_energy(*args)
         assert abs(E_fci - t_fci) < 1e-9, (args, E_fci, t_fci)
@@ -1267,6 +1253,64 @@ def _crown_case():
     for _t_args in ((3.0, 3.0, 0.5, 0.5, 0.1), (1.0, 3.0, 3.0, 0.5, 0.1), (3.0, 1.0, 3.0, 0.5, 100.0)):
         E_fci, E_rhf = _t_check(_t_args)
         assert E_fci <= E_rhf + 2e-9, (_t_args, E_fci, E_rhf)   # two outputs, each within 1e-9
+
+
+_crown_case()
+
+# --- test case 8 ---
+# Separated atoms at R = 100 bohr, an analytic special case without two-centre integrals: every overlap,
+# kinetic, attraction and repulsion integral involving the overlap density of the two functions vanishes
+# (below 1e-150), the other nucleus and the other atom's charge cloud act as point charges (shell
+# theorem) and the three singlet configurations decouple. With the one-centre closed forms of each
+# normalized 1s function (norm s = sum w_ij (pi / p)**(3/2), core energy e = (T - Z U) / s, repulsion
+# J = (aa|aa) / s**2, with T = sum w_ij 3 a_i a_j / p (pi / p)**(3/2), U = sum w_ij 2 pi / p,
+# (aa|aa) = sum w_ij w_kl 2 pi**(5/2) / (p q sqrt(p + q)), w_ij = d_i d_j n_i n_j, n_i = (2 a_i / pi)**(3/4),
+# p = a_i + a_j, q = a_k + a_l):
+#   E_fci = min(2 e_A + J_A + (ZA - 2) ZB / R, 2 e_B + J_B + (ZB - 2) ZA / R, e_A + e_B + (ZA - 1)(ZB - 1) / R)
+# (both electrons on A, both on B, one on each), and E_rhf = the minimum over x = (weight of B) in [0, 1] of
+# the convex quadratic 2 (1 - x) h_A + 2 x h_B + (1 - x)**2 J_A + x**2 J_B + 2 x (1 - x) / R + ZA ZB / R,
+# h_A = e_A - ZB / R, h_B = e_B - ZA / R (for H2 the minimum is at x = 1/2: E_rhf = 2 e + J / 2 - 1 / (2 R)).
+# Molecules: H2 (neutral atoms; RHF keeps half ionic weight, 0.38 hartree above full CI), HeH+ (He + H+,
+# where RHF is exact), an ion pair H- + H+ (zetaB = 2.69) and fragments of charge 0.5 and 0.5 (ZA = ZB = 1.5).
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+
+    _T_ALPHA = np.array([0.109818, 0.405771, 2.22766])
+
+    _T_D = np.array([0.444635, 0.535328, 0.154329])
+
+    def _t_atom(Z, zeta):
+        a = _T_ALPHA * zeta ** 2
+        w = np.outer(_T_D * (2 * a / np.pi) ** 0.75, _T_D * (2 * a / np.pi) ** 0.75).ravel()
+        p = np.add.outer(a, a).ravel()
+        ab = np.multiply.outer(a, a).ravel()
+        s = float(np.sum(w * (np.pi / p) ** 1.5))
+        T = float(np.sum(w * 3 * ab / p * (np.pi / p) ** 1.5))
+        U = float(np.sum(w * 2 * np.pi / p))
+        J = float(np.sum(np.outer(w, w) * 2 * np.pi ** 2.5 / (np.outer(p, p) * np.sqrt(np.add.outer(p, p)))))
+        return (T - Z * U) / s, J / s ** 2
+
+    def _t_limits(ZA, ZB, za, zb, R):
+        eA, JA = _t_atom(ZA, za)
+        eB, JB = _t_atom(ZB, zb)
+        e_fci = min(2 * eA + JA + (ZA - 2) * ZB / R, 2 * eB + JB + (ZB - 2) * ZA / R,
+                    eA + eB + (ZA - 1) * (ZB - 1) / R)
+        hA, hB = eA - ZB / R, eB - ZA / R
+        c0 = 2 * hA + JA + ZA * ZB / R
+        c1 = -2 * hA + 2 * hB - 2 * JA + 2 / R
+        c2 = JA + JB - 2 / R
+        x = min(max(-c1 / (2 * c2), 0.0), 1.0)
+        return e_fci, c0 + c1 * x + c2 * x * x
+
+    for _t_args in ((1.0, 1.0, 1.24, 1.24, 100.0), (2.0, 1.0, 2.0925, 1.24, 100.0), (1.0, 1.0, 1.24, 2.69, 100.0),
+                    (1.5, 1.5, 2.0, 1.24, 100.0)):
+        E_fci, E_rhf = fci_energy(*_t_args)
+        t_fci, t_rhf = _t_limits(*_t_args)
+        assert abs(E_fci - t_fci) < 1e-9, (_t_args, E_fci, t_fci)
+        assert abs(E_rhf - t_rhf) < 1e-9, (_t_args, E_rhf, t_rhf)
 
 
 _crown_case()

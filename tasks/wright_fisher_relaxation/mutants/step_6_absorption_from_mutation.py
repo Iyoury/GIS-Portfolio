@@ -31,8 +31,6 @@ def quasi_stationary(N, s, v):
     if not 1 <= N <= 400:
         raise ValueError("need 1 <= N <= 400")
     s, v = float(s), float(v)
-    if not (np.isfinite(s) and np.isfinite(v)):
-        raise ValueError("s and v must be finite")
     if not (-0.5 <= s <= 0.5 and 1e-12 <= v <= 0.1):
         raise ValueError("need -0.5 <= s <= 0.5 and 1e-12 <= v <= 0.1")
     P = wf_transition_matrix(N, s, 0.0, v)

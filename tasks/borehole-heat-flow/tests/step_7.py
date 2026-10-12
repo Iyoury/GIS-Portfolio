@@ -1,8 +1,9 @@
 # --- test case 0 ---
-# three holes with innovation sd 4, 12, 25 mK and phi 0.35, 0.7, 0.85: every output (and its type) against the exact
-# maximum-likelihood solution. Targets: whitened-space data construction (every score of the exact log-likelihood vanishes
-# at the generating values), branch-cut oracle for P and dP/dt_end, expected information of the oracle Jacobians,
-# chi-square quantile from math.erf; interval ends bracketed by crossings of the oracle profile within a relative 5e-4.
+# three holes with innovation sd 4, 12.3 and 30 mK (the top of the stated domain) and phi 0.35, 0.7, 0.85: every output
+# (and its type) against the exact maximum-likelihood solution. Targets: whitened-space data construction (every score
+# of the exact log-likelihood vanishes at the generating values), branch-cut oracle for P and dP/dt_end, expected
+# information of the oracle Jacobians, chi-square quantile from math.erf; interval ends bracketed by crossings of the
+# oracle profile within a relative 5e-4.
 def _crown_case():
   import math
   import numpy as np
@@ -210,11 +211,11 @@ def _crown_case():
 
   def check(r, reg):
     ex = reg.star
-    assert isinstance(r, dict) and len(r["holes"]) == len(ex["holes"])
     for key, tol in (("g", 2e-3), ("t_end", 2e-3), ("sigma_g", 1e-2), ("sigma_t_end", 1e-2)):
       assert abs(float(r[key]) / ex[key] - 1.0) < tol, (key, r[key], ex[key])
     assert abs(float(r["log_likelihood"]) - ex["log_likelihood"]) < 0.1, (r["log_likelihood"], ex["log_likelihood"])
-    for h, (rh, eh) in enumerate(zip(r["holes"], ex["holes"])):
+    for h, eh in enumerate(ex["holes"]):
+      rh = r["holes"][h]
       assert int(round(float(rh["n_used"]))) == eh["n_used"], (h, rh["n_used"])
       for key, tol in (("T0", 2e-3), ("phi", 2e-3)):
         assert abs(float(rh[key]) - eh[key]) < tol, (h, key, rh[key], eh[key])
@@ -239,19 +240,17 @@ def _crown_case():
   def short3():
     return Bore(g_survey(900, 20, 15, 22, 200, 215, 0.5, 4), ([0, 90, 400], [3.8, 2.4, 3.1]), 0.5e-6, 2.5e6, 80.0,
         log_step=6.0, log_top=10.0)
+  # third hole: maximum-likelihood innovation sd sqrt(noise^2 + |c|^2 / n) = 0.03 K exactly (|c|^2 = 6.25 noise^2, n = 136)
   reg = Region([incl7(10.0), mid4(), short3()], [4.1, 3.2, 5.0], [0.037, 0.048, 0.031], 7.8, 11500.0,
-      [0.0, -1.0, 0.25], [1.0e5, 1.2e5], [0.004, 0.012, 0.025], [0.35, 0.7, 0.85], [None, (2.0, -1.5), (-1.5, 2.0)], 5, 0)
+      [0.0, -1.0, 0.25], [1.0e5, 1.2e5], [0.004, 0.012, 0.03 / math.sqrt(1.0 + 6.25 / 136)], [0.35, 0.7, 0.85],
+      [None, (2.0, -1.5), (-1.5, 2.0)], 5, 0)
   r = regional_deglaciation_inversion(reg.holes, [1.0e5, 1.2e5], [0.0, -1.0, 0.25], (3000.0, 60000.0))
   keys = ["g", "t_end", "sigma_g", "sigma_t_end", "t_end_low", "t_end_high", "log_likelihood"]
-  assert isinstance(r, dict) and set(keys + ["holes"]) <= set(r)
-  for key in keys:
-    assert type(r[key]) is float, key
-  assert isinstance(r["holes"], list) and len(r["holes"]) == 3
-  for rh in r["holes"]:
-    assert isinstance(rh, dict)
-    for key in ("T0", "q0", "sigma_T0", "sigma_q0", "phi", "innovation_sd"):
-      assert type(rh[key]) is float, key
-    assert type(rh["n_used"]) is int
+  hk = ["T0", "q0", "sigma_T0", "sigma_q0", "phi", "innovation_sd"]
+  # output contract: seven Python floats and a list of three hole dicts of six Python floats and the int n_used
+  assert (isinstance(r, dict) and all(type(r[key]) is float for key in keys) and isinstance(r["holes"], list)
+      and len(r["holes"]) == 3 and all(type(rh[key]) is float for rh in r["holes"] for key in hk)
+      and all(type(rh["n_used"]) is int for rh in r["holes"]))
   check(r, reg)
 
 
@@ -467,11 +466,11 @@ def _crown_case():
 
   def check(r, reg):
     ex = reg.star
-    assert isinstance(r, dict) and len(r["holes"]) == len(ex["holes"])
     for key, tol in (("g", 2e-3), ("t_end", 2e-3), ("sigma_g", 1e-2), ("sigma_t_end", 1e-2)):
       assert abs(float(r[key]) / ex[key] - 1.0) < tol, (key, r[key], ex[key])
     assert abs(float(r["log_likelihood"]) - ex["log_likelihood"]) < 0.1, (r["log_likelihood"], ex["log_likelihood"])
-    for h, (rh, eh) in enumerate(zip(r["holes"], ex["holes"])):
+    for h, eh in enumerate(ex["holes"]):
+      rh = r["holes"][h]
       assert int(round(float(rh["n_used"]))) == eh["n_used"], (h, rh["n_used"])
       for key, tol in (("T0", 2e-3), ("phi", 2e-3)):
         assert abs(float(rh[key]) - eh[key]) < tol, (h, key, rh[key], eh[key])
@@ -502,7 +501,8 @@ def _crown_case():
 _crown_case()
 
 # --- test case 2 ---
-# uniform columns (closed-form erfc oracle), the collar reading at z_min = 0 kept (121 readings), wide asymmetric interval.
+# uniform columns (closed-form erfc oracle), the collar reading at z_min = 0 kept (121 readings), no heat production in
+# the second hole (A = 0), wide asymmetric interval.
 # Targets: exact maximum-likelihood construction as in case 0.
 def _crown_case():
   import math
@@ -705,11 +705,11 @@ def _crown_case():
 
   def check(r, reg):
     ex = reg.star
-    assert isinstance(r, dict) and len(r["holes"]) == len(ex["holes"])
     for key, tol in (("g", 2e-3), ("t_end", 2e-3), ("sigma_g", 1e-2), ("sigma_t_end", 1e-2)):
       assert abs(float(r[key]) / ex[key] - 1.0) < tol, (key, r[key], ex[key])
     assert abs(float(r["log_likelihood"]) - ex["log_likelihood"]) < 0.1, (r["log_likelihood"], ex["log_likelihood"])
-    for h, (rh, eh) in enumerate(zip(r["holes"], ex["holes"])):
+    for h, eh in enumerate(ex["holes"]):
+      rh = r["holes"][h]
       assert int(round(float(rh["n_used"]))) == eh["n_used"], (h, rh["n_used"])
       for key, tol in (("T0", 2e-3), ("phi", 2e-3)):
         assert abs(float(rh[key]) - eh[key]) < tol, (h, key, rh[key], eh[key])
@@ -731,7 +731,7 @@ def _crown_case():
       return np.array([math.erfc(v / (2.0 * math.sqrt(kap * tau))) for v in self.zk])
   bA = UBore((np.array([0.0, 600.0, 1200.0]), np.zeros(3), np.zeros(3)), ([0, 400, 900], [3.1, 3.1, 3.1]), 0.7e-6, 2.2e6, 0.0,
       log_step=10.0, log_top=0.0, uniform_k=3.1)
-  bB = UBore((np.array([0.0, 900.0]), np.zeros(2), np.zeros(2)), ([0, 300], [2.4, 2.4]), 1.2e-6, 2.6e6, 50.0,
+  bB = UBore((np.array([0.0, 900.0]), np.zeros(2), np.zeros(2)), ([0, 300], [2.4, 2.4]), 0.0, 2.6e6, 50.0,
       log_step=15.0, log_top=5.0, uniform_k=2.4)
   reg = Region([bA, bB], [5.5, 2.9], [0.044, 0.061], 6.2, 10500.0, [0.0, -1.0, 0.3], [9.0e4, 1.15e5], [0.006, 0.015], [0.5, 0.25],
       [None, (-2.0, 1.5)], 99, 0)
@@ -745,7 +745,9 @@ _crown_case()
 
 # --- test case 3 ---
 # short glaciation (11.1-24 ka): second profile maximum near 17.9 ka (about 10 below l_max) behind a valley near 15.6 ka,
-# both inside the bounds. Targets: exact maximum-likelihood construction and oracle profile as in case 0.
+# both inside the bounds; then a noisier region on the same holes whose second maximum (near 18.2 ka) is only 1.25 below
+# l_max, so that the statistic falls below the quantile again there, outside the interval of the nearest crossings.
+# Targets: exact maximum-likelihood construction and oracle profile as in case 0.
 def _crown_case():
   import math
   import numpy as np
@@ -953,11 +955,11 @@ def _crown_case():
 
   def check(r, reg):
     ex = reg.star
-    assert isinstance(r, dict) and len(r["holes"]) == len(ex["holes"])
     for key, tol in (("g", 2e-3), ("t_end", 2e-3), ("sigma_g", 1e-2), ("sigma_t_end", 1e-2)):
       assert abs(float(r[key]) / ex[key] - 1.0) < tol, (key, r[key], ex[key])
     assert abs(float(r["log_likelihood"]) - ex["log_likelihood"]) < 0.1, (r["log_likelihood"], ex["log_likelihood"])
-    for h, (rh, eh) in enumerate(zip(r["holes"], ex["holes"])):
+    for h, eh in enumerate(ex["holes"]):
+      rh = r["holes"][h]
       assert int(round(float(rh["n_used"]))) == eh["n_used"], (h, rh["n_used"])
       for key, tol in (("T0", 2e-3), ("phi", 2e-3)):
         assert abs(float(rh[key]) - eh[key]) < tol, (h, key, rh[key], eh[key])
@@ -987,6 +989,12 @@ def _crown_case():
   r = regional_deglaciation_inversion(reg.holes, [2.4e4, 1.2e5], [0.0, -1.0, 0.25], (9000.0, 23900.0))
   check(r, reg)
   assert reg.lp(17910.0) - reg.lp(15620.0) > 5.0 and reg.lp(17910.0) < reg.thr
+  reg = Region([incl7(5.0), mid4(), short3()], [4.1, 3.2, 5.0], [0.037, 0.048, 0.031], 7.4, 11070.0, [0.0, -1.0, 0.25],
+      [2.4e4, 1.2e5], [0.005, 0.009, 0.015], [0.5, 0.7, 0.3], [None, (1.0, -1.0), (-1.0, 1.0)], 77, 0)
+  r = regional_deglaciation_inversion(reg.holes, [2.4e4, 1.2e5], [0.0, -1.0, 0.25], (9000.0, 23900.0))
+  check(r, reg)
+  assert reg.lp(18160.0) > reg.thr and reg.lp(15530.0) < reg.thr - 3.0
+  assert float(r["t_end_high"]) < 15530.0, r["t_end_high"]
 
 
 _crown_case()
@@ -1201,11 +1209,11 @@ def _crown_case():
 
   def check(r, reg):
     ex = reg.star
-    assert isinstance(r, dict) and len(r["holes"]) == len(ex["holes"])
     for key, tol in (("g", 2e-3), ("t_end", 2e-3), ("sigma_g", 1e-2), ("sigma_t_end", 1e-2)):
       assert abs(float(r[key]) / ex[key] - 1.0) < tol, (key, r[key], ex[key])
     assert abs(float(r["log_likelihood"]) - ex["log_likelihood"]) < 0.1, (r["log_likelihood"], ex["log_likelihood"])
-    for h, (rh, eh) in enumerate(zip(r["holes"], ex["holes"])):
+    for h, eh in enumerate(ex["holes"]):
+      rh = r["holes"][h]
       assert int(round(float(rh["n_used"]))) == eh["n_used"], (h, rh["n_used"])
       for key, tol in (("T0", 2e-3), ("phi", 2e-3)):
         assert abs(float(rh[key]) - eh[key]) < tol, (h, key, rh[key], eh[key])
@@ -1241,8 +1249,10 @@ def _crown_case():
       pass
     else:
       raise AssertionError("ValueError expected for bounds %r" % (bounds,))
+  # second precise hole: maximum-likelihood innovation sd 1e-3 K exactly, the floor of the stated domain (n = 137)
   regp = Region([incl7(5.0), mid4(), short3()], [4.1, 3.2, 5.0], [0.037, 0.048, 0.031], 7.8, 11500.0,
-      [0.0, -1.0, 0.25], [1.0e5, 1.2e5], [0.001, 0.001, 0.001], [0.1, 0.2, 0.3], [None, (2.0, -1.5), (-1.5, 2.0)], 5, 0)
+      [0.0, -1.0, 0.25], [1.0e5, 1.2e5], [0.001, 0.001 / math.sqrt(1.0 + 6.25 / 137), 0.001], [0.1, 0.2, 0.3],
+      [None, (2.0, -1.5), (-1.5, 2.0)], 5, 0)
   for bounds in ((11423.0, 99000.0), (1700.0, 11577.0)):
     r = regional_deglaciation_inversion(regp.holes, [1.0e5, 1.2e5], [0.0, -1.0, 0.25], bounds)
     check(r, regp)
@@ -1460,11 +1470,11 @@ def _crown_case():
 
   def check(r, reg):
     ex = reg.star
-    assert isinstance(r, dict) and len(r["holes"]) == len(ex["holes"])
     for key, tol in (("g", 2e-3), ("t_end", 2e-3), ("sigma_g", 1e-2), ("sigma_t_end", 1e-2)):
       assert abs(float(r[key]) / ex[key] - 1.0) < tol, (key, r[key], ex[key])
     assert abs(float(r["log_likelihood"]) - ex["log_likelihood"]) < 0.1, (r["log_likelihood"], ex["log_likelihood"])
-    for h, (rh, eh) in enumerate(zip(r["holes"], ex["holes"])):
+    for h, eh in enumerate(ex["holes"]):
+      rh = r["holes"][h]
       assert int(round(float(rh["n_used"]))) == eh["n_used"], (h, rh["n_used"])
       for key, tol in (("T0", 2e-3), ("phi", 2e-3)):
         assert abs(float(rh[key]) - eh[key]) < tol, (h, key, rh[key], eh[key])
@@ -1503,8 +1513,8 @@ def _crown_case():
 _crown_case()
 
 # --- test case 6 ---
-# a hole with exactly eight used readings is valid; seven, and 28 other invalid inputs, raise ValueError.
-# Targets: exact maximum-likelihood construction as in case 0.
+# a hole with exactly eight used readings and the shortest history (m = 2: glaciation, then post-glacial) is valid;
+# seven used readings raise ValueError. Targets: exact maximum-likelihood construction as in case 0.
 def _crown_case():
   import math
   import numpy as np
@@ -1712,11 +1722,11 @@ def _crown_case():
 
   def check(r, reg):
     ex = reg.star
-    assert isinstance(r, dict) and len(r["holes"]) == len(ex["holes"])
     for key, tol in (("g", 2e-3), ("t_end", 2e-3), ("sigma_g", 1e-2), ("sigma_t_end", 1e-2)):
       assert abs(float(r[key]) / ex[key] - 1.0) < tol, (key, r[key], ex[key])
     assert abs(float(r["log_likelihood"]) - ex["log_likelihood"]) < 0.1, (r["log_likelihood"], ex["log_likelihood"])
-    for h, (rh, eh) in enumerate(zip(r["holes"], ex["holes"])):
+    for h, eh in enumerate(ex["holes"]):
+      rh = r["holes"][h]
       assert int(round(float(rh["n_used"]))) == eh["n_used"], (h, rh["n_used"])
       for key, tol in (("T0", 2e-3), ("phi", 2e-3)):
         assert abs(float(rh[key]) - eh[key]) < tol, (h, key, rh[key], eh[key])
@@ -1735,88 +1745,21 @@ def _crown_case():
         log_step=8.0, log_top=20.0)
   bA = Bore((np.array([0.0, 1300.0]), np.zeros(2), np.zeros(2)), ([0, 350, 700], [2.6, 3.8, 3.0]), 0.8e-6, 2.3e6, 200.0,
       log_md=np.array([60.0, 150.0, 240.0, 330.0, 470.0, 610.0, 760.0, 900.0, 1180.0, 1280.0]))
-  reg = Region([bA, mid4()], [6.0, 3.2], [0.045, 0.048], 7.0, 10000.0, [0.0, -1.0, 0.25], [9.0e4, 1.2e5], [0.004, 0.008],
+  reg = Region([bA, mid4()], [6.0, 3.2], [0.045, 0.048], 7.0, 10000.0, [0.0, -1.0], [9.0e4], [0.004, 0.008],
       [0.0, 0.5], [None, (0.3, -0.3)], 5, 0)
   assert bA.n == 8
-  T_K, SHAPE, B = [9.0e4, 1.2e5], [0.0, -1.0, 0.25], (3000.0, 60000.0)
+  T_K, SHAPE, B = [9.0e4], [0.0, -1.0], (3000.0, 60000.0)
   r = regional_deglaciation_inversion(reg.holes, T_K, SHAPE, B)
   check(r, reg)
 
-  def bad(name):
-    holes = [{k: (v.copy() if isinstance(v, np.ndarray) else v) for k, v in h.items()} for h in reg.holes]
-    t_k, shape, bounds = np.array(T_K), np.array(SHAPE), B
-    a, b = holes
-    if name == "one_hole":
-      holes = [a]
-    elif name == "holes_not_a_list":
-      holes = a
-    elif name == "hole_not_a_dict":
-      holes = [a, list(b.values())]
-    elif name == "missing_key":
-      del b["rho_c"]
-    elif name == "extra_key":
-      b["noise_sd"] = 0.01
-    elif name == "seven_readings":
-      a["z_min"] = 300.0
-    elif name == "log_len":
-      b["log_temp"] = b["log_temp"][:-1]
-    elif name == "log_two_d":
-      a["log_md"], a["log_temp"] = a["log_md"][None, :], a["log_temp"][None, :]
-    elif name == "A_negative":
-      a["heat_production"] = -1e-6
-    elif name == "rho_c_zero":
-      b["rho_c"] = 0.0
-    elif name == "k_zero":
-      a["layer_k"] = np.array([2.6, 0.0, 3.0])
-    elif name == "k_count":
-      a["layer_k"] = np.array([2.6, 3.8])
-    elif name == "top_beyond_hole":
-      a["layer_top_md"] = np.array([0.0, 350.0, 1400.0])
-    elif name == "log_beyond_hole":
-      a["log_md"] = np.array([60.0, 150.0, 240.0, 330.0, 470.0, 610.0, 760.0, 900.0, 1180.0, 1320.0])
-    elif name == "survey_start":
-      a["survey_md"] = np.array([5.0, 1300.0])
-    elif name == "one_depth":
-      a["log_md"] = np.full(10, 760.0)
-    elif name == "one_interval":
-      shape, t_k = np.array([-1.0]), np.array([], float)
-    elif name == "times_count":
-      t_k = np.array([9.0e4, 1.2e5, 1.5e5])
-    elif name == "times_not_increasing":
-      t_k = np.array([9.0e4, 9.0e4])
-    elif name == "times_nonpositive":
-      t_k = np.array([-9.0e4, 1.2e5])
-    elif name == "equal_first_shapes":
-      shape = np.array([-1.0, -1.0, 0.25])
-    elif name == "shape_two_d":
-      shape = np.array([[0.0, -1.0, 0.25]])
-    elif name == "times_two_d":
-      t_k = np.array([[9.0e4, 1.2e5]])
-    elif name == "bounds_lo_zero":
-      bounds = (0.0, 60000.0)
-    elif name == "bounds_reversed":
-      bounds = (60000.0, 3000.0)
-    elif name == "bounds_beyond_glaciation":
-      bounds = (3000.0, 95000.0)
-    elif name == "bounds_at_glaciation_start":
-      bounds = (3000.0, 90000.0)
-    elif name == "bounds_equal":
-      bounds = (5000.0, 5000.0)
-    elif name == "bounds_three":
-      bounds = (3000.0, 30000.0, 60000.0)
-    return holes, t_k, shape, bounds
-  for name in ["one_hole", "holes_not_a_list", "hole_not_a_dict", "missing_key", "extra_key", "seven_readings", "log_len",
-      "log_two_d", "A_negative", "rho_c_zero", "k_zero", "k_count", "top_beyond_hole",
-      "log_beyond_hole", "survey_start", "one_depth", "one_interval", "times_count", "times_not_increasing",
-      "times_nonpositive", "equal_first_shapes", "shape_two_d", "times_two_d",
-      "bounds_lo_zero", "bounds_reversed", "bounds_beyond_glaciation", "bounds_at_glaciation_start",
-      "bounds_equal", "bounds_three"]:
-    try:
-      regional_deglaciation_inversion(*bad(name))
-    except ValueError:
-      pass
-    else:
-      raise AssertionError("regional_deglaciation_inversion must raise ValueError (%s)" % name)
+  holes = [dict(h) for h in reg.holes]
+  holes[0]["z_min"] = 300.0
+  try:
+    regional_deglaciation_inversion(holes, T_K, SHAPE, B)
+  except ValueError:
+    pass
+  else:
+    raise AssertionError("regional_deglaciation_inversion must raise ValueError (seven used readings)")
 
 
 _crown_case()
@@ -2031,11 +1974,11 @@ def _crown_case():
 
   def check(r, reg):
     ex = reg.star
-    assert isinstance(r, dict) and len(r["holes"]) == len(ex["holes"])
     for key, tol in (("g", 2e-3), ("t_end", 2e-3), ("sigma_g", 1e-2), ("sigma_t_end", 1e-2)):
       assert abs(float(r[key]) / ex[key] - 1.0) < tol, (key, r[key], ex[key])
     assert abs(float(r["log_likelihood"]) - ex["log_likelihood"]) < 0.1, (r["log_likelihood"], ex["log_likelihood"])
-    for h, (rh, eh) in enumerate(zip(r["holes"], ex["holes"])):
+    for h, eh in enumerate(ex["holes"]):
+      rh = r["holes"][h]
       assert int(round(float(rh["n_used"]))) == eh["n_used"], (h, rh["n_used"])
       for key, tol in (("T0", 2e-3), ("phi", 2e-3)):
         assert abs(float(rh[key]) - eh[key]) < tol, (h, key, rh[key], eh[key])

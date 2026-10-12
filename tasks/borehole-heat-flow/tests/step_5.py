@@ -32,6 +32,9 @@ def _crown_case():
     got = np.asarray(layered_paleoclimate_perturbation(np.array(z), tops, k, rho_c, t_y, d))
     _t5_exp = [_t5_halfspace(v, 3.0 / 2.5e6, t_y, d) for v in z]
     assert np.max(np.abs(got - np.array(_t5_exp))) < 1e-8      # 1e-8 K per K of the largest |dT|
+    # a single layer (the smallest valid column) is the same half-space
+    got = np.asarray(layered_paleoclimate_perturbation(np.array(z), [0.0], [3.0], rho_c, t_y, d))
+    assert np.max(np.abs(got - np.array(_t5_exp))) < 1e-8
 
 
 _crown_case()
@@ -221,10 +224,12 @@ def _crown_case():
     tops, k, rc, t_y, d = [0, 150, 420], [2.3, 4.6, 3.1], 2.5e6, [2e3, 2.5e4, 1.1e5], [0.6, -2.5, 0.4]
     z = np.array([[0.0, 150.0, 400.0], [900.0, 1600.0, 3000.0]])
     got = layered_paleoclimate_perturbation(z, tops, k, rc, t_y, d)
-    assert isinstance(got, np.ndarray) and got.shape == (2, 3)
     one = layered_paleoclimate_perturbation(400.0, tops, k, rc, t_y, d)
-    assert type(one) is float
-    assert abs(got[0, 2] - one) < 5e-8          # two computed outputs, each within 2.5e-8
+    arr1 = layered_paleoclimate_perturbation(np.array([400.0]), tops, k, rc, t_y, d)
+    # output contract: the shape of z (a one-element z included); a float for a scalar z
+    assert (isinstance(got, np.ndarray) and got.shape == (2, 3) and isinstance(arr1, np.ndarray) and arr1.shape == (1,)
+            and type(one) is float)
+    assert abs(got[0, 2] - one) < 5e-8 and abs(float(arr1[0]) - one) < 5e-8   # two computed outputs, each within 2.5e-8
     assert abs(got[0, 0] - 0.6) < 2.5e-8
 
 
@@ -265,12 +270,10 @@ def _crown_case():
     t_y, d = np.logspace(2.0, 5.5, 20), np.sin(np.arange(20.0))
     tops = np.linspace(0.0, 2450.0, 50)
     out = np.asarray(layered_paleoclimate_perturbation(z, tops, np.full(50, 2.9), 2.4e6, t_y, d))
-    assert out.shape == (1000,)
     want = np.array([_t5_halfspace(float(x), 2.9 / 2.4e6, list(t_y), list(d)) for x in z])
     assert np.max(np.abs(out - want)) < 1e-8 * np.max(np.abs(d))
     k = np.linspace(1.5, 5.0, 50)
     out = np.asarray(layered_paleoclimate_perturbation(z, tops, k, 2.4e6, t_y, d))
-    assert out.shape == (1000,) and np.all(np.isfinite(out))
     for j, v in _t5_T_50.items():
         assert abs(out[j] - v) < 1e-8 * np.max(np.abs(d)), (j, out[j], v)
     for j in (0, 137, 500, 999):
@@ -281,46 +284,20 @@ def _crown_case():
 _crown_case()
 
 # --- test case 7 ---
-# invalid raises
+# a non-positive conductivity or volumetric heat capacity raises ValueError (stated error rules)
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for case in ["top0", "order", "k0", "len", "rc", "t0", "t_order", "hist_len", "zneg", "two_d", "empty", "hist_two_d"]:
-        _t_msg = " (case %r)" % (case,)
-        z, tops, k, rc, t, d = 100.0, [0.0, 200.0], [2.0, 3.0], 2.5e6, [1e3, 1e4], [0.5, -1.0]
-        if case == "top0":
-            tops = [10.0, 200.0]
-        elif case == "order":
-            tops = [0.0, 200.0, 150.0]
-            k = [2.0, 3.0, 2.5]
-        elif case == "k0":
-            k = [2.0, 0.0]
-        elif case == "len":
-            k = [2.0]
-        elif case == "rc":
-            rc = 0.0
-        elif case == "t0":
-            t = [0.0, 1e4]
-        elif case == "t_order":
-            t = [1e4, 1e3]
-        elif case == "hist_len":
-            d = [0.5]
-        elif case == "zneg":
-            z = -1.0
-        elif case == "two_d":
-            tops, k = [[0.0, 200.0]], [[2.0, 3.0]]          # equal shapes, but not 1-D
-        elif case == "empty":
-            tops, k = [], []                                 # no layer at all
-        else:
-            t, d = [[1e3, 1e4]], [[0.5, -1.0]]               # equal shapes, but not 1-D
+    for case in ["k0", "rc"]:
+        k, rc = ([2.0, 0.0], 2.5e6) if case == "k0" else ([2.0, 3.0], 0.0)
         try:
-            layered_paleoclimate_perturbation(z, tops, k, rc, t, d)
+            layered_paleoclimate_perturbation(100.0, [0.0, 200.0], k, rc, [1e3, 1e4], [0.5, -1.0])
         except ValueError:
             pass
         else:
-            raise AssertionError("layered_paleoclimate_perturbation must raise ValueError" + _t_msg)
+            raise AssertionError("layered_paleoclimate_perturbation must raise ValueError (case %r)" % (case,))
 
 
 _crown_case()

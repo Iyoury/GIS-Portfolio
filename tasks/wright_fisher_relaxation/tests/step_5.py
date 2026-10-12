@@ -447,9 +447,9 @@ def _crown_case():
 _crown_case()
 
 # --- test case 11 ---
-# the largest passage times in the domain: N = 400 with A strongly deleterious (s = -0.45, just inside the excluded
-# corner s <= -0.46), mutation A -> a at its upper end u = 0.1 and a -> A at its floor v = 1e-12, where t_up is about
-# 3.45e290 generations while t_down is about 12 generations. Independent targets: the hitting-time systems
+# the largest passage times in the domain: N = 400 with A strongly deleterious (s = -0.45, next to the excluded
+# corner, which needs s <= -0.46), mutation A -> a at its upper end u = 0.1 and a -> A at its floor v = 1e-12, where
+# t_up is about 3.45e290 generations while t_down is about 12 generations. Independent targets: the hitting-time systems
 # (I - Q) t = 1 (Q the matrix without the target state), with the transition matrix from mpmath binomials, solved by
 # plain Gaussian elimination with partial pivoting in mpmath, run once: t_up at 380 and at 450 digits (identical to
 # 40 digits) and t_down at 100 digits
