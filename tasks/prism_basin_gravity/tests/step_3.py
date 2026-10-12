@@ -155,16 +155,19 @@ _crown_case()
 
 # --- test case 3 ---
 # each stated error rule once, just outside the valid domain: a station 1e-9 m below the surface, stations
-# of shape (2,), drho0 = 0 (gz = 0, where a relative accuracy has no meaning), x1 > x2, y1 = y2, depth 0
-# and depth 50001 m (5e4 m itself is valid), lam = -1e-4 and lam = 0.0101 per m (0 and 1e-2 are valid)
+# of shape (2,) and (2, 2), drho0 = 0 (gz = 0, where a relative accuracy has no meaning), x1 > x2 and
+# x1 = x2, y1 = y2, depth 0 and depth 50001 m (5e4 m itself is valid), lam = -1e-4 and lam = 0.0101 per m
+# (0 and 1e-2 are valid)
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
     _t_ok = (0.0, 100.0, 0.0, 200.0, 3000.0, -400.0, 5e-4)
-    for _t_q, _t_c in (((0, 0, 1e-9), _t_ok), ((0, 0), _t_ok), ((0, 0, 0), (0.0, 100.0, 0.0, 200.0, 3000.0, 0.0, 5e-4)),
+    for _t_q, _t_c in (((0, 0, 1e-9), _t_ok), ((0, 0), _t_ok), (((0, 0), (0, 0)), _t_ok),
+                       ((0, 0, 0), (0.0, 100.0, 0.0, 200.0, 3000.0, 0.0, 5e-4)),
                        ((0, 0, 0), (100.0, 0.0, 0.0, 200.0, 3000.0, -400.0, 5e-4)),
+                       ((0, 0, 0), (100.0, 100.0, 0.0, 200.0, 3000.0, -400.0, 5e-4)),
                        ((0, 0, 0), (0.0, 100.0, 200.0, 200.0, 3000.0, -400.0, 5e-4)), ((0, 0, 0), (0.0, 100.0, 0.0, 200.0, 0.0, -400.0, 5e-4)),
                        ((0, 0, 0), (0.0, 100.0, 0.0, 200.0, 50001.0, -400.0, 5e-4)), ((0, 0, 0), (0.0, 100.0, 0.0, 200.0, 3000.0, -400.0, -1e-4)),
                        ((0, 0, 0), (0.0, 100.0, 0.0, 200.0, 3000.0, -400.0, 0.0101))):
@@ -237,7 +240,7 @@ def _crown_case():
     _t_g0 = column_gz(_t_q[0], *_t_c)
     _t_g1 = column_gz(_t_q[:1], *_t_c)
     _t_g3 = column_gz(_t_q, *_t_c)
-    assert (type(_t_g0) is float and isinstance(_t_g1, np.ndarray) and _t_g1.shape == (1,)
+    assert (isinstance(_t_g0, float) and isinstance(_t_g1, np.ndarray) and _t_g1.shape == (1,)
             and isinstance(_t_g3, np.ndarray) and _t_g3.shape == (3,)), (type(_t_g0), _t_g1, _t_g3)
     assert abs(_t_g0 - _t_t[0]) < 1e-10 * abs(_t_t[0]) and abs(_t_g1[0] - _t_t[0]) < 1e-10 * abs(_t_t[0]), (_t_g0, _t_g1)
     assert np.all(np.abs(_t_g3 - _t_t) < 1e-10 * np.abs(_t_t)), (_t_g3, _t_t)

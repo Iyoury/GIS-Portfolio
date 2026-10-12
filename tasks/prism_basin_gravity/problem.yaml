@@ -19,8 +19,9 @@ metadata:
   expert_time_estimate_hours: 14
   difficulty_explanation: >-
     The closed forms of the prism potential, attraction and gradient tensor (Nagy, Papp and Benedek 2000) are
-    exact, but their corner terms grow like the square of the distance while the field decays, so evaluated as
-    written they lose about (distance / size)^2 of their digits far away (for a 100 m x 200 m x 250 m prism, U
+    exact, but their corner terms grow like the square of the distance while the potential falls like
+    1/distance, so evaluated as written their relative error grows like the rounding unit times distance^3 /
+    volume far away (for a 100 m x 200 m x 250 m prism, U
     is off by a median 6.5e-9 relative at 100 diagonals, 9e-6 at 1000 and 1e-2 at 1e4, and has the wrong sign
     in most directions at a million; a thin plate is a hundred to a thousand times worse) and, for a rod or a
     plate, already within two diagonals (about 1e-8 for aspect ratio 1000), while the stated accuracy must

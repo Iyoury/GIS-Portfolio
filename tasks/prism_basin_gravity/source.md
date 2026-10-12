@@ -17,7 +17,9 @@
   - 0 ln 0 is taken as 0, and atan(n/0) as sign(n) pi/2. These are the limits used where the sums are
     continuous.
 - **Prism, beyond two diagonals.** A 16^3-point Gauss-Legendre volume rule of 1/r and its derivatives.
-  It is exact to rounding that far. The corner sums lose about (distance/size)^2 of their digits. Measured
+  It is exact to rounding that far. The relative error of the corner sums grows like the rounding unit
+  times distance^3 / volume (corrected in version 7; earlier versions said (distance/size)^2, which the
+  figures below contradict). Measured
   in version 4 (mutants/step_1_closed_form_everywhere.py against my own 60-digit mpmath closed form, 50
   random directions): for the 100 m x 200 m x 250 m prism of the tests, U is off by a median 6.5e-9
   (max 5.1e-8) relative at 100 diagonals, 9.1e-6 (4.0e-5) at 1000, 9.7e-3 (4.6e-2) at 1e4, and at 1e6
@@ -719,3 +721,21 @@ all-zero controls pass 0 cases in every step and in general; SUMMARY ALL OK. Raw
 
 Not changed: the physics, the algorithms of both solutions, every stored target, every tolerance and
 every n_test_cases.
+
+Second pass of version 7 (same edit_label), after an independent re-read of the whole task:
+- Every compound error rule is now tested on each of its conditions: step 1 case 3 adds bounds of seven
+  numbers, y1 = y2 and points of shape (2, 2); step 3 case 3 adds x1 = x2 and stations of shape (2, 2);
+  step 4 case 1 replaces the 11 x 11 entry (data about 1e10 times any reachable anomaly, so a copy
+  without the cell-count check still raised, from "no depths reproduce the observations") by a 101 x 1
+  grid with in-domain data (sign of drho0, below the slab limit), one cell above the limit.
+- Step 1 case 5 and step 3 case 5 checked `type(x) is float`, which rejects numpy.float64 although it is
+  a Python float subclass; both now use isinstance(x, float).
+- The far-field error law was misstated as "(distance/size)^2" in difficulty_explanation, this file and
+  the _far comment of nine code files; measured (5.4e-12, 1.2e-10, 8.7e-9, 2.2e-7, 8.2e-6 at 10 to 1000
+  diagonals) it grows like the rounding unit times distance^3 / volume, which the quoted figures already
+  followed. Texts and comments only.
+Assertion sites after this pass: step 1 6.0 / 23, step 2 2.5 / 12, step 3 6.5 / 13, step 4 6.0 / 13,
+general 0 / 10. No target, tolerance, algorithm, mutant or n_test_cases changed. Rerun: crown_check all
+modes (one BLAS thread, -j 2) after the pass: FORMAT OK; REF and SECOND 8/8, 8/8, 7/7, 10/10 and general
+3/3; every mutant fails the same cases as listed above; SHIFT +-1e-12 all pass; all-None and all-zero
+controls pass 0 cases; SUMMARY ALL OK.

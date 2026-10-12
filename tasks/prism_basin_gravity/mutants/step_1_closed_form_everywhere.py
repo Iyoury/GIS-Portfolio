@@ -88,8 +88,9 @@ def _tens(x, y, z):
 
 
 def _far(p, b):
-    # points at least two diagonals from the centre: the corner sums lose about (distance / size)^2 of their
-    # digits there (their terms grow like distance^2 while U and g fall like 1/distance and 1/distance^2),
+    # points at least two diagonals from the centre: the relative error of the corner sums grows there like
+    # the rounding unit times distance^3 / volume (the terms of U grow like distance^2 while U falls like
+    # 1/distance, those of g like distance while g falls like 1/distance^2),
     # so the volume integral is taken by a 16^3-point Gauss-Legendre rule, exact to rounding that far out
     c = 0.5 * np.array([b[0] + b[1], b[2] + b[3], b[4] + b[5]])
     diag = math.sqrt((b[1] - b[0]) ** 2 + (b[3] - b[2]) ** 2 + (b[5] - b[4]) ** 2)

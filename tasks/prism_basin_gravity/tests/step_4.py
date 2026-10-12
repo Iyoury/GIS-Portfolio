@@ -30,7 +30,8 @@ _crown_case()
 
 # --- test case 1 ---
 # each stated error rule once, every other input valid: x edges decreasing and y edges with a repeated
-# entry (a cell of zero width), 121 cells, gz_obs of the wrong shape, drho0 = 0, lam = -1e-4 and
+# entry (a cell of zero width), 101 cells (a 101 x 1 grid, one cell above the limit, with data of the
+# sign of drho0 below the slab limit), gz_obs of the wrong shape, drho0 = 0, lam = -1e-4 and
 # lam = 0.0101 per m (0 and 1e-2 are valid; the data scaled by 0.05 have slab-equivalent thicknesses d of
 # at most 46.6 m, so lam d <= 0.47 < 1 and the infinite-slab rule does not apply), an observation of the
 # sign opposite to drho0, an observation exactly zero (no basin of the stated domain gives it: every column
@@ -62,7 +63,7 @@ def _crown_case():
     _t_zero[2, 1] = 0.0
     for _t_args in ((_t_xe[::-1], _t_ye, _t_gz, _T_DRHO0, _T_LAM),
                     (_t_xe, np.array([0.0, 1000.0, 2000.0, 2000.0, 4000.0]), _t_gz, _T_DRHO0, _T_LAM),
-                    (np.linspace(0, 1, 12), np.linspace(0, 1, 12), np.ones((11, 11)), 1.0, 0.0),
+                    (np.linspace(0.0, 101000.0, 102), np.array([0.0, 1000.0]), np.full((101, 1), -1e-4), _T_DRHO0, _T_LAM),
                     (_t_xe, _t_ye, _t_gz[:, :3], _T_DRHO0, _T_LAM), (_t_xe, _t_ye, _t_gz, 0.0, _T_LAM),
                     (_t_xe, _t_ye, _t_gz, _T_DRHO0, -1e-4), (_t_xe, _t_ye, 0.05 * _t_gz, _T_DRHO0, 0.0101),
                     (_t_xe, _t_ye, _t_sign, _T_DRHO0, _T_LAM), (_t_xe, _t_ye, _t_zero, _T_DRHO0, _T_LAM),
