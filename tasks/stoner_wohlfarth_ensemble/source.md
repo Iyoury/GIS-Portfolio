@@ -683,3 +683,99 @@ Rerun for version 14 (after items 10-12):
     general case with every evaluated function shifted (4/4).
   - CONTROLS: all-None and all-zero stubs pass 0 cases in every step and in general.
   - SUMMARY ALL OK.
+
+## Version 15 (grading_fix: platform content-check rules, applied before any report on this task)
+
+- Finding: the platform content check now enforces (2026-10-12): no non-finite literal anywhere in the tests
+  (float("nan"), float("inf"), np.nan, np.inf, also inside helpers); no finiteness promise in the visible text;
+  computed values must clearly outweigh validation per step (assertion sites: type/shape/exception checks, a
+  stated raise at half weight, against computed-value checks); no relative requirement on an exactly zero
+  output; every stated output shape and inclusive endpoint exercised with values. No platform report on this
+  task yet; the rules were applied proactively.
+- Cause (audit of version 14): (1) the invalid-input lists held non-finite inputs (step 1: h = nan and inf;
+  step 2: h = nan and an array with inf; step 3: h = nan, a = nan, rate = inf; step 4: a = nan; step 5:
+  sigma = nan, h = nan; step 6: weights with inf and nan, a = nan, rate = inf), matching the "not finite" /
+  "positive finite number" clauses of every prompt, function_header, problem_io and their copies. (2)
+  Validation weighed too much: the contract check (tuple of floats, array type/shape/dtype) was repeated in
+  several cases of steps 2, 4, 5, 6 and the whole-task tests, steps 6 and general repeated a range check of
+  the outputs in every case, the raise lists tested several rules more than once (9, 10, 9 and 17 entries in
+  steps 2, 3, 4 and 6), and the grid oracles of steps 1 and 2 held internal `assert len(...)` sanity checks.
+  Emulated count (asserts made only of type/shape/len/dtype checks 1, each raise entry 0.5, value asserts
+  computed; the range checks of step 6 and general counted as computed), validation / computed, before ->
+  after: step 1 7 / 9 -> 2 / 13, step 2 13.5 / 10 -> 2.5 / 14, step 3 6 / 8 -> 3 / 9, step 4 7.5 / 10 -> 3 / 12,
+  step 5 8 / 15 -> 3 / 15, step 6 14.5 / 26 -> 5.5 / 22, general 4 / 8 -> 1 / 6. (3) No relative requirement
+  applies to an exact zero: only step 5 has relative tolerances, and lam1 > 0 and tau_int > 0 on its whole
+  domain (both 1 at sigma = 0). (4) Shapes and endpoints: the one-element and one-row (1, 3) array shapes of
+  step 2 were not checked; the accuracy boundaries |h + h_sw| = 1e-3 (step 1), h_sw - |h| = 1e-3 (step 2)
+  and h_sw - 1e-6 (step 3, 0 < psi < pi/2) were approached (1.1e-3) but not hit; the corners
+  (a, f0 / rate) = (40, 1e5) and (1000, 1e13) were not used in steps 4 and 6.
+- Change:
+  - Texts: the finiteness clauses are removed from every visible copy (step_description_prompt and
+    function_header of steps 1 to 6, problem_io, steps/, solution/, solution.py, second_solution.py and the
+    mutants' docstrings): "or h is not finite" (step 1), "if any h is not finite" (step 2), "if h is not
+    finite" (step 3), "if sigma or h is not finite" (step 5), "or not finite" for the weights (step 6), and
+    "not a positive finite number" -> "not positive" (steps 3, 4, 6). The solutions keep their internal
+    checks (a NaN or infinite input still raises ValueError); their messages no longer mention finiteness.
+    No requirement, tolerance or domain changed; every function header still matches the scaffold, the
+    per-step solution and solution.py, and problem_io matches the step 6 header (checked with ast).
+  - Raise lists (each stated rule once, just outside its limit; every non-finite entry removed): step 1
+    psi = -0.01 and pi/2 + 0.01 (4 -> 2 entries); step 2 psi = pi/2 + 0.01, h = h_sw = 1 at psi = 0 (the
+    boundary of |h| >= h_sw), an array with one entry -0.6 below -h_sw = -1/2 at psi = pi/4 (9 -> 3); step 3
+    psi = pi/2 + 0.01, rate = 0, a = 1000.5, f0 / rate = 1.01e13 (10 -> 4); step 4 psi = pi/2 + 0.01, rate = 0,
+    a = 39.5, f0 / rate = 9.9e4 (9 -> 4); step 5 sigma = -0.01 and 60.5, h = 0.91 and -0.91 (6 -> 4); step 6
+    different lengths, 2-D arrays, empty arrays, a psi above pi/2, a negative weight, zero weights, rate = 0,
+    a = 1000.5, f0 / rate = 1.01e13 (17 -> 9).
+  - One contract check per step: step 1 case 0 (Python float), step 2 case 0 (one assert over a scalar h at
+    two angles, 1-D, one-element (1,), one-row (1, 3) and (2, 3) inputs: float scalars, or float numpy
+    arrays of the shape of h), step 3 case 0, step 4 case 0, step 5 case 0, step 6 case 0, general case 0
+    (tuple of Python floats). The repeated type/shape/dtype asserts and the output range checks are removed;
+    the array values of step 2 are read by position (low[i], low[idx], low[0, j]), so a wrong shape still
+    fails them. The grid oracles' internal length checks raise RuntimeError instead of being asserts.
+  - New computed-value cases with independent targets:
+    - step 1 case 5 (special_case, exact identity): the inverse parametrization of the equilibrium curve,
+      h = -sin(2 theta) / (2 sin(theta - psi)) and m = cos(theta - psi), for 12 angles theta between the fold
+      angle and psi at psi = 0.05, 0.3, 0.9, 1.3, 1.55, pi/2 - 1e-6 (e'' > 0 checked), and theta + pi at -h for
+      the branch after the jump; 84 fields at least 1.5e-3 from the jump. No root finding; the reference
+      agrees to 1.0e-15, the second solution to 1.8e-13.
+    - step 1 case 6 and step 2 case 5 (special_case, closed form): at psi = pi/4 the substitution
+      u = theta - pi/4 turns e' = 0 into sin(u)**2 - h sin(u) - 1/2 = 0, so the four extrema, the branch
+      m = cos(u) and the barriers c1 (r + 3h) / 2 and (c2 (r - 3h) + c1 (r + 3h)) / 4 (r = sqrt(h**2 + 2),
+      c = sqrt(1 - sin(u)**2)) are in closed form; evaluated at 40 digits. Step 1: 14 fields from 6 to -3,
+      including |h + h_sw| = 1e-3 exactly (h = -0.499 and -0.501); step 2: a 1-D array of 10 fields up to
+      h_sw - |h| = 1e-3 (|h| = 0.499), a one-row (1, 3) batch and two scalars. Reference and second solution
+      within 8.8e-16 (step 1) and 2.2e-16 (step 2).
+    - step 3 case 6 (independent_recomputation): survival probability at psi = pi/4 from the same closed-form
+      barriers in a cancellation-free double form, the escape integral by adaptive quadrature with relative
+      tolerance 1e-12, at (a, f0 / rate) = (40, 1e13), (1000, 1e5) (two corners) and (100, 1e9), on fields
+      across the window, at h = 0 and at h = h_sw - 1e-6 (the inclusive end of the accurate range); reference
+      within 1.3e-14.
+    - step 4 case 6 (independent_recomputation): median and mean at psi = pi/4 at the two corners not used in
+      step 4, (40, 1e5) and (1000, 1e13): median by Brent's method on the quadrature escape integral, mean
+      1/2 - int P dh by quadrature split at the median; reference within 3.3e-16, second solution within
+      5.0e-16.
+    - step 6 case 8 (special_case): a psi = 0 particle (weight 3) with a psi = pi/2 particle (weight 1) at the
+      corners (1000, 1e13) and (40, 1e5): 3 (2 P0(-h_c) - 1) - h_c = 0 and P0(-h_half) = 2/3 with the erfc form
+      of P0 (the hard-axis particle has m = h in both minima and has left before the fields concerned); the
+      two fields differ by 3e-4 and 7e-3. Reference within 1.1e-16, second solution within 1.3e-15.
+    - No new case in step 5 (computed 15 against validation 3 after the trims) or in the whole-task tests.
+  - n_test_cases: 7, 6, 7, 7, 6, 9 (general 4, unchanged). verification_explanation names the new
+    evidence; the target table above has three new rows.
+- Regression: the new cases reject step 1 global_minimum and wrong_astroid_power (cases 5 and 6), step 2
+  barrier_from_global_minimum (case 5), step 3 lower_route_only (case 6), step 4 wrong_mean_formula (case 6)
+  and step 6 athermal_particles (case 8).
+- Rerun: both solutions still raise ValueError on non-finite inputs (checked once outside the tests, on one
+  call per evaluated function). tools/crown_check.py, all modes, every case alone in a fresh process (-j 2,
+  single-threaded BLAS):
+  - FORMAT OK (no non-finite literal, no text before the first marker, n_test_cases match).
+  - REF steps 1-6: 7/7, 6/6, 7/7, 7/7, 6/6, 9/9; REF general (solution.py): 4/4; solution.py passes every
+    step file.
+  - SECOND steps 1-6: 7/7, 6/6, 7/7, 7/7, 6/6, 9/9; SECOND general: 4/4.
+  - MUTANTS: step 1 global_minimum fails cases [0, 1, 2, 3, 5, 6], wrong_astroid_power [1, 5, 6]; step 2
+    barrier_from_global_minimum [0, 1, 2, 3, 5]; step 3 lower_route_only [0, 1, 4, 6]; step 4
+    wrong_mean_formula [0, 1, 2, 3, 5, 6]; step 5 brown_asymptote, tau_from_slowest_mode, missing_half and
+    doubled_energy [0, 1, 2, 3, 4] each; step 6 athermal_particles [0-6, 8]; whole-task
+    whole_task_barriers_from_global_minimum fails all 4 general cases.
+  - SHIFT +1e-12 and -1e-12: every case of steps 1-6 passes, and every general case with every evaluated
+    function shifted.
+  - CONTROLS: all-None and all-zero stubs pass 0 cases in every step and in general.
+  - SUMMARY ALL OK.

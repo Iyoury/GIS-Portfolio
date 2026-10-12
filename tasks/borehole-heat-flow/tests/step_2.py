@@ -63,7 +63,8 @@ def _crown_case():
     sc = layer_integrals([0.0, 300.0], [3.0, 2.0], 450.0)
     # output contract: a tuple of two arrays with the shape of z (a one-element z included), two floats for a scalar z
     assert (isinstance(out, tuple) and len(out) == 2 and all(isinstance(v, np.ndarray) and v.shape == z.shape for v in out)
-            and all(isinstance(v, np.ndarray) and v.shape == (1,) for v in one) and all(type(v) is float for v in sc))
+            and all(isinstance(v, np.ndarray) and v.shape == (1,) for v in one) and all(type(v) is float for v in sc)
+            and all(np.issubdtype(v.dtype, np.floating) for v in tuple(out) + tuple(one)))
     _t2_R, _t2_S = out
     zz = np.minimum(z, 300.0)
     _t2_R_exp = zz / 3.0 + np.maximum(z - 300.0, 0.0) / 2.0

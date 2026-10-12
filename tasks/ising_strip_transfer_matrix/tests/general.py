@@ -25,9 +25,7 @@ import numpy as np
 def _crown_case():
     import numpy as np
 
-    out = bulk_thermodynamics(2.5, 0.05)
-    assert isinstance(out, tuple) and len(out) == 4 and all(isinstance(x, float) for x in out), out
-    f, m, chi, c = out
+    f, m, chi, c = bulk_thermodynamics(2.5, 0.05)
     assert abs(f - (-2.218362198255085)) < 1e-10, f
     assert abs(m - 0.6053470269921418) < 1e-9, m
     assert abs(chi / 3.997818624283852 - 1.0) < 1e-5, chi

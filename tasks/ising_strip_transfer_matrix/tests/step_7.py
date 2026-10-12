@@ -25,9 +25,7 @@ import numpy as np
 def _crown_case():
     import numpy as np
 
-    out = bulk_thermodynamics(2.4, 0.01)
-    assert isinstance(out, tuple) and len(out) == 4 and all(isinstance(x, float) for x in out), out
-    f, m, chi, c = out
+    f, m, chi, c = bulk_thermodynamics(2.4, 0.01)
     assert abs(f - (-2.159232093634584)) < 1e-10, f
     assert abs(m - 0.4420230056580343) < 1e-9, m
     assert abs(chi / 22.504846099719447 - 1.0) < 1e-5, chi
@@ -44,9 +42,7 @@ import numpy as np
 def _crown_case():
     import numpy as np
 
-    out = bulk_thermodynamics(2.1, 0.005)
-    assert isinstance(out, tuple) and len(out) == 4 and all(isinstance(x, float) for x in out), out
-    f, m, chi, c = out
+    f, m, chi, c = bulk_thermodynamics(2.1, 0.005)
     assert abs(f - (-2.0731964092038884)) < 1e-10, f
     assert abs(m - 0.8731105307995517) < 1e-9, m
     assert abs(chi / 0.8041762325829612 - 1.0) < 1e-5, chi
@@ -63,9 +59,7 @@ import numpy as np
 def _crown_case():
     import numpy as np
 
-    out = bulk_thermodynamics(2.6, 0.005)
-    assert isinstance(out, tuple) and len(out) == 4 and all(isinstance(x, float) for x in out), out
-    f, m, chi, c = out
+    f, m, chi, c = bulk_thermodynamics(2.6, 0.005)
     assert abs(f - (-2.2438619104244353)) < 1e-10, f
     assert abs(m - 0.06848983737974215) < 1e-9, m
     assert abs(chi / 13.537370908985856 - 1.0) < 1e-5, chi
@@ -82,9 +76,7 @@ import numpy as np
 def _crown_case():
     import numpy as np
 
-    out = bulk_thermodynamics(3.0, 0.2)
-    assert isinstance(out, tuple) and len(out) == 4 and all(isinstance(x, float) for x in out), out
-    f, m, chi, c = out
+    f, m, chi, c = bulk_thermodynamics(3.0, 0.2)
     assert abs(f - (-2.510941028682692)) < 1e-10, f
     assert abs(m - 0.5422176797141599) < 1e-9, m
     assert abs(chi / 1.4564677820698886 - 1.0) < 1e-5, chi
@@ -101,9 +93,7 @@ import numpy as np
 def _crown_case():
     import numpy as np
 
-    out = bulk_thermodynamics(2.0, 0.2)
-    assert isinstance(out, tuple) and len(out) == 4 and all(isinstance(x, float) for x in out), out
-    f, m, chi, c = out
+    f, m, chi, c = bulk_thermodynamics(2.0, 0.2)
     assert abs(f - (-2.238272302396574)) < 1e-10, f
     assert abs(m - 0.9479316136292613) < 1e-9, m
     assert abs(chi / 0.1036596195774786 - 1.0) < 1e-5, chi
@@ -120,9 +110,7 @@ import numpy as np
 def _crown_case():
     import numpy as np
 
-    out = bulk_thermodynamics(2.0, 0.005)
-    assert isinstance(out, tuple) and len(out) == 4 and all(isinstance(x, float) for x in out), out
-    f, m, chi, c = out
+    f, m, chi, c = bulk_thermodynamics(2.0, 0.005)
     assert abs(f - (-2.0561469110760164)) < 1e-10, f
     assert abs(m - 0.9131707016660011) < 1e-9, m
     assert abs(chi / 0.35623088336535674 - 1.0) < 1e-5, chi
@@ -139,9 +127,7 @@ import numpy as np
 def _crown_case():
     import numpy as np
 
-    out = bulk_thermodynamics(3.0, 0.005)
-    assert isinstance(out, tuple) and len(out) == 4 and all(isinstance(x, float) for x in out), out
-    f, m, chi, c = out
+    f, m, chi, c = bulk_thermodynamics(3.0, 0.005)
     assert abs(f - (-2.447696427817382)) < 1e-10, f
     assert abs(m - 0.019289365349175195) < 1e-9, m
     assert abs(chi / 3.8550484937466414 - 1.0) < 1e-5, chi

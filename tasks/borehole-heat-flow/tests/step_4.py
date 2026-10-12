@@ -19,11 +19,16 @@ def _crown_case():
 
     _t4_T, _t4_R, _t4_S, _t4_P = _t4_synthetic(0.0)
     r = fit_heat_flow(_t4_T, _t4_R, _t4_S, _t4_P, 1.1e-6)
-    # noise-free data: the exact least-squares solution is the generating (T0, q0, g) = (4.7, 0.044, 7.0)
-    assert abs(r["T0"] - 4.7) < 1e-9
-    assert abs(r["q0"] - 0.044) < 1e-12
-    assert abs(r["amplitude"] - 7.0) < 1e-9
-    assert r["rms_residual"] < 1e-9
+    # noise-free data: the exact least-squares solution is the generating (T0, q0, g) = (4.7, 0.044, 7.0); stated
+    # accuracy (scaled smallest singular value 0.039 >= 1e-3): every fitted term T0, q0 R, g P within 1e-9 K
+    assert abs(r["T0"] - 4.7) <= 1e-9
+    assert abs(r["q0"] - 0.044) * np.max(np.abs(_t4_R)) <= 1e-9
+    assert abs(r["amplitude"] - 7.0) * np.max(np.abs(_t4_P)) <= 1e-9
+    assert r["rms_residual"] <= 1e-9
+    # the same profile with P in units of 1e-4 (g = 7e4 K): the limit on g scales with 1 / max|P|
+    r = fit_heat_flow(4.7 + 0.044 * _t4_R - 1.1e-6 * _t4_S + 7e4 * (1e-4 * _t4_P), _t4_R, _t4_S, 1e-4 * _t4_P, 1.1e-6)
+    assert abs(r["amplitude"] - 7e4) * np.max(np.abs(1e-4 * _t4_P)) <= 1e-9
+    assert abs(r["T0"] - 4.7) <= 1e-9 and abs(r["q0"] - 0.044) * np.max(np.abs(_t4_R)) <= 1e-9
 
 
 _crown_case()
@@ -43,10 +48,11 @@ def _crown_case():
     _t4_T = 4.7 + 0.044 * _t4_R - 1.1e-6 * _t4_S + 7.0 * _t4_P
     r = fit_heat_flow(_t4_T, _t4_R, _t4_S, _t4_P, 1.1e-6)
     # noise-free data: the exact least-squares solution is the generating (T0, q0, g) = (4.7, 0.044, 7.0)
-    assert abs(r["T0"] - 4.7) < 1e-9
-    assert abs(r["q0"] - 0.044) < 1e-12
-    assert abs(r["amplitude"] - 7.0) < 1e-9
-    assert r["rms_residual"] < 1e-9
+    # stated accuracy (scaled smallest singular value 0.050): T0, q0 R and g P within 1e-9 K
+    assert abs(r["T0"] - 4.7) <= 1e-9
+    assert abs(r["q0"] - 0.044) * np.max(np.abs(_t4_R)) <= 1e-9
+    assert abs(r["amplitude"] - 7.0) * np.max(np.abs(_t4_P)) <= 1e-9
+    assert r["rms_residual"] <= 1e-9
 
 
 _crown_case()
@@ -76,9 +82,9 @@ def _crown_case():
     # independent target: numpy.linalg.lstsq (SVD) and the OLS covariance s^2 (G^T G)^-1, s^2 = RSS / (n - 3)
     m, rss, *_ = np.linalg.lstsq(_t4_G, y, rcond=None)
     _t4_C = rss[0] / (len(_t4_T) - 3) * np.linalg.inv(_t4_G.T @ _t4_G)
-    assert abs(r["T0"] - m[0]) < 1e-9
-    assert abs(r["q0"] - m[1]) < 1e-12
-    assert abs(r["amplitude"] - m[2]) < 1e-9
+    assert abs(r["T0"] - m[0]) <= 1e-9
+    assert abs(r["q0"] - m[1]) * np.max(np.abs(_t4_R)) <= 1e-9
+    assert abs(r["amplitude"] - m[2]) * np.max(np.abs(_t4_P)) <= 1e-9
     for key, i in (("sigma_T0", 0), ("sigma_q0", 1), ("sigma_amplitude", 2)):
         assert abs(r[key] / math.sqrt(_t4_C[i, i]) - 1) < 1e-6
     assert abs(r["rms_residual"] - math.sqrt(rss[0] / len(_t4_T))) < 1e-9
@@ -106,7 +112,7 @@ def _crown_case():
     _t4_T, _t4_R, _t4_S, _t4_P = _t4_synthetic(0.0)
     r = fit_heat_flow(_t4_T, _t4_R, _t4_S, _t4_P, 1.1e-6)
     r0 = fit_heat_flow(_t4_T, _t4_R, _t4_S, _t4_P, 0.0)
-    assert abs(r["q0"] - 0.044) < 1e-12
+    assert abs(r["q0"] - 0.044) * np.max(np.abs(_t4_R)) <= 1e-9
     # ignoring the known heat production (A = 0) biases q0 low by more than 1e-4 W m^-2
     assert r0["q0"] < 0.044 - 1e-4
 
@@ -137,7 +143,8 @@ def _crown_case():
     keys = ["T0", "q0", "amplitude", "sigma_T0", "sigma_q0", "sigma_amplitude", "rms_residual"]
     # output contract: a dict of Python floats
     assert isinstance(out, dict) and all(type(out[k]) is float for k in keys)
-    assert abs(out["T0"] - 4.7) < 1e-9 and abs(out["q0"] - 0.044) < 1e-12 and abs(out["amplitude"] - 7.0) < 1e-9
+    assert abs(out["T0"] - 4.7) <= 1e-9 and abs(out["q0"] - 0.044) * np.max(R) <= 1e-9
+    assert abs(out["amplitude"] - 7.0) * np.max(np.abs(P)) <= 1e-9
     Ri = np.linalg.inv(Rm)
     sig = np.sqrt(float(r @ r) / (z.size - 3) * np.diag(Ri @ Ri.T))
     for key, v in zip(("sigma_T0", "sigma_q0", "sigma_amplitude"), sig):
@@ -148,57 +155,46 @@ def _crown_case():
 _crown_case()
 
 # --- test case 5 ---
-# resolvability threshold is 1e minus 8
+# resolvability threshold 1e-8: a nearly collinear design just above it is fitted with an accurate rms residual
+# Targets: a residual orthogonal to [1, R, P] (its rms is the exact least-squares rms residual) and the stated
+# rejection below the threshold.
 import numpy as np
 
 
 def _crown_case():
+    import math
     import numpy as np
-
-    _t4_KEYS = {"T0", "q0", "amplitude", "sigma_T0", "sigma_q0", "sigma_amplitude", "rms_residual"}
-
-    def _t4_synthetic(noise, seed=5):
-        rng = np.random.default_rng(seed)
-        z = np.linspace(150, 1400, 120)
-        R = z / 3.1 + 0.00002 * z**1.5
-        S = z**2 / (2 * 3.1)
-        P = -(np.exp(-z / 900.0) - np.exp(-z / 250.0)) - 0.3 * np.exp(-z / 2000.0)
-        T = 4.7 + 0.044 * R - 1.1e-6 * S + 7.0 * P + noise * rng.standard_normal(z.size)
-        return T, R, S, P
-
-    def _t4_t_scaled_min_sv(R, P):
-        G = np.column_stack([np.ones(R.size), R, P])
-        return float(np.linalg.svd(G / np.linalg.norm(G, axis=0), compute_uv=False)[-1])
-
-    def _t4_t_nearly_proportional_P(R, target):
-        Q, _ = np.linalg.qr(np.column_stack([np.ones(R.size), R]))
-        u = R ** 2 - Q @ (Q.T @ (R ** 2))
-        u /= np.linalg.norm(u)
-        alpha = target * np.linalg.norm(0.01 * R)
-        for _ in range(30):
-            P = 0.01 * R + alpha * u
-            s = _t4_t_scaled_min_sv(R, P)
-            if abs(s / target - 1.0) < 1e-3:
-                break
-            alpha *= target / s
-        return P, s
-
-    _t4_t_msg = ""
-    _t4_T, _t4_R, _t4_S, _t4_P0 = _t4_synthetic(0.0)
-    # just above the threshold: the fit must run and return finite values
-    _t4_P, s = _t4_t_nearly_proportional_P(_t4_R, 3e-8)
-    assert 1e-8 < s < 1e-7
-    r = fit_heat_flow(_t4_T, _t4_R, _t4_S, _t4_P, 1e-6)
-    assert all(np.isfinite(r[k]) for k in _t4_KEYS)
-    # just below the threshold: rejected
-    _t4_P, s = _t4_t_nearly_proportional_P(_t4_R, 3e-9)
-    assert 0.0 < s < 1e-8
-    try:
-        fit_heat_flow(_t4_T, _t4_R, _t4_S, _t4_P, 1e-6)
-    except ValueError:
-        pass
-    else:
-        raise AssertionError("fit_heat_flow must raise ValueError" + _t4_t_msg)
+    z = np.linspace(150, 1400, 120)
+    R = z / 3.1 + 0.00002 * z**1.5
+    S = z**2 / (2 * 3.1)
+    one = np.ones(z.size)
+    Q2, _ = np.linalg.qr(np.column_stack([one, R]))
+    u = R**2 - Q2 @ (Q2.T @ R**2)
+    u /= np.linalg.norm(u)
+    for alpha, accepted in ((1.286e-6, True), (1.286e-7, False)):
+        # P = 0.01 R + alpha u (u: unit part of R^2 orthogonal to 1 and R) is nearly proportional to R
+        P = 0.01 * R + alpha * u
+        G = np.column_stack([one, R, P])
+        s_min = np.linalg.svd(G / np.linalg.norm(G, axis=0), compute_uv=False)[-1]
+        if not accepted:
+            # scaled smallest singular value 3.0e-9 < 1e-8: unresolvable, ValueError
+            assert 0.0 < s_min < 1e-8
+            try:
+                fit_heat_flow(4.7 + 0.044 * R + 7.0 * P, R, S, P, 1.1e-6)
+            except ValueError:
+                continue
+            raise AssertionError("fit_heat_flow must raise ValueError below the threshold")
+        assert 2.9e-8 < s_min < 3.1e-8
+        # r orthogonal to 1, R, P with rms 1e-3 K; the exact least-squares solution is (T0, q0, g) = (4.7, -1.956, 207):
+        # q0 R and g P reach 885 and 937 K and nearly cancel; the rms residual is 1e-3 K (60-digit check: 4e-15 K)
+        Q, _ = np.linalg.qr(G)
+        r = np.random.default_rng(7).standard_normal(z.size)
+        for _ in range(2):
+            r = r - Q @ (Q.T @ r)
+        r *= 1e-3 / math.sqrt(np.mean(r * r))
+        out = fit_heat_flow(4.7 - 1.956 * R - 1.1e-6 * S + 207.0 * P + r, R, S, P, 1.1e-6)
+        # stated accuracy for every resolvable design (fitted terms up to 1e3 K): rms_residual within 1e-9 K
+        assert abs(out["rms_residual"] - 1e-3) <= 1e-9, out["rms_residual"]
 
 
 _crown_case()
@@ -240,6 +236,49 @@ def _crown_case():
             pass
         else:
             raise AssertionError("fit_heat_flow must raise ValueError" + _t4_t_msg)
+
+
+_crown_case()
+
+# --- test case 7 ---
+# nearly collinear but resolved design (scaled smallest singular value 1.05e-3): coefficients and standard errors
+# Targets: the generating values (residual orthogonal to [1, R, P]) and the Frisch-Waugh identity
+# [(G^T G)^-1]_jj = 1 / |G_j - projection of G_j on the other two columns|^2.
+import numpy as np
+
+
+def _crown_case():
+    import math
+    import numpy as np
+    z = np.linspace(150, 1400, 120)
+    R = z / 3.1 + 0.00002 * z**1.5
+    S = z**2 / (2 * 3.1)
+    one = np.ones(z.size)
+    Q2, _ = np.linalg.qr(np.column_stack([one, R]))
+    u = R**2 - Q2 @ (Q2.T @ R**2)
+    P = 0.01 * R + 0.045 * u / np.linalg.norm(u)
+    G = np.column_stack([one, R, P])
+    s_min = np.linalg.svd(G / np.linalg.norm(G, axis=0), compute_uv=False)[-1]
+    assert 1e-3 <= s_min <= 1.1e-3
+    Q, _ = np.linalg.qr(G)
+    r = np.random.default_rng(7).standard_normal(z.size)
+    for _ in range(2):
+        r = r - Q @ (Q.T @ r)
+    r *= 1e-3 / math.sqrt(np.mean(r * r))
+    sig = []
+    for j in range(3):
+        others = np.delete(G, j, axis=1)
+        e = G[:, j] - others @ np.linalg.lstsq(others, G[:, j], rcond=None)[0]
+        sig.append(math.sqrt(float(r @ r) / (z.size - 3) / float(e @ e)))
+    # (T0, q0, g) = (4.7, 0.044, 7.0), and (4.7, -1.956, 207.0) whose terms q0 R and g P reach 885 and 939 K
+    for T0, q0, g in ((4.7, 0.044, 7.0), (4.7, -1.956, 207.0)):
+        out = fit_heat_flow(T0 + q0 * R - 1.1e-6 * S + g * P + r, R, S, P, 1.1e-6)
+        assert abs(out["T0"] - T0) <= 1e-9, (g, out["T0"])
+        assert abs(out["q0"] - q0) * np.max(np.abs(R)) <= 1e-9, (g, out["q0"])
+        assert abs(out["amplitude"] - g) * np.max(np.abs(P)) <= 1e-9, (g, out["amplitude"])
+        assert abs(out["rms_residual"] - 1e-3) <= 1e-9
+        for key, want in zip(("sigma_T0", "sigma_q0", "sigma_amplitude"), sig):
+            assert abs(out[key] / want - 1.0) <= 1e-6, (g, key, out[key], want)
 
 
 _crown_case()

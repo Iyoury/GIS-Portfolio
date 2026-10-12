@@ -57,14 +57,18 @@ metadata:
     range (T = 0.5 and 10, |h| = 20, L = 10, largest entry exp(440)); both solutions also agree with a
     40-digit sum over the energy to 3e-14 relative at the corners of the range. Step 2 targets are
     Kaufman's exact free-fermion spectrum of the periodic strip, evaluated inside the tests with 60-digit
-    decimal arithmetic and no transfer matrix. The inline targets of steps 3 to 6 were regenerated for
-    this version by a route that shares no code with either solution: the transfer matrix, summed from
+    decimal arithmetic and no transfer matrix. The inline targets of steps 3 to 6 come from
+    extended-precision routes that share no code with either solution: the transfer matrix, summed from
     the energy, is reduced exactly to its zero-momentum block (every state involved is translation
     invariant) and diagonalized with mpmath, giving m_L at 50 digits, chi as a 90-digit second
     difference of the top eigenvalue with a field step of 1e-25, and H_edge as a 40-digit root of the
-    leading-pair discriminant; the step 6 targets apply the stated estimators in extended precision to
-    these values and to Kaufman's f and lengths. The reference agrees with these targets to 7e-16 in
-    m_L, 1.5e-8 relative in chi, 1.1e-13 relative in H_edge and 3e-13 in the step 6 values, and
+    leading-pair discriminant; the cases added in version 11 use the full 2**L-state matrix instead (no
+    orbit reduction, same precisions), which agrees with the zero-momentum route to 1e-22 in m_L and
+    1e-25 and 5e-30 relative in chi and H_edge, and two m_L values are checked against Yang's closed
+    form, which m_L reaches within 5.2e-19 at (L, T) = (10, 0.9) and 8e-21 at (8, 0.7); the step 6
+    targets apply the stated estimators in extended precision to these values and to Kaufman's f and
+    lengths. The reference agrees with these targets to 7e-16 in m_L, 1.5e-8 relative in chi,
+    1.4e-13 relative in H_edge and 3.2e-13 in the step 6 values, and
     second_solution.py, which uses other methods (momentum and flip sectors for the lengths, rotation of
     the leading pair into parity states, an odd-sector linear solve, bisection on the leading pair
     leaving the real axis, divided differences for c, VUMPS), to 1.2e-15, 1.7e-8, 5.7e-12 and 4.5e-12.
@@ -238,7 +242,7 @@ sub_steps:
       eigenvalue to the largest one. A state contributes only if the operator joins it to the
       top state. At Tc, xi_L / L tends to 1 / (2 pi x) for an operator of scaling dimension x
       (Cardy), with x = 1/8 for the spin and x = 1 for the energy.
-    n_test_cases: 5
+    n_test_cases: 7
     contract:
       quantity: "Free energy per spin, spin correlation length and energy correlation length of an infinitely long periodic strip."
       assumptions: "Zero field. xi_energy is the decay length of the connected correlation of e = s_0 s_1, which is even under the global spin flip."
@@ -283,7 +287,7 @@ sub_steps:
       m_L**2 over a distance xi_spin that grows exponentially with L. m_L converges quickly to
       Yang's spontaneous magnetization (1 - sinh(2K)**-4)**(1/8) as L grows. At Tc it decays
       like L**(-beta/nu) with beta/nu = 1/8.
-    n_test_cases: 6
+    n_test_cases: 9
     contract:
       quantity: "Amplitude m_L of the slowest-decaying term of the zero-field spin correlation along the strip (finite-width spontaneous magnetization below Tc)."
       assumptions: "Zero field; m_L = |<top state|s_0|top odd state>|. Below Tc the two top states are degenerate to machine precision for the larger widths and lower temperatures of the range."
@@ -330,7 +334,7 @@ sub_steps:
       correlation of the row magnetization, divided by T and by L. At Tc it grows like
       L**(gamma/nu) with gamma/nu = 7/4. Below Tc it grows exponentially with L, because the
       correlation length does.
-    n_test_cases: 6
+    n_test_cases: 9
     contract:
       quantity: "Zero-field susceptibility per spin, -d2f/dh2 at h = 0, of an infinitely long periodic strip."
       assumptions: "Field coupled as - h sum s_i. Below Tc the gap between the two top eigenvalues closes exponentially with L (1.4e-8 relative at L = 10, T = 1) and the curvature of f(h) is confined to |h| of the order of that gap, so the value must not depend on a finite step in h."
@@ -378,7 +382,7 @@ sub_steps:
       neighbourhood is a critical point of its own (Fisher's Yang-Lee edge singularity). At Tc
       the edge of a strip of width L shrinks like L**(-y_h) with y_h = 15/8, and below Tc it
       closes exponentially fast with L.
-    n_test_cases: 6
+    n_test_cases: 10
     contract:
       quantity: "Yang-Lee edge of the strip: smallest imaginary field H at which the two leading eigenvalues of the transfer matrix meet."
       assumptions: "Imaginary field h = i H; the leading pair stays real and distinct for 0 <= H < H_edge (checked for L = 3 to 8 at ten temperatures from 1.5 to 10, on 120 fields below each edge), while lower eigenvalue pairs may leave the real axis earlier. The smallest edge of the range is about 4.8e-5, at L = 8 and T = 1.5."
@@ -443,7 +447,7 @@ sub_steps:
       f_L is of order 1/L**4. For the 2D Ising model x_sigma = 1/8, x_energy = 1, c = 1/2, and
       the scaling relations give beta/nu = x_sigma, gamma/nu = 2 - 2 x_sigma = 7/4 and
       y_h = 2 - x_sigma = 15/8. The two-width estimates approach these values as L grows.
-    n_test_cases: 3
+    n_test_cases: 5
     contract:
       quantity: "Two-width finite-size estimates at the exact Tc of x_sigma, x_energy, beta/nu, gamma/nu, y_h, and the three-width estimate of c."
       assumptions: "Formulas exactly as in the prompt, all at T = Tc = 2 / ln(1 + sqrt(2))."

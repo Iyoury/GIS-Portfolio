@@ -18,16 +18,19 @@ def fit_heat_flow(T, R, S, P, A):
     dict with keys T0 (deg C), q0 (W m^-2), amplitude (g, K), sigma_T0,
     sigma_q0, sigma_amplitude (1-sigma standard errors of ordinary least
     squares, noise variance estimated as RSS/(n-3)) and rms_residual (K,
-    sqrt(RSS/n)); every value a Python float. Accuracy: T0 and g within
-    1e-9 K, q0 within 1e-12 W m^-2 of the exact least-squares solution,
-    rms_residual within 1e-9 K and, for data with rms_residual >= 1e-6 K,
-    the standard errors within a relative 1e-6.
+    sqrt(RSS/n)); every value a Python float. Accuracy against the exact
+    least-squares solution, for terms T0, q0 R, A S, g P of at most 1e3 K
+    at that solution: rms_residual within 1e-9 K; if s_min >= 1e-3, also
+    T0 within 1e-9 K, q0 within 1e-9 K / max|R|, g within 1e-9 K / max|P|
+    and, for data with rms_residual >= 1e-6 K, the standard errors within
+    a relative 1e-6 (no accuracy is required for the coefficients and
+    standard errors when 1e-8 <= s_min < 1e-3).
 
     Raises
     ------
     ValueError for n < 4, A < 0, or an unresolvable design:
-    one of the columns 1, R, P is all zero, or the smallest singular value of
-    the n x 3 matrix [1, R, P] with each column scaled to unit length is below
-    1e-8 (e.g. P proportional to R).
+    one of the columns 1, R, P is all zero, or the smallest singular value
+    s_min of the n x 3 matrix [1, R, P] with each column scaled to unit
+    length is below 1e-8 (e.g. P proportional to R).
     """
     raise NotImplementedError

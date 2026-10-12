@@ -409,3 +409,74 @@ the same result in every line, FORMAT OK with no problem; REF and SECOND 5/5, 5/
 3/3, 8/8 and 2/2 general; the mutants fail the same cases as above (first_complex_eigenvalue [0, 1],
 third_eigenvalue [0, 1, 4]); SHIFT +-1e-12 all pass; both controls pass 0 cases; SUMMARY ALL OK
 (7 min 30 s wall time). crown_check format was run once more after the last edit of this file.
+
+## Version 11 (grading_fix: platform content-check rules, applied before any report on this task)
+
+- Finding: the platform content check now enforces (2026-10-12): no non-finite literal anywhere in the
+  tests; no finiteness promise in the visible text; computed values must clearly outweigh validation in
+  each step (assertion sites: type/shape/exception checks, a stated raise at half weight, against
+  computed-value checks); no relative requirement on an exactly zero output; every stated output shape and
+  inclusive endpoint exercised with values. No platform report on this task yet; the rules were applied
+  proactively.
+- Cause (audit of version 10): (1) and (2) nothing to remove: no test uses a NaN or infinite input or a
+  non-finite literal, no step states an error rule, and no visible text, scaffold, solution or mutant
+  promises anything about non-finite inputs. (3) Validation weighed too much in steps 2 to 6: the
+  contract check (tuple of floats, Python float, dict keys) was repeated in every case, and step 6
+  checked its six values in a loop (one assertion site per case for six values) next to two contract
+  asserts per case. Assertion sites, validation / computed, version 10 -> version 11: step 1 7 / 29 -> 1 / 29,
+  step 2 10 / 15 -> 1 / 21, step 3 6 / 6 -> 1 / 11, step 4 7 / 7 -> 1 / 10, step 5 8 / 8 -> 1 / 12, step 6
+  6 / 3 -> 1 / 30, step 7 8 / 32 -> 1 / 32, general 2 / 8 -> 1 / 8. (4) No relative requirement applies to an
+  exact zero anywhere in the domain: the step 1 entries are exponentials (smallest exp(-360)), f < 0 and
+  both lengths > 0 in step 2, chi_L > 0 in step 4, H_edge > 0 in step 5, and chi and c > 0 in step 7 (c is
+  an energy variance); steps 3 and 6 and f and m of step 7 have absolute requirements. (5) Shapes and
+  endpoints were already exercised with values: the (2**L, 2**L) matrix at L = 3, 4, 6 and 10, and every
+  inclusive end of every stated range (step 1 L = 3 and 10, T = 0.5 and 10, |h| = 20 real and imaginary;
+  steps 2 and 4 (3, 10) and (10, 1); step 3 (3, 10) and (10, 0.5); step 5 (3, 1.5), (3, 10), (8, 1.5); step 6
+  L = 3 and 7; step 7 and general T = 2 and 3, h = 0.005 and 0.2).
+- Change (tests and n_test_cases only; no prompt, docstring, tolerance, domain, solution or mutant
+  changed):
+  - One contract check per step, in case 0: step 1 shape (8, 8); step 2 tuple of three Python floats (one
+    assert); steps 3, 4 and 5 a Python float; step 6 a dict with exactly the six keys and float values (one
+    assert); step 7 and general a tuple of four Python floats (one assert). The other cases read the values
+    directly, so a wrong type or shape still fails them.
+  - Step 6: the six values are asserted one by one, and the old case 2 (L = 3 and 7 in a loop) is split into
+    cases 2 (L = 3) and 3 (L = 7).
+  - New computed cases with independent targets:
+    - step 2 cases 5 and 6, (L, T) = (5, 1.5) and (9, 2.6) (independent_recomputation: Kaufman's exact
+      strip spectrum evaluated in the test with 60-digit decimal arithmetic, as in the other cases); at
+      (9, 2.6), above the crossover temperature 2.416 of L = 9, the third eigenvalue of the whole matrix is
+      an odd state.
+    - step 3 case 6 (special_case): Yang's closed form (1 - sinh(2/T)**-4)**(1/8) evaluated in the test at
+      (10, 0.9) and (8, 0.7); the 50-digit zero-momentum route gives m_L - Yang = 5.2e-19 and 8.0e-21 there
+      (relative gaps of the top pair 1.1e-9 and 2.8e-10). Cases 7 and 8, (3, 0.5) (corner of the domain),
+      (4, 1.6) and (5, 2.8) (independent_recomputation): 50-digit mpmath eigsy of the full 2**L-state matrix
+      summed from the energy, no orbit reduction, m_L = |<top|s_0|top flip-odd>|; the zero-momentum route
+      agrees to 1e-22.
+    - step 4 cases 6 to 8, (4, 1.0), (5, 2.0), (6, 1.25) (independent_recomputation): chi = (T / L) d2 ln
+      lambda_0 / dh2 by a centred second difference with step 1e-25 of the top eigenvalue of the full
+      2**L-state matrix at 90 digits (the step 2e-25 partner agrees to 1e-41); the zero-momentum route
+      agrees to 7e-26, and the same full-space route reproduces the existing target at (3, 2.5) to 16 digits.
+    - step 5 cases 6 to 9, (3, 4.0), (4, 2.5), (5, 1.8), (6, 1.5) (independent_recomputation): 40-digit
+      Illinois root of Re((a - b)**2) for the two eigenvalues of largest modulus of the full 2**L-state
+      complex matrix (mpmath eig), bracketed by a double-precision scan on a logarithmic grid from 1e-7;
+      the zero-momentum route agrees to 5e-30 relative.
+    - step 6 case 4, L = 5 (independent_recomputation): the stated estimators evaluated in mpmath on
+      Kaufman's f and lengths at W = 5, 6, 7 and on the stored extended-precision m_W, chi_W and H_edge(W)
+      at W = 5, 6 of the zero-momentum route; the full-space route reproduces these six inputs to 25 digits.
+  - Agreement on the new points: reference within 9.3e-14 relative (step 2), 2.2e-16 (m_L), 4.4e-13
+    relative (chi), 1.4e-13 relative (H_edge), 3.2e-13 (step 6); second solution within 2.6e-14, 8.9e-16,
+    1.3e-13, 6.8e-13 and 3.9e-12. verification_explanation updated accordingly (full-space route, Yang
+    check, 1.4e-13 and 3.2e-13 as the largest reference deviations in H_edge and step 6).
+- Regression test: tools/crown_check.py format (no non-finite literal, markers, n_test_cases) and all
+  modes; the emulated assertion-site count above. solution.py and second_solution.py were each run twice
+  in clean single-threaded processes on the inputs of the new cases; the two runs of each were identical.
+
+crown_check result (version 11, all modes, every case alone in a fresh process, -j 2, single-threaded
+BLAS): FORMAT OK (no problem); REF 5/5, 7/7, 9/9, 9/9, 10/10, 5/5, 8/8 for steps 1 to 7 and 2/2 general;
+SECOND the same, all pass; mutants: field_not_shared fails 4/5 [0, 1, 3, 4], third_eigenvalue 4/7
+[0, 1, 4, 6] (new case 6 at (9, 2.6) rejects it), correlation_one_row 7/9 [1, 3, 4, 5, 6, 7, 8],
+one_sided_correlation_sum 9/9, first_complex_eigenvalue 2/10 [0, 1] (no eigenvalue becomes complex
+before the leading pair meets at the four new points), inverted_edge_ratio 5/5,
+missing_corner_normalization, specific_heat_without_T and free_spin_susceptibility 8/8 each,
+whole_task_field_not_scaled 2/2 general; SHIFT +-1e-12 all pass; the all-None and all-zero controls pass
+0 cases in every step and in general; SUMMARY ALL OK.

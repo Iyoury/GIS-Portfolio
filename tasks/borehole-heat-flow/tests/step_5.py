@@ -228,6 +228,7 @@ def _crown_case():
     arr1 = layered_paleoclimate_perturbation(np.array([400.0]), tops, k, rc, t_y, d)
     # output contract: the shape of z (a one-element z included); a float for a scalar z
     assert (isinstance(got, np.ndarray) and got.shape == (2, 3) and isinstance(arr1, np.ndarray) and arr1.shape == (1,)
+            and np.issubdtype(got.dtype, np.floating) and np.issubdtype(arr1.dtype, np.floating)
             and type(one) is float)
     assert abs(got[0, 2] - one) < 5e-8 and abs(float(arr1[0]) - one) < 5e-8   # two computed outputs, each within 2.5e-8
     assert abs(got[0, 0] - 0.6) < 2.5e-8

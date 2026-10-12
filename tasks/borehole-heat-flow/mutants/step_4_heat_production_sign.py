@@ -13,13 +13,16 @@ def fit_heat_flow(T, R, S, P, A):
     y = T - A * S                           # MUTANT: wrong sign of the heat-production term
     G = np.column_stack([np.ones(n), R, P])
     norms = np.linalg.norm(G, axis=0)
-    if np.any(norms == 0.0) or np.linalg.svd(G / norms, compute_uv=False)[-1] < 1e-8:
+    if np.any(norms == 0.0):
+        raise ValueError("T0, q0 and amplitude are not separately resolvable (zero column)")
+    U, sv, Vt = np.linalg.svd(G / norms, full_matrices=False)
+    if sv[-1] < 1e-8:
         raise ValueError("T0, q0 and amplitude are not separately resolvable (rank-deficient design)")
-    GtG = G.T @ G
-    m = np.linalg.solve(GtG, G.T @ y)
+    W = Vt.T / sv
+    m = (W @ (U.T @ y)) / norms
     res = y - G @ m
     s2 = float(res @ res) / (n - 3)
-    C = s2 * np.linalg.inv(GtG)
+    C = s2 * (W @ W.T) / np.outer(norms, norms)
     return {"T0": float(m[0]), "q0": float(m[1]), "amplitude": float(m[2]),
             "sigma_T0": float(np.sqrt(C[0, 0])), "sigma_q0": float(np.sqrt(C[1, 1])),
             "sigma_amplitude": float(np.sqrt(C[2, 2])),

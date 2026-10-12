@@ -58,7 +58,6 @@ def _crown_case():
 
     # purely imaginary field: K = 0.4, h / T = 0.08j
     A = np.asarray(transfer_matrix(4, 2.5, 0.2j))
-    assert A.shape == (16, 16)
     assert abs(A[0, 0] / np.exp(3.2 + 0.32j) - 1.0) < 1e-10
     assert abs(A[5, 0] - np.exp(0.16j)) < 1e-10          # row 5 = spins (-, +, -, +)
     assert abs(A[0, 15] - 1.0) < 1e-10
@@ -93,7 +92,6 @@ def _crown_case():
 
 
     A = np.asarray(transfer_matrix(6, 1.7))
-    assert A.shape == (64, 64)
     assert abs(A[63, 21] - 1.0) < 1e-10                   # all down against (-, +, -, +, -, +)
     _t_B = _t_brute(6, 1.7, 0.0)
     assert np.max(np.abs(A - _t_B) / np.abs(_t_B)) <= 1e-10
@@ -125,7 +123,6 @@ def _crown_case():
 
     # lowest temperature of the range: K = 2 and h / T = 0.2
     A = np.asarray(transfer_matrix(3, 0.5, 0.1))
-    assert A.shape == (8, 8)
     assert abs(A[0, 0] / np.exp(12.6) - 1.0) < 1e-10
     assert abs(A[7, 7] / np.exp(11.4) - 1.0) < 1e-10
     assert abs(A[0, 7] - 1.0) < 1e-10
@@ -133,7 +130,6 @@ def _crown_case():
     assert np.max(np.abs(A - _t_B) / np.abs(_t_B)) <= 1e-10
     # highest temperature and largest imaginary field of the range: K = 0.1 and h / T = 2j
     A = np.asarray(transfer_matrix(3, 10.0, 20j))
-    assert A.shape == (8, 8)
     assert abs(A[0, 0] / np.exp(0.6 + 6j) - 1.0) < 1e-10
     assert abs(A[7, 7] / np.exp(0.6 - 6j) - 1.0) < 1e-10
     assert abs(A[0, 7] - 1.0) < 1e-10
@@ -165,7 +161,6 @@ def _crown_case():
 
     # widest strip and lowest temperature of the range: K = 2, 1024 x 1024 matrix
     A = np.asarray(transfer_matrix(10, 0.5))
-    assert A.shape == (1024, 1024)
     assert abs(A[0, 0] / np.exp(40.0) - 1.0) < 1e-10        # all up to all up: 10 + 10 + 20
     assert abs(A[0, 1] / np.exp(32.0) - 1.0) < 1e-10        # row 1 has spin 0 down: 10 + 6 + 16
     assert abs(A[0, 1023] - 1.0) < 1e-10                     # all up to all down
@@ -173,7 +168,6 @@ def _crown_case():
     assert np.max(np.abs(A - _t_B) / np.abs(_t_B)) <= 1e-10
     # largest real field of the range, h = -20: the field term of a row is (h / T) / 2 times its sum of spins
     A = np.asarray(transfer_matrix(10, 0.5, -20.0))
-    assert A.shape == (1024, 1024)
     assert abs(A[1023, 1023] / np.exp(440.0) - 1.0) < 1e-10  # all down to all down: 40 + 400
     assert abs(A[0, 0] / np.exp(-360.0) - 1.0) < 1e-10      # all up to all up: 40 - 400
     assert abs(A[0, 1023] - 1.0) < 1e-10

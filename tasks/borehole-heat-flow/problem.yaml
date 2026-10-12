@@ -54,8 +54,9 @@ metadata:
     dogleg from atan2(|t1 x t2|, t1 . t2) and the ratio factor tan(beta/2)/(beta/2) from its Taylor series for small
     half-angles; a point inside a segment uses the great-circle tangent written with sinc functions. Step 2 sums the
     exact layer terms (b - a)/k and (b - a)(b + a)/(2k). Step 3 superposes differences of erfc step responses with
-    times in seconds (Julian year). Step 4 checks resolvability with the singular values of the column-normalized
-    [1, R, P], solves for y = T + A S and takes the covariance s^2 (G^T G)^-1 with s^2 = RSS/(n - 3). Step 5
+    times in seconds (Julian year). Step 4 takes the thin SVD U S V^T of the column-normalized design
+    G D^-1 = [1, R, P] D^-1 (resolvability from its smallest singular value), solves for y = T + A S as
+    D^-1 V S^-1 U^T y without squaring the condition number, and forms s^2 D^-1 V S^-2 V^T D^-1, s^2 = RSS/(n - 3). Step 5
     Laplace-transforms the layered problem (a e^{-qz} + b e^{qz} per layer, q = sqrt(s/kappa_i)), carries the
     admittance k F'/F up from the bottom half-space with a tanh recursion, assembles F in logarithms from e^{-2qh}
     factors only and inverts F/s on a fixed 32-node Talbot contour (Abate and Valko 2004). Step 6 converts the
@@ -460,13 +461,16 @@ sub_steps:
       sqrt(RSS / n).
       The three unknowns are separately determined only if the data resolve the constant, R and P: scale each
       of the three columns 1, R and P to unit Euclidean length; if one of them is all zero (for example P
-      identically zero) or the smallest singular value of the scaled n x 3 matrix is below 1e-8 (for example
-      P proportional to R), raise ValueError. Any n >= 4 with a resolvable design is valid.
+      identically zero) or the smallest singular value s_min of the scaled n x 3 matrix is below 1e-8 (for
+      example P proportional to R), raise ValueError. Any n >= 4 with a resolvable design is valid.
       Returns: dict with keys T0, q0, amplitude, sigma_T0, sigma_q0, sigma_amplitude, rms_residual, each value
       a Python float.
-      Accuracy: T0 and g within 1e-9 K and q0 within 1e-12 W m^-2 of the exact least-squares solution,
-      rms_residual within 1e-9 K, and, for data with rms_residual >= 1e-6 K, the three standard errors within a
-      relative 1e-6.
+      Accuracy, against the exact least-squares solution of the given data (data whose terms T0, q0 R, A S and
+      g P at that solution are at most 1e3 K in magnitude at every reading): rms_residual within 1e-9 K for every
+      resolvable design. If s_min >= 1e-3, also T0 within 1e-9 K, q0 within 1e-9 K / max|R| and g within 1e-9 K / max|P|
+      (every fitted term within 1e-9 K; maxima over the readings) and, for data with rms_residual >= 1e-6 K,
+      the three standard errors within a relative 1e-6. For 1e-8 <= s_min < 1e-3 (nearly collinear columns)
+      the coefficients and standard errors are ill-conditioned and no accuracy is required for them.
       Errors: ValueError for n < 4, A < 0, or an unresolvable design as defined above.
     function_header: |-
       def fit_heat_flow(T, R, S, P, A):
@@ -485,30 +489,35 @@ sub_steps:
           dict with keys T0 (deg C), q0 (W m^-2), amplitude (g, K), sigma_T0,
           sigma_q0, sigma_amplitude (1-sigma standard errors of ordinary least
           squares, noise variance estimated as RSS/(n-3)) and rms_residual (K,
-          sqrt(RSS/n)); every value a Python float. Accuracy: T0 and g within
-          1e-9 K, q0 within 1e-12 W m^-2 of the exact least-squares solution,
-          rms_residual within 1e-9 K and, for data with rms_residual >= 1e-6 K,
-          the standard errors within a relative 1e-6.
+          sqrt(RSS/n)); every value a Python float. Accuracy against the exact
+          least-squares solution, for terms T0, q0 R, A S, g P of at most 1e3 K
+          at that solution: rms_residual within 1e-9 K; if s_min >= 1e-3, also
+          T0 within 1e-9 K, q0 within 1e-9 K / max|R|, g within 1e-9 K / max|P|
+          and, for data with rms_residual >= 1e-6 K, the standard errors within
+          a relative 1e-6 (no accuracy is required for the coefficients and
+          standard errors when 1e-8 <= s_min < 1e-3).
 
           Raises
           ------
           ValueError for n < 4, A < 0, or an unresolvable design:
-          one of the columns 1, R, P is all zero, or the smallest singular value of
-          the n x 3 matrix [1, R, P] with each column scaled to unit length is below
-          1e-8 (e.g. P proportional to R).
+          one of the columns 1, R, P is all zero, or the smallest singular value
+          s_min of the n x 3 matrix [1, R, P] with each column scaled to unit
+          length is below 1e-8 (e.g. P proportional to R).
           """
     return_line: "    return result"
     step_background: |-
       With R, S and the unit-amplitude perturbation P evaluated at every reading, the observation model is
       linear in T0, q0 and g. The heat production is known from geochemistry on core, so the term A S is
       moved to the left side and the three parameters follow from ordinary least squares on the design
-      [1, R, P], with the usual parameter covariance and the unbiased residual variance RSS/(n - 3).
-    n_test_cases: 7
+      [1, R, P], with the usual parameter covariance and the unbiased residual variance RSS/(n - 3). When P is
+      nearly proportional to R (or to a constant), the coefficients become ill-conditioned while the fitted
+      profile and its residual stay well determined.
+    n_test_cases: 8
     contract:
       quantity: "Ordinary least-squares estimates of T0, q0 and g in T = T0 + q0 R - A S + g P, their 1-sigma standard errors and the rms residual."
-      assumptions: "Known heat production A; unweighted least squares; noise variance RSS/(n - 3); design [1, R, P] resolvable (no zero column and smallest singular value of the column-normalized design >= 1e-8)."
+      assumptions: "Known heat production A; unweighted least squares; noise variance RSS/(n - 3); design [1, R, P] resolvable (no zero column and smallest singular value s_min of the column-normalized design >= 1e-8)."
       result_kind: exact
-      valid_input_ranges: "n >= 4 readings with finite T, R, S, P of equal length; A finite and >= 0; resolvable design; the standard-error accuracy applies to data with rms_residual >= 1e-6 K."
+      valid_input_ranges: "n >= 4 readings with finite T, R, S, P of equal length; A finite and >= 0; resolvable design; terms T0, q0 R, A S, g P of at most 1e3 K at the solution; rms_residual accuracy for every resolvable design, coefficient accuracy (each fitted term within 1e-9 K) for s_min >= 1e-3, standard-error accuracy for s_min >= 1e-3 and rms_residual >= 1e-6 K."
       units: "T0 in deg C, q0 in W m^-2, g in K, standard errors in the same units, rms_residual in K."
       output_shape: "dict of seven Python floats: T0, q0, amplitude, sigma_T0, sigma_q0, sigma_amplitude, rms_residual."
       step_dependencies: []

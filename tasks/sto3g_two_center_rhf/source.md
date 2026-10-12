@@ -674,3 +674,87 @@ changed. Each item gives the finding, its cause, the change, the regression test
   - All-None and all-zero controls pass 0 cases in every step and in general.
   - Repeat runs: two clean processes with one thread give bitwise identical outputs of the new
     second-solution polarized_energies (two inputs) and vibrational_levels (two inputs).
+
+## Version 17 (grading_fix: platform content check)
+
+- Finding: the platform content check (2026-10-12) blocks non-finite literals anywhere in the tests
+  (float("nan"), np.nan, np.inf and the like, also in internal helpers), even when a prompt promises a
+  ValueError for non-finite input, and it counts assertion sites per step: validation, type, shape and
+  exception checks (a raise stated in the prompt at half weight) against computed-value checks, which must
+  clearly dominate. It also asks that a relative-error requirement never apply to an exactly zero output
+  and that every stated output shape and inclusive endpoint be exercised with values. No platform report
+  had been received for this task; the rules were applied proactively.
+- Cause:
+  - Non-finite inputs: step 1 case 4 passed t = NaN and an array containing NaN, step 5 case 7 a NaN
+    mass, an infinite mass and a NaN charge, matching the "not finite" clauses of the step 1 and step 5
+    prompts and function headers. The step 4 RHF oracle started its search from best = np.inf (8 copies).
+  - Validation weight: the contract check was repeated in the helper of every case (step 2: four asserts
+    per case; steps 3-6 and general: one or two), and the invalid-input lists tested rules several times
+    (step 1: 9 entries, step 2: 7, step 3: 4, step 5: 8). Counted conservatively (an assert mixing a
+    shape and a value check counted on both sides, the "raised" assert of an error case as validation,
+    each listed invalid input as 0.5), computed : validation sites were step 1 15 : 9.5, step 2 31 : 24.5,
+    step 3 21 : 7, step 4 28 : 16, step 5 26 : 12, step 6 17 : 4, general 10 : 4.
+- Change:
+  - Texts: "not finite" is removed from the step 1 and step 5 prompts and function headers and from every
+    copy (steps/, solution/, solution.py, second_solution.py, the step 1 and step 5 mutants and the
+    whole-task mutant); the error messages of the code no longer mention finiteness. The solutions still
+    reject non-finite input internally. No domain, tolerance, signature or other requirement changed; the
+    function headers still match the scaffolds, the per-step solutions, solution.py and the mutants, and
+    problem_io matches the step 6 header.
+  - Validation tests: every non-finite entry is removed and each stated error rule is tested once at its
+    limit: step 1 n_max = 17, n_max = 2.5, t = -1e-3 and t = 1.000001e6 (both inside arrays, for the
+    "any t" rule); step 2 R, ZA, ZB, zetaA and zetaB equal to 0 (one entry each); step 3 R, zetaA and
+    zetaB equal to 0; step 5 He2 2+ (fewer than five levels), ZB = 0.99 and massA = 10.05 u. The step 4
+    oracle starts from best = 1e300.
+  - Contract checks kept once per step, in one assert: step 1 case 3, steps 2-6 case 0, general case 0
+    (the type assert on the fci_energy output in general case 0 is dropped; the values are still used).
+    Step 1 case 3 now also checks a one-row (1, 3) batch, shape (1, 3, 17) with the inclusive end
+    t = 1e6 among its values, and a Python float, shape (3,).
+  - New computed cases with independent targets (rows "since version 17" in the target table):
+    - step 1 case 5 (independent_recomputation, special_case): F_0..F_16 at t = 0.5, 8, 60 from the
+      defining integral by mpmath tanh-sinh quadrature at 30 digits; at t = 1000, 4.2e4 and 1e6 from the
+      large-t closed form (2n - 1)!! sqrt(pi) / (2^(n+1) t^(n+1/2)), exact to Q(n + 1/2, t) < 1e-380.
+    - step 1 case 6 (independent_recomputation, analytic identity): the Taylor series at t = 1e-3, 0.02,
+      0.3 (40 digits), F_0 = sqrt(pi / t) erf(sqrt t) / 2 at t = 0.7, 5, 30, and the identity
+      (2n + 1) F_n - 2t F_(n+1) = exp(-t) between computed outputs at t = 1.5 and 6 (tolerance 2e-11
+      times the sum of the two term magnitudes).
+    - step 2 case 6 (special_case, exact relations): S[0, 0] = S[1, 1] from the zeta-independent norm
+      formula; at R = 100 bohr S[0, 1] = H[0, 1] = 0 and H[0, 0], H[1, 1] from one-centre closed forms
+      and the shell theorem; lengths divided by 2 with charges doubled leave S unchanged and multiply H
+      by 4 (tolerance 2e-10 and 5e-10); the mirror exchange of the atoms (2e-10).
+    - step 3 case 5 (special_case, exact relations): (00|00) and (11|11) from the concentric closed
+      form at R = 1.7 bohr; the whole array at R = 100 bohr ((00|11) = S_AA S_BB / R, overlap densities
+      zero); lengths divided by 2 multiply every integral by 2 (tolerance 3e-10); mirror exchange
+      (2e-10).
+    - step 4 case 8 (special_case): separated atoms at R = 100 bohr for H2, HeH+, the ion pair
+      (1, 1, 1.24, 2.69) and (1.5, 1.5, 2.0, 1.24): E_fci = the lowest decoupled fragment arrangement,
+      E_rhf = the minimum of a convex quadratic in the weight of B, from one-centre closed forms.
+    - step 5 case 8 (independent_recomputation, exact relation): HeH+ with masses (2, 2) u against the
+      finite-difference target, and (1.5, 3) and (4, 4/3) u (the same reduced mass 1 u) against the
+      first within 0.02 cm^-1.
+  - Rule on relative errors: the only relative requirement (step 1, 1e-11) applies to F_n(t), which is
+    positive on the whole domain (smallest value F_16(1e6) = 2.6e-87, representable); no exactly zero
+    output exists, so nothing changed there.
+  - verification_explanation mentions the new routes; n_test_cases: step 1 7, step 2 7, step 3 6,
+    step 4 9, step 5 9, step 6 4 (unchanged), general 3 (unchanged).
+- Counts after the change (same conservative count), computed : validation: step 1 19 : 4, step 2
+  29 : 4.5, step 3 22 : 3.5, step 4 30 : 1, step 5 22 : 3.5, step 6 17 : 1, general 10 : 1.
+- Regression tests: the new cases fail the mutants they target: upward_recursion fails step 1 cases 5
+  and 6; zeta_not_squared step 2 case 6; wrong_boys_argument step 3 case 5; full_exchange,
+  orthonormal_atomic_basis and single_start_scf step 4 case 8 (lowest_product_eigenvalue passes it: at
+  R = 100 bohr the triplet is degenerate with the covalent singlet); total_mass and harmonic_levels step 5
+  case 8 (limit_at_finite_distance passes it: the He + H+ limit is neutral). The reference and the
+  second solution pass them with large margins (step 4 case 8 within 1.8e-15 hartree, step 5 case 8
+  within 6.1e-7 cm^-1 for the reference and 3.4e-8 cm^-1 for the second solution).
+- Rerun after all changes: tools/crown_check.py, all modes, every case alone in a fresh process, one
+  BLAS/OpenMP thread, -j 2.
+  - FORMAT OK (no non-finite literal left in tests/).
+  - REF: steps 1-6 pass 7/7, 7/7, 6/6, 9/9, 9/9 and 4/4; general 3/3.
+  - SECOND: all cases of steps 1-6 and general pass.
+  - Mutants: upward_recursion fails 5/7 (cases 0, 1, 3, 5, 6); zeta_not_squared 5/7 (0, 1, 3, 5, 6);
+    wrong_boys_argument 5/6 (0, 1, 2, 4, 5); full_exchange 9/9; orthonormal_atomic_basis 9/9;
+    single_start_scf 2/9 (5, 8); lowest_product_eigenvalue 1/9 (6); limit_at_finite_distance 2/9
+    (2, 3); total_mass 8/9 (0-6, 8); harmonic_levels 8/9 (0-6, 8); kinetic_without_angular_momentum
+    4/4; sigma_p_only 4/4; aufbau_scf 1/4 (2); whole_task_missing_hermite_sign 3/3 general cases.
+  - SHIFT ±1e-12: every step case passes, and every general case with every evaluated function shifted.
+  - All-None and all-zero controls pass 0 cases in every step and in general.

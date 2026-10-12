@@ -195,6 +195,7 @@ def _crown_case():
     flat = [paleoclimate_perturbation(float(v), hist_t, hist_d, kappa) for v in z.ravel()]
     # output contract: the shape of z (a one-element z included); a float for a scalar z
     assert (isinstance(got, np.ndarray) and got.shape == (2, 3) and isinstance(one, np.ndarray) and one.shape == (1,)
+            and np.issubdtype(got.dtype, np.floating) and np.issubdtype(one.dtype, np.floating)
             and all(type(v) is float for v in flat))
     # two computed outputs, each within 1e-6 K per K of the largest |dT| = 2.5 K
     assert np.max(np.abs(np.asarray(got.ravel(), float) - np.asarray(flat, float))) <= 5e-6

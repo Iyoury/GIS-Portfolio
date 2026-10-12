@@ -25,15 +25,17 @@ All data are synthetic and built inside each test case (no data file). Each case
 
 - Step 1: exact straight holes and constant-build arcs (R sin(MD/R) between stations), a constant-azimuth segment
   with inclination linear in MD (closed form without cancellation, also for doglegs of 8e-10 to 2e-6 rad on 20 km),
-  8-decimal three-dimensional values checked by adaptive quadrature of the arc tangent (5e-9 m), and eight random
-  surveys against scipy quad of the great-circle tangent computed in the case.
+  8-decimal three-dimensional values checked by adaptive quadrature of the arc tangent (5e-9 m), eight random
+  surveys against scipy quad of the great-circle tangent computed in the case, and the planar closed form for a
+  dogleg of 180 deg - 2e-6 rad (checked at 50 digits).
 - Step 2: hand-computed layer sums (harmonic, not arithmetic, effective conductivity), R = z/k1 and S = z^2/(2 k1)
   under a deep stack, six random columns against quad of 1/k and z/k.
 - Step 3: erfc forms with math.erfc (down to 0.05 m under a 2-year interval), a multistep history checked by Duhamel
   convolution (5e-9 K), linearity and decay.
-- Step 4: exact recovery on noise-free designs (n = 4 included), numpy.linalg.lstsq with the OLS covariance, a
-  P column with prescribed scaled singular values (3e-9 rejected, 3e-8 fitted), and a residual orthogonal to
-  [1, R, P] with rms exactly 1e-6 K (standard errors from a QR factorization of the design).
+- Step 4: exact recovery on noise-free designs (n = 4 included; P also in units of 1e-4), numpy.linalg.lstsq with
+  the OLS covariance, residuals orthogonal to [1, R, P] (rms exactly 1e-6 K, standard errors from a QR factorization;
+  rms 1e-3 K with P nearly proportional to R at scaled singular values 3e-8 and 1.05e-3, standard errors from the
+  Frisch-Waugh identity; checked against 80-digit mpmath least squares on the same inputs) and 3e-9 rejected.
 - Step 5: the erfc half-space (also a single-layer column), the Carslaw-Jaeger image series, 90-digit mpmath values (transfer-matrix transform,
   mpmath Talbot) for a five-layer Abitibi column and a contrasted column (five of them recomputed by forward transfer
   matrices at 40 digits: 5e-17 K), and six depths of a 50-layer column computed at 267-392 digits with fixed Talbot
@@ -172,3 +174,18 @@ short-glaciation regions (d ln g/d ln t_end about 2.05) the g limit binds first.
   the changed regions (step 6 case 6: 6000 times; step 7 cases 0, 4, 6: 241-341 times) find the extremum at t_end
   (largest excess 7.5e-12) and one interval. Rerun: crown_check in all modes on the final files (one thread,
   -j 4): ALL OK, FORMAT OK; every mutant still fails (step 4 sign mutant now also case 4); raw folder below 600 KiB.
+- Content-check emulation 2 (2026-10-12, last version; edit_label unchanged). Findings: (1) step 4: the reference
+  solved the normal equations (condition number squared) and missed its own limits near the resolvability threshold
+  (80-digit check: g off by 0.6 K at a scaled singular value s_min of 3e-8, 1.9e-3 K at 1e-6); the near-threshold
+  case checked only isfinite; absolute limits on g and q0 do not follow a rescaling of P or R. (2) Step 1 case 20
+  (dogleg 180 deg - 2e-6 rad) checked bounds only; an arccos dogleg errs by 1.8e-4 m there. (3) The output asserts
+  of steps 1, 2, 3, 5 did not check the stated float dtype. Change: fit_heat_flow by the thin SVD of the
+  column-scaled design (reference, solution.py, mutant copies); accuracy restated for terms up to 1e3 K:
+  rms_residual within 1e-9 K for every resolvable design; for s_min >= 1e-3 every fitted term within 1e-9 K (T0, q0
+  max|R|, g max|P|) and the standard errors within 1e-6 (rms >= 1e-6 K); step 4 case 5 rebuilt (s_min 3.0e-8 with
+  terms of 885 and 937 K: rms; 3.0e-9 rejected), new case 7 (s_min 1.05e-3, two coefficient sets), P in units of
+  1e-4 in case 0; step 1 case 20 against the closed form; dtype in the existing asserts. Regression: targets of
+  cases 5 and 7 within 6e-4 of each limit of the 80-digit solution (rms 4e-15 K), Frisch-Waugh standard errors
+  within 1.1e-12; reference worst error/limit 8.8e-3 (second solution 1.5e-3); normal equations fail cases 5 (rms
+  3.4e-7 K) and 7; arccos fails case 20, reference and second solution within 2.0e-9 m. Rerun: crown_check all modes
+  (one thread, -j 4): ALL OK, FORMAT OK.

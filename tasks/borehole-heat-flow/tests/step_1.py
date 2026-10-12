@@ -144,6 +144,7 @@ def _crown_case():
     ref = [[true_vertical_depth(md, inc, azi, float(v)) for v in row] for row in q]
     # output contract: an array query keeps its shape (a one-element array included), a scalar query gives a float
     assert (isinstance(out, np.ndarray) and out.shape == q.shape and isinstance(one, np.ndarray) and one.shape == (1,)
+            and np.issubdtype(out.dtype, np.floating) and np.issubdtype(one.dtype, np.floating)
             and all(type(v) is float for row in ref for v in row))
     # two computed outputs (array call against scalar calls): twice the 1e-6 m accuracy
     assert np.max(np.abs(np.asarray(out, float) - np.asarray(ref, float))) <= 2e-6
@@ -595,9 +596,13 @@ def _crown_case():
     inc, azi = [10.0, 170.0 - math.degrees(2e-6)], [0.0, 180.0]
     v = true_vertical_depth([0.0, 100.0], inc, azi, [40.0, 100.0])
     v = np.asarray(v, float)
-    # the path is almost a half circle (radius ~ 100/pi m): it turns back up, so the TVD at the
-    # end of the segment is smaller than at MD 40, and both stay within [0, MD]
-    assert np.all(v >= -1e-9) and np.all(v <= 100.0 + 1e-9) and v[1] < v[0]
+    # the path stays in the north-down plane; the angle of the tangent from vertical (positive toward north)
+    # decreases at the constant rate k = (pi - 2e-6) / 100 rad per m from theta0 = 10 deg (the short way round), so
+    # TVD(m) = (sin(theta0) - sin(theta0 - k m)) / k: 33.6324974019 m at MD 40 and 11.0548560664 m at MD 100
+    # (turning the long way round would give 25.99 m and -11.05 m)
+    th0, k = math.radians(10.0), (math.pi - 2e-6) / 100.0
+    for m, got in zip((40.0, 100.0), v):
+        assert abs(got - (math.sin(th0) - math.sin(th0 - k * m)) / k) <= 1e-6, (m, got)
 
 
 _crown_case()
