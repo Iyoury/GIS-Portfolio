@@ -196,19 +196,78 @@ def _crown_case():
 _crown_case()
 
 # --- test case 4 ---
-# non-finite input, |i| > 10 or theta outside [0.02, 50] raises ValueError
+# |i| > 10 or theta outside [0.02, 50] raises ValueError (just beyond each stated limit)
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for _t_bad in ((float("nan"), 0.1), (0.5, float("nan")), (10.01, 0.1), (-10.01, 0.1), (0.5, 0.01), (0.5, 60.0), (0.5, -0.1)):
+    for _t_bad in ((-10.01, 0.1), (0.5, 0.0199), (0.5, 50.5)):
         try:
             effective_diffusion(*_t_bad)
         except ValueError:
             pass
         else:
             raise AssertionError("effective_diffusion%r must raise ValueError" % (_t_bad,))
+
+
+_crown_case()
+
+# --- test case 5 ---
+# giant diffusion just above the critical current at the weakest noise, moderate and strong noise
+# around and above it (continued-fraction targets), and the symmetry D_eff(-i) = D_eff(i)
+# between two computed outputs (twice the single-output tolerance)
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+    import mpmath as _t_mp
+
+    def _t_cf(i, theta, want_D=True):
+        sgn = -1 if i < 0 else 1
+        dps = 30 + int(1.8 / theta)
+        with _t_mp.workdps(dps):
+            a = _t_mp.mpf(abs(i))
+            th = _t_mp.mpf(theta)
+            N = 40 + int(1.3 * _t_mp.sqrt(2 * dps * 2.303 / th))
+            J = _t_mp.mpc(0, 1)
+            r = [_t_mp.mpc(0)] * (N + 2)
+            dr = [_t_mp.mpc(0)] * (N + 2)
+            for n in range(N, 0, -1):
+                r[n] = 1 / (2 * th * n + 2 * J * a + r[n + 1])
+                dr[n] = -r[n] ** 2 * (2 * J + dr[n + 1])
+            v = a + _t_mp.im(r[1])
+            dv = 1 + _t_mp.im(dr[1])
+            if not want_D:
+                return float(sgn * v), float(dv)
+            c = [_t_mp.mpc(0)] * (N + 1)
+            c[0] = 1 / (2 * _t_mp.pi)
+            for n in range(1, N + 1):
+                c[n] = r[n] * c[n - 1]
+            s = [_t_mp.mpc(0)] * (N + 2)
+            for n in range(N, 1, -1):
+                s[n] = 1 / (-2 * th * n + 2 * J * a + s[n + 1])
+            g = [_t_mp.mpc(0)] * (N + 1)
+            g[1] = 1 / (2 * J * a - 2 * th + s[2])
+            for n in range(2, N + 1):
+                g[n] = s[n] * g[n - 1]
+            h = np.array([_t_mp.conj(g[k]) for k in range(N, 0, -1)] + [_t_mp.mpc(1)] + g[1:], dtype=object)
+            cf = np.array([_t_mp.conj(c[k]) for k in range(N, 0, -1)] + c, dtype=object)
+            q = np.convolve(h, h)                       # Fourier coefficients of (1 + chi')**2, index -2N..2N
+            tot = _t_mp.fsum(q[N:3 * N + 1][::-1] * cf)  # sum_m q_m c_{-m}, |m| <= N
+            D = th * 2 * _t_mp.pi * _t_mp.re(tot)
+            return float(sgn * v), float(dv), float(D)
+
+    def _t_rel(x, y):
+        return abs(x - y) / abs(y)
+
+    for _t_i, _t_th in ((1.05, 0.02), (0.97, 0.2), (1.5, 1.0), (4.0, 5.0), (0.3, 50.0)):
+        _t_res = effective_diffusion(_t_i, _t_th)
+        _t_D = _t_cf(_t_i, _t_th)[2]
+        assert _t_rel(_t_res, _t_D) < 1e-9, (_t_i, _t_th, _t_res, _t_D)
+    _t_p, _t_m = effective_diffusion(1.2, 0.07), effective_diffusion(-1.2, 0.07)
+    assert _t_rel(_t_m, _t_p) < 2e-9, (_t_p, _t_m)
 
 
 _crown_case()

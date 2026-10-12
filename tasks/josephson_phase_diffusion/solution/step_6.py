@@ -64,7 +64,7 @@ def rcsj_voltage(i, theta, beta_c):
         r_d: differential resistance dv/di (units of R), relative error below 1e-5.
 
     Raises:
-      ValueError if an input is not finite, if |i| > 2.5, if theta is outside [0.1, 2], or
+      ValueError if |i| > 2.5, if theta is outside [0.1, 2], or
       if beta_c is neither 0 nor in [0.1, 2].
     '''
     i = float(i)

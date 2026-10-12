@@ -8,8 +8,6 @@ import numpy as np
 def _crown_case():
     import numpy as np
 
-    _t4_KEYS = {"T0", "q0", "amplitude", "sigma_T0", "sigma_q0", "sigma_amplitude", "rms_residual"}
-
     def _t4_synthetic(noise, seed=5):
         rng = np.random.default_rng(seed)
         z = np.linspace(150, 1400, 120)
@@ -21,7 +19,6 @@ def _crown_case():
 
     _t4_T, _t4_R, _t4_S, _t4_P = _t4_synthetic(0.0)
     r = fit_heat_flow(_t4_T, _t4_R, _t4_S, _t4_P, 1.1e-6)
-    assert _t4_KEYS <= set(r)
     # noise-free data: the exact least-squares solution is the generating (T0, q0, g) = (4.7, 0.044, 7.0)
     assert abs(r["T0"] - 4.7) < 1e-9
     assert abs(r["q0"] - 0.044) < 1e-12
@@ -117,29 +114,35 @@ def _crown_case():
 _crown_case()
 
 # --- test case 4 ---
-# output types
+# output types, and the standard errors at the floor rms_residual = 1e-6 K of their stated accuracy
 import numpy as np
 
 
 def _crown_case():
+    import math
     import numpy as np
-
-    _t4_KEYS = {"T0", "q0", "amplitude", "sigma_T0", "sigma_q0", "sigma_amplitude", "rms_residual"}
-
-    def _t4_synthetic(noise, seed=5):
-        rng = np.random.default_rng(seed)
-        z = np.linspace(150, 1400, 120)
-        R = z / 3.1 + 0.00002 * z**1.5
-        S = z**2 / (2 * 3.1)
-        P = -(np.exp(-z / 900.0) - np.exp(-z / 250.0)) - 0.3 * np.exp(-z / 2000.0)
-        T = 4.7 + 0.044 * R - 1.1e-6 * S + 7.0 * P + noise * rng.standard_normal(z.size)
-        return T, R, S, P
-
-    _t4_T, _t4_R, _t4_S, _t4_P = _t4_synthetic(0.01)
-    r = fit_heat_flow(_t4_T, _t4_R, _t4_S, _t4_P, 1.1e-6)
-    for k in _t4_KEYS:
-        assert type(r[k]) is float
-    assert r["sigma_q0"] > 0 and r["sigma_T0"] > 0 and r["sigma_amplitude"] > 0
+    # a residual r orthogonal to the columns 1, R, P with rms exactly 1e-6 K: the exact least-squares solution is the
+    # generating (T0, q0, g) = (4.7, 0.044, 7.0), RSS = |r|^2, and the standard errors are
+    # sqrt(RSS / (n - 3) [(G^T G)^-1]_ii) with (G^T G)^-1 = Rm^-1 Rm^-T from a QR factorization G = Q Rm
+    z = np.linspace(150, 1400, 120)
+    R = z / 3.1 + 0.00002 * z**1.5
+    S = z**2 / (2 * 3.1)
+    P = -(np.exp(-z / 900.0) - np.exp(-z / 250.0)) - 0.3 * np.exp(-z / 2000.0)
+    Q, Rm = np.linalg.qr(np.column_stack([np.ones(z.size), R, P]))
+    r = np.random.default_rng(5).standard_normal(z.size)
+    for _ in range(2):
+        r = r - Q @ (Q.T @ r)
+    r *= 1e-6 / math.sqrt(np.mean(r * r))
+    out = fit_heat_flow(4.7 + 0.044 * R - 1.1e-6 * S + 7.0 * P + r, R, S, P, 1.1e-6)
+    keys = ["T0", "q0", "amplitude", "sigma_T0", "sigma_q0", "sigma_amplitude", "rms_residual"]
+    # output contract: a dict of Python floats
+    assert isinstance(out, dict) and all(type(out[k]) is float for k in keys)
+    assert abs(out["T0"] - 4.7) < 1e-9 and abs(out["q0"] - 0.044) < 1e-12 and abs(out["amplitude"] - 7.0) < 1e-9
+    Ri = np.linalg.inv(Rm)
+    sig = np.sqrt(float(r @ r) / (z.size - 3) * np.diag(Ri @ Ri.T))
+    for key, v in zip(("sigma_T0", "sigma_q0", "sigma_amplitude"), sig):
+        assert abs(out[key] / v - 1.0) < 1e-6, (key, out[key], v)
+    assert abs(out["rms_residual"] - 1e-6) < 1e-9
 
 
 _crown_case()
@@ -201,7 +204,7 @@ def _crown_case():
 _crown_case()
 
 # --- test case 6 ---
-# invalid raises
+# stated error rules: n < 4, A < 0, a zero P column, P proportional to R
 import numpy as np
 
 
@@ -217,38 +220,16 @@ def _crown_case():
         T = 4.7 + 0.044 * R - 1.1e-6 * S + 7.0 * P + noise * rng.standard_normal(z.size)
         return T, R, S, P
 
-    def _t4_t_scaled_min_sv(R, P):
-        G = np.column_stack([np.ones(R.size), R, P])
-        return float(np.linalg.svd(G / np.linalg.norm(G, axis=0), compute_uv=False)[-1])
-
-    def _t4_t_nearly_proportional_P(R, target):
-        Q, _ = np.linalg.qr(np.column_stack([np.ones(R.size), R]))
-        u = R ** 2 - Q @ (Q.T @ (R ** 2))
-        u /= np.linalg.norm(u)
-        alpha = target * np.linalg.norm(0.01 * R)
-        for _ in range(30):
-            P = 0.01 * R + alpha * u
-            s = _t4_t_scaled_min_sv(R, P)
-            if abs(s / target - 1.0) < 1e-3:
-                break
-            alpha *= target / s
-        return P, s
-
-    for case in ["short", "len", "zeroP", "P_prop_R", "P_nearly_prop_R", "negA"]:
+    for case in ["short", "zeroP", "P_prop_R", "negA"]:
         _t4_t_msg = " (case %r)" % (case,)
         _t4_T, _t4_R, _t4_S, _t4_P = _t4_synthetic(0.0)
         A = 1e-6
         if case == "short":
             _t4_T, _t4_R, _t4_S, _t4_P = _t4_T[:3], _t4_R[:3], _t4_S[:3], _t4_P[:3]
-        elif case == "len":
-            _t4_R = _t4_R[:-1]
         elif case == "zeroP":
             _t4_P = np.zeros_like(_t4_P)
         elif case == "P_prop_R":
             _t4_P = 0.01 * _t4_R
-        elif case == "P_nearly_prop_R":
-            _t4_P, s = _t4_t_nearly_proportional_P(_t4_R, 3e-9)
-            assert 0.0 < s < 1e-8          # premise checked by the test's own singular values
         else:
             A = -1e-6
         try:

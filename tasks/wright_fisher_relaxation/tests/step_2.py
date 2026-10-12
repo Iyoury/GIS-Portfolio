@@ -91,7 +91,7 @@ def _crown_case():
 
     def _t_check(out, target, tol=1e-8):
         # values only (the return type is checked in case 1)
-        assert len(out) == 4 and all(_t_rel(a, b) < tol for a, b in zip(out, target)), (out, target)
+        assert all(_t_rel(out[k], target[k]) < tol for k in range(4)), (out, target)
 
     for N, s, s2 in ((400, 0.5, -1.0 / 3.0), (400, 0.25, -0.2), (250, -0.1, 1.0 / 9.0)):
         for i0 in (1, N // 3, N - 1):
@@ -116,14 +116,14 @@ def _crown_case():
 _crown_case()
 
 # --- test case 3 ---
-# N not an integer in [2, 400], i0 not an integer in [1, N - 1] (i0 = 0 and i0 = N are absorbing), or s out of
-# range
+# each stated error rule once, just outside the domain: N = 1 (no transient state), N a float (even
+# integer-valued), i0 a bool, i0 = N (an absorbing state), s above 0.5
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for _t_bad in ((1, 0.1, 1), (401, 0.1, 1), (10.0, 0.1, 1), (10, 0.1, True), (10, 0.1, 0), (10, 0.1, 10), (10, 0.7, 3)):
+    for _t_bad in ((1, 0.1, 1), (10.0, 0.1, 1), (10, 0.1, True), (10, 0.1, 10), (10, 0.51, 3)):
         try:
             fixation_statistics(*_t_bad)
         except ValueError:
@@ -150,7 +150,7 @@ def _crown_case():
         t = (2.0 + _t_s) ** 2 / (1.0 + w)
         target = (w / (1.0 + w), 1.0 / (1.0 + w), t, t)
         out = fixation_statistics(2, _t_s, 1)
-        assert len(out) == 4 and all(abs(a - b) < 1e-8 * b for a, b in zip(out, target)), (_t_s, out, target)
+        assert all(abs(out[k] - target[k]) < 1e-8 * target[k] for k in range(4)), (_t_s, out, target)
 
 
 _crown_case()
@@ -200,7 +200,7 @@ def _crown_case():
             k = i0 - 1
             target = [float(x) for x in (hf[k], hl[k], gf[k] / hf[k], gl[k] / hl[k])]
             out = fixation_statistics(N, s, i0)
-            assert len(out) == 4 and all(abs(a - b) < 1e-8 * b for a, b in zip(out, target)), (N, s, i0, out, target)
+            assert all(abs(out[k] - target[k]) < 1e-8 * target[k] for k in range(4)), (N, s, i0, out, target)
 
 
 _crown_case()
@@ -239,6 +239,30 @@ def _crown_case():
             g = np.concatenate(([0.0], h_in * t_in, [0.0]))
             assert np.all(np.abs(h_in - P @ h) <= 2.1e-8 * h_in), (N, s, ends)
             assert np.all(np.abs(g[1:N] - (h_in + P @ g)) <= 4.2e-8 * g[1:N]), (N, s, ends)
+
+
+_crown_case()
+
+# --- test case 7 ---
+# neutral drift at the largest population, N = 400: the number of copies is then a martingale and the chain is
+# absorbed with probability 1, so p_fix = i0 / N and p_loss = (N - i0) / N exactly (for i0 = 399 the loss
+# probability 1/400 is the small one); exchanging the two alleles maps i0 copies of A to N - i0 copies, so
+# t_fix(i0) = t_loss(N - i0) exactly (two computed outputs, each within 1e-8: 2.1e-8), and with i0 = N / 2 the two
+# conditional times are equal
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+
+    def _t_rel(a, b):
+        return abs(a - b) / abs(b)
+
+    N = 400
+    out = {i0: fixation_statistics(N, 0.0, i0) for i0 in (1, 2, 137, 200, 263, 398, 399)}
+    for i0, o in out.items():
+        assert _t_rel(o[0], i0 / N) < 1e-8 and _t_rel(o[1], (N - i0) / N) < 1e-8, (i0, o)
+        assert _t_rel(o[2], out[N - i0][3]) < 2.1e-8, (i0, o, out[N - i0])
 
 
 _crown_case()

@@ -40,8 +40,7 @@ def mean_voltage(i, theta):
         v = 0 within an absolute 1e-12.
 
     Raises:
-      ValueError if i or theta is not finite, if |i| > 10 or if theta is outside
-      [0.02, 50].
+      ValueError if |i| > 10 or if theta is outside [0.02, 50].
     '''
     i = float(i)
     theta = float(theta)
@@ -101,8 +100,7 @@ def effective_diffusion(i, theta):
          (tau = 2 e I_c R t / hbar). Relative error below 1e-9.
 
     Raises:
-      ValueError if i or theta is not finite, if |i| > 10 or if theta is outside
-      [0.02, 50].
+      ValueError if |i| > 10 or if theta is outside [0.02, 50].
     '''
     i = float(i)
     theta = float(theta)
@@ -174,7 +172,7 @@ def diffusion_peak(theta):
                 1e-9).
 
     Raises:
-      ValueError if theta is not finite or is outside [0.02, 1].
+      ValueError if theta is outside [0.02, 1].
     '''
     theta = float(theta)
     if not (np.isfinite(theta) and 0.02 <= theta <= 1.0):
@@ -270,7 +268,7 @@ def noise_temperature(i, v):
                below 1e-6. Over the domain kappa ranges from about 0.01 to about 2e7.
 
     Raises:
-      ValueError if i or v is not finite, if i is not in (0, 10], if v is not strictly
+      ValueError if i is not in (0, 10], if v is not strictly
       between sqrt(max(i**2 - 1, 0)) and i, or if v < v_lo * (1 - 1e-11) or
       v > v_hi * (1 + 1e-11), with the endpoint voltages v_lo = mean_voltage(i, 0.02)[0] and
       v_hi = mean_voltage(i, 50)[0] of step 1. A v in [v_lo * (1 - 1e-11), v_lo] returns
@@ -314,9 +312,9 @@ def array_criterion(ics, rs, theta0, v_crit):
     '''Criterion current, differential resistance and voltage noise of a series junction array.
 
     Inputs:
-      ics: 1-D array of critical currents c_k in units of I_0, finite, > 0,
+      ics: 1-D array of critical currents c_k in units of I_0, > 0,
            max(ics) / min(ics) <= 5.
-      rs: 1-D array of the same length, normal resistances r_k in units of R_0, finite, > 0.
+      rs: 1-D array of the same length, normal resistances r_k in units of R_0, > 0.
       theta0: float, k_B T / E_J0 with E_J0 = hbar I_0 / (2 e); every theta0 / c_k must
               lie in [0.02, 50].
       v_crit: float, voltage criterion in units of I_0 R_0,
@@ -335,9 +333,8 @@ def array_criterion(ics, rs, theta0, v_crit):
 
     Raises:
       ValueError if ics and rs are not 1-D arrays of the same nonzero length, if an entry
-      is not finite and positive, if max(ics) / min(ics) > 5, if theta0 is not finite and
-      positive or a ratio theta0 / c_k is outside [0.02, 50], or if v_crit is not in
-      (0, 0.5 * sum(c_k * r_k)].
+      is not positive, if max(ics) / min(ics) > 5, if a ratio theta0 / c_k is
+      outside [0.02, 50], or if v_crit is not in (0, 0.5 * sum(c_k * r_k)].
     '''
     c = np.asarray(ics, dtype=float)
     r = np.asarray(rs, dtype=float)
@@ -435,7 +432,7 @@ def rcsj_voltage(i, theta, beta_c):
         r_d: differential resistance dv/di (units of R), relative error below 1e-5.
 
     Raises:
-      ValueError if an input is not finite, if |i| > 2.5, if theta is outside [0.1, 2], or
+      ValueError if |i| > 2.5, if theta is outside [0.1, 2], or
       if beta_c is neither 0 nor in [0.1, 2].
     '''
     i = float(i)

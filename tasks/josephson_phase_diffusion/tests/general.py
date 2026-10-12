@@ -103,7 +103,6 @@ def _crown_case():
 
     def _t_check_rcsj(i, theta, beta_c):
         out = rcsj_voltage(i, theta, beta_c)
-        assert isinstance(out, tuple) and len(out) == 2 and all(type(x) is float for x in out), out
         v, dv = _t_kramers(i, theta, beta_c)
         assert abs(out[0] - v) <= 1e-7 * abs(v) + 1e-12, (i, theta, beta_c, out, v)
         assert abs(out[1] / dv - 1.0) < 1e-5, (i, theta, beta_c, out, dv)
@@ -113,7 +112,6 @@ def _crown_case():
     _t_check_rcsj(1.6, 1.0, 0.5)
     _t_o = rcsj_voltage(-0.6, 0.4, 0.0)
     _t_m = mean_voltage(-0.6, 0.4)
-    assert isinstance(_t_o, tuple) and len(_t_o) == 2 and all(type(x) is float for x in _t_o), _t_o
     assert _t_m[0] < -1e-3 and abs(_t_o[0] - _t_m[0]) <= 2e-7 * abs(_t_m[0]) + 2e-12, (_t_o, _t_m)
     assert abs(_t_o[1] / _t_m[1] - 1.0) < 2e-5, (_t_o, _t_m)
 

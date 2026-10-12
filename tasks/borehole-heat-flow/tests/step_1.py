@@ -121,10 +121,10 @@ def _crown_case():
     import math
     import numpy as np
     got = true_vertical_depth([0, 100], [30, 30], [10, 10], 0.0)
-    assert type(got) is float and abs(got) < 1e-6
-    # a scalar query inside the straight segment: a float equal to MD cos(30 deg)
+    assert abs(got) < 1e-6
+    # a scalar query inside the straight segment: MD cos(30 deg)
     got = true_vertical_depth([0, 100], [30, 30], [10, 10], 64.0)
-    assert type(got) is float and abs(got - 64.0 * math.cos(math.radians(30.0))) < 1e-6
+    assert abs(got - 64.0 * math.cos(math.radians(30.0))) < 1e-6
 
 
 _crown_case()
@@ -140,13 +140,17 @@ def _crown_case():
     q = np.array([[10.0, 20.0], [30.0, 40.0]])
     md, inc, azi = [0, 100], [10, 12], [0, 0]
     out = true_vertical_depth(md, inc, azi, q)
-    assert isinstance(out, np.ndarray) and out.shape == q.shape, (type(out), np.shape(out))
-    ref = np.array([[true_vertical_depth(md, inc, azi, float(v)) for v in row] for row in q])
+    one = true_vertical_depth(md, inc, azi, np.array([75.0]))
+    ref = [[true_vertical_depth(md, inc, azi, float(v)) for v in row] for row in q]
+    # output contract: an array query keeps its shape (a one-element array included), a scalar query gives a float
+    assert (isinstance(out, np.ndarray) and out.shape == q.shape and isinstance(one, np.ndarray) and one.shape == (1,)
+            and all(type(v) is float for row in ref for v in row))
     # two computed outputs (array call against scalar calls): twice the 1e-6 m accuracy
     assert np.max(np.abs(np.asarray(out, float) - np.asarray(ref, float))) <= 2e-6
     # constant azimuth, inclination linear in MD: TVD = (sin(I(m)) - sin(I1)) / k
     k = math.radians(2.0) / 100.0
     assert np.max(np.abs(np.asarray(out, float) - np.asarray((np.sin(math.radians(10.0) + k * q) - math.sin(math.radians(10.0))) / k, float))) <= 1e-6
+    assert abs(float(one[0]) - (math.sin(math.radians(10.0) + k * 75.0) - math.sin(math.radians(10.0))) / k) <= 1e-6
 
 
 _crown_case()
@@ -272,7 +276,6 @@ def _crown_case():
     azi = np.cumsum(rng.normal(0.0, 40.0, 8)) % 360.0
     q = np.sort(rng.uniform(0.0, md[-1], 6))
     got = true_vertical_depth(md, inc, azi, q)
-    assert isinstance(got, np.ndarray) and got.shape == q.shape
     ref = np.array([_t1_quad_tvd(md, inc, azi, m) for m in q])
     assert np.max(np.abs(np.asarray(got, float) - np.asarray(ref, float))) <= 1e-6
 
@@ -316,7 +319,6 @@ def _crown_case():
     azi = np.cumsum(rng.normal(0.0, 40.0, 8)) % 360.0
     q = np.sort(rng.uniform(0.0, md[-1], 6))
     got = true_vertical_depth(md, inc, azi, q)
-    assert isinstance(got, np.ndarray) and got.shape == q.shape
     ref = np.array([_t1_quad_tvd(md, inc, azi, m) for m in q])
     assert np.max(np.abs(np.asarray(got, float) - np.asarray(ref, float))) <= 1e-6
 
@@ -360,7 +362,6 @@ def _crown_case():
     azi = np.cumsum(rng.normal(0.0, 40.0, 8)) % 360.0
     q = np.sort(rng.uniform(0.0, md[-1], 6))
     got = true_vertical_depth(md, inc, azi, q)
-    assert isinstance(got, np.ndarray) and got.shape == q.shape
     ref = np.array([_t1_quad_tvd(md, inc, azi, m) for m in q])
     assert np.max(np.abs(np.asarray(got, float) - np.asarray(ref, float))) <= 1e-6
 
@@ -404,7 +405,6 @@ def _crown_case():
     azi = np.cumsum(rng.normal(0.0, 40.0, 8)) % 360.0
     q = np.sort(rng.uniform(0.0, md[-1], 6))
     got = true_vertical_depth(md, inc, azi, q)
-    assert isinstance(got, np.ndarray) and got.shape == q.shape
     ref = np.array([_t1_quad_tvd(md, inc, azi, m) for m in q])
     assert np.max(np.abs(np.asarray(got, float) - np.asarray(ref, float))) <= 1e-6
 
@@ -448,7 +448,6 @@ def _crown_case():
     azi = np.cumsum(rng.normal(0.0, 40.0, 8)) % 360.0
     q = np.sort(rng.uniform(0.0, md[-1], 6))
     got = true_vertical_depth(md, inc, azi, q)
-    assert isinstance(got, np.ndarray) and got.shape == q.shape
     ref = np.array([_t1_quad_tvd(md, inc, azi, m) for m in q])
     assert np.max(np.abs(np.asarray(got, float) - np.asarray(ref, float))) <= 1e-6
 
@@ -492,7 +491,6 @@ def _crown_case():
     azi = np.cumsum(rng.normal(0.0, 40.0, 8)) % 360.0
     q = np.sort(rng.uniform(0.0, md[-1], 6))
     got = true_vertical_depth(md, inc, azi, q)
-    assert isinstance(got, np.ndarray) and got.shape == q.shape
     ref = np.array([_t1_quad_tvd(md, inc, azi, m) for m in q])
     assert np.max(np.abs(np.asarray(got, float) - np.asarray(ref, float))) <= 1e-6
 
@@ -536,7 +534,6 @@ def _crown_case():
     azi = np.cumsum(rng.normal(0.0, 40.0, 8)) % 360.0
     q = np.sort(rng.uniform(0.0, md[-1], 6))
     got = true_vertical_depth(md, inc, azi, q)
-    assert isinstance(got, np.ndarray) and got.shape == q.shape
     ref = np.array([_t1_quad_tvd(md, inc, azi, m) for m in q])
     assert np.max(np.abs(np.asarray(got, float) - np.asarray(ref, float))) <= 1e-6
 
@@ -580,7 +577,6 @@ def _crown_case():
     azi = np.cumsum(rng.normal(0.0, 40.0, 8)) % 360.0
     q = np.sort(rng.uniform(0.0, md[-1], 6))
     got = true_vertical_depth(md, inc, azi, q)
-    assert isinstance(got, np.ndarray) and got.shape == q.shape
     ref = np.array([_t1_quad_tvd(md, inc, azi, m) for m in q])
     assert np.max(np.abs(np.asarray(got, float) - np.asarray(ref, float))) <= 1e-6
 
@@ -607,36 +603,22 @@ def _crown_case():
 _crown_case()
 
 # --- test case 21 ---
-# invalid raises
+# stated error rules raise ValueError
 import numpy as np
 
 
 def _crown_case():
     import math
     import numpy as np
-    for case in ["beyond", "negative", "start", "order", "lengths", "one_station", "two_d", "inc_neg", "inc_180", "dogleg_180", "dogleg_near_180"]:
+    # the two stated error rules: a query depth outside the survey (below and above it), and a dogleg within
+    # 1e-6 rad of 180 degrees (the arc between opposite directions is not defined)
+    for case in ["beyond", "negative", "dogleg_near_180"]:
         _t_msg = " (case %r)" % (case,)
         md, inc, azi, q = [0.0, 100.0, 200.0], [10.0, 12.0, 14.0], [0.0, 0.0, 0.0], 50.0
         if case == "beyond":
             q = 250.0
         elif case == "negative":
             q = -1.0
-        elif case == "start":
-            md = [5.0, 100.0, 200.0]
-        elif case == "order":
-            md = [0.0, 200.0, 100.0]
-        elif case == "lengths":
-            inc = [10.0, 12.0]
-        elif case == "one_station":
-            md, inc, azi, q = [0.0], [10.0], [0.0], 0.0
-        elif case == "two_d":
-            md, inc, azi = [[0.0, 100.0, 200.0]], [[10.0, 12.0, 14.0]], [[0.0, 0.0, 0.0]]
-        elif case == "inc_neg":
-            inc = [-5.0, 12.0, 14.0]
-        elif case == "inc_180":
-            inc = [10.0, 180.0, 14.0]
-        elif case == "dogleg_180":
-            inc, azi = [10.0, 170.0, 20.0], [0.0, 180.0, 0.0]
         else:
             # opposite azimuths: dogleg = I1 + I2 = 180 deg - 5e-7 rad, inside the 1e-6 rad band
             inc, azi = [10.0, 170.0 - math.degrees(5e-7), 20.0], [0.0, 180.0, 0.0]

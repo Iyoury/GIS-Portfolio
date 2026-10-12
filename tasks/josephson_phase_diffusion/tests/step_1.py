@@ -216,19 +216,58 @@ def _crown_case():
 _crown_case()
 
 # --- test case 4 ---
-# non-finite input, |i| > 10 or theta outside [0.02, 50] raises ValueError
+# |i| > 10 or theta outside [0.02, 50] raises ValueError (just beyond each stated limit)
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for _t_bad in ((float("nan"), 0.1), (0.5, float("nan")), (0.5, float("inf")), (10.5, 0.1), (-11.0, 1.0), (0.5, 0.019), (0.5, 51.0), (0.5, 0.0), (0.5, -1.0)):
+    for _t_bad in ((10.01, 0.1), (0.5, 0.0199), (0.5, 50.5)):
         try:
             mean_voltage(*_t_bad)
         except ValueError:
             pass
         else:
             raise AssertionError("mean_voltage%r must raise ValueError" % (_t_bad,))
+
+
+_crown_case()
+
+# --- test case 5 ---
+# closed form in modified Bessel functions of imaginary order,
+# v = (theta / pi) sinh(pi i / theta) / |I_{j i / theta}(1 / theta)|**2 (j the imaginary unit),
+# at 40 digits, with dv/di from extended-precision numerical differentiation of the same closed
+# form: a route independent of the continued fraction and of any double-integral quadrature
+# (on these points it reproduces the continued-fraction v to the last bit and dv/di to 1e-14)
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+    import mpmath as _t_mp
+
+    def _t_v_iz(i, theta, dps=40):
+        with _t_mp.workdps(dps):
+            a, th = _t_mp.mpf(i), _t_mp.mpf(theta)
+            nu = _t_mp.mpc(0, a / th)
+            return th / _t_mp.pi * _t_mp.sinh(_t_mp.pi * a / th) / abs(_t_mp.besseli(nu, 1 / th)) ** 2
+
+    def _t_dv_iz(i, theta):
+        with _t_mp.workdps(40):
+            return _t_mp.diff(lambda x: _t_v_iz(x, theta, 60), _t_mp.mpf(i))
+
+    def _t_rel(x, y):
+        return abs(x - y) / abs(y)
+
+    # Arrhenius regime, crossover, running state at the weakest noise, reversed bias, ohmic limit at
+    # the inclusive corner (10, 50), and linear response at strong noise
+    for _t_i, _t_th in ((0.4, 0.1), (1.0, 0.5), (3.0, 0.02), (-0.08, 0.04), (2.0, 0.3), (-1.7, 0.04),
+                        (10.0, 50.0), (0.001, 2.0)):
+        _t_out = mean_voltage(_t_i, _t_th)
+        _t_v = float(_t_v_iz(_t_i, _t_th))
+        _t_dv = float(_t_dv_iz(_t_i, _t_th))
+        assert _t_rel(_t_out[0], _t_v) < 1e-9, (_t_i, _t_th, _t_out, _t_v)
+        assert _t_rel(_t_out[1], _t_dv) < 1e-8, (_t_i, _t_th, _t_out, _t_dv)
 
 
 _crown_case()

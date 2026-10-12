@@ -24,7 +24,7 @@ def noise_temperature(i, v):
                below 1e-6. Over the domain kappa ranges from about 0.01 to about 2e7.
 
     Raises:
-      ValueError if i or v is not finite, if i is not in (0, 10], if v is not strictly
+      ValueError if i is not in (0, 10], if v is not strictly
       between sqrt(max(i**2 - 1, 0)) and i, or if v < v_lo * (1 - 1e-11) or
       v > v_hi * (1 + 1e-11), with the endpoint voltages v_lo = mean_voltage(i, 0.02)[0] and
       v_hi = mean_voltage(i, 50)[0] of step 1. A v in [v_lo * (1 - 1e-11), v_lo] returns

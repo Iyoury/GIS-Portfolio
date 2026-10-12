@@ -40,8 +40,7 @@ def mean_voltage(i, theta):
         v = 0 within an absolute 1e-12.
 
     Raises:
-      ValueError if i or theta is not finite, if |i| > 10 or if theta is outside
-      [0.02, 50].
+      ValueError if |i| > 10 or if theta is outside [0.02, 50].
     '''
     i = float(i)
     theta = float(theta)

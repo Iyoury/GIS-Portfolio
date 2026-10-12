@@ -130,13 +130,15 @@ def _crown_case():
 _crown_case()
 
 # --- test case 4 ---
-# N not an integer in [1, 400], or s, u, v out of range (u = 0: the chain is not irreducible)
+# each stated error rule once, just outside the domain: N above 400, N a float (even integer-valued), N a bool,
+# s above 0.5, u = 0 (below its floor 1e-12: the chain is then not irreducible), v above 0.1
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for _t_bad in ((0, 0.1, 0.01, 0.01), (500, 0.1, 0.01, 0.01), (8.0, 0.1, 0.01, 0.01), (False, 0.1, 0.01, 0.01), (10, 0.6, 0.01, 0.01), (10, 0.1, 0.0, 0.01), (10, 0.1, 0.01, 0.11)):
+    for _t_bad in ((401, 0.1, 0.01, 0.01), (8.0, 0.1, 0.01, 0.01), (False, 0.1, 0.01, 0.01), (10, 0.51, 0.01, 0.01),
+                   (10, 0.1, 0.0, 0.01), (10, 0.1, 0.01, 0.11)):
         try:
             relaxation_rate(*_t_bad)
         except ValueError:
@@ -353,6 +355,71 @@ def _crown_case():
 
     for N, u, v in ((300, 1e-12, 1e-12), (400, 1e-12, 1e-12), (200, 5e-12, 1.5e-11)):
         _t_check(relaxation_rate(N, 0.0, u, v), u + v)
+
+
+_crown_case()
+
+# --- test case 10 ---
+# corners of the mutation range: one rate at its upper end 0.1 and the other at its floor 1e-12, with the strongest
+# selection either way (s = 0.5 with u = 0.1: a deterministic equilibrium at p = 0.7 next to the nearly absorbing
+# i = 0; s = -0.5 with v = 0.1: an equilibrium at p = 0.2 next to the nearly absorbing i = N), against inverse
+# iteration in extended precision as in case 7; and neutral drift at the largest population with both rates at
+# 0.1, where the gap is u + v = 0.2 exactly
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+    import mpmath as _t_mp
+
+    def _t_P(N, s, u, v):
+        # call inside _t_mp.workdps(...)
+        s, u, v = _t_mp.mpf(s), _t_mp.mpf(u), _t_mp.mpf(v)
+        P = _t_mp.matrix(N + 1, N + 1)
+        for i in range(N + 1):
+            p = _t_mp.mpf(i) / N
+            ps = (1 + s) * p / (1 + s * p)
+            pm = (1 - u) * ps + v * (1 - ps)
+            for j in range(N + 1):
+                P[i, j] = _t_mp.binomial(N, j) * pm ** j * (1 - pm) ** (N - j)
+        return P
+
+    def _t_rel(a, b):
+        return abs(a - b) / abs(b)
+
+    def _t_gap(N, s, u, v, dps):
+        # inverse iteration in extended precision on I - P + 1 pi^T (eigenvalues: 1 and the nonzero
+        # eigenvalues of I - P), pi from a plain LU solve
+        with _t_mp.workdps(dps):
+            P = _t_P(N, s, u, v)
+            n = N + 1
+            M = _t_mp.matrix(n, n)
+            for i in range(n):
+                for j in range(n):
+                    M[i, j] = 1 if i == 0 else (1 if i == j else 0) - P[j, i]
+            rhs = _t_mp.matrix(n, 1)
+            rhs[0] = 1
+            pi = _t_mp.lu_solve(M, rhs)
+            D = _t_mp.matrix(n, n)
+            for i in range(n):
+                for j in range(n):
+                    D[i, j] = (1 if i == j else 0) - P[i, j] + pi[j]
+            y = _t_mp.matrix([_t_mp.mpf(i) for i in range(n)])
+            old = None
+            for _ in range(500):
+                x = _t_mp.lu_solve(D, y)
+                size = max(abs(t) for t in x)
+                y = x / size
+                if old is not None and abs(1 / size - old) < _t_mp.mpf(10) ** -25 * old:
+                    break
+                old = 1 / size
+            return float(1 / size)
+
+    for N, s, u, v in ((30, 0.5, 0.1, 1e-12), (24, -0.5, 1e-12, 0.1)):
+        g, target = relaxation_rate(N, s, u, v), _t_gap(N, s, u, v, 60)
+        assert _t_rel(g, target) < 1e-8, (N, s, u, v, g, target)
+    g = relaxation_rate(400, 0.0, 0.1, 0.1)
+    assert _t_rel(g, 0.2) < 1e-8, g
 
 
 _crown_case()

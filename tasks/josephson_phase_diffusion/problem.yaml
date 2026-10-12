@@ -59,8 +59,13 @@ metadata:
   verification_explanation: >-
     Every test computes its own target independently of the reference: the stationary Fokker-Planck density
     and the homogenization corrector as continued fractions in mpmath extended precision (30 + 1.8 / theta
-    digits), the single-integral Bessel form of the Ambegaokar-Halperin voltage at 40 digits, the closed
-    forms at i = 0 (1 / I_0(1/theta)**2 and the Lifson-Jackson D), Newton-step criteria on those targets for
+    digits), the single-integral Bessel form of the Ambegaokar-Halperin voltage at 40 digits, its closed
+    form in modified Bessel functions of imaginary order, v = (theta / pi) sinh(pi i / theta) /
+    |I_{j i / theta}(1 / theta)|**2, at 40 digits with dv/di by extended-precision differentiation,
+    the closed forms at i = 0 (1 / I_0(1/theta)**2 and the
+    Lifson-Jackson D), the equilibrium linear response of the array at v_crit = 1e-9 (r_diff =
+    sum r_k / I_0(c_k / theta0)**2, j_star = v_crit / r_diff and the Johnson-Nyquist noise
+    s_v = 2 theta0 r_diff of the fluctuation-dissipation theorem), Newton-step criteria on those targets for
     the diffusion peak and the array criterion current, and a central difference for kappa in at least
     60-digit arithmetic (60 + 1.8 / theta digits, step 1e-15 theta). Step 4 defines theta through
     mean_voltage, whose relative error (below 1e-9) enters theta multiplied by |kappa| (kappa from about
@@ -109,7 +114,7 @@ metadata:
     relation, maximum of dv/di instead of D_eff, Kramers-rate inversion, inverted or Arrhenius sensitivity,
     squared voltage scale, no inertia, unscaled velocity noise, missing thermal-velocity scale) and there is a
     whole-task unscaled-velocity-noise mutant; each fails at least one case of its target tests.
-    tools/crown_check.py (version 12, single-threaded BLAS) ran every test case alone in a fresh process (step
+    tools/crown_check.py (version 13, single-threaded BLAS) ran every test case alone in a fresh process (step
     k with reference steps 1..k-1 as context, general cases with solution.py) for the reference (solution.py
     also on every step file), the second solution and the mutants, checked that scaling every reference
     output by 1 +- 1e-12 (in the general cases the outputs of every evaluated function) still passes every
@@ -167,7 +172,7 @@ problem_io: |-
           r_d: differential resistance dv/di (units of R), relative error below 1e-5.
 
       Raises:
-        ValueError if an input is not finite, if |i| > 2.5, if theta is outside [0.1, 2], or
+        ValueError if |i| > 2.5, if theta is outside [0.1, 2], or
         if beta_c is neither 0 nor in [0.1, 2].
       '''
 
@@ -201,8 +206,7 @@ sub_steps:
       Inputs: i (float, |i| <= 10) and theta (float, 0.02 <= theta <= 50). Return the tuple
       (v, r_d) of two Python floats, v with a relative error below 1e-9 and r_d with a relative
       error below 1e-8.
-      Errors: raise ValueError if i or theta is not finite, if |i| > 10 or if theta is outside
-      [0.02, 50].
+      Errors: raise ValueError if |i| > 10 or if theta is outside [0.02, 50].
     function_header: |-
       def mean_voltage(i, theta):
           '''Stationary dc voltage and differential resistance of a noisy overdamped junction.
@@ -219,8 +223,7 @@ sub_steps:
               v = 0 within an absolute 1e-12.
 
           Raises:
-            ValueError if i or theta is not finite, if |i| > 10 or if theta is outside
-            [0.02, 50].
+            ValueError if |i| > 10 or if theta is outside [0.02, 50].
           '''
     return_line: return result
     step_background: |-
@@ -230,7 +233,7 @@ sub_steps:
       potential (Stratonovich formula). For theta -> 0 the voltage tends to the noiseless value
       sqrt(max(i**2 - 1, 0)); for theta -> infinity it tends to the ohmic value i. At i = 0 the
       system is in equilibrium and the linear-response resistance is 1 / I_0(1/theta)**2.
-    n_test_cases: 5
+    n_test_cases: 6
     contract:
       quantity: "Mean dc voltage and differential resistance of an overdamped Josephson junction with thermal noise."
       assumptions: "RSJ model, overdamped, additive white Johnson noise, stationary state; exact, no Kramers approximation."
@@ -263,8 +266,7 @@ sub_steps:
 
       Inputs: i (float, |i| <= 10) and theta (float, 0.02 <= theta <= 50). Return D_eff as a
       Python float with a relative error below 1e-9.
-      Errors: raise ValueError if i or theta is not finite, if |i| > 10 or if theta is outside
-      [0.02, 50].
+      Errors: raise ValueError if |i| > 10 or if theta is outside [0.02, 50].
     function_header: |-
       def effective_diffusion(i, theta):
           '''Effective diffusion coefficient of the junction phase.
@@ -278,8 +280,7 @@ sub_steps:
                (tau = 2 e I_c R t / hbar). Relative error below 1e-9.
 
           Raises:
-            ValueError if i or theta is not finite, if |i| > 10 or if theta is outside
-            [0.02, 50].
+            ValueError if |i| > 10 or if theta is outside [0.02, 50].
           '''
     return_line: return D
     step_background: |-
@@ -289,7 +290,7 @@ sub_steps:
       (corrector) theory or from the moments of the first passage time over one period. At zero
       tilt it reduces to the Lifson-Jackson formula, D = theta / I_0(1/theta)**2 for this
       potential. For free diffusion (no potential) D_eff = theta.
-    n_test_cases: 5
+    n_test_cases: 6
     contract:
       quantity: "Effective (long-time) diffusion coefficient of the phase of a noisy overdamped Josephson junction."
       assumptions: "Same model as step 1; exact long-time limit of the variance."
@@ -322,7 +323,7 @@ sub_steps:
       apparent maximum by several 1e-6 at weak noise and by about 1e-4 at the strong-noise end
       of the range, so i_peak has to be located with D_eff, or d ln(D_eff) / di, evaluated far
       more accurately than that and smoothly in i.
-      Errors: raise ValueError if theta is not finite or is outside [0.02, 1].
+      Errors: raise ValueError if theta is outside [0.02, 1].
     function_header: |-
       def diffusion_peak(theta):
           '''Bias current of maximal phase diffusion (giant diffusion) and the enhancement there.
@@ -340,7 +341,7 @@ sub_steps:
                       1e-9).
 
           Raises:
-            ValueError if theta is not finite or is outside [0.02, 1].
+            ValueError if theta is outside [0.02, 1].
           '''
     return_line: return result
     step_background: |-
@@ -395,9 +396,8 @@ sub_steps:
       endpoint voltages given by mean_voltage (step 1). A v with v_lo * (1 - 1e-11) <= v <= v_lo
       returns theta = 0.02 and a v with v_hi <= v <= v_hi * (1 + 1e-11) returns theta = 50, each
       with its kappa.
-      Errors: raise ValueError if i or v is not finite, if i is not in (0, 10], if v is not
-      strictly between sqrt(max(i**2 - 1, 0)) and i, or if v < v_lo * (1 - 1e-11) or
-      v > v_hi * (1 + 1e-11).
+      Errors: raise ValueError if i is not in (0, 10], if v is not strictly between
+      sqrt(max(i**2 - 1, 0)) and i, or if v < v_lo * (1 - 1e-11) or v > v_hi * (1 + 1e-11).
     function_header: |-
       def noise_temperature(i, v):
           '''Noise strength theta = k_B T / E_J inferred from a measured dc voltage, and its sensitivity.
@@ -420,7 +420,7 @@ sub_steps:
                      below 1e-6. Over the domain kappa ranges from about 0.01 to about 2e7.
 
           Raises:
-            ValueError if i or v is not finite, if i is not in (0, 10], if v is not strictly
+            ValueError if i is not in (0, 10], if v is not strictly
             between sqrt(max(i**2 - 1, 0)) and i, or if v < v_lo * (1 - 1e-11) or
             v > v_hi * (1 + 1e-11), with the endpoint voltages v_lo = mean_voltage(i, 0.02)[0] and
             v_hi = mean_voltage(i, 50)[0] of step 1. A v in [v_lo * (1 - 1e-11), v_lo] returns
@@ -482,21 +482,20 @@ sub_steps:
       Use mean_voltage (step 1) and effective_diffusion (step 2). The mean array voltage rises
       strictly with J from 0 at J = 0.
 
-      Inputs: ics and rs (1-D arrays of the same length, finite and > 0, with
+      Inputs: ics and rs (1-D arrays of the same length, entries > 0, with
       max(ics) / min(ics) <= 5), theta0 (float, > 0, with every theta0 / c_k in [0.02, 50]) and
       v_crit (float, 0 < v_crit <= 0.5 * sum(c_k r_k)).
       Errors: raise ValueError if ics and rs are not 1-D arrays of the same nonzero length, if
-      an entry is not finite and positive, if max(ics) / min(ics) > 5, if theta0 is not finite
-      and positive or a ratio theta0 / c_k is outside [0.02, 50], or if v_crit is not in
-      (0, 0.5 * sum(c_k r_k)].
+      an entry is not positive, if max(ics) / min(ics) > 5, if a ratio theta0 / c_k is
+      outside [0.02, 50], or if v_crit is not in (0, 0.5 * sum(c_k r_k)].
     function_header: |-
       def array_criterion(ics, rs, theta0, v_crit):
           '''Criterion current, differential resistance and voltage noise of a series junction array.
 
           Inputs:
-            ics: 1-D array of critical currents c_k in units of I_0, finite, > 0,
+            ics: 1-D array of critical currents c_k in units of I_0, > 0,
                  max(ics) / min(ics) <= 5.
-            rs: 1-D array of the same length, normal resistances r_k in units of R_0, finite, > 0.
+            rs: 1-D array of the same length, normal resistances r_k in units of R_0, > 0.
             theta0: float, k_B T / E_J0 with E_J0 = hbar I_0 / (2 e); every theta0 / c_k must
                     lie in [0.02, 50].
             v_crit: float, voltage criterion in units of I_0 R_0,
@@ -515,9 +514,8 @@ sub_steps:
 
           Raises:
             ValueError if ics and rs are not 1-D arrays of the same nonzero length, if an entry
-            is not finite and positive, if max(ics) / min(ics) > 5, if theta0 is not finite and
-            positive or a ratio theta0 / c_k is outside [0.02, 50], or if v_crit is not in
-            (0, 0.5 * sum(c_k * r_k)].
+            is not positive, if max(ics) / min(ics) > 5, if a ratio theta0 / c_k is
+            outside [0.02, 50], or if v_crit is not in (0, 0.5 * sum(c_k * r_k)].
           '''
     return_line: return result
     step_background: |-
@@ -527,7 +525,7 @@ sub_steps:
       junction comes from its phase diffusion: the variance of hbar/2e times the accumulated
       phase grows linearly in time, and the reduced time of each junction runs at its own rate
       2 e I_ck R_k / hbar.
-    n_test_cases: 6
+    n_test_cases: 7
     contract:
       quantity: "Voltage-criterion current, differential resistance and zero-frequency voltage noise of a series array of noisy overdamped Josephson junctions."
       assumptions: "Independent junctions with independent Johnson noise at a common temperature; each junction obeys the model of steps 1-2. j_star is graded against the exact criterion current with the relative tolerance 1e-9 + 2e-9 / s, s = d ln(V) / d ln(J) of the exact array voltage (the 1e-9 accuracy of mean_voltage divided by s); r_diff and s_v at the returned j_star, relative tolerance 1e-8."
@@ -575,8 +573,8 @@ sub_steps:
       Inputs: i (float, |i| <= 2.5), theta (float, 0.1 <= theta <= 2) and beta_c (float, either
       exactly 0 or 0.1 <= beta_c <= 2). Return the tuple (v, r_d) of two Python floats, v with an
       error below 1e-7 * |v| + 1e-12 and r_d with a relative error below 1e-5.
-      Errors: raise ValueError if an input is not finite, if |i| > 2.5, if theta is outside
-      [0.1, 2], or if beta_c is neither 0 nor in [0.1, 2].
+      Errors: raise ValueError if |i| > 2.5, if theta is outside [0.1, 2], or if beta_c is
+      neither 0 nor in [0.1, 2].
     function_header: |-
       def rcsj_voltage(i, theta, beta_c):
           '''Stationary dc voltage and differential resistance of a noisy junction with capacitance (RCSJ).
@@ -594,7 +592,7 @@ sub_steps:
               r_d: differential resistance dv/di (units of R), relative error below 1e-5.
 
           Raises:
-            ValueError if an input is not finite, if |i| > 2.5, if theta is outside [0.1, 2], or
+            ValueError if |i| > 2.5, if theta is outside [0.1, 2], or
             if beta_c is neither 0 nor in [0.1, 2].
           '''
     return_line: return result
@@ -608,7 +606,7 @@ sub_steps:
       beta_c, weak noise and strong bias (Risken, chapter 11, matrix continued fractions; Vollmer
       and Risken for the noisy RCSJ junction). As beta_c -> 0 the result goes to the
       Ambegaokar-Halperin voltage of step 1.
-    n_test_cases: 4
+    n_test_cases: 5
     contract:
       quantity: "Exact stationary mean voltage and differential resistance of an underdamped (RCSJ) Josephson junction with thermal noise."
       assumptions: "RCSJ model with Johnson noise of the shunt resistor, stationary state of the Kramers equation, no small-noise or small-capacitance approximation; beta_c = 0 is the overdamped model of step 1."

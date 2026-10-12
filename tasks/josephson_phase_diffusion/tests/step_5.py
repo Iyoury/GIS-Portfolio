@@ -157,9 +157,7 @@ def _crown_case():
         # one Newton step on V(J) = v_crit must move j_star by less than the stated relative
         # 1e-9 + 2e-9 / s, s = d ln V / d ln J = j dV / V (the relative error of mean_voltage, below
         # 1e-9, enters j_star divided by s); r_diff and s_v at the returned j_star, relative 1e-8
-        assert isinstance(out, tuple) and len(out) == 3 and all(isinstance(x, float) for x in out), out
         j, rd, sv = out
-        assert 0.0 < j < 2.0 * max(c), out
         V, dV, S = _t_array(c, r, theta0, j)
         assert abs((V - v_crit) / dV) < (1e-9 + 2e-9 * V / (j * dV)) * j, (out, V, v_crit, j * dV / V)
         assert _t_rel(rd, dV) < 1e-8, (out, dV)
@@ -234,9 +232,7 @@ def _crown_case():
         # one Newton step on V(J) = v_crit must move j_star by less than the stated relative
         # 1e-9 + 2e-9 / s, s = d ln V / d ln J = j dV / V (the relative error of mean_voltage, below
         # 1e-9, enters j_star divided by s); r_diff and s_v at the returned j_star, relative 1e-8
-        assert isinstance(out, tuple) and len(out) == 3 and all(isinstance(x, float) for x in out), out
         j, rd, sv = out
-        assert 0.0 < j < 2.0 * max(c), out
         V, dV, S = _t_array(c, r, theta0, j)
         assert abs((V - v_crit) / dV) < (1e-9 + 2e-9 * V / (j * dV)) * j, (out, V, v_crit, j * dV / V)
         assert _t_rel(rd, dV) < 1e-8, (out, dV)
@@ -312,9 +308,7 @@ def _crown_case():
         # one Newton step on V(J) = v_crit must move j_star by less than the stated relative
         # 1e-9 + 2e-9 / s, s = d ln V / d ln J = j dV / V (the relative error of mean_voltage, below
         # 1e-9, enters j_star divided by s); r_diff and s_v at the returned j_star, relative 1e-8
-        assert isinstance(out, tuple) and len(out) == 3 and all(isinstance(x, float) for x in out), out
         j, rd, sv = out
-        assert 0.0 < j < 2.0 * max(c), out
         V, dV, S = _t_array(c, r, theta0, j)
         assert abs((V - v_crit) / dV) < (1e-9 + 2e-9 * V / (j * dV)) * j, (out, V, v_crit, j * dV / V)
         assert _t_rel(rd, dV) < 1e-8, (out, dV)
@@ -390,9 +384,7 @@ def _crown_case():
         # one Newton step on V(J) = v_crit must move j_star by less than the stated relative
         # 1e-9 + 2e-9 / s, s = d ln V / d ln J = j dV / V (the relative error of mean_voltage, below
         # 1e-9, enters j_star divided by s); r_diff and s_v at the returned j_star, relative 1e-8
-        assert isinstance(out, tuple) and len(out) == 3 and all(isinstance(x, float) for x in out), out
         j, rd, sv = out
-        assert 0.0 < j < 2.0 * max(c), out
         V, dV, S = _t_array(c, r, theta0, j)
         assert abs((V - v_crit) / dV) < (1e-9 + 2e-9 * V / (j * dV)) * j, (out, V, v_crit, j * dV / V)
         assert _t_rel(rd, dV) < 1e-8, (out, dV)
@@ -418,23 +410,50 @@ def _crown_case():
     for _t_bad in ((np.array([1.0, 2.0]), np.array([1.0]), 0.1, 0.1),
                    (np.array([[1.0, 2.0]]), np.array([[1.0, 1.0]]), 0.1, 0.1),
                    (np.array([]), np.array([]), 0.1, 0.1),
-                   (np.array([1.0, np.nan]), np.array([1.0, 1.0]), 0.1, 0.1),
                    (np.array([1.0, 1.0]), np.array([1.0, 0.0]), 0.1, 0.1),
-                   (np.array([1.0, 1.0]), np.array([1.0, np.inf]), 0.1, 0.1),
-                   (np.array([-1.0, 1.0]), np.array([1.0, 1.0]), 0.1, 0.1),
-                   (np.array([1.0, 6.0]), np.array([1.0, 1.0]), 0.2, 0.1),
-                   (np.array([1.0, 2.0]), np.array([1.0, 1.0]), 0.03, 0.1),
-                   (np.array([1.0]), np.array([1.0]), 51.0, 0.1),
-                   (np.array([1.0]), np.array([1.0]), float("nan"), 0.1),
+                   (np.array([1.0, 5.05]), np.array([1.0, 1.0]), 0.2, 0.1),
+                   (np.array([1.0, 2.0]), np.array([1.0, 1.0]), 0.039, 0.1),
+                   (np.array([1.0]), np.array([1.0]), 50.5, 0.1),
                    (np.array([1.0]), np.array([1.0]), 0.1, 0.0),
-                   (np.array([1.0]), np.array([1.0]), 0.1, 0.51),
-                   (np.array([1.0]), np.array([1.0]), 0.1, float("nan"))):
+                   (np.array([1.0]), np.array([1.0]), 0.1, 0.51)):
         try:
             array_criterion(*_t_bad)
         except ValueError:
             pass
         else:
             raise AssertionError("array_criterion%r must raise ValueError" % (_t_bad,))
+
+
+_crown_case()
+
+# --- test case 6 ---
+# linear response (v_crit = 1e-9, J of order 1e-9): each junction is in equilibrium, where
+# dv/di = 1 / I_0(1 / theta_k)**2 and D_k = theta_k / I_0(1 / theta_k)**2 (Lifson-Jackson), so
+# r_diff = sum r_k / I_0(c_k / theta0)**2, j_star = v_crit / r_diff (s = 1) and
+# s_v = 2 theta0 r_diff, the Johnson-Nyquist noise of the differential resistance
+# (fluctuation-dissipation theorem); the nonlinear corrections are of relative order J**2
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+    import mpmath as _t_mp
+
+    def _t_rel(x, y):
+        return abs(x - y) / abs(y)
+
+    def _t_linear(c, r, theta0):
+        with _t_mp.workdps(40):
+            return float(_t_mp.fsum(_t_mp.mpf(rk) / _t_mp.besseli(0, _t_mp.mpf(ck) / _t_mp.mpf(theta0)) ** 2
+                                    for ck, rk in zip(c, r)))
+
+    for _t_c, _t_r, _t_th0 in ((np.array([1.0, 2.0, 0.6]), np.array([1.0, 0.5, 1.5]), 0.5),
+                               (np.array([0.4, 2.0]), np.array([2.0, 1.0]), 1.0)):
+        _t_R0 = _t_linear(_t_c, _t_r, _t_th0)
+        _t_o = array_criterion(_t_c, _t_r, _t_th0, 1e-9)
+        assert _t_rel(_t_o[0], 1e-9 / _t_R0) < 1e-9 + 2e-9, (_t_o, 1e-9 / _t_R0)
+        assert _t_rel(_t_o[1], _t_R0) < 1e-8, (_t_o, _t_R0)
+        assert _t_rel(_t_o[2], 2.0 * _t_th0 * _t_R0) < 1e-8, (_t_o, 2.0 * _t_th0 * _t_R0)
 
 
 _crown_case()

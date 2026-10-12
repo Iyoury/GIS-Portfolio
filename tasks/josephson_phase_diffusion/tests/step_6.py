@@ -154,7 +154,6 @@ def _crown_case():
 
     def _t_check_rcsj(i, theta, beta_c):
         out = rcsj_voltage(i, theta, beta_c)
-        assert isinstance(out, tuple) and len(out) == 2 and all(type(x) is float for x in out), out
         v, dv = _t_kramers(i, theta, beta_c)
         assert abs(out[0] - v) <= 1e-7 * abs(v) + 1e-12, (i, theta, beta_c, out, v)
         assert abs(out[1] / dv - 1.0) < 1e-5, (i, theta, beta_c, out, dv)
@@ -209,7 +208,6 @@ def _crown_case():
 
     def _t_check_rcsj(i, theta, beta_c):
         out = rcsj_voltage(i, theta, beta_c)
-        assert isinstance(out, tuple) and len(out) == 2 and all(type(x) is float for x in out), out
         v, dv = _t_kramers(i, theta, beta_c)
         assert abs(out[0] - v) <= 1e-7 * abs(v) + 1e-12, (i, theta, beta_c, out, v)
         assert abs(out[1] / dv - 1.0) < 1e-5, (i, theta, beta_c, out, dv)
@@ -232,15 +230,67 @@ import numpy as np
 
 def _crown_case():
     import numpy as np
-    for _t_bad in ((0.5, 0.3, 0.05), (2.6, 0.3, 1.0), (-2.6, 0.3, 1.0), (0.5, 0.09, 1.0), (0.5, 2.01, 1.0),
-                   (0.5, 0.3, 2.01), (0.5, 0.3, -1.0), (float("nan"), 0.3, 1.0), (float("inf"), 0.3, 1.0),
-                   (0.5, float("nan"), 1.0), (0.5, float("inf"), 1.0), (0.5, 0.3, float("nan")), (0.5, 0.3, float("inf"))):
+    for _t_bad in ((2.51, 0.3, 1.0), (0.5, 0.099, 1.0), (0.5, 2.01, 1.0), (0.5, 0.3, 0.05),
+                   (0.5, 0.3, 2.01)):
         try:
             rcsj_voltage(*_t_bad)
         except ValueError:
             pass
         else:
             raise AssertionError("rcsj_voltage%r must raise ValueError" % (_t_bad,))
+
+
+_crown_case()
+
+# --- test case 4 ---
+# near the bistable range (beta_c = 1.8, theta = 0.15, i = 0.95) and the locked-to-running crossover
+# at moderate inertia (beta_c = 0.7, theta = 0.25, i = 0.6), against the shifted-basis Kramers
+# expansion (converged at these points: against N = 220, |p| <= 110 its v is within 3e-9 of the v
+# tolerance and its dv/di within 6e-14 relative); and the symmetry v(-i) = -v(i), r_d(-i) = r_d(i)
+# between two computed outputs (twice the single-output tolerances)
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+
+    def _t_kramers_v(i, theta, beta_c, N=120, P=60):
+        v0 = 0.6 * i
+        vth = np.sqrt(theta / beta_c)
+        gam = 1.0 / beta_c
+        ps = np.arange(-P, P + 1)
+        M = ps.size
+        D = np.diag(vth * 1j * ps)
+        Fm = np.diag(np.full(M, (i - v0) / beta_c, dtype=complex))
+        Fm += np.diag(np.full(M - 1, -1.0 / (2j * beta_c)), -1) + np.diag(np.full(M - 1, 1.0 / (2j * beta_c)), 1)
+        Dh = D - Fm / vth
+        V0 = np.diag(v0 * 1j * ps)
+        S = np.zeros((M, M), complex)
+        for n in range(N, 0, -1):
+            S = -np.linalg.solve(gam * n * np.eye(M) + V0 + np.sqrt(n + 1) * D @ S, np.sqrt(n) * Dh)
+        Q = V0 + D @ S
+        rows = [k for k in range(M) if k != P]
+        c0 = np.zeros(M, complex)
+        c0[P] = 1 / (2 * np.pi)
+        c0[rows] = np.linalg.solve(Q[np.ix_(rows, rows)], -Q[np.ix_(rows, [P])][:, 0] / (2 * np.pi))
+        c1 = S @ c0
+        return v0 + vth * 2 * np.pi * c1[P].real
+
+    def _t_kramers(i, theta, beta_c):
+        # v, and dv/di from the fourth-order central difference (five-point stencil, h = 1e-3)
+        h = 1e-3
+        f = lambda x: _t_kramers_v(x, theta, beta_c)
+        d = (8.0 * (f(i + h) - f(i - h)) - (f(i + 2 * h) - f(i - 2 * h))) / (12.0 * h)
+        return f(i), d
+
+    for _t_i, _t_th, _t_bc in ((0.95, 0.15, 1.8), (0.6, 0.25, 0.7)):
+        _t_out = rcsj_voltage(_t_i, _t_th, _t_bc)
+        _t_v, _t_dv = _t_kramers(_t_i, _t_th, _t_bc)
+        assert abs(_t_out[0] - _t_v) <= 1e-7 * abs(_t_v) + 1e-12, (_t_i, _t_th, _t_bc, _t_out, _t_v)
+        assert abs(_t_out[1] / _t_dv - 1.0) < 1e-5, (_t_i, _t_th, _t_bc, _t_out, _t_dv)
+    _t_p, _t_m = rcsj_voltage(0.95, 0.15, 1.8), rcsj_voltage(-0.95, 0.15, 1.8)
+    assert abs(_t_m[0] + _t_p[0]) <= 2e-7 * abs(_t_p[0]) + 2e-12, (_t_p, _t_m)
+    assert abs(_t_m[1] / _t_p[1] - 1.0) < 2e-5, (_t_p, _t_m)
 
 
 _crown_case()

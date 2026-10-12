@@ -16,7 +16,6 @@ def _crown_case():
     kappa = 1.2e-6
     _t3_exp = 1.5 * math.erfc(z / (2 * math.sqrt(kappa * 1.0e4 * _t3_YEAR)))
     got = paleoclimate_perturbation(z, [1.0e4], [1.5], kappa)
-    assert type(got) is float
     assert abs(got - _t3_exp) < 1.5e-6   # 1e-6 K per K of the largest |dT|
 
 
@@ -38,7 +37,6 @@ def _crown_case():
     kappa = 1.2e-6
     _t3_exp = 1.5 * math.erfc(z / (2 * math.sqrt(kappa * 1.0e4 * _t3_YEAR)))
     got = paleoclimate_perturbation(z, [1.0e4], [1.5], kappa)
-    assert type(got) is float
     assert abs(got - _t3_exp) < 1.5e-6   # 1e-6 K per K of the largest |dT|
 
 
@@ -60,7 +58,6 @@ def _crown_case():
     kappa = 1.2e-6
     _t3_exp = 1.5 * math.erfc(z / (2 * math.sqrt(kappa * 1.0e4 * _t3_YEAR)))
     got = paleoclimate_perturbation(z, [1.0e4], [1.5], kappa)
-    assert type(got) is float
     assert abs(got - _t3_exp) < 1.5e-6   # 1e-6 K per K of the largest |dT|
 
 
@@ -82,7 +79,6 @@ def _crown_case():
     kappa = 1.2e-6
     _t3_exp = 1.5 * math.erfc(z / (2 * math.sqrt(kappa * 1.0e4 * _t3_YEAR)))
     got = paleoclimate_perturbation(z, [1.0e4], [1.5], kappa)
-    assert type(got) is float
     assert abs(got - _t3_exp) < 1.5e-6   # 1e-6 K per K of the largest |dT|
 
 
@@ -104,7 +100,6 @@ def _crown_case():
     kappa = 1.2e-6
     _t3_exp = 1.5 * math.erfc(z / (2 * math.sqrt(kappa * 1.0e4 * _t3_YEAR)))
     got = paleoclimate_perturbation(z, [1.0e4], [1.5], kappa)
-    assert type(got) is float
     assert abs(got - _t3_exp) < 1.5e-6   # 1e-6 K per K of the largest |dT|
 
 
@@ -196,8 +191,11 @@ def _crown_case():
     hist_t, hist_d, kappa = [2e3, 2.5e4, 1.1e5], [0.6, -2.5, 0.4], 1.1e-6
     z = np.array([[0.0, 150.0, 400.0], [900.0, 1600.0, 3000.0]])
     got = paleoclimate_perturbation(z, hist_t, hist_d, kappa)
-    assert isinstance(got, np.ndarray) and got.shape == (2, 3)
-    flat = np.array([paleoclimate_perturbation(float(v), hist_t, hist_d, kappa) for v in z.ravel()])
+    one = paleoclimate_perturbation(np.array([900.0]), hist_t, hist_d, kappa)
+    flat = [paleoclimate_perturbation(float(v), hist_t, hist_d, kappa) for v in z.ravel()]
+    # output contract: the shape of z (a one-element z included); a float for a scalar z
+    assert (isinstance(got, np.ndarray) and got.shape == (2, 3) and isinstance(one, np.ndarray) and one.shape == (1,)
+            and all(type(v) is float for v in flat))
     # two computed outputs, each within 1e-6 K per K of the largest |dT| = 2.5 K
     assert np.max(np.abs(np.asarray(got.ravel(), float) - np.asarray(flat, float))) <= 5e-6
     assert abs(got[0, 0] - 0.6) < 2.5e-6
@@ -208,39 +206,24 @@ def _crown_case():
         e_old = math.erfc(900.0 / (2 * math.sqrt(kappa * edges[i + 1])))
         e_new = 0.0 if i == 0 else math.erfc(900.0 / (2 * math.sqrt(kappa * edges[i])))
         _t3_exp += d * (e_old - e_new)
-    assert abs(got[1, 0] - _t3_exp) < 2.5e-6
+    assert abs(got[1, 0] - _t3_exp) < 2.5e-6 and abs(float(one[0]) - _t3_exp) < 2.5e-6
 
 
 _crown_case()
 
 # --- test case 10 ---
-# invalid raises
+# a non-positive diffusivity raises ValueError (stated error rule)
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for case in ["t0", "order", "kappa", "len", "two_d", "zneg"]:
-        _t_msg = " (case %r)" % (case,)
-        z, t, d, k = 100.0, [1e3, 1e4], [0.5, -1.0], 1e-6
-        if case == "t0":
-            t = [0.0, 1e4]
-        elif case == "order":
-            t = [1e4, 1e3]
-        elif case == "kappa":
-            k = 0.0
-        elif case == "len":
-            d = [0.5]
-        elif case == "two_d":
-            t, d = [[1e3, 1e4]], [[0.5, -1.0]]
-        else:
-            z = -1.0
-        try:
-            paleoclimate_perturbation(z, t, d, k)
-        except ValueError:
-            pass
-        else:
-            raise AssertionError("paleoclimate_perturbation must raise ValueError" + _t_msg)
+    try:
+        paleoclimate_perturbation(100.0, [1e3, 1e4], [0.5, -1.0], 0.0)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("paleoclimate_perturbation must raise ValueError for kappa = 0")
 
 
 _crown_case()
@@ -270,7 +253,6 @@ def _crown_case():
             tot += di * (e_old - e_new)
         _t3_exp.append(tot)
     got = np.asarray(paleoclimate_perturbation(z, t_y, d, kappa))
-    assert got.shape == (4,)
     assert np.max(np.abs(np.asarray(got, float) - np.asarray(_t3_exp, float))) <= 1.2e-6   # 1e-6 K per K, largest |dT| = 1.2
 
 

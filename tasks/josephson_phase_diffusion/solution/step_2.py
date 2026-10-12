@@ -34,8 +34,7 @@ def effective_diffusion(i, theta):
          (tau = 2 e I_c R t / hbar). Relative error below 1e-9.
 
     Raises:
-      ValueError if i or theta is not finite, if |i| > 10 or if theta is outside
-      [0.02, 50].
+      ValueError if |i| > 10 or if theta is outside [0.02, 50].
     '''
     i = float(i)
     theta = float(theta)

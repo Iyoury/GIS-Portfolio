@@ -37,8 +37,8 @@ def _crown_case():
 _crown_case()
 
 # --- test case 2 ---
-# every entry of moderate matrices and the end and middle rows of N = 400 against
-# extended precision, including entries down to 1e-250
+# every entry of moderate matrices (and of N = 1 with v = 0, a (2, 2) matrix with an exact zero) and the end and
+# middle rows of N = 400 against extended precision, including entries down to 1e-250
 import numpy as np
 
 
@@ -64,7 +64,7 @@ def _crown_case():
                         # within 1e-250 of the exact value (the difference taken in extended precision)
                         assert abs(_t_mp.mpf(float(P[i, j])) - t) <= _t_mp.mpf("1e-250"), (N, s, u, v, i, j, P[i, j])
 
-    for N, s, u, v in ((40, -0.5, 1e-3, 0.1), (60, 0.25, 1e-12, 1e-12)):
+    for N, s, u, v in ((1, 0.5, 0.1, 0.0), (40, -0.5, 1e-3, 0.1), (60, 0.25, 1e-12, 1e-12)):
         _t_check_entries(wf_transition_matrix(N, s, u, v), N, s, u, v, range(N + 1))
     _t_check_entries(wf_transition_matrix(400, 0.5, 0.05, 1e-7), 400, 0.5, 0.05, 1e-7, (0, 1, 2, 200, 398, 399, 400))
 
@@ -117,14 +117,15 @@ def _crown_case():
 _crown_case()
 
 # --- test case 4 ---
-# N not an integer in [1, 400], or s, u, v out of range, raise ValueError
+# each stated error rule once, just outside the domain: N above 400, N a float (even integer-valued), N a bool,
+# s below -0.5, u negative, v above 0.1
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for _t_bad in ((0, 0.1, 0.01, 0.01), (401, 0.1, 0.01, 0.01), (2.5, 0.1, 0.01, 0.01), (True, 0.1, 0.01, 0.01), (10, 0.6, 0.01, 0.01),
-                   (10, 0.1, -1e-3, 0.01), (10, 0.1, 0.01, 0.2)):
+    for _t_bad in ((401, 0.1, 0.01, 0.01), (10.0, 0.1, 0.01, 0.01), (True, 0.1, 0.01, 0.01), (10, -0.51, 0.01, 0.01),
+                   (10, 0.1, -1e-6, 0.01), (10, 0.1, 0.01, 0.11)):
         try:
             wf_transition_matrix(*_t_bad)
         except ValueError:
@@ -184,6 +185,43 @@ def _crown_case():
         d = np.abs(a - b)
         ok = (d <= 2.1e-10 * np.maximum(np.abs(a), np.abs(b))) | (d <= 2e-250)
         assert ok.all(), (N, s, u, v, np.argwhere(~ok)[:5])
+
+
+_crown_case()
+
+# --- test case 7 ---
+# successive entries of a binomial row: P[i, j + 1] (j + 1) q_i = P[i, j] (N - j) p_i, with p_i = p_mut and
+# q_i = 1 - p_mut of row i formed directly from the model in double precision (q_mut = u p_sel + (1 - v) q_sel,
+# q_sel = (N - i) / (N + s i): no subtraction, relative error a few 1e-16), independent of how the binomial
+# coefficients are evaluated. Checked on every pair of neighbouring entries whose exact values exceed 1e-238 (located
+# with a log-gamma estimate, accurate to far better than the factor 100 margin above the 1e-250 threshold of the
+# relative requirement), and the output entries there must be positive, in every row of N = 400 at corners of the
+# parameter ranges (s = -0.5 or 0.5, each of u and v at 0.1, at its floor 1e-12 or 0), where rows near the fixed
+# states have q_i or p_i of order 1e-12 and span more than 200 decades. Two outputs, each within 1e-10, against
+# factors within 1e-15: 2.1e-10
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+    from scipy.special import gammaln as _t_g
+    for N, s, u, v in ((400, -0.5, 0.1, 1e-12), (400, 0.5, 1e-12, 0.1), (400, 0.5, 0.0, 1e-12)):
+        P = np.asarray(wf_transition_matrix(N, s, u, v), dtype=float)
+        i = np.arange(N + 1.0)
+        den = N + s * i
+        ps, qs = (1 + s) * i / den, (N - i) / den
+        pm, qm = (1 - u) * ps + v * qs, u * ps + (1 - v) * qs
+        jj = np.arange(N + 1.0)[None, :]
+        with np.errstate(divide="ignore", invalid="ignore"):
+            # log10 of the exact entries (estimate), -inf or nan where an exact entry is zero
+            est = (_t_g(N + 1.0) - _t_g(jj + 1.0) - _t_g(N - jj + 1.0) + jj * np.log(pm)[:, None]
+                   + (N - jj) * np.log(qm)[:, None]) / np.log(10.0)
+        use = (est[:, 1:] > -238.0) & (est[:, :-1] > -238.0)
+        j = np.arange(N, dtype=float)[None, :]
+        lhs = P[:, 1:] * (j + 1.0) * qm[:, None]
+        rhs = P[:, :-1] * (N - j) * pm[:, None]
+        ok = (np.abs(lhs - rhs) <= 2.1e-10 * np.maximum(lhs, rhs)) & (np.minimum(lhs, rhs) > 0.0)
+        assert np.all(ok[use]), (N, s, u, v, np.argwhere(use & ~ok)[:5])
 
 
 _crown_case()

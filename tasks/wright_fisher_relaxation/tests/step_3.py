@@ -12,8 +12,8 @@ def _crown_case():
         return abs(a - b) / abs(b)
 
     def _t_check(pi, target, tol=1e-8):
-        pi = np.asarray(pi)
-        assert pi.shape == (len(target),), pi.shape
+        # the return type (the one contract check of this step): a float numpy array of shape (N + 1,), here (2,)
+        assert isinstance(pi, np.ndarray) and pi.shape == (len(target),) and np.issubdtype(pi.dtype, np.floating), pi
         for a, b in zip(pi, target):
             if b >= 1e-250:
                 assert _t_rel(a, b) < tol, (a, b)
@@ -91,9 +91,10 @@ def _crown_case():
             return [float(x) for x in _t_mp.lu_solve(M, rhs)]
 
     def _t_check(pi, target, tol=1e-8):
+        # values only (the return type is checked in case 0); every target entry is read by position
         pi = np.asarray(pi)
-        assert pi.shape == (len(target),), pi.shape
-        for a, b in zip(pi, target):
+        for k, b in enumerate(target):
+            a = pi[k]
             if b >= 1e-250:
                 assert _t_rel(a, b) < tol, (a, b)
             else:
@@ -152,14 +153,15 @@ def _crown_case():
 _crown_case()
 
 # --- test case 4 ---
-# N not an integer in [1, 400], or s, u, v out of range (u, v >= 1e-12; u = 0: the chain is not irreducible)
+# each stated error rule once, just outside the domain: N = 0, N a float (even integer-valued), N a bool, s below
+# -0.5, u = 0 (below its floor 1e-12: the chain is then not irreducible), v above 0.1
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for _t_bad in ((0, 0.1, 0.01, 0.01), (401, 0.1, 0.01, 0.01), (12.0, 0.1, 0.01, 0.01), (True, 0.1, 0.01, 0.01), (10, -0.6, 0.01, 0.01), (10, 0.1, 0.0, 0.01),
-                   (10, 0.1, 0.01, 1e-13), (10, 0.1, 0.2, 0.01)):
+    for _t_bad in ((0, 0.1, 0.01, 0.01), (12.0, 0.1, 0.01, 0.01), (True, 0.1, 0.01, 0.01), (10, -0.51, 0.01, 0.01),
+                   (10, 0.1, 0.0, 0.01), (10, 0.1, 0.01, 0.11)):
         try:
             stationary_distribution(*_t_bad)
         except ValueError:
@@ -211,7 +213,7 @@ def _crown_case():
         A = [[1] * n] + [[(1 if i == j else 0) - P[i][j] for i in range(n)] for j in range(1, n)]
         target = np.array([float(x) for x in _t_solve_exact(A, [1] + [0] * N)])
         got = np.asarray(stationary_distribution(N, s, u, v), dtype=float)
-        assert got.shape == target.shape and bool(np.all(np.abs(got - target) < 1e-8 * target)), (N, s, u, v, got, target)
+        assert all(abs(got[k] - target[k]) < 1e-8 * target[k] for k in range(N + 1)), (N, s, u, v, got, target)
 
 
 _crown_case()
@@ -248,6 +250,56 @@ def _crown_case():
         big = pi >= 1e-235
         assert np.all(np.abs(pi[big] - rhs[big]) <= 2.1e-8 * pi[big]), (N, s, u, v, np.nonzero(big)[0].size)
         assert abs(pi.sum() - 1.0) < 1e-8, (N, s, u, v, pi.sum())
+
+
+_crown_case()
+
+# --- test case 7 ---
+# neutral drift (s = 0): the mean of the next frequency is linear, p' = v + c p with c = 1 - u - v, and the
+# binomial factorial moments are E[j (j - 1) ... (j - k + 1) | i] = N (N - 1) ... (N - k + 1) p'**k, so the
+# stationary moments m_k = E_pi[i**k] obey a closed triangular system: with the falling factorial
+# i (i - 1) ... (i - k + 1) = sum_l S1(k, l) i**l (S1: signed Stirling numbers of the first kind),
+# sum_l S1(k, l) m_l = N (N - 1) ... (N - k + 1) sum_l C(k, l) v**(k - l) (c / N)**l m_l, l = 0, ..., k, m_0 = 1.
+# m_1, ..., m_4 solved exactly with Python fractions from the binary values of the inputs. The outputs give
+# sum_i pi_i i**k, a sum of nonnegative terms, so it keeps the relative accuracy 1e-8 of the entries (the entries
+# below 1e-250 add at most 401 x 1e-250 x 400**4 in absolute value), plus summation rounding below 1e-13: 1.01e-8.
+# At the largest population and both mutation rates at their upper end 0.1, and with one rate at its floor 1e-12
+# (then m_1 = N v / (u + v) is about 4e-9 and the moments are set by the small entries next to i = 0)
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+    from fractions import Fraction as _t_F
+    from math import comb as _t_comb
+
+    def _t_stirling1(k, l):
+        # signed Stirling numbers of the first kind, s(k, l), by the recurrence s(k, l) = s(k-1, l-1) - (k-1) s(k-1, l)
+        table = {(0, 0): 1}
+        for a in range(1, k + 1):
+            for b in range(0, a + 1):
+                table[(a, b)] = table.get((a - 1, b - 1), 0) - (a - 1) * table.get((a - 1, b), 0)
+        return table.get((k, l), 0)
+
+    def _t_moments(N, u, v, K):
+        u, v = _t_F(u), _t_F(v)
+        c = 1 - u - v
+        m = [_t_F(1)]
+        for k in range(1, K + 1):
+            fall = 1
+            for a in range(k):
+                fall *= N - a
+            rhs = sum(fall * _t_comb(k, l) * v ** (k - l) * (c / N) ** l * m[l] for l in range(k))
+            rhs -= sum(_t_stirling1(k, l) * m[l] for l in range(k))
+            m.append(rhs / (1 - fall * (c / N) ** k))
+        return [float(x) for x in m[1:]]
+
+    for N, u, v in ((400, 0.1, 0.1), (400, 0.1, 1e-12), (250, 1e-12, 0.1), (37, 0.05, 2e-3)):
+        pi = np.asarray(stationary_distribution(N, 0.0, u, v), dtype=float)
+        i = np.arange(N + 1, dtype=float)
+        for k, target in enumerate(_t_moments(N, u, v, 4), start=1):
+            got = float(pi @ i ** k)
+            assert abs(got - target) <= 1.01e-8 * target, (N, u, v, k, got, target)
 
 
 _crown_case()

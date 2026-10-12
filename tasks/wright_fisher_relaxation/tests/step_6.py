@@ -103,7 +103,7 @@ def _crown_case():
         # entries with an exact value of at least 1e-250: relative 1e-8; the others within 1e-250
         q, target = np.asarray(q, dtype=float), np.asarray(target, dtype=float)
         big = target >= 1e-250
-        assert q.shape == target.shape and np.all(np.abs(q[big] - target[big]) < 1e-8 * target[big]), q.shape
+        assert np.all(np.abs(q[big] - target[big]) < 1e-8 * target[big]), np.nonzero(big)[0].size
         assert np.all(np.abs(q[~big] - target[~big]) <= 1e-250), np.nonzero(~big)[0]
 
     for N, s, v, dps in ((20, -0.5, 1e-12, 200), (25, 0.3, 1e-3, 120), (16, 0.5, 0.1, 80), (22, -0.1, 3e-7, 120)):
@@ -154,7 +154,7 @@ def _crown_case():
         # entries with an exact value of at least 1e-250: relative 1e-8; the others within 1e-250
         q, target = np.asarray(q, dtype=float), np.asarray(target, dtype=float)
         big = target >= 1e-250
-        assert q.shape == target.shape and np.all(np.abs(q[big] - target[big]) < 1e-8 * target[big]), q.shape
+        assert np.all(np.abs(q[big] - target[big]) < 1e-8 * target[big]), np.nonzero(big)[0].size
         assert np.all(np.abs(q[~big] - target[~big]) <= 1e-250), np.nonzero(~big)[0]
 
     _T_QSD_FULL = {}
@@ -181,14 +181,14 @@ def _crown_case():
 _crown_case()
 
 # --- test case 4 ---
-# N not an integer in [1, 400], or s, v out of range (v = 0: i = 0 is absorbing as well)
+# each stated error rule once, just outside the domain: N above 400, N a float (even integer-valued), N a bool,
+# s above 0.5, v = 0 (below its floor 1e-12: i = 0 would then be absorbing as well)
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for _t_bad in ((0, 0.1, 0.01), (401, 0.1, 0.01), (5.0, 0.1, 0.01), (True, 0.1, 0.01), (10, 0.6, 0.01),
-                   (10, 0.1, 0.0), (10, 0.1, 0.2)):
+    for _t_bad in ((401, 0.1, 0.01), (5.0, 0.1, 0.01), (True, 0.1, 0.01), (10, 0.51, 0.01), (10, 0.1, 0.0)):
         try:
             quasi_stationary(*_t_bad)
         except ValueError:
@@ -226,7 +226,47 @@ def _crown_case():
         t_rate, t_q = _t_two_states(_t_s, _t_v)
         assert abs(rate - t_rate) < 1e-8 * t_rate, (_t_s, _t_v, rate, t_rate)
         q = np.asarray(q, dtype=float)
-        assert q.shape == (2,) and np.all(np.abs(q - t_q) < 1e-8 * t_q), (_t_s, _t_v, q, t_q)
+        assert all(abs(q[k] - t_q[k]) < 1e-8 * t_q[k] for k in range(2)), (_t_s, _t_v, q, t_q)
+
+
+_crown_case()
+
+# --- test case 6 ---
+# origin-fixation limit: with rare one-way mutation (v = 1e-12) the quasi-stationary population is almost always
+# fixed for a (i = 0); new A copies appear at the rate N v and each fixes with the probability pi_A of one copy
+# without mutation. To first order in v the Perron root of the restricted matrix only feels row 0 (the left
+# eigenvector of the v = 0 block is e_0 and its right eigenvector is the loss probability 1 - pi(i)), so
+# rate = N v pi_A (1 + O(N v T)), with T the mean time a new mutant lineage segregates before it is lost or fixed;
+# for beneficial A with fast sweeps here (s = 0.5, N = 60: T = p_fix t_fix + p_loss t_loss of one copy, about 12.5
+# generations; s = 0.3, N = 40: about 12.2), N v T is 7.5e-10 and 4.9e-10, below 1e-9. pi_A from the absorbing chain
+# without mutation (u = v = 0), solved by plain LU in mpmath at 60 digits; tolerance 1e-8 + 1e-9 = 1.1e-8. Rates of
+# about 3.5e-11 and 1.7e-11, far below the rounding errors of the diagonal entries of the restricted matrix
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+    import mpmath as _t_mp
+
+    def _t_single_copy(N, s):
+        # fixation probability of one A copy without mutation, plain LU in extended precision
+        with _t_mp.workdps(60):
+            s_ = _t_mp.mpf(s)
+            M = _t_mp.matrix(N - 1, N - 1)
+            fix = _t_mp.matrix(N - 1, 1)
+            for a in range(1, N):
+                p = _t_mp.mpf(a) / N
+                ps = (1 + s_) * p / (1 + s_ * p)
+                row = [_t_mp.binomial(N, j) * ps ** j * (1 - ps) ** (N - j) for j in range(N + 1)]
+                fix[a - 1] = row[N]
+                for b in range(1, N):
+                    M[a - 1, b - 1] = (1 if a == b else 0) - row[b]
+            return float(_t_mp.lu_solve(M, fix)[0])
+
+    for N, s, v in ((60, 0.5, 1e-12), (40, 0.3, 1e-12)):
+        rate, q = quasi_stationary(N, s, v)
+        target = N * v * _t_single_copy(N, s)
+        assert abs(rate - target) < 1.1e-8 * target, (N, s, v, rate, target)
 
 
 _crown_case()

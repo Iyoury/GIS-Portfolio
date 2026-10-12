@@ -190,7 +190,7 @@ sub_steps:
       The Wright-Fisher model is the standard model of genetic drift in a population of constant size.
       Selection and mutation act on the expected frequency, and drift is binomial sampling. The entries of
       one row span many decades.
-    n_test_cases: 7
+    n_test_cases: 8
     contract:
       quantity: "One-generation transition matrix of the haploid Wright-Fisher model with selection, then mutation, then binomial sampling."
       assumptions: "Haploid population of constant size N, two alleles, genic selection with fitness 1 + s for A, life cycle selection then mutation then binomial sampling."
@@ -253,7 +253,7 @@ sub_steps:
       quantities of population genetics (Kimura 1962; Kimura and Ohta 1969). For a strongly deleterious
       mutation the fixation probability is exponentially small in N s, and the conditional times follow
       from the Doob h-transform of the absorbing chain.
-    n_test_cases: 7
+    n_test_cases: 8
     contract:
       quantity: "Fixation and loss probabilities and the conditional mean fixation and loss times of allele A without mutation."
       assumptions: "Wright-Fisher chain of step 1 with u = v = 0; conditional times from the h-transformed chain."
@@ -308,7 +308,7 @@ sub_steps:
       limit it is Wright's distribution, proportional to p**(2 N v - 1) (1 - p)**(2 N u - 1) exp(2 N s p).
       With rare mutations it is concentrated on the two fixed states; the probabilities of the
       intermediate states are many orders of magnitude smaller but still needed.
-    n_test_cases: 7
+    n_test_cases: 8
     contract:
       quantity: "Stationary distribution of the number of copies of A under mutation, selection and drift."
       assumptions: "Wright-Fisher chain of step 1 with u, v > 0 (irreducible)."
@@ -363,7 +363,7 @@ sub_steps:
       The relaxation rate sets how long a population takes to forget its initial state. Without
       selection the spectrum is known exactly (Feller 1951; Cannings 1974), and the gap is u + v. With
       rare mutations the slow mode is the switching between the two fixed states.
-    n_test_cases: 10
+    n_test_cases: 11
     contract:
       quantity: "Relaxation rate 1 - lambda_2 of the Wright-Fisher chain with mutation and selection."
       assumptions: "Wright-Fisher chain of step 1 with u, v > 0; real positive spectrum."
@@ -430,7 +430,7 @@ sub_steps:
       In the origin-fixation regime (rare mutations) the waiting time for a substitution is about
       1 / (N v p_fix), with p_fix the fixation probability of one new copy (step 2). The exact mean
       first-passage times include all the failed attempts and the duration of the sweeps.
-    n_test_cases: 11
+    n_test_cases: 12
     contract:
       quantity: "Mean first-passage times between the two monomorphic states (0 -> N and N -> 0)."
       assumptions: "Wright-Fisher chain of step 1 with u, v > 0."
@@ -492,7 +492,7 @@ sub_steps:
       The quasi-stationary distribution (Yaglom limit) describes a population that has not yet reached an
       absorbing state; from it, absorption is geometric with the rate 1 - rho (Darroch and Seneta 1965). With
       one-way mutation this is the waiting time for a substitution under recurrent mutation.
-    n_test_cases: 6
+    n_test_cases: 7
     contract:
       quantity: "Absorption rate 1 - rho and quasi-stationary distribution of the Wright-Fisher chain with one-way mutation a -> A."
       assumptions: "Wright-Fisher chain of step 1 with u = 0, v > 0; i = N absorbing; Perron root rho of the restricted matrix."

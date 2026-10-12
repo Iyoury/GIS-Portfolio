@@ -53,7 +53,7 @@ def diffusion_peak(theta):
                 1e-9).
 
     Raises:
-      ValueError if theta is not finite or is outside [0.02, 1].
+      ValueError if theta is outside [0.02, 1].
     '''
     theta = float(theta)
     if not (np.isfinite(theta) and 0.02 <= theta <= 1.0):

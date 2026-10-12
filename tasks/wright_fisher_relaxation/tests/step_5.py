@@ -64,7 +64,7 @@ def _crown_case():
 
     def _t_check(out, target, tol=1e-8):
         # values only (the return type is checked in case 0)
-        assert len(out) == 2 and _t_rel(out[0], target[0]) < tol and _t_rel(out[1], target[1]) < tol, (out, target)
+        assert _t_rel(out[0], target[0]) < tol and _t_rel(out[1], target[1]) < tol, (out, target)
 
     for N, s, u, v in ((20, -0.5, 1e-12, 1e-12), (30, 0.3, 1e-3, 1e-10)):
         _t_check(substitution_times(N, s, u, v), _t_times(N, s, u, v, 80))
@@ -86,7 +86,7 @@ def _crown_case():
 
     def _t_check(out, target, tol=1e-8):
         # values only (the return type is checked in case 0)
-        assert len(out) == 2 and _t_rel(out[0], target[0]) < tol and _t_rel(out[1], target[1]) < tol, (out, target)
+        assert _t_rel(out[0], target[0]) < tol and _t_rel(out[1], target[1]) < tol, (out, target)
 
     for N, s, s2, u, v in ((400, 0.5, -1.0 / 3.0, 1e-12, 1e-12), (250, 0.25, -0.2, 1e-7, 1e-11)):
         a = substitution_times(N, s, u, v)
@@ -141,14 +141,15 @@ def _crown_case():
 _crown_case()
 
 # --- test case 4 ---
-# N not an integer in [1, 400], or s, u, v out of range (u = 0: i = 0 is never reached from i = N; v = 0: i = N
-# is never reached from i = 0)
+# each stated error rule once, just outside the domain: N above 400, N a float (even integer-valued), N a bool,
+# s below -0.5, u = 0 (below its floor 1e-12: i = 0 is then never reached from i = N), v above 0.1
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for _t_bad in ((0, 0.1, 0.01, 0.01), (401, 0.1, 0.01, 0.01), (True, 0.1, 0.01, 0.01), (10, 0.1, 0.0, 0.01), (10, 0.1, 0.01, 0.0), (10, 0.1, 0.01, 0.15), (6.0, 0.1, 0.01, 0.01), (10, -0.51, 0.01, 0.01)):
+    for _t_bad in ((401, 0.1, 0.01, 0.01), (6.0, 0.1, 0.01, 0.01), (True, 0.1, 0.01, 0.01), (10, -0.51, 0.01, 0.01),
+                   (10, 0.1, 0.0, 0.01), (10, 0.1, 0.01, 0.11)):
         try:
             substitution_times(*_t_bad)
         except ValueError:
@@ -203,7 +204,7 @@ def _crown_case():
         P = _t_P_exact(N, s, u, v)
         target = (float(_t_hit(P, N, 0)), float(_t_hit(P, 0, N)))
         out = substitution_times(N, s, u, v)
-        assert len(out) == 2 and all(abs(a - b) < 1e-8 * b for a, b in zip(out, target)), (N, s, u, v, out, target)
+        assert all(abs(out[k] - target[k]) < 1e-8 * target[k] for k in range(2)), (N, s, u, v, out, target)
 
 
 _crown_case()
@@ -307,7 +308,7 @@ def _crown_case():
 
     def _t_check(out, target, tol=1e-8):
         # values only (the return type is checked in case 0)
-        assert len(out) == 2 and _t_rel(out[0], target[0]) < tol and _t_rel(out[1], target[1]) < tol, (out, target)
+        assert _t_rel(out[0], target[0]) < tol and _t_rel(out[1], target[1]) < tol, (out, target)
 
     for N, s, u, v in ((25, 0.0, 1e-9, 1e-9), (12, 0.1, 0.1, 0.03), (16, -0.25, 0.02, 1e-12)):
         _t_check(substitution_times(N, s, u, v), _t_times(N, s, u, v, 80))
@@ -328,7 +329,7 @@ def _crown_case():
                 (400, -0.5, 1e-12, 1e-12): ("4.37795967826815097712471068418e+248", "3138809269.90745487051403101222")}
     for args, target in _T_TIMES.items():
         out = substitution_times(*args)
-        assert len(out) == 2 and all(abs(a - float(b)) < 1e-8 * float(b) for a, b in zip(out, target)), (args, out)
+        assert all(abs(out[k] - float(target[k])) < 1e-8 * float(target[k]) for k in range(2)), (args, out)
 
 
 _crown_case()
@@ -383,7 +384,7 @@ def _crown_case():
     for N, s, u, v in ((12, -0.4, 1e-12, 1e-12), (16, 0.2, 0.05, 1e-9), (10, 0.0, 0.1, 0.1)):
         out = substitution_times(N, s, u, v)
         target = _t_times_Z(N, s, u, v)
-        assert len(out) == 2 and all(abs(a - b) < 1e-8 * b for a, b in zip(out, target)), (N, s, u, v, out, target)
+        assert all(abs(out[k] - target[k]) < 1e-8 * target[k] for k in range(2)), (N, s, u, v, out, target)
 
 
 _crown_case()
@@ -441,6 +442,27 @@ def _crown_case():
         out = substitution_times(N, s, u, v)
         target = _t_commute(N, s, u, v)
         assert abs(out[0] + out[1] - target) < 1e-8 * target, (N, s, u, v, out, target)
+
+
+_crown_case()
+
+# --- test case 11 ---
+# the largest passage times in the domain: N = 400 with A strongly deleterious (s = -0.45, just inside the excluded
+# corner s <= -0.46), mutation A -> a at its upper end u = 0.1 and a -> A at its floor v = 1e-12, where t_up is about
+# 3.45e290 generations while t_down is about 12 generations. Independent targets: the hitting-time systems
+# (I - Q) t = 1 (Q the matrix without the target state), with the transition matrix from mpmath binomials, solved by
+# plain Gaussian elimination with partial pivoting in mpmath, run once: t_up at 380 and at 450 digits (identical to
+# 40 digits) and t_down at 100 digits
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+    t_up, t_down = substitution_times(400, -0.45, 0.1, 1e-12)
+    target_up = float("3.452011881615877833006321693380180711916e+290")
+    target_down = float("12.41572647226185732189932164804773815549")
+    assert abs(t_up - target_up) < 1e-8 * target_up, (t_up, target_up)
+    assert abs(t_down - target_down) < 1e-8 * target_down, (t_down, target_down)
 
 
 _crown_case()

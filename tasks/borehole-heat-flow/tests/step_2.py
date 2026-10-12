@@ -6,10 +6,7 @@ import numpy as np
 
 def _crown_case():
     import numpy as np
-    out = layer_integrals([0.0], [2.5], 800.0)
-    assert isinstance(out, tuple) and len(out) == 2
-    _t2_R, _t2_S = out
-    assert type(_t2_R) is float and type(_t2_S) is float, (type(_t2_R), type(_t2_S))
+    _t2_R, _t2_S = layer_integrals([0.0], [2.5], 800.0)
     assert abs(_t2_R - 800.0 / 2.5) < 1e-9 * 320
     assert abs(_t2_S - 800.0**2 / (2 * 2.5)) < 1e-9 * 128000
 
@@ -62,14 +59,19 @@ def _crown_case():
     import numpy as np
     z = np.linspace(0, 900, 12).reshape(3, 4)
     out = layer_integrals([0.0, 300.0], [3.0, 2.0], z)
-    assert isinstance(out, tuple) and len(out) == 2
+    one = layer_integrals([0.0, 300.0], [3.0, 2.0], np.array([450.0]))
+    sc = layer_integrals([0.0, 300.0], [3.0, 2.0], 450.0)
+    # output contract: a tuple of two arrays with the shape of z (a one-element z included), two floats for a scalar z
+    assert (isinstance(out, tuple) and len(out) == 2 and all(isinstance(v, np.ndarray) and v.shape == z.shape for v in out)
+            and all(isinstance(v, np.ndarray) and v.shape == (1,) for v in one) and all(type(v) is float for v in sc))
     _t2_R, _t2_S = out
-    assert isinstance(_t2_R, np.ndarray) and isinstance(_t2_S, np.ndarray) and _t2_R.shape == z.shape and _t2_S.shape == z.shape
     zz = np.minimum(z, 300.0)
     _t2_R_exp = zz / 3.0 + np.maximum(z - 300.0, 0.0) / 2.0
     _t2_S_exp = zz ** 2 / 6.0 + (np.maximum(z, 300.0) ** 2 - 300.0 ** 2) / 4.0
     np.testing.assert_allclose(np.asarray(_t2_R), _t2_R_exp, rtol=1e-9, atol=1e-12)
     np.testing.assert_allclose(np.asarray(_t2_S), _t2_S_exp, rtol=1e-9, atol=1e-12)
+    # z = 450 m: R = 300/3 + 150/2 = 175, S = 300^2/6 + (450^2 - 300^2)/4 = 43125
+    np.testing.assert_allclose([float(one[0][0]), float(one[1][0]), sc[0], sc[1]], [175.0, 43125.0, 175.0, 43125.0], rtol=1e-9)
 
 
 _crown_case()
@@ -273,33 +275,18 @@ def _crown_case():
 _crown_case()
 
 # --- test case 10 ---
-# invalid raises
+# a non-positive conductivity raises ValueError (stated error rule)
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for case in ["k0", "tops", "first", "neg", "len", "two_d"]:
-        _t_msg = " (case %r)" % (case,)
-        tops, k, z = [0.0, 100.0], [2.0, 3.0], 50.0
-        if case == "k0":
-            k = [2.0, 0.0]
-        elif case == "tops":
-            tops = [0.0, 0.0]
-        elif case == "first":
-            tops = [10.0, 100.0]
-        elif case == "neg":
-            z = -5.0
-        elif case == "len":
-            k = [2.0]
-        else:
-            tops, k = [[0.0, 100.0]], [[2.0, 3.0]]
-        try:
-            layer_integrals(tops, k, z)
-        except ValueError:
-            pass
-        else:
-            raise AssertionError("layer_integrals must raise ValueError" + _t_msg)
+    try:
+        layer_integrals([0.0, 100.0], [2.0, 0.0], 50.0)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("layer_integrals must raise ValueError for a zero conductivity")
 
 
 _crown_case()

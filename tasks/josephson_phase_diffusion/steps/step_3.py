@@ -19,6 +19,6 @@ def diffusion_peak(theta):
                 1e-9).
 
     Raises:
-      ValueError if theta is not finite or is outside [0.02, 1].
+      ValueError if theta is outside [0.02, 1].
     '''
     raise NotImplementedError
