@@ -91,7 +91,12 @@ def _ss_integrate(g, theta, psi):
             def fp(p):
                 E = p * p / (1.0 + math.sqrt(1.0 + p * p))
                 return p * p * g(E, (E - EF) / theta)
-            tot += _ss_quad(fp, math.sqrt(a * (a + 2.0)), math.sqrt(b * (b + 2.0)))
+            pa, pb = math.sqrt(a * (a + 2.0)), math.sqrt(b * (b + 2.0))
+            # breakpoints at p = 1, 2, 4, ...: a single 21-point Gauss-Kronrod rule over a long first panel
+            # (p up to the Fermi momentum) can report convergence while missing the curvature of
+            # eps = sqrt(1 + p^2) near p = 1 (error estimate 1e-13, actual error up to 5e-11, measured)
+            br = [q for q in (2.0 ** k for k in range(64)) if pa < q < pb]
+            tot += _ss_quad(fp, pa, pb, points=br or None)
         else:
             ya, yb = (a - EF) / theta, (b - EF) / theta
 
