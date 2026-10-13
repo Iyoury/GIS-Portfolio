@@ -132,6 +132,8 @@ starting points, use judgement and flag what does not fit. Update prompt, refere
 - 2026-10-12 later: activation v14 and electron v3 "too easy" by the difficulty probe (2/2, miss 1 of 3); prism v3
   content check failed (4 untested step 4 error rules). Redesign/fix workflows run with blind quick-solver probes;
   design briefs in the scratchpad probe/<task>/DESIGN.md.
+- prism v7 (2026-10-13): content-check v3 fixes + second pass, crown_check ALL OK, verifier READY; calibrated
+  probe 0 of 3 full solves (34, 30, 34 of 36; step 2 in-plane/edge points and step 1 rods fail) -> zip sent (zips5).
 - Content-check sweep 2 (2026-10-12): all 9 tasks without non-finite literals or finiteness promises, per-step
   validation trimmed, computed cases added; independent verifiers PASS. Zips sent: electron, prism, activation
   (zips3); josephson, sto3g, stoner, ising, wright-fisher and borehole v10 final (zips4; borehole crown_check ALL OK,
