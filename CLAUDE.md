@@ -119,7 +119,11 @@ starting points, use judgement and flag what does not fit. Update prompt, refere
 - borehole-heat-flow v10 final design: step 6 single-hole joint inversion (q0, T0, g, t_end; Wald + profile
   interval) and step 7 regional ML over several holes with AR(1) noise (exact likelihood, expected Fisher
   information, likelihood-ratio interval). Blind solvers 7/7 passed (proxy optimistic, see above).
-- wright_fisher_relaxation v11 and activation_chains v12: queued for rollouts on the platform when last seen.
+- wright_fisher_relaxation platform v11 (local v10-era text, 5 Oct): in band 1/8, difficulty probe 0/3, 3 of 8 attempts
+  invalid ("possibly timed out", agents ran out of session time on step 7), notes discoverability and verifier
+  correctness 1/6 each; returned by an administrator 2026-10-13, reason not pasted (asked the author). v11 still had
+  the per-call 20 s budget and the non-finite clauses; local v15 (zips6, identical to the repo) removes both.
+  Reference cases take 0.6-7.4 s each on one core (92 s in all), so the timeouts are not the verifier's.
 - stoner_wohlfarth_ensemble v12 (eased: budgets, step-6 hints, tolerance 1e-5): awaiting rollouts when last seen.
 - All tasks: authoring-guide conformance passes 1-2 (2026-10-10/11). Author metadata filled 2026-10-12 with the
   author's own text (tools/set_author_meta.py): affiliation "Independent Researcher"; relevant_experience = B.Sc.
