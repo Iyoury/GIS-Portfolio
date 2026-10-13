@@ -95,6 +95,12 @@ starting points, use judgement and flag what does not fit. Update prompt, refere
   about Sonnet-medium / Opus-low: use those two as the quick-probe proxy, and require that they fail for scientific
   reasons before uploading a hardened version.
 
+- UPLOADS ON HOLD (2026-10-13): an admin paused new uploads and revisions from the author's account (tasks already
+  uploaded keep moving), after a second AfterQuery warning about submissions failing validation and review. WF v11 and
+  stoner v13 were both returned by an administrator at 13 Oct 04:31 (batch, no reason shown; both submitted 5 Oct with
+  time budgets and finiteness clauses in their prompts). While on hold: no upload advice; prepare and audit locally only;
+  when lifted, submit one fully audited task at a time and wait for its result.
+
 ## Validation before every zip
 
 1. Reference: each case of tests/step_k.py run alone in a fresh process with solution/step_1..k; each case
