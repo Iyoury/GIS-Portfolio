@@ -199,3 +199,37 @@ relief ignoré), première fois sur ce sujet. Règles :
   glissante, qui prend les gorges pour des pics.
 - `pkill -f` : jamais dans une commande qui contient aussi le nom du script visé (le shell s'est tué
   deux fois) ; motif entre crochets et commande séparée.
+
+## Leçon de la version « détecteur haut mort » (`airborne-radiometric-reduction` v4)
+
+Deux sondes locales de plus à effort bas sur la v3 : la deuxième a **résolu** la tâche en 15 commandes
+(somme sur les cellules du MNT pour le relief, a_u re-mesuré, pads par date, interpolation des trois
+lignes mortes). Un seul levier à ~50 % de réussite n'est pas assez. Mesures et règles :
+
+- **Un seuil ne distingue pas les modèles, seulement l'absence d'une étape.** Deux corrections de
+  terrain approximatives (sources ponctuelles sans cosinus de la normale ; correction de hauteur au
+  dégagement moyen de l'empreinte, sans intégrale) sont à 2-3 % de la vérité dans les cellules de relief,
+  la référence à 1-2 %, la terre plate à 10-50 % ; aucune tolérance juste ne sépare les premières de la
+  référence (bruit de Poisson). Le dire dans le README (c'est un argument d'équité) et ne pas
+  compter sur la fidélité du modèle pour la difficulté.
+- **Instrument mort sur un vol entier plutôt que sur trois lignes.** Le détecteur haut meurt après le
+  passage sur l'eau du vol 2 et reste mort sur ses treize lignes pendant que la bouffée de radon décroît
+  (τ 1,5 h) : rien à interpoler en temps (prochain enregistrement valide le lendemain), la valeur
+  maintenue est fausse de 1 ppm en fin de vol, et le radon doit venir des croisements avec les lignes de
+  rattachement (vol 3, détecteur valide) — la pratique du métier, nommée nulle part. Variantes « zéros
+  pris pour des données » et « dernière valeur maintenue » : échec net ; la référence et l'indépendante
+  (estimateurs différents : différence par croisement + moyenne ±300 s, contre nivellement par ligne
+  avec arbre k-d et quadratique en temps) passent.
+- **Mais** une sonde à effort bas a fait ce nivellement par croisements en 17 commandes (sans toucher
+  au relief) : les leviers « contrôle qualité » et « pratique du métier » tombent chacun ~une fois sur
+  deux à effort bas ; c'est leur **produit** qui compte (deux leviers indépendants à 50 % → 25 % par
+  essai, ≈ 84 % de passer la sonde de facilité à ≤ 1/3).
+- **Définir l'amplitude d'un défaut dans l'unité jugée** (ppm), pas en comptes bruts : la bouffée de
+  30-40 cps valait 1,4 à 4 ppm selon l'efficacité du pack, et la variante naïve passait à 95 % de
+  cellules sur une graine. Mettre l'amplitude à l'échelle de la sensibilité.
+- La revue de qualité exige une section **« Reference solution » dans le README** (pas seulement
+  `solution_explanation` dans task.toml) et vérifie les chiffres du texte contre le code (5 vs 9
+  enregistrements de la moyenne glissante). Écrire les textes **à partir du code**, constantes
+  incluses, et relire chaque nombre.
+- Le motif d'un kill (`grep "[a]grcal"`) ne doit pas partager sa commande avec la ligne de relance qui
+  contient le nom en clair : le shell s'est tué une troisième fois.
