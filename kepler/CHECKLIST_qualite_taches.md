@@ -174,3 +174,28 @@ contrôle qualité » ne suffit plus ; chaque défaut supplémentaire coûte deu
 sonde locale **à effort bas** avant de soumettre : c'est elle qui imite la sonde de facilité. La seule voie
 restante est une science sans procédure de manuel (la méthode standard fausse pour ces données, la
 correction à dériver), avec le risque de la revue d'équité.
+
+## Leçon de la version relief (`airborne-radiometric-reduction` v3)
+
+La plateforme a confirmé la sonde locale sur la v2 (facilité 2/3 à effort bas). La v3 remplace la
+source de difficulté : deux gorges et une crête traversent le bloc, l'avion tient le niveau du plateau,
+et l'hypothèse du sol plat de la correction de hauteur IAEA donne ×1,5 à ×3 dans les gorges ; la
+correction se dérive des premiers principes (radiance isotrope, cos θ_n · e^(−μr)/r², intégrée sur le
+MNT fourni), elle n'est dans aucun manuel. Sonde locale à effort bas : **échec** (tout le reste juste,
+relief ignoré), première fois sur ce sujet. Règles :
+
+- La difficulté qui tient est **une physique sans recette** que les données rendent visible (MNT fourni,
+  altimètre à 250 m, concentrations ×3 dans une même unité) ; les défauts d'instrument, même nombreux,
+  ne tiennent pas à ce niveau d'agent.
+- Juger le levier **dans ses propres cellules** (cellules de relief, tolérances élargies pour le bruit
+  des comptes) : dilué dans des moyennes ligne-unité ordinaires, un biais de ×3 sur dix enregistrements
+  passait.
+- Pour une correction géométrique, la vérité doit être insensible à l'erreur de position de l'agent
+  (parois lisses, pentes < 35°) ; des parois raides faisaient varier le facteur de 100 % en 100 m et
+  la référence elle-même échouait.
+- Ordre des étapes : corriger le relief **avant** l'étalonnage sur la ligne test, sinon la ligne test
+  porte le biais ; choisir la ligne test là où le facteur de terrain vaut 1.
+- Le dépiquage de l'altimètre se fait contre le dégagement prédit (GPS − géoïde − MNT), pas par médiane
+  glissante, qui prend les gorges pour des pics.
+- `pkill -f` : jamais dans une commande qui contient aussi le nom du script visé (le shell s'est tué
+  deux fois) ; motif entre crochets et commande séparée.
