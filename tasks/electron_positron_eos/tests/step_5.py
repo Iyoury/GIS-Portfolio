@@ -102,11 +102,16 @@ _crown_case()
 # dB/dT = (k / (m_e c^2 pi^2 lambda^3)) (3 K2(a) + a K1(a)), (dP/dn)_T = k T rho Ye N_A / N_tot,
 # gamma1 = (rho Ye N_A / P) (dP/dn)_T + T (dP/dT)_n^2 / (P c_V), nabla_ad = (dP/dT)_n / (c_V gamma1);
 # rho = 2e-10 g cm^-3, T = 1.4e8 K, Ye = 0.5 (psi about 9.8; pair creation adds 1.5e-5 to c_V),
-# rho = 1e-8 g cm^-3, T = 1.2e8 K, Ye = 1 (psi about 21.7) and a pair plasma at rho = 2e-10 g cm^-3,
+# rho = 1e-8 g cm^-3, T = 1.2e8 K, Ye = 1 (psi about 21.7), a pair plasma at rho = 2e-10 g cm^-3,
 # T = 2e8 K, Ye = 0.5 (psi about 0.0156, 0.97 positrons per electron, gamma1 = 1.063: the heat goes into
-# pair creation). target evidence (special_case): these closed forms agree with the exact Bessel-function
+# pair creation) and the cool, dilute corner of the domain, rho = 2e-10 g cm^-3, T = 1e7 K, Ye = 0.5
+# (rho Ye = 1e-10 g cm^-3 and T at their inclusive endpoints; psi = 564, close to m_e c^2 / k T = 593, so
+# n_minus, P and u change by 564 times and s by about 546 times the relative change of psi; n_plus about
+# 3e-477 cm^-3, within 1e-250 of 0). target evidence (special_case): these closed forms agree with the exact Bessel-function
 # series of the Fermi-Dirac integrals (route S, definition-level exponents) within 3.2e-13 for the seven
-# equation-of-state values and 2.2e-14 for gamma1 and nabla_ad; limits: occupation exponent above 27.
+# equation-of-state values and 2.2e-14 for gamma1 and nabla_ad; at the corner, where the electron
+# occupation exponent is at least 1/theta - psi = 28.6, within 1.4e-13 and 2e-16 (route S with 8 terms in
+# 60 digits). limits: occupation exponent above 27.
 import numpy as np
 
 
@@ -125,7 +130,7 @@ def _crown_case():
 
     _T_KEYS = ("psi", "n_minus", "n_plus", "P", "u", "s", "cv", "gamma1", "nabla_ad")
 
-    for _t_rho, _t_T, _t_Ye in ((2e-10, 1.4e8, 0.5), (1e-8, 1.2e8, 1.0), (2e-10, 2e8, 0.5)):
+    for _t_rho, _t_T, _t_Ye in ((2e-10, 1.4e8, 0.5), (1e-8, 1.2e8, 1.0), (2e-10, 2e8, 0.5), (2e-10, 1e7, 0.5)):
         with _t_mp.workdps(40):
             _t_n = _t_mp.mpf(_t_rho) * _t_mp.mpf(_t_Ye) * _t_mp.mpf(_T_NA)
             _t_kb = _t_mp.mpf(_T_KB)
@@ -158,7 +163,10 @@ def _crown_case():
         _t_out = electron_positron_eos(_t_rho, _t_T, _t_Ye)
         for _t_k, _t_w in zip(_T_KEYS, _t_want):
             _t_tol = 1e-8 if _t_k in ("cv", "gamma1", "nabla_ad") else 1e-10
-            assert _t_rel(_t_out[_t_k], _t_w) < _t_tol, (_t_rho, _t_T, _t_Ye, _t_k, _t_out[_t_k], _t_w)
+            if _t_k == "n_plus" and _t_w < 1e-250:
+                assert abs(_t_out[_t_k] - _t_w) <= 1e-250, (_t_rho, _t_T, _t_Ye, _t_k, _t_out[_t_k], _t_w)
+            else:
+                assert _t_rel(_t_out[_t_k], _t_w) < _t_tol, (_t_rho, _t_T, _t_Ye, _t_k, _t_out[_t_k], _t_w)
 
 
 _crown_case()
@@ -166,9 +174,8 @@ _crown_case()
 # --- test case 3 ---
 # strongly degenerate gases: an ultra-relativistic gas (rho = 2e13 g cm^-3, T = 1e9 K, Ye = 0.5, E_F about
 # 1300 k T) and a mildly relativistic one (rho = 4e6 g cm^-3, T = 1e7 K, Ye = 0.5, E_F about 370 k T); here
-# the
-# adiabat is far from the one at constant entropy density (holding s fixed would make nabla_ad 3 to 4 times
-# larger).
+# the adiabat is far from the one at constant entropy density (holding s fixed would give nabla_ad = -0.50
+# and -0.36 instead of 0.25 and 0.31: the opposite sign).
 # psi, n_minus, n_plus, P, u, s and c_V are the version-5 Sommerfeld targets (route M below, terms to k = 8;
 # n_plus the Maxwell-Juettner value theta K2(1/theta) e^{-psi} / (pi^2 lambda^3), below 1e-500 cm^-3).
 # target evidence, gamma1 and nabla_ad (independent_recomputation): route M, the Sommerfeld expansion with
@@ -272,14 +279,15 @@ def _crown_case():
 _crown_case()
 
 # --- test case 6 ---
-# Ye outside (0, 1], rho Ye outside [1e-10, 1e13] g cm^-3 or T outside [1e7, 1e11] K
+# Ye outside (0, 1], rho Ye outside [1e-10, 1e13] g cm^-3 or T outside [1e7, 1e11] K (below and above)
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
 
-    for _t_bad in ((1e6, 1e9, 0.0), (1e6, 1e9, 1.2), (1e-11, 1e9, 0.5), (3e13, 1e9, 0.5), (1e6, 2e11, 0.5)):
+    for _t_bad in ((1e6, 1e9, 0.0), (1e6, 1e9, 1.2), (1e-11, 1e9, 0.5), (3e13, 1e9, 0.5), (1e6, 9e6, 0.5),
+                   (1e6, 2e11, 0.5)):
         try:
             electron_positron_eos(*_t_bad)
         except ValueError:
@@ -366,11 +374,13 @@ _crown_case()
 # --- test case 9 ---
 # pair plasmas at T = 5e9 K that differ only in their small net electron density: rho = 2e-10 and 2e2
 # g cm^-3, Ye = 0.5 (psi about 2.1e-17 and 2.1e-5). P, s and the total energy are even in psi and n_net is
-# odd (charge conjugation), so c_V, gamma1 and nabla_ad of the two states differ only at order psi^2: the
-# two outputs must agree within 2e-8 plus the difference of the two stored targets (1.3e-10), and each must
-# meet its target. target evidence (independent_recomputation): rho = 2e-10, route P0 (case 0), cross-checked
-# by route S (100 terms) to all 25 digits; rho = 2e2, route S (100 terms; h and 2h agree within 1.5e-38),
-# which agrees with the psi -> 0 limit within 8.5e-13 (the order psi^2 terms).
+# odd (charge conjugation), so c_V, gamma1 and nabla_ad of the two states differ only at order psi^2: each
+# output must meet its target, and the two outputs must agree within 2e-8 plus the difference of the two
+# stored targets (1.3e-10; this restates the symmetry and follows from the per-target bounds).
+# target evidence (independent_recomputation): rho = 2e-10, route P0 (case 0), cross-checked by route S
+# (100 terms) to all 25 digits; rho = 2e2, route S (100 terms; h and 2h agree within 1.5e-38), which agrees
+# with the psi -> 0 limit within 8.5e-13 (gamma1), 1.3e-11 (nabla_ad) and 1.3e-10 (c_V), its order-psi^2
+# terms.
 # Limits: S exact for psi < m_e c^2 / k T = 1.19.
 import numpy as np
 

@@ -55,14 +55,13 @@ _crown_case()
 #      4.8e-9 for u and 6.0e-9 for s at this state, measured from the difference formula at h and 2 h,
 #      whose ratio is 16);
 #  (d) gamma1 and nabla_ad as the exponents of the adiabat at constant s / rho: with five-point centred
-#      differences (h = 5e-3 rho and 5e-3 T) of the returned ln P and sigma = s / rho, chi_rho = rho
-#      dlnP/drho,
-#      chi_T = T dlnP/dT, Gamma3 - 1 = -(rho dsigma/drho) / (T dsigma/dT), gamma1_FD = chi_rho + chi_T
-#      (Gamma3 - 1) and nabla_FD = (Gamma3 - 1) / gamma1_FD, within 1e-8 (the returned exponent itself) + the
-#      first-order propagation of 1e-10 relative errors of every returned P and s through the differences
-#      and these formulas (about 1.3e-7 here) + 2e-8 for the truncation error of the stencils (5.5e-9 for
-#      gamma1 and 8.8e-9 for nabla_ad, measured on the exact Bessel-series equation of state at h and 2 h,
-#      ratio 16);
+#      differences (h = 5e-3 rho and 5e-3 T) of the returned ln P and sigma = s / rho,
+#      chi_rho = rho dlnP/drho, chi_T = T dlnP/dT, Gamma3 - 1 = -(rho dsigma/drho) / (T dsigma/dT),
+#      gamma1_FD = chi_rho + chi_T (Gamma3 - 1) and nabla_FD = (Gamma3 - 1) / gamma1_FD, within 1e-8 (the
+#      returned exponent itself) + the first-order propagation of 1e-10 relative errors of every returned P
+#      and s through the differences and these formulas (6.4e-8 for gamma1 and 1.1e-7 for nabla_ad here)
+#      + 2e-8 for the truncation error of the stencils (5.5e-9 for gamma1 and 8.8e-9 for nabla_ad, measured
+#      on the exact Bessel-series equation of state at h and 2 h, ratio 16);
 #  (e) every returned value against the independent targets of this state: route S, the Bessel-function
 #      series of the Fermi-Dirac integrals (90 terms, exact for psi < m_e c^2 / k T = 1.98) with
 #      definition-level exponents, cross-checked by route Q (quadrature) within 4.3e-18 for gamma1 and

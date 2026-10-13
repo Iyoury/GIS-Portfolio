@@ -126,7 +126,8 @@ values (k, N_A).
 
   At the 19 tested (rho, T, Ye) states the exponents agree within 3.1e-10 (at (2e-10, 2e8, 0.5), the
   h^6 truncation of the stencil in T where the pair number varies as e^{-1/theta}). The second solution
-  meets every stored target within 1.8e-11 for gamma1 and nabla_ad and within 1e-13 for the other keys.
+  meets every stored target within 1.8e-11 for gamma1 and nabla_ad and within 1.1e-13 for the other keys
+  (1.02e-13, n_plus at (1e8, 3e8, 0.43)).
 
 ## Targets (all independent of the solution code)
 - **Classical gas.** The Maxwell-Juettner closed forms with modified Bessel functions, in mpmath:
@@ -179,15 +180,18 @@ values (k, N_A).
   with the exact Bessel series within 3.3e-13. This includes classical pair plasmas at T = 2e8 K (steps 1
   and 2 at psi = 0.0156, steps 3 and 4 at rho_Ye = 1e-10, 1e-9 and 1e-8 g cm^-3, step 5 at (2e-10, 2e8,
   0.5)), with up to 0.97 positrons per electron and occupation exponents above 28.4, where the closed forms
-  agree with the series within 1.6e-13.
+  agree with the series within 1.6e-13. Since the second pass of version 6, step 5 also uses them at the
+  cool, dilute corner (rho, T, Ye) = (2e-10, 1e7, 0.5): psi = 564, occupation exponent at least 28.6.
 - **General case 1** (version 4) has no stored target. At (rho, T, Ye) = (1e6, 3e9, 0.5) it checks
   identities of the returned equation of state (charge neutrality, the Euler relation, c_V = du/dT =
   T ds/dT at constant rho Ye), each within its first-order error budget (see Version 4).
 - **Version 6 targets for gamma1, nabla_ad and the new states.** None comes from a solution; the scripts
-  (mpmath) stay outside the task folder. Every route takes the exponents from their definitions, by the
-  Jacobian chain rule on directly computed n_net, P and s (sigma = s/n_net):
+  (mpmath) stay outside the task folder. The primary routes M, S and Q take the exponents from their
+  definitions, by the Jacobian chain rule on directly computed n_net, P and s (sigma = s/n_net):
   gamma1 = (n/P) d(P, sigma)/d(n, sigma), nabla_ad = (P/T) d(T, sigma)/d(P, sigma), and
-  c_V = T d(s, n)/d(T, n). No Maxwell relation, no fluctuation moment and no c_V input is used.
+  c_V = T d(s, n)/d(T, n). They use no Maxwell relation, no fluctuation moment and no c_V input. Route P0
+  is the exact psi -> 0 limit of the same definitions and route C a closed form, both written with c_V;
+  route G (response moments) and the zero-temperature forms serve only as cross-checks.
   - **M** (degenerate states). The Sommerfeld expansion above, carried to theta^24 (k = 12) in 60
     digits, with the (theta, mu) derivatives taken term by term. k = 10 and k = 12 agree within 1e-33 at
     every M target state except (rho_Ye, T) = (4.3e7, 3e8), where they agree within 1.2e-17. There E_F
@@ -210,7 +214,11 @@ values (k, N_A).
     N_tot = sqrt(n^2 + 4B^2), (dP/dT)_n = k N_tot + 4 kT B (dB/dT)/N_tot,
     (dP/dn)_T = kT n/N_tot, gamma1 = n (dP/dn)_T/P + T (dP/dT)_n^2/(P c_V) and
     nabla_ad = (dP/dT)_n/(c_V gamma1). They agree with the definition-level route S within 2.2e-14 for
-    the exponents and 3.2e-13 for the other keys at the three tested states.
+    the exponents and 3.2e-13 for the other keys at the three states of the first pass. At the cool,
+    dilute corner (2e-10, 1e7, 0.5), added in the second pass, route S (8 terms, 60 digits, Jacobian by
+    five-point differences in (ln T, ln psi) at h = 1e-12) agrees with them within 2e-16 for the exponents,
+    3.5e-14 for c_V, 7e-14 for P and u and 2.5e-16 for psi; this is the size of the Fermi corrections that
+    route C neglects.
   - **Zero-temperature closed forms** (cross-check only). Gamma1 = 8x^5/(3 sqrt(1+x^2)
     [x(2x^2 - 3) sqrt(1+x^2) + 3 asinh x]) and Gamma3 - 1 = (2+x^2)/(3(1+x^2)), x = p_F/(m_e c). They
     hold up to the thermal correction, of order (kT/E_F)^2.
@@ -225,8 +233,13 @@ values (k, N_A).
 
     The version-3 7-key targets kept in step 5 cases 0, 1, 3 and 5 agree with these routes within 1e-14.
     The only differences above 1e-16 are c_V, by the 1e-14 truncation of the centred difference that
-    produced them, and, in the pair plasmas at 1e10 and 1e11 K, psi and the densities. The version-3 40-digit
-    quadrature of n_minus - n_plus put them 2.4e-16 off the exact P0 values, through that cancellation.
+    produced them, and, in the pair plasmas at 1e10 and 1e11 K, psi and the densities. They differ from the
+    P0 values by 2.4e-16 because the version-3 targets use the decimal constants and route P0 their
+    double-precision values (checked in the second pass: the version-3 psi at (1e-3, 1e10, 0.5) and
+    (2e-10, 1e11, 0.5) match the psi -> 0 limit with the decimal constants within 1.4e-23 and 1e-23, and
+    with the double constants they are 2.4e-16 and 2.3e-16 off; the P0 psi at (2e-10, 1e9, 0.5) matches
+    the double constants within 2.3e-26). The effect of the convention, below 5e-16 at the states checked,
+    is far inside every tolerance.
 
 The reference agrees with all targets to 1.4e-13 or better (remeasured in version 4, same values as in
 version 3): 1.4e-13 for n_net = 9.0e-250 cm^-3 of the cool classical gas at T = 1e7 K, psi = 1e-18 (and
@@ -249,10 +262,16 @@ psi = 1.3e5 and 2.8e-6 for the Schur form at rho_Ye = 1e13; neither is reproduce
 - Adiabatic exponents (version 6, measured with the shipped mutants and two unshipped controls against
   the stored targets; required 1e-8):
   - **Entropy density s instead of s/rho held fixed** (adiabat_at_constant_entropy_density):
-    nabla_ad off by 3.0 relative in cold degenerate gases (4 times the true value), 4.2 at
-    (2e6, 1e9, 0.5) and 5.7 at (1e6, 3e9, 0.5); gamma1 near 0 in every pair plasma.
-  - **Pair number frozen during the change** (pairs_frozen_in_response): gamma1 off by 8.2 to 60
-    relative in pair plasmas (61 times the true value at (2e-10, 1e9, 0.5)) and by 2.4 at (1e6, 3e9, 0.5).
+    nabla_ad off by 3.0 relative in cold degenerate gases (-2 times the true value: -0.50 instead of
+    +0.25, since s is proportional to T n^(2/3) in an ultra-relativistic degenerate gas, so T falls as
+    n^(-2/3) at constant s), by 2.2 at (4e6, 1e7, 0.5) (-1.17 times), 4.2 at (2e6, 1e9, 0.5) and 5.7 at
+    (1e6, 3e9, 0.5); gamma1 near 0 in every pair plasma.
+  - **Positron terms dropped from the response moments** (positron_response_ignored; named
+    pairs_frozen_in_response before the second pass): electron weights only in n_psi, X and the c_V of
+    the exponents, with the total s and n_net kept. gamma1 off by 8.2 to 60 relative in pair plasmas (61
+    times the true value at (2e-10, 1e9, 0.5)) and by 2.4 at (1e6, 3e9, 0.5). This is not a consistent
+    frozen-pair adiabat: with each species at fixed number (separate chemical potentials, 30-digit
+    quadrature) gamma1 would be 1.5013 instead of 1.2354 at (2e-10, 1e9, 0.5).
   - **(dP/dT)_n through (T, psi)** (thermal_pressure_from_T_psi_jacobian): s + n k psi - n kT
     (dn/dT)_psi/n_psi cancels by about psi^2. nabla_ad is off by 1.7e-7 at (2e13, 1e7, 0.5), 1.5e-7 at
     (1e13, 1.2e7, 0.5), 4.3e-7 at (2e12, 1e7, 0.5) and 6.5e-8 at (3.5e12, 2e7, 0.46). This is rounding
@@ -813,7 +832,7 @@ the finding, its cause, the change, the regression test and what was rerun.
     - Controls: all-None and all-zero pass 0 cases of every step and of general.
     - SUMMARY ALL OK.
 
-## Version 6 (difficulty_increase: adiabatic exponents in the final step, recipes and hints removed)
+## Version 6 (difficulty_increase: adiabatic exponents in the final step, recipes and hints removed from the agent-visible text)
 
 Platform version 4 of the task; edit_label difficulty_increase. The design brief and the pre-probe
 verdicts are kept outside the task folder. Each item gives the finding, its cause, the change, the
@@ -837,8 +856,8 @@ regression test and what was rerun.
     states per (2 pi hbar)^3), that the radiation and the ions are not part of the gas, and that the input
     ranges bound the arguments and are not limits of the gas.
   - Steps 1 and 2: the integrals and the method hints are removed. The bounded domain facts are kept:
-    Fermi energies up to about 1e6 kT, pair plasmas with up to about 20 decades of pair excess, and net
-    densities below double precision.
+    Fermi energies up to about 1e6 kT, pair plasmas with 20 decades or more of pair excess (worded "up to
+    about 20 decades" until the second pass), and net densities below double precision.
   - Steps 2 and 4: the clauses "in which the entropy per electron is only about 1e-5 k" and "c_V is
     smaller than u/T by a factor proportional to (kT/E_F)^2 ..." are removed. Step 4 gains the domain
     sentence on Fermi energies up to about 1.3e5 kT in the densest, coolest gases.
@@ -878,8 +897,8 @@ regression test and what was rerun.
     exact Bessel-series equation of state at h and 2h, ratio 16. Both solutions show exactly these
     truncation errors.
 - 6. Change: mutants.
-  - New step 5 mutants: adiabat_at_constant_entropy_density, pairs_frozen_in_response and
-    thermal_pressure_from_T_psi_jacobian.
+  - New step 5 mutants: adiabat_at_constant_entropy_density, positron_response_ignored (named
+    pairs_frozen_in_response in the first pass) and thermal_pressure_from_T_psi_jacobian.
   - cv_at_fixed_psi is rebuilt on the new step 5: the wrong c_V is returned and enters the exponents.
   - whole_task_classical_occupation is rebuilt: Boltzmann occupation throughout, including the response
     moments.
@@ -887,7 +906,7 @@ regression test and what was rerun.
   - Rejections (tools/crown_check.py):
     - cv_at_fixed_psi fails step 5 cases 0-5, 7 and 9;
     - adiabat_at_constant_entropy_density fails cases 0-5 and 7-9;
-    - pairs_frozen_in_response fails cases 0, 2, 4, 5, 8 and 9;
+    - positron_response_ignored fails cases 0, 2, 4, 5, 8 and 9;
     - thermal_pressure_from_T_psi_jacobian fails case 1 (6.5x the tolerance at (3.5e12, 2e7, 0.46)),
       case 5 (17x at the degenerate corner) and case 7 (43x at (2e12, 1e7, 0.5));
     - whole_task_classical_occupation fails general cases 0-3;
@@ -913,4 +932,83 @@ regression test and what was rerun.
     gave bit-identical outputs.
   - Per-case runtime: at most 0.8 s for the reference, and at most 6.6 s for the second solution
     (general case 1, nine calls of about 0.7 s each).
-  - Raw folder size: 334,129 bytes (du -sb, this note included), against a limit of 650 KB.
+  - Raw folder size after the first pass: 334,129 bytes (du -sb); see the second pass below.
+
+### Version 6, second pass (independent verification; same upload, edit_label difficulty_increase)
+
+Three independent verifiers (file checks, content check, targets) reviewed the first pass. Nothing was
+blocking; each item below gives the finding, its cause, the change, the regression test and what was rerun.
+
+- Mutant descriptions.
+  - Finding: the texts said that holding s fixed makes nabla_ad "4 times too large" in degenerate gases
+    (difficulty_explanation, this file, a comment of step 5 case 3), and that the step 5 mutant
+    pairs_frozen_in_response freezes the positron number.
+  - Cause: the first figure was the relative error (3.0) read as a ratio. The second described the intent,
+    not the code: the mutant drops the positron terms from n_psi, X and the c_V of the exponents but keeps
+    the total s and n_net.
+  - Change: holding s fixed gives nabla_ad = -1/2 instead of +1/4 in an ultra-relativistic degenerate gas
+    (-0.50 and -0.36 instead of 0.25 and 0.31 at the case 3 states; s is proportional to T n^(2/3), so T
+    falls on compression). The mutant is renamed positron_response_ignored (file
+    mutants/step_5_positron_response_ignored.py), with its description and code comment corrected. A
+    consistent frozen-pair adiabat (each species at fixed number, 30-digit quadrature with separate
+    chemical potentials) gives gamma1 = 1.5013 instead of 1.2354 at (2e-10, 1e9, 0.5); the texts now quote
+    that value next to the mutant's 76.
+  - Regression: the shipped mutant returns nabla_ad / true = -2.000 at (2e13, 1e9), (2e13, 1e7),
+    (1e13, 1.2e7), (2e12, 1e7) and -1.170 at (4e6, 1e7) (all Ye = 0.5); the renamed mutant fails step 5
+    cases 0, 2, 4, 5, 8 and 9 as before.
+- Verification text.
+  - Finding: verification_explanation and the Targets section said that no stored exponent used a c_V
+    input, while route P0 (gamma1 = T (dP0/dT)^2 / (P0 c_V0)) does; the list of second routes left out
+    Q with P0 at the pair corner and the state (2e2, 5e9, 0.5); the (T, psi) mutant margins were called
+    "at the corner states"; the second solution's figure for the other keys was 1e-13 (measured 1.02e-13);
+    the 2.4e-16 offset of the version-3 pair-plasma targets was attributed to cancellation in their
+    quadrature; a comment of general case 1 (d) gave about 1.3e-7 for the propagated error.
+  - Change: the no-c_V statement is limited to routes M, S and Q, and P0 is described as the exact
+    psi -> 0 limit of the definitions; the second routes now include Q with P0 within 4.0e-20 and, at
+    (2e2, 5e9, 0.5), S with the psi -> 0 limit within 1.3e-10 (its order-psi^2 terms; 8.5e-13 for gamma1,
+    1.3e-11 for nabla_ad); the (T, psi) mutant margins are 6.5 to 43 times the tolerance at four cold
+    degenerate states; 1.1e-13; the 2.4e-16 is the decimal versus double-precision constants (checked, see
+    Targets); 6.4e-8 for gamma1 and 1.1e-7 for nabla_ad in the general case 1 comment.
+  - Regression: remeasured with the reference (propagated part 6.45e-8 and 1.118e-7, budgets 9.45e-8 and
+    1.418e-7, deviations 5.48e-9 and 8.75e-9) and the second solution (1.77e-11 for the exponents, 9.8e-15
+    for c_V and 1.02e-13 for the other keys against every stored target).
+- Untested regime of step 5.
+  - Finding: the step 5 prompt states that n_minus, n_plus, P, u and s change by up to about 600 times the
+    relative change of psi and that the bounds hold at the boundaries, but no step 5 or general state was
+    cool and dilute (largest amplification about 73); the corner rho Ye = 1e-10 g cm^-3, T = 1e7 K was
+    tested only in steps 3 and 4. The lower end of the T range was not among the step 5 error inputs.
+  - Change: step 5 case 2 adds the corner (2e-10, 1e7, 0.5) to the classical closed forms (psi = 564;
+    n_minus, P and u amplify psi errors 564 times, s 546 times; n_plus = 3.4e-477 cm^-3 takes the absolute
+    1e-250 branch). Its targets are checked against route S (8 terms, 60 digits, definition-level
+    exponents): within 2e-16 for the exponents, 3.5e-14 for c_V and 7e-14 for P and u. Step 5 case 6 adds
+    (1e6, 9e6, 0.5), T below its range. n_test_cases is unchanged.
+  - Regression: at the corner the reference meets the closed forms within 2.4e-12 (gamma1), 7.5e-13
+    (nabla_ad), 1.4e-13 (c_V) and 1.03e-13 (n_minus); the second solution within 3.3e-10, 9.0e-14 and
+    1.03e-13. A psi solved only to 1e-12 relative would move n_minus by about 5.6e-10 there and fail.
+- Step 1 wording (agent-visible text).
+  - Finding: step 1 described its domain as containing pair plasmas in which the electrons and positrons
+    outnumber their difference "by up to about 20 decades", but the domain 0 < psi <= 1e6 at T = 1e11 K
+    reaches far more (about 100 decades at psi = 1e-100, where n_net is still about 3e-66 cm^-3 and the
+    relative bound applies).
+  - Change: "by 20 decades or more". This is the only change to the agent-visible text; the
+    tools/visible_spec.py output differs from the approved specification in that line only.
+- Backgrounds.
+  - Finding: background.md and the step 2 and 4 step_background still described the Euler-relation and
+    grand-canonical cancellations and gave the Gibbs entropy integrand and the fluctuation formula of c_V,
+    the hints removed from the agent-visible text. Whether the platform shows backgrounds to its solvers
+    is not known, so they would partly restore the removed hints.
+  - Change: background.md keeps the physics (pair equilibrium, occupation numbers, the regimes, the
+    meaning of Gamma1 and nabla_ad) and states the regimes qualitatively; the step 2 background keeps only
+    that pressure, energy and entropy follow from the occupation numbers; the step 4 background keeps the
+    role of c_V and the pair contribution. No formula, method or cancellation hint is left in a
+    background. Nothing graded depends on these fields.
+- Not changed.
+  - The pairwise check of step 5 case 9 follows from the per-target bounds; its comment now says so.
+- Rerun.
+  - tools/crown_check.py, all modes (-j 3): FORMAT OK; REF and SECOND pass 5/5, 7/7, 8/8, 9/9, 10/10 and
+    general 4/4; every mutant fails at least one case of its target tests (positron_response_ignored
+    cases 0, 2, 4, 5, 8, 9; thermal_pressure_from_T_psi_jacobian cases 1, 5, 7); SHIFT +-1e-12 passes
+    every case; the all-None and all-zero controls pass no case; SUMMARY ALL OK.
+  - The three pre-probe codes of the approved specification score 39/43, 40/43 and 40/43 on the final
+    tests, as before: all three pass the new corner state and the new error input.
+  - Raw folder size: 344,232 bytes (du -sb, this note included), against a limit of 650 KB.

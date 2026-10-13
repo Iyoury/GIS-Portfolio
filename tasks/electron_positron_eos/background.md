@@ -6,27 +6,16 @@ non-relativistic or ultra-relativistic. Above about 10^9 K, photons create elect
 At low density the pairs then outnumber the electrons supplied by the ions by many orders of
 magnitude.
 
-Every quantity follows from the Fermi-Dirac occupation numbers of electrons and positrons:
-
-- number densities;
-- pressure;
-- energy;
-- entropy;
-- specific heat.
+Number densities, pressure, energy, entropy and specific heat all follow from the Fermi-Dirac occupation
+numbers of electrons and positrons.
 
 The pairs are in equilibrium with radiation, so the positron chemical potential is minus that of the
 electrons, rest energy included. With psi = (mu + m_e c^2)/(k T), the occupation numbers are
 1/(exp(eps/kT -+ psi) + 1). Here eps is the total energy of a particle in units of m_e c^2.
 
-The quantities used in a stellar model are often small differences of large ones:
-
-- **Net electron density.** In a pair plasma it can be 20 decades below the electron and positron
-  densities, which nearly cancel.
-- **Entropy of a degenerate gas.** It is of order kT/E_F times the particle number. That makes it a
-  minute remainder of the Euler relation u + P - mu n = T s.
-- **Specific heat at constant density.** In the grand canonical ensemble it is
-  (<dE^2> - <dE dN>^2 / <dN^2>)/(k T^2). In a degenerate gas this difference is smaller than its terms
-  by (kT/E_F)^2.
+The gas spans pair plasmas, in which the net electron density lies many decades below the electron and
+positron densities, classical gases, and completely degenerate gases, whose thermal properties are tiny
+compared with their zero-temperature values.
 
 A stellar model also needs the response of the gas to a reversible adiabatic change, at constant
 entropy per unit mass:

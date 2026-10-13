@@ -86,8 +86,8 @@ def _epeos5_response(T, psi, n_net, P, s, cv):
     fm, gm = _epeos5_occ(xm)
     fp, gp = _epeos5_occ(xp)
     wa, wb = w * fm * gm, w * fp * gp
-    # MISTAKE: the positron number is held fixed during the adiabatic change (electron weights only in
-    # (dn/dmu)_T, (dn/dT)_mu and in the specific heat used for the exponents)
+    # MISTAKE: the positron terms are dropped from the response (electron weights only in (dn/dmu)_T,
+    # (dn/dT)_mu and in the specific heat used for the exponents), while the total s and n_net are kept
     n_psi = _EPEOS5_PREF * float(np.sum(wa))
     X = _EPEOS5_PREF * float(np.sum(wa * xm))
     eps = E + 1.0

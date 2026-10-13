@@ -32,11 +32,12 @@ metadata:
     built from by (k T / E_F)^2, so the Schur form <dE^2> - <dE dN>^2 / <dN^2> evaluated directly loses 1.9e-7 at
     rho Ye = 1e13 g cm^-3, T = 1e7 K (shipped schur_complement mutant). The final step asks for the two adiabatic
     exponents of the gas, gamma1 and nabla_ad, which the solver must derive from their definitions: the adiabatic
-    invariant is the entropy per unit mass, not per volume (holding s fixed makes nabla_ad 4 times too large in
-    degenerate gases); only the net electron number is conserved, so pair creation enters every derivative (with the
-    positron number frozen gamma1 comes out 61 times too large at rho Ye = 1e-10 g cm^-3, T = 1e9 K, where the true
-    value is 1.235); and in a completely degenerate gas, with E_F up to 1.3e5 k T, the thermal pressure (dP/dT) at
-    constant density is only chi_T = 8e-10 to 4e-9 of P / T. That pressure is set by the antisymmetric moment
+    invariant is the entropy per unit mass, not per volume (holding s fixed gives nabla_ad = -1/2 instead of +1/4 in
+    ultra-relativistic degenerate gases: the temperature would fall on compression); only the net electron number is
+    conserved, so pair creation enters every derivative (at rho Ye = 1e-10 g cm^-3, T = 1e9 K the true gamma1 is
+    1.235; with the pair number frozen, each species at fixed number, it would be 1.501, and with the positron terms
+    dropped from the response moments 76); and in a completely degenerate gas, with E_F up to 1.3e5 k T, the
+    thermal pressure (dP/dT) at constant density is only chi_T = 8e-10 to 4e-9 of P / T. That pressure is set by the antisymmetric moment
     (dn/dT) at constant mu, itself about k T / E_F ~ 1e-5 of its own scale: finite differences of P lose 4.2e-3 to
     0.16 in nabla_ad at the cold degenerate states; the (T, psi) Jacobian, s + n k psi - n k T (dn/dT)_psi /
     (dn/dpsi)_T, cancels by about psi^2 and loses 6.5e-8 to 4.3e-7; and the (T, psi) Jacobian is not the only route
@@ -83,18 +84,24 @@ metadata:
     constant n_net, a different route from the fluctuation formula of the reference. Version 5 added the Sommerfeld
     expansion of the degenerate gas (closed-form zero-temperature integrals plus terms in theta^2k), the series of
     the Fermi-Dirac integrals in modified Bessel functions (exact for psi < m_e c^2 / k T), and the closed forms of
-    a classical gas with thermal pairs. In version 6 every stored gamma1 and nabla_ad comes from the definitions, by
-    the Jacobian chain rule on directly computed n_net, P and s at constant s / n_net, with no Maxwell relation,
-    fluctuation moment or c_V input: route M (Sommerfeld to theta^24, 60 digits, derivatives term by term) for
-    degenerate states, route S (Bessel series, 5 to 200 terms, 50 digits, five-point differences at h = 1e-10) and
-    route P0 (the charge-conjugation limit psi -> 0, 1-D integrals of the psi = 0 gas, error O(psi^2) below 1.4e-21)
-    for pair plasmas, and route Q (50-digit tanh-sinh quadrature with five-point differences) elsewhere; every
-    exponent target has a second route: S with P0 within 1.1e-22, M with Q within 4.2e-18 (within 1.7e-21 at the
-    cold degenerate states), Q with S within 4.3e-18, Q with a 34-digit Gauss-Legendre evaluation of the analytic
-    response moments (route G, no differences) within 9.3e-19, and M with the zero-temperature closed forms of the
-    Chandrasekhar gas within their thermal correction (6.3e-15 to 2.9e-13 for x >= 100, 1.9e-9 at x = 10). The
-    reference meets every stored target within 3.1e-12 for gamma1 and nabla_ad (at the degenerate corner), 3.3e-13
-    for c_V and 2.7e-14 for the other keys of the step 5 states. General case 1 needs no stored target for its
+    a classical gas with thermal pairs. In version 6 every stored gamma1 and nabla_ad comes either from the
+    definitions, by the Jacobian chain rule on directly computed n_net, P and s at constant s / n_net with no
+    Maxwell relation, fluctuation moment or c_V input (route M, Sommerfeld to theta^24, 60 digits, derivatives term
+    by term, for degenerate states; route S, Bessel series, 5 to 200 terms, 50 digits, five-point differences at h
+    = 1e-10, for pair plasmas; route Q, 50-digit tanh-sinh quadrature with five-point differences, elsewhere), or,
+    for pair plasmas with psi < 1e-10, from the exact psi -> 0 limit of those definitions (route P0: gamma1 = T
+    (dP0/dT)^2 / (P0 c_V0) and nabla_ad = P0 / (T dP0/dT) from 1-D integrals of the psi = 0 gas, error O(psi^2)
+    below 1.4e-21). Every exponent target has a second route: S with P0 within 1.1e-22, Q with P0 within 4.0e-20 at
+    the pair corner, M with Q within 4.2e-18 (within 1.7e-21 at the cold degenerate states), Q with S within
+    4.3e-18, Q with a 34-digit Gauss-Legendre evaluation of the analytic response moments (route G, no differences)
+    within 9.3e-19, M with the zero-temperature closed forms of the Chandrasekhar gas within their thermal
+    correction (6.3e-15 to 2.9e-13 for x >= 100, 1.9e-9 at x = 10), and at (2e2 g cm^-3, 5e9 K, 0.5), where psi =
+    2.1e-5, S with the psi -> 0 limit within 1.3e-10 (its order-psi^2 terms). The reference meets every stored
+    target within 3.1e-12 for gamma1 and nabla_ad (at the degenerate corner), 3.3e-13 for c_V and 2.7e-14 for the
+    other keys of the step 5 states. Step 5 case 2 also grades the cool, dilute corner (rho Ye = 1e-10 g cm^-3, T =
+    1e7 K, psi = 564, where an error of psi is amplified 564 times) against the classical closed forms, whose
+    Fermi corrections are about 1e-13 there; the reference meets them within 2.4e-12 (gamma1), 1.4e-13 (c_V) and
+    1.1e-13 (the other keys). General case 1 needs no stored target for its
     identities: at (rho, T, Ye) = (1e6 g cm^-3, 3e9 K, 0.5) it checks charge neutrality, the Euler relation, c_V =
     du/dT = T ds/dT and (version 6) gamma1 and nabla_ad against five-point differences of the returned ln P and s /
     rho along the adiabat, each within the first-order error budget of the stated accuracies computed in the test
@@ -111,16 +118,16 @@ metadata:
     method for psi; c_V from the Jacobian of (u_tot, n_net) in (T, mu); and gamma1, nabla_ad from
     Richardson-extrapolated five-point differences of ln P and s / n_net in ln n_net and ln T with psi re-solved at
     every stencil state, without response moments or c_V. It meets every stored target within 1.8e-11 for the
-    exponents and 1e-13 for the other keys, passes every test case, and on a 40-state (rho_Ye, T) grid with the four
+    exponents and 1.1e-13 for the other keys, passes every test case, and on a 40-state (rho_Ye, T) grid with the four
     corners agrees with the reference within 3.2e-13 (psi, densities, P, u, s), 1.5e-12 (c_V) and 3.3e-10
     (exponents, largest at the cool classical corner where the rounding of the occupation exponent near 590 is
     divided by the difference step). Each step has named scientific mutants (net density by subtraction, entropy
     from the Euler relation, positrons ignored in the density equation, Schur-form c_V and c_V without positron
-    fluctuations, and in step 5 c_V at constant psi, the adiabat at constant entropy density, the pair number frozen
-    in the response, and (dP/dT)_n through the cancelling (T, psi) Jacobian) and the whole-task mutant uses
-    classical (Maxwell-Boltzmann) statistics throughout; each fails at least one case of its target tests, the
-    rounding-noise (T, psi) mutant by 17x and 43x the tolerance at the corner states, identically with one
-    BLAS/OpenMP thread. tools/crown_check.py ran every test case alone in a fresh process for the reference (each
+    fluctuations, and in step 5 c_V at constant psi, the adiabat at constant entropy density, the positron terms
+    dropped from the response moments, and (dP/dT)_n through the cancelling (T, psi) Jacobian) and the whole-task
+    mutant uses classical (Maxwell-Boltzmann) statistics throughout; each fails at least one case of its target
+    tests, the rounding-noise (T, psi) mutant by 6.5 to 43 times the tolerance at four cold degenerate states
+    (step 5 cases 1, 5 and 7), identically with one BLAS/OpenMP thread. tools/crown_check.py ran every test case alone in a fresh process for the reference (each
     step with the reference earlier steps, and solution.py on every test file), the second solution and the mutants;
     checked that scaling the outputs by 1 +- 1e-12 still passes every step case and, with all five functions scaled
     at once, every general case; checked that all-None and all-zero controls pass no case; and checked the file
@@ -211,7 +218,7 @@ sub_steps:
       it. These bounds hold everywhere in the input domain, which contains completely degenerate gases
       (Fermi energies up to about 1e6 k T), classical gases, cool gases whose net density lies below the
       range of double precision, and pair plasmas in which the electrons and the positrons outnumber their
-      difference by up to about 20 decades.
+      difference by 20 decades or more.
       Inputs: T (float, 1e7 <= T <= 1e11) and psi (float, 0 < psi <= 1e6).
       Errors: raise ValueError if T is outside [1e7, 1e11] or if psi is not in (0, 1e6].
     function_header: |-
@@ -287,10 +294,8 @@ sub_steps:
           '''
     return_line: return result
     step_background: |-
-      Pressure, energy and entropy follow from the occupation numbers; the entropy density of an ideal Fermi
-      gas is -k sum over states [f ln f + (1 - f) ln(1 - f)]. In a degenerate gas the entropy is of order
-      k T / E_F times the particle number and is a minute fraction of the energy and pressure terms of the
-      Euler relation u_tot + P - T s = mu n (Landau and Lifshitz, Statistical Physics, sec. 56-61).
+      Pressure, energy and entropy follow from the occupation numbers of the two species (Landau and
+      Lifshitz, Statistical Physics, sec. 56-61).
     n_test_cases: 7
     contract:
       quantity: "Pressure, energy density and entropy density of the ideal electron-positron gas."
@@ -392,10 +397,7 @@ sub_steps:
     return_line: return cv
     step_background: |-
       The specific heat at constant density controls the thermal evolution of white dwarfs and of the
-      cores of massive stars. For a degenerate gas it is smaller than the classical 3/2 n k by about
-      pi^2 k T / E_F (the Sommerfeld expansion); pair creation adds to it at high temperature. In the grand
-      canonical ensemble, c_V = (<dE^2> - <dE dN>^2 / <dN^2>) / (k T^2), with the fluctuations of energy and of
-      the net particle number.
+      cores of massive stars; pair creation adds to it at high temperature.
     n_test_cases: 9
     contract:
       quantity: "Specific heat per volume at constant net electron density."
@@ -487,9 +489,9 @@ sub_steps:
       - name: adiabat_at_constant_entropy_density
         description: "Holds the entropy per volume s instead of the entropy per mass s / rho fixed along the adiabat: Gamma3 - 1 = ((dP/dT)_n - s) / c_V."
         file: mutants/step_5_adiabat_at_constant_entropy_density.py
-      - name: pairs_frozen_in_response
-        description: "Keeps the positron number fixed during the adiabatic change (electron response moments only in (dP/dT)_n, (dP/dn)_T and the c_V of the exponents)."
-        file: mutants/step_5_pairs_frozen_in_response.py
+      - name: positron_response_ignored
+        description: "Drops the positron terms from the response moments n_psi, X and from the c_V used in the exponents, while keeping the total s and n_net (a positron-blind response, not a consistent frozen-pair adiabat)."
+        file: mutants/step_5_positron_response_ignored.py
       - name: thermal_pressure_from_T_psi_jacobian
         description: "Takes (dP/dT)_n through the variables (T, psi), s + n k psi - n k T (dn/dT)_psi / (dn/dpsi)_T, which cancels by about psi^2 in a degenerate gas."
         file: mutants/step_5_thermal_pressure_from_T_psi_jacobian.py
