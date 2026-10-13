@@ -148,7 +148,10 @@ starting points, use judgement and flag what does not fit. Update prompt, refere
   Opus-low -> STOP, author decides (park, or new science such as Westcott g(T_n) / Cd-covered monitors, re-gated).
   Electron v4 design with two hint clauses removed (step 2 entropy per electron, step 4 (kT/E_F)^2) -> 12, 11, 12 of 14,
   failing only nabla_ad at the three cold degenerate corners (p-space quadrature floor ~1e-8, edge-centred ~1e-12) ->
-  PROCEED; approved visible text = scratchpad probe/electron_positron_eos/next2/spec.md; implementation workflow run.
+  PROCEED; approved visible text = scratchpad probe/electron_positron_eos/next2/spec.md. Electron v4 built (source.md
+  Version 6 + second pass), independently verified (targets recomputed by a separate mp adiabat to <= 3.5e-17), method
+  hints also removed from the backgrounds, crown_check ALL OK, 343704 bytes; zip in scratchpad zips7, sent, NOT uploaded
+  (account on hold). Only visible-text change after the probe: step 1 "by 20 decades or more".
 - prism v7 (2026-10-13): content-check v3 fixes + second pass, crown_check ALL OK, verifier READY; calibrated
   probe 0 of 3 full solves (34, 30, 34 of 36; step 2 in-plane/edge points and step 1 rods fail) -> zip sent (zips5).
 - Content-check sweep 2 (2026-10-12): all 9 tasks without non-finite literals or finiteness promises, per-step
