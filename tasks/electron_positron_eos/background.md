@@ -28,6 +28,19 @@ The quantities used in a stellar model are often small differences of large ones
   (<dE^2> - <dE dN>^2 / <dN^2>)/(k T^2). In a degenerate gas this difference is smaller than its terms
   by (kT/E_F)^2.
 
+A stellar model also needs the response of the gas to a reversible adiabatic change, at constant
+entropy per unit mass:
+
+- **First adiabatic exponent** Gamma1 = (d ln P / d ln rho) at constant entropy. It decides dynamical
+  stability: a self-gravitating body needs a pressure-weighted Gamma1 above 4/3.
+- **Adiabatic temperature gradient** nabla_ad = (d ln T / d ln P) at constant entropy, the threshold of
+  the Schwarzschild criterion for convection.
+
+With the pairs in equilibrium only the net electron number is conserved during the change, so pair
+creation enters every derivative. For the completely degenerate gas Gamma1 falls from 5/3 to 4/3 as the
+electrons become relativistic, which sets the Chandrasekhar mass. In a pair plasma part of the heat
+goes into the rest energy of new pairs, and Gamma1 of the pair gas falls below 4/3.
+
 All of these quantities are needed with a small relative error over the whole range of stellar
 conditions.
 

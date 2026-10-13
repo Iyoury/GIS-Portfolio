@@ -29,8 +29,29 @@ values (k, N_A).
 - **Helper names** (version 4). The module-level helpers and constants of the per-step files and of
   solution.py are named _epeos_* and _EPEOS_*, so that a helper with a generic name (_nodes, _log_net,
   PREF, ...) defined by a candidate in a later step cannot replace them in the shared namespace.
+- **Adiabatic exponents** (version 6). gamma1 and nabla_ad of the electron-positron gas alone, at
+  constant entropy per unit mass and fixed Y_e, with the pairs in equilibrium at every instant. They come
+  from the grand-canonical response moments on the same edge-centred nodes. solution/step_5.py rebuilds
+  these nodes under _epeos5_* names, so step 5 does not use the private helpers of another step.
+  - Moments, with the weights f(1-f) of both species:
+    - n_psi = kT (dn/dmu)_T = PREF sum w [f_-(1-f_-) + f_+(1-f_+)];
+    - X = T (dn/dT)_mu = PREF sum w [x_- f_-(1-f_-) - x_+ f_+(1-f_+)].
+  - Gibbs-Duhem with only n_net conserved (mu_+ = -mu_-) is dP = s dT + n_net dmu. It gives
+    (dP/dn)_T = n_net kT/n_psi and (dP/dT)_n = s - n_net k X/n_psi.
+  - The first law per baryon at constant s/n_net gives Gamma3 - 1 = (dP/dT)_n / c_V. Then
+    gamma1 = chi_rho + chi_T (Gamma3 - 1) and nabla_ad = (Gamma3 - 1)/gamma1, with
+    chi_rho = n_net (dP/dn)_T / P and chi_T = T (dP/dT)_n / P.
+  - On these nodes x_- is the distance from the Fermi edge in units of kT, not eps/theta - psi. The
+    antisymmetric edge moment X is only about kT/E_F of its own scale in a degenerate gas, and it keeps
+    its relative accuracy. (dP/dT)_n then cancels only by a factor of about 3.
+  - Checks (version 6): against the zero-temperature closed forms (x = p_F/(m_e c) >= 47, T <= 1.2e7 K)
+    within 4.2e-12, the size of their thermal correction. Against the classical closed forms with
+    thermal pairs within 2.2e-13 at five states with T >= 1e8 K, and within 2.4e-12 at rho_Ye = 1e-10
+    g cm^-3, T = 1e7 K, where psi = 564 amplifies rounding. Against every stored target within 3.1e-12.
+  - Cost: 0.4 ms per call on top of the 13 ms of the rest of electron_positron_eos at the degenerate
+    corner.
 
-## Second solution (version 4)
+## Second solution (versions 4 and 6)
 - **Quadrature.** Adaptive QUADPACK (scipy.integrate.quad, epsrel 1e-13) instead of fixed panels: in the
   momentum p itself on the first panel, from E = 0 up to E_F - 40 kT (up to E_F when 0 < E_F < 40 kT),
   and on every panel of a non-degenerate gas (E_F <= 0); in y = (E - E_F)/kT on the panels above, split
@@ -69,6 +90,43 @@ values (k, N_A).
   puts the reference within 6e-16 and the second solution within 3.2e-12).
 - Versions 1-3 used QUADPACK in E, the sinh identity for n_net, the p^4/eps form of P and the same
   pairwise determinant for c_V as the reference; it agreed with the reference to 9.8e-12.
+- **Adiabatic exponents (version 6).** From their definitions, without fluctuation moments, Maxwell
+  relations or c_V.
+  - Richardson-extrapolated five-point difference quotients (steps 4e-3 and 2e-3) of ln P and of the
+    entropy per net electron sigma = s/n_net, in ln n_net and in ln T.
+  - At each stencil state psi is solved afresh (Brent, then two Newton steps in psi itself). P (grand
+    potential) and s come from the integrals above, without the range checks of the public functions,
+    so the stencils may step just outside T = 1e7 K or rho Ye = 1e13 g cm^-3.
+  - Gamma3 - 1 = -(d sigma/d ln n)_T / (d sigma/d ln T)_n,
+    gamma1 = (d ln P/d ln n)_T + (d ln P/d ln T)_n (Gamma3 - 1) and nabla_ad = (Gamma3 - 1)/gamma1.
+    nabla_ad never uses (dP/dT)_n. In gamma1, (d ln P/d ln T)_n (below 1e-9 in the coldest states, where
+    its difference quotient keeps only a few digits) is multiplied by Gamma3 - 1.
+  - The Newton steps matter in a cool classical gas: brentq stops at a tolerance in ln psi, which leaves
+    psi uncertain by about 1e-15 |ln psi| psi. At psi = 564 (T = 1e7 K) ln P and sigma move by that
+    absolute error, and the difference quotients divided it by 2e-3. That gave 1.6e-9 in the exponents
+    before the Newton steps and 3.3e-10 after them.
+  - Cost: up to 0.9 s per call (12 stencil states).
+- **First momentum panel (version 6).** The panel from p = 0 up to the Fermi window is split at
+  p = 1, 2, 4, .... Before the split, QUADPACK sometimes accepted a single 21-point Gauss-Kronrod rule
+  over the whole panel (up to p_F = 173 at rho_Ye = 5e12 g cm^-3, T = 1.2e7 K), with an error estimate of
+  8e-14 relative. The actual error was 4.9e-11, checked against the reference and against 30-digit
+  mpmath quadrature. That error jumps as psi changes, and the difference quotients of the exponents turned
+  it into 2e-9. After the split, pair_densities and pair_thermodynamics agree with the reference within
+  1.1e-13 on 486 (T, psi) points: six temperatures from 1e7 to 1e11 K, psi from 1e-20 to 1e6, each with
+  offsets of +-1 %.
+- **Accuracy (measured in version 6).** On a 40-state (rho_Ye, T) grid with Ye = 1 (rho_Ye from 1e-10 to
+  1e13 g cm^-3, T from 1e7 to 1e11 K, the four corners included), the complete equations of state of the
+  two solutions agree:
+  - within 3.2e-13 for psi, the densities, P, u and s;
+  - within 1.5e-12 for c_V;
+  - within 2.1e-10 for gamma1 and 3.3e-10 for nabla_ad. The largest exponent difference is at the cool
+    classical corner (1e-10 g cm^-3, 1e7 K), where psi is about 1/theta, about 590, and the
+    double-precision rounding of the occupation exponent (about 6e-14 absolute) is divided by the
+    difference step.
+
+  At the 19 tested (rho, T, Ye) states the exponents agree within 3.1e-10 (at (2e-10, 2e8, 0.5), the
+  h^6 truncation of the stencil in T where the pair number varies as e^{-1/theta}). The second solution
+  meets every stored target within 1.8e-11 for gamma1 and nabla_ad and within 1e-13 for the other keys.
 
 ## Targets (all independent of the solution code)
 - **Classical gas.** The Maxwell-Juettner closed forms with modified Bessel functions, in mpmath:
@@ -125,6 +183,50 @@ values (k, N_A).
 - **General case 1** (version 4) has no stored target. At (rho, T, Ye) = (1e6, 3e9, 0.5) it checks
   identities of the returned equation of state (charge neutrality, the Euler relation, c_V = du/dT =
   T ds/dT at constant rho Ye), each within its first-order error budget (see Version 4).
+- **Version 6 targets for gamma1, nabla_ad and the new states.** None comes from a solution; the scripts
+  (mpmath) stay outside the task folder. Every route takes the exponents from their definitions, by the
+  Jacobian chain rule on directly computed n_net, P and s (sigma = s/n_net):
+  gamma1 = (n/P) d(P, sigma)/d(n, sigma), nabla_ad = (P/T) d(T, sigma)/d(P, sigma), and
+  c_V = T d(s, n)/d(T, n). No Maxwell relation, no fluctuation moment and no c_V input is used.
+  - **M** (degenerate states). The Sommerfeld expansion above, carried to theta^24 (k = 12) in 60
+    digits, with the (theta, mu) derivatives taken term by term. k = 10 and k = 12 agree within 1e-33 at
+    every M target state except (rho_Ye, T) = (4.3e7, 3e8), where they agree within 1.2e-17. There E_F
+    is only 53 kT, so route Q is used and M is the cross-check.
+  - **S** (pair plasmas, partly degenerate pairs). The Bessel-function series above, 5 to 200 terms
+    (e^{-J(1/theta - psi)} < 1e-48), 50 digits. The Jacobian comes from five-point differences in
+    (ln T, ln psi) at h = 1e-10; h and 2h agree within 4e-32.
+  - **P0** (pair plasmas with psi < 1e-10). The charge-conjugation limit: P, s and u_tot are even in
+    psi and n_net is odd. With n_net = psi A + O(psi^3), the definitions give
+    gamma1 = T (dP0/dT)^2/(P0 c_V0) and nabla_ad = P0/(T dP0/dT), with c_V = c_V0 and
+    s = (U0 + P0)/T of the psi = 0 gas. These are 1-D integrals in 50-digit tanh-sinh quadrature, with
+    error O(psi^2) <= 1.4e-21. At T = 1e11 K its A agrees with a 2400-term Bessel series within 3e-41.
+  - **Q** (generic states). 50-digit tanh-sinh quadrature of n_net, P and s (Gibbs integrand), psi
+    re-solved, and five-point differences in (ln T, ln psi) at h = 1e-10. h and 2h agree within 3e-38.
+    The difference quotients of the quadrature hold Q to about 1e-18.
+  - **G** (cross-check of Q). 34-digit Gauss-Legendre quadrature in p of the response moments n_psi, X
+    and A = PREF sum w (x_-^2 f_-(1-f_-) + x_+^2 f_+(1-f_+)), with the analytic (T, mu) Jacobian:
+    (dP/dT)_n = s - n k X/n_psi and c_V = k (A - X^2/n_psi). It uses no differences.
+  - **C** (classical gases with thermal pairs, evaluated inside the tests, 40 digits).
+    N_tot = sqrt(n^2 + 4B^2), (dP/dT)_n = k N_tot + 4 kT B (dB/dT)/N_tot,
+    (dP/dn)_T = kT n/N_tot, gamma1 = n (dP/dn)_T/P + T (dP/dT)_n^2/(P c_V) and
+    nabla_ad = (dP/dT)_n/(c_V gamma1). They agree with the definition-level route S within 2.2e-14 for
+    the exponents and 3.2e-13 for the other keys at the three tested states.
+  - **Zero-temperature closed forms** (cross-check only). Gamma1 = 8x^5/(3 sqrt(1+x^2)
+    [x(2x^2 - 3) sqrt(1+x^2) + 3 asinh x]) and Gamma3 - 1 = (2+x^2)/(3(1+x^2)), x = p_F/(m_e c). They
+    hold up to the thermal correction, of order (kT/E_F)^2.
+  - Route-pair agreement for gamma1 and nabla_ad (DESIGN gate B):
+    - S with P0 within 1.2e-24 (1.1e-22 at (2e-6, 1.5e9, 0.5));
+    - M with Q within 3.8e-22 to 1.7e-21 at the cold degenerate states, 1.8e-19 at (2e9, 1.2e7, 0.5),
+      4.2e-18 at (4e6, 1e7, 0.5) and 1.5e-18 at (1e8, 3e8, 0.43);
+    - Q with S within 4.3e-18 at (1e6, 3e9, 0.5);
+    - Q with G within 9.3e-19 at (2e6, 1e9, 0.5) and with P0 within 4.0e-20 at (2e-10, 1e11, 0.5);
+    - M with the zero-temperature forms within 6.3e-15, 2.3e-14, 1.4e-13, 2.9e-13 and 1.9e-9 at x = 217,
+      173, 101, 118 and 10.1, their thermal correction.
+
+    The version-3 7-key targets kept in step 5 cases 0, 1, 3 and 5 agree with these routes within 1e-14.
+    The only differences above 1e-16 are c_V, by the 1e-14 truncation of the centred difference that
+    produced them, and, in the pair plasmas at 1e10 and 1e11 K, psi and the densities. The version-3 40-digit
+    quadrature of n_minus - n_plus put them 2.4e-16 off the exact P0 values, through that cancellation.
 
 The reference agrees with all targets to 1.4e-13 or better (remeasured in version 4, same values as in
 version 3): 1.4e-13 for n_net = 9.0e-250 cm^-3 of the cool classical gas at T = 1e7 K, psi = 1e-18 (and
@@ -144,6 +246,42 @@ psi = 1.3e5 and 2.8e-6 for the Schur form at rho_Ye = 1e13; neither is reproduce
   entropy_from_euler).
 - The Schur form of c_V: 1.9e-7 at rho_Ye = 1e13, T = 1e7 K, and 4.5e-8 at 1e11 g cm^-3, T = 1e7 K
   (required 1e-8; schur_complement).
+- Adiabatic exponents (version 6, measured with the shipped mutants and two unshipped controls against
+  the stored targets; required 1e-8):
+  - **Entropy density s instead of s/rho held fixed** (adiabat_at_constant_entropy_density):
+    nabla_ad off by 3.0 relative in cold degenerate gases (4 times the true value), 4.2 at
+    (2e6, 1e9, 0.5) and 5.7 at (1e6, 3e9, 0.5); gamma1 near 0 in every pair plasma.
+  - **Pair number frozen during the change** (pairs_frozen_in_response): gamma1 off by 8.2 to 60
+    relative in pair plasmas (61 times the true value at (2e-10, 1e9, 0.5)) and by 2.4 at (1e6, 3e9, 0.5).
+  - **(dP/dT)_n through (T, psi)** (thermal_pressure_from_T_psi_jacobian): s + n k psi - n kT
+    (dn/dT)_psi/n_psi cancels by about psi^2. nabla_ad is off by 1.7e-7 at (2e13, 1e7, 0.5), 1.5e-7 at
+    (1e13, 1.2e7, 0.5), 4.3e-7 at (2e12, 1e7, 0.5) and 6.5e-8 at (3.5e12, 2e7, 0.46). This is rounding
+    noise; the values are identical with OMP_NUM_THREADS=1.
+  - **c_V at constant psi** (cv_at_fixed_psi): c_V off by 5.2e-2 at (1e6, 3e9, 0.5) up to 5e9 relative
+    in cold degenerate gases, and nabla_ad off by 1.0 there.
+  - **Finite differences of P at fixed n_net** (control, h = 1e-4 T): nabla_ad off by 0.16 at the
+    corner (2e13, 1e7, 0.5), by 3.3e-2, 1.4e-2 and 4.2e-3 at the other cold states and by 4.9e-5 at
+    (4e6, 1e7, 0.5); gamma1 off by 2e-8 to 3e-4 in pair plasmas. It fails step 5 cases 0-3, 5 and 7-9
+    and general cases 0-3.
+  - **Isothermal exponent gamma1 = chi_rho** (control): it fails step 5 cases 0-5 and 7-9 and general
+    cases 0-1. General case 1 (d) rejects it by 0.77 against a budget of 9.4e-8.
+- Error budget of (dP/dT)_n in the cold, completely degenerate gases (version 6).
+  - There E_F reaches 1.3e5 kT, (dP/dT)_n is chi_T = 8e-10 to 4e-9 of P/T, and it is set by the
+    antisymmetric thermal moment (dn/dT)_mu, itself only about kT/E_F ~ 1e-5 of its own scale.
+  - Quadrature nodes placed in the momentum p, with the Fermi argument formed as eps/theta - psi, locate
+    the edge only to about p eps_mach, roughly 1e-11 kT at psi ~ 1e5. Divided by kT/E_F, this leaves a
+    floor near 1e-8 in (dP/dT)_n and therefore in nabla_ad, independent of the requested quadrature
+    tolerance.
+  - Measured on the three blind codes of the version-6 pre-probe, written from the agent-visible text
+    only: QUADPACK in p at its 1.2e-14 floor gave 6e-9 to 6.5e-8; 60- or 80-node Gauss-Legendre panels
+    in p gave 1.4e-8 to 7.6e-8.
+  - Routes centred on the edge reach about 1e-12: nodes in x = (E - E_F)/kT as in the reference
+    (3.1e-12), the Sommerfeld expansion, and the second solution's differences of a directly computed
+    entropy (within 8.1e-12 at the cold states).
+  - The (T, psi) Jacobian is therefore not the only route that fails at the cold corners. Uncentred
+    (T, mu) moments in p fail too, and so does the Schur-form c_V with uncentred moments. Their errors are
+    1.01 to 7.4 times the tolerance, so a p-space code can occasionally clear a corner by chance (2 of 9
+    cold-state results in the pre-probe).
 
 ## Version 2 (grading_fix: authoring-guide conformance)
 
@@ -674,3 +812,105 @@ the finding, its cause, the change, the regression test and what was rerun.
     - SHIFT +-1e-12: every step case and every general case pass.
     - Controls: all-None and all-zero pass 0 cases of every step and of general.
     - SUMMARY ALL OK.
+
+## Version 6 (difficulty_increase: adiabatic exponents in the final step, recipes and hints removed)
+
+Platform version 4 of the task; edit_label difficulty_increase. The design brief and the pre-probe
+verdicts are kept outside the task folder. Each item gives the finding, its cause, the change, the
+regression test and what was rerun.
+
+- 1. Finding.
+  - The previous version passed the content check, then failed the platform's blocking difficulty probe:
+    a quick model solved the task end to end in 2 of 2 attempts (difficulty misses in a row: 1 of 3).
+  - Two calibrated blind solvers that reproduce the platform's quick model also solved it fully.
+- 2. Cause.
+  - The final step added no science: it was a recipe that chained steps 1-4.
+  - The integrated tests used only mild states: a white dwarf at 1e9 K, a pair plasma at 1e10 K and the
+    identity check at (1e6, 3e9, 0.5).
+  - The step 1 and 2 prompts handed over the defining integrals, including the non-cancelling form of
+    the entropy integrand.
+  - The step 1, 2 and 4 prompts named the cancellations to avoid: "n_net/n_minus of order psi", entropy
+    "a tiny fraction of (u + P)/T", and c_V "smaller than u/T by (kT/E_F)^2".
+- 3. Change: agent-visible text. It now equals the pre-probed specification word for word (checked with
+  tools/visible_spec.py; the diff is empty).
+  - Main text: the integrals are removed. The conventions now state the phase-space normalization (two
+    states per (2 pi hbar)^3), that the radiation and the ions are not part of the gas, and that the input
+    ranges bound the arguments and are not limits of the gas.
+  - Steps 1 and 2: the integrals and the method hints are removed. The bounded domain facts are kept:
+    Fermi energies up to about 1e6 kT, pair plasmas with up to about 20 decades of pair excess, and net
+    densities below double precision.
+  - Steps 2 and 4: the clauses "in which the entropy per electron is only about 1e-5 k" and "c_V is
+    smaller than u/T by a factor proportional to (kT/E_F)^2 ..." are removed. Step 4 gains the domain
+    sentence on Fermi energies up to about 1.3e5 kT in the densest, coolest gases.
+  - Step 5: the call chain and "so psi must be found to about 1e-13" are removed. The result gains gamma1
+    = (d ln P/d ln rho) and nabla_ad = (d ln T/d ln P), both at constant s/rho and fixed Ye, of the
+    electron-positron gas alone with the pairs in equilibrium, at 1e-8 relative accuracy everywhere in
+    the domain, boundaries included.
+  - Contracts of steps 1, 2 and 5 are updated to match; the step 5 step_background is rewritten;
+    background.md gains a paragraph on Gamma1 and nabla_ad.
+- 4. Change: reference, second solution and targets.
+  - The reference adds the response helper described under Reference solution.
+  - The second solution adds the finite-difference route and the panel fix described under Second
+    solution. Its docstrings are now those of the visible text.
+  - New targets come from routes M, S, P0, Q, G and C (see Targets). Their agreements are listed there.
+- 5. Change: tests.
+  - tests/step_5.py goes from 7 to 10 cases; every computed case grades all nine values.
+    - Case 0 adds the contract (exactly nine keys, Python floats).
+    - Case 2 extends the classical closed forms to the exponents.
+    - Case 7 (new): the cold degenerate gases (1e13, 1.2e7), (2e12, 1e7) and (2e9, 1.2e7).
+    - Case 8 (new): the pair-softened plasmas (2e-10, 1e9) and (2e-6, 1.5e9).
+    - Case 9 (new): the rescaled pair plasmas (2e-10, 5e9) and (2e2, 5e9). Their c_V, gamma1 and
+      nabla_ad must meet the targets and agree within 2e-8 plus the difference of the two stored
+      targets (1.3e-10). Requiring 2e-8 alone could reject a compliant pair with errors of +-1e-8, and
+      the pre-probe verdict asked for this threshold.
+  - tests/general.py goes from 2 to 4 cases.
+    - Case 0 grades all nine values.
+    - Case 1 adds (d), the adiabatic consistency of the returned P and s along constant s/rho by
+      five-point differences with a first-order error budget computed in the test, and (e), the
+      Bessel-series targets of (1e6, 3e9, 0.5).
+    - Case 2 (new): the three cold degenerate states (1e13, 1.2e7), (2e13, 1e7) and (2e12, 1e7).
+    - Case 3 (new): the pair-softened plasma (2e-10, 1e9).
+  - Every case stays self-contained and wrapped in _crown_case(), with nothing before the first marker.
+    No stored target or tolerance of steps 1-4 changed.
+  - The general case 1 (d) budget at this state is 9.4e-8 for gamma1 and 1.4e-7 for nabla_ad. It is
+    1e-8 + the propagation of 1e-10 errors of every returned P and s (6.5e-8 and 1.1e-7) + 2e-8 for the
+    stencil truncation. The truncation is 5.5e-9 for gamma1 and 8.8e-9 for nabla_ad, measured on the
+    exact Bessel-series equation of state at h and 2h, ratio 16. Both solutions show exactly these
+    truncation errors.
+- 6. Change: mutants.
+  - New step 5 mutants: adiabat_at_constant_entropy_density, pairs_frozen_in_response and
+    thermal_pressure_from_T_psi_jacobian.
+  - cv_at_fixed_psi is rebuilt on the new step 5: the wrong c_V is returned and enters the exponents.
+  - whole_task_classical_occupation is rebuilt: Boltzmann occupation throughout, including the response
+    moments.
+- 7. Regression tests.
+  - Rejections (tools/crown_check.py):
+    - cv_at_fixed_psi fails step 5 cases 0-5, 7 and 9;
+    - adiabat_at_constant_entropy_density fails cases 0-5 and 7-9;
+    - pairs_frozen_in_response fails cases 0, 2, 4, 5, 8 and 9;
+    - thermal_pressure_from_T_psi_jacobian fails case 1 (6.5x the tolerance at (3.5e12, 2e7, 0.46)),
+      case 5 (17x at the degenerate corner) and case 7 (43x at (2e12, 1e7, 0.5));
+    - whole_task_classical_occupation fails general cases 0-3;
+    - the unshipped finite-difference and isothermal controls fail as listed under "Why the naive
+      formulas fail".
+  - The three blind codes of the approved specification's pre-probe score 39/43, 40/43 and 40/43 on the
+    final tests (tools/grade_candidate.py, end to end). Each fails only nabla_ad at the cold degenerate
+    states, by 1.01 to 7.4 times the tolerance (step 5 cases 1, 5 and 7, general case 2).
+  - The previous round's codes, written with the two hint clauses still in the text, score 43/43, 40/43
+    and 39/43.
+- 8. Rerun.
+  - tools/crown_check.py, all modes (-j 3), with every case alone in a fresh process:
+    - FORMAT OK;
+    - REF: steps 1-5 pass 5/5, 7/7, 8/8, 9/9 and 10/10; general passes 4/4; solution.py passes every
+      step file;
+    - SECOND: every case passes;
+    - every mutant fails at least one case of its target tests; the mutant mode repeated with
+      OMP_NUM_THREADS=1 gives identical results and margins;
+    - SHIFT +-1e-12: every case passes;
+    - controls: all-None and all-zero pass no case;
+    - SUMMARY ALL OK.
+  - Both solutions, run three times in clean processes (once with one BLAS/OpenMP thread) on 20 states,
+    gave bit-identical outputs.
+  - Per-case runtime: at most 0.8 s for the reference, and at most 6.6 s for the second solution
+    (general case 1, nine calls of about 0.7 s each).
+  - Raw folder size: 334,129 bytes (du -sb, this note included), against a limit of 650 KB.

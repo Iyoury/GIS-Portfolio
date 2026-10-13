@@ -7,7 +7,7 @@ metadata:
   author_profile: "https://www.linkedin.com/in/ayoub-bousfiha-674a75219"
   conflicts_of_interest: "None"
   relevant_experience: "B.Sc. in Georesources and Environment (FST Fes, 2016), known as Geological Engineering in Canada, and a graduate certificate in geomatics from Université Laval (reference frames, rotations, least-squares adjustment). GIS analyst at Morocco's Ministry of Energy and Mines (2016-2018) on exploration databases, and now running an independent geospatial consultancy (Craton Géodonnées) in Quebec that works with the drilling databases of Abitibi exploration programs."
-  subfield: "Stellar astrophysics: equation of state of the relativistic electron-positron gas with pair equilibrium"
+  subfield: "Stellar astrophysics: equation of state and adiabatic exponents of the relativistic electron-positron gas with pairs"
   tags:
     - equation of state
     - Fermi-Dirac integrals
@@ -15,93 +15,117 @@ metadata:
     - degenerate matter
     - specific heat
     - stellar interiors
+    - adiabatic exponent
     - numerical cancellation
-  expert_time_estimate_hours: 10
+  expert_time_estimate_hours: 12
   difficulty_explanation: >-
-    Every quantity must be delivered with a relative error below 1e-10 (c_V below 1e-8; n_plus and n_net
-    below 1e-250 cm^-3 to within 1e-250 cm^-3) for 1e7 <= T <= 1e11 K and psi from about 2e-21 to 1e6, a
+    Every quantity must be delivered with a small relative error (1e-10; c_V, gamma1 and nabla_ad 1e-8; n_plus and
+    n_net below 1e-250 cm^-3 to within 1e-250 cm^-3) for 1e7 <= T <= 1e11 K and psi from about 2e-21 to 1e6, a
     domain that spans classical and completely degenerate, non-relativistic and ultra-relativistic, and
-    pair-dominated gases, so no single textbook formula or fixed grid works. Three of the wanted quantities
-    are tiny differences of large ones: in a pair plasma at rho Ye = 1e-10 g cm^-3, T = 1e11 K the net
-    electron density is 4e-21 of n_minus, so n_minus - n_plus has no correct digit; the entropy of a
-    degenerate gas is 6e-10 of (u + P) / T at psi = 1.3e5, T = 1e7 K and 1e-11 at psi = 1e6, T = 2e7 K, so
-    the Euler relation (u_tot + P - mu n) / T gives it with relative errors of 7.5e-7 and 3.2e-5 there
-    (measured with the shipped entropy_from_euler mutant); and c_V of a degenerate gas is smaller than the
-    energy and number fluctuations it is built from by (k T / E_F)^2, so the textbook Schur form <dE^2> -
-    <dE dN>^2 / <dN^2> evaluated directly loses 1.9e-7 at rho Ye = 1e13 g cm^-3, T = 1e7 K and 4.5e-8 at
-    1e11 g cm^-3 (shipped schur_complement mutant, against the required 1e-8). The solver has to recast each
-    of them without subtraction, integrate across a Fermi edge only k T wide at an energy up to 1e6 k T with
-    the occupation argument taken relative to the edge, invert n_net(psi) to full relative precision when
-    psi is 2e-21 (which requires working in psi, rest energy included, rather than mu / k T), and
-    differentiate the energy at constant net density so that pair creation enters c_V. The complete equation
-    of state must meet these bounds with respect to the exact values at (rho, T, Ye), and n_minus, n_plus,
-    P, u and s amplify a relative error of psi up to about 600 times (in a cool classical gas d ln n / d ln
-    psi is about psi, close to m_e c^2 / k T), so psi has to be converged to about 1e-13; in a degenerate,
-    non-relativistic gas near 1e7 K the slope of ln n_net against ln psi falls from several hundred to below
-    20 across the bracket, where plain false position stalls.
+    pair-dominated gases, so no single textbook formula or fixed grid works; the prompts state the definitions,
+    conventions, domain and accuracies but neither the defining integrals nor the forms that avoid cancellation.
+    Three of the wanted quantities are tiny differences of large ones: in a pair plasma at rho Ye = 1e-10 g cm^-3, T
+    = 1e11 K the net electron density is 4e-21 of n_minus, so n_minus - n_plus has no correct digit; the entropy of
+    a degenerate gas is 6e-10 of (u + P) / T at psi = 1.3e5, T = 1e7 K and 1e-11 at psi = 1e6, T = 2e7 K, so the
+    Euler relation (u_tot + P - mu n) / T gives it with relative errors of 7.5e-7 and 3.2e-5 there (shipped
+    entropy_from_euler mutant); and c_V of a degenerate gas is smaller than the energy and number fluctuations it is
+    built from by (k T / E_F)^2, so the Schur form <dE^2> - <dE dN>^2 / <dN^2> evaluated directly loses 1.9e-7 at
+    rho Ye = 1e13 g cm^-3, T = 1e7 K (shipped schur_complement mutant). The final step asks for the two adiabatic
+    exponents of the gas, gamma1 and nabla_ad, which the solver must derive from their definitions: the adiabatic
+    invariant is the entropy per unit mass, not per volume (holding s fixed makes nabla_ad 4 times too large in
+    degenerate gases); only the net electron number is conserved, so pair creation enters every derivative (with the
+    positron number frozen gamma1 comes out 61 times too large at rho Ye = 1e-10 g cm^-3, T = 1e9 K, where the true
+    value is 1.235); and in a completely degenerate gas, with E_F up to 1.3e5 k T, the thermal pressure (dP/dT) at
+    constant density is only chi_T = 8e-10 to 4e-9 of P / T. That pressure is set by the antisymmetric moment
+    (dn/dT) at constant mu, itself about k T / E_F ~ 1e-5 of its own scale: finite differences of P lose 4.2e-3 to
+    0.16 in nabla_ad at the cold degenerate states; the (T, psi) Jacobian, s + n k psi - n k T (dn/dT)_psi /
+    (dn/dpsi)_T, cancels by about psi^2 and loses 6.5e-8 to 4.3e-7; and the (T, psi) Jacobian is not the only route
+    that fails there. Error budget: quadrature nodes placed in the momentum p, with the Fermi argument formed as eps
+    / theta - psi, locate the edge only to about p eps_mach ~ 1e-11 k T at psi ~ 1e5, which divided by k T / E_F
+    leaves a floor near 1e-8 in (dP/dT)_n and nabla_ad whatever the quadrature tolerance (measured 6e-9 to 7.6e-8,
+    1.01 to 7.4 times the tolerance, on three blind codes written from the agent-visible text, QUADPACK in p at its
+    1.2e-14 floor and 60- or 80-node Gauss-Legendre panels in p); routes centred on the edge (nodes in x = (E - E_F)
+    / k T, the Sommerfeld expansion, or differences of a directly computed entropy) reach about 1e-12. The complete
+    equation of state must meet the bounds with respect to the exact values at (rho, T, Ye), and n_minus, n_plus, P,
+    u and s amplify a relative error of psi up to about 600 times (in a cool classical gas d ln n / d ln psi is
+    about psi, close to m_e c^2 / k T), so psi has to be converged to about 1e-13; in a degenerate, non-relativistic
+    gas near 1e7 K the slope of ln n_net against ln psi falls from several hundred to below 20 across the bracket,
+    where plain false position stalls.
   solution_explanation: >-
-    The reference integrates over the kinetic energy E with composite 24-point Gauss-Legendre rules: below
-    the Fermi edge in t = sqrt(E) on doubling panels, and over the window E_F +- 60 k T in y = (E - E_F) /
-    (k T) on unit panels, so the electron occupation argument is y itself and the integrands stay accurate
-    even at psi = 1e6. The net electron density uses the identity f(b - psi) - f(b + psi) = sinh(psi) /
-    (cosh b + cosh psi) (b = eps / theta), a positive integrand summed in logarithms; the entropy uses the
-    positive integrand log1p(e^{-|x|}) + |x| / (e^{|x|} + 1). degeneracy_parameter solves ln n_net(ln psi) =
-    ln(rho_Ye N_A) by bisection-safeguarded false position with the Illinois modification in ln psi, stopped
-    when the bracket is below 1e-14 or the residual below 1e-15, well inside the about 1e-13 that the
-    complete equation of state needs. specific_heat evaluates the grand-canonical fluctuation formula c_V =
-    det / (k T^2 <dN^2>) with det = <dE^2><dN^2> - <dE dN>^2 written as 1/2 sum_ij w_i w_j (e_i n_j - e_j
-    n_i)^2, i.e. two-pass centred second moments for same-species pairs and (e_i + e_j)^2 > 0 for
-    electron-positron pairs, so nothing cancels. electron_positron_eos validates rho, T and Ye and chains
-    the four functions at rho_Ye = rho Ye. The module-level helpers and constants of the per-step reference
-    files carry the prefixes _epeos_ and _EPEOS_, so that a helper a candidate defines in a later step
-    cannot replace them in the shared evaluation namespace.
+    The reference integrates over the kinetic energy E with composite 24-point Gauss-Legendre rules: below the Fermi
+    edge in t = sqrt(E) on doubling panels, and over the window E_F +- 60 k T in y = (E - E_F) / (k T) on unit
+    panels, so the electron occupation argument is y itself and the integrands stay accurate even at psi = 1e6. The
+    net electron density uses the identity f(b - psi) - f(b + psi) = sinh(psi) / (cosh b + cosh psi) (b = eps /
+    theta), a positive integrand summed in logarithms; the entropy uses the positive integrand log1p(e^{-|x|}) + |x|
+    / (e^{|x|} + 1). degeneracy_parameter solves ln n_net(ln psi) = ln(rho_Ye N_A) by bisection-safeguarded false
+    position with the Illinois modification in ln psi, stopped when the bracket is below 1e-14 or the residual below
+    1e-15, well inside the about 1e-13 that the complete equation of state needs. specific_heat evaluates the
+    grand-canonical fluctuation formula c_V = det / (k T^2 <dN^2>) with det = <dE^2><dN^2> - <dE dN>^2 written as
+    1/2 sum_ij w_i w_j (e_i n_j - e_j n_i)^2, i.e. two-pass centred second moments for same-species pairs and (e_i +
+    e_j)^2 > 0 for electron-positron pairs, so nothing cancels. electron_positron_eos validates rho, T and Ye, takes
+    psi, the densities, P, u, s and c_V from the step 1-4 functions at rho_Ye = rho Ye, and evaluates on the same
+    edge-centred nodes the grand-canonical response moments n_psi = k T (dn/dmu)_T and X = T (dn/dT)_mu with the
+    weights f(1 - f) of both species. Gibbs-Duhem with only n_net conserved (mu_+ = -mu_-) gives (dP/dn)_T = n_net k
+    T / n_psi and (dP/dT)_n = s - n_net k X / n_psi; the first law per baryon at constant s / rho gives Gamma3 - 1 =
+    (dP/dT)_n / c_V; then gamma1 = chi_rho + chi_T (Gamma3 - 1) and nabla_ad = (Gamma3 - 1) / gamma1. Because x_- on
+    these nodes is the distance from the Fermi edge in units of k T, X keeps its relative accuracy in a degenerate
+    gas although it is only about k T / E_F of its own scale, so the exponents are good to 3e-12 at the densest,
+    coolest corner. The module-level helpers and constants of the per-step reference files carry the prefixes
+    _epeos_, _EPEOS_, _epeos5_ and _EPEOS5_ (step 5 rebuilds its own nodes), so that a helper a candidate defines in
+    a later step cannot replace them in the shared evaluation namespace.
   verification_explanation: >-
-    The test targets do not come from the solution code: classical-gas states use the Maxwell-Juettner
-    closed forms with modified Bessel functions in 40-digit mpmath (only where the Fermi corrections are
-    below 1e-11), twelve (T, psi) states use 40-digit mpmath tanh-sinh quadrature of the defining integrals
-    with breakpoints every k T over the Fermi edge, and twelve (rho_Ye, T) and four (rho, T, Ye) states take
-    psi from an mpmath root search on those integrals and c_V from a centred difference of u at constant
-    n_net (T +- 1e-7 T, psi re-solved at each temperature), a different route from the fluctuation formula
-    of the reference; three of the twelve (T, psi) states (T = 1e7, 1e9, 1e11 K) were re-checked with mpmath
-    Gauss-Legendre quadrature of the same integrals. Version 5 adds targets from routes that share nothing
-    with those quadratures: the Sommerfeld expansion of the degenerate gas (zero-temperature integrals in
-    closed form plus terms to theta^16, in 60-digit mpmath; it reproduces the five stored degenerate c_V
-    within 4e-16), the series of the Fermi-Dirac integrals in modified Bessel functions, exact for
-    psi < m_e c^2 / k T (50 digits, c_V from its term-by-term T and psi derivatives), and the closed forms
-    of a classical gas with thermal pairs (psi = asinh(rho Ye N_A / 2B), c_V from the Maxwell-Juettner
-    moments), evaluated in the tests; every step has computed-value cases from at least two independent
-    routes. The two (rho_Ye, T) states added in version 3 (1e5 g
-    cm^-3 at 1e7 K and 4e5 g cm^-3 at 1.2e7 K) were computed with both tanh-sinh and Gauss-Legendre
-    quadrature, which agree to 30 digits, and their centred-difference c_V agrees with the 40-digit
-    fluctuation formula to 1e-17; the two step 5 corner states at the domain endpoints use the stored psi
-    and c_V with P, u, s and the densities from the same 40-digit quadratures (n_minus of the degenerate
-    corner from n_minus = rho Ye N_A + n_plus). General case 1 needs no stored target: at (rho, T, Ye) =
-    (1e6 g cm^-3, 3e9 K, 0.5), where n_plus / n_minus = 0.29, it checks charge neutrality n_minus - n_plus =
-    rho Ye N_A, the Euler relation u_tot + P - T s = mu n_net and c_V = du/dT = T ds/dT at constant rho Ye
-    (five-point differences of the returned u and s, h = 5e-3 T), each within the first-order error budget
-    of the stated accuracies computed in the test (plus 1.2e-8 for the stencil truncation, measured at
-    4.8e-9 and 6.0e-9); it rejects whole solutions that ignore the positrons in psi, s or P, drop the pair
-    rest energy from u or the positron fluctuations from c_V, or take c_V at constant psi. The reference
-    agrees with every stored target to 1.4e-13 or better, and with the classical closed forms (which omit
-    Fermi corrections of up to 3e-13) to 3.3e-13. second_solution.py follows different routes:
-    adaptive QUADPACK quadrature in the momentum p below the Fermi window and in y over it; n_net as n_minus
-    - n_plus for psi >= 1 and as the integral over psi of the positive charge susceptibility d n_net / d psi
-    for psi < 1 (Gauss-Legendre in psi), instead of the sinh identity; P from the grand potential k T int
-    p^2 ln(1 + e^{-x}) dp instead of the p^4 / eps moment; Brent's method for psi; and c_V from the Jacobian
-    of (u_tot, n_net) in (T, mu) with analytic derivative integrands, instead of the pairwise fluctuation
-    determinant (only s uses the same stable form of the defining integrand). It agrees with every stored
-    target to 1.1e-13 and passes every test case. Each step has a named scientific mutant (net density by
-    subtraction, entropy from the Euler relation, positrons ignored in the density equation, Schur-form c_V
-    and c_V without positron fluctuations, c_V at constant psi) and the whole-task mutant uses classical
-    (Maxwell-Boltzmann) statistics throughout; each fails at least one case of its target tests.
-    tools/crown_check.py ran every test case alone in a fresh process for the reference (each step with the
-    reference earlier steps, and solution.py on every test file), the second solution and the mutants;
-    checked that scaling the outputs by 1 +- 1e-12 still passes every step case and, with all five functions
-    scaled at once, every general case; checked that all-None and all-zero controls pass no case; and
-    checked the file format. Both solutions were run three times in clean processes (once with one
-    BLAS/OpenMP thread) and gave identical outputs; on a 240-state (rho_Ye, T) grid with Ye = 1 the complete
-    equations of state of the two solutions agree to 2.7e-12, and on a 190-point (T, psi) grid their
-    pair_densities and pair_thermodynamics agree to 3.2e-12.
+    The test targets do not come from the solution code. Classical-gas states use the Maxwell-Juettner closed forms
+    with modified Bessel functions in 40-digit mpmath (only where the Fermi corrections are below 1e-11), extended
+    in version 6 to the exponents with thermal pairs ((dP/dT)_n = k N_tot + 4 k T B B_T / N_tot, (dP/dn)_T = k T n /
+    N_tot), evaluated inside the tests. Twelve (T, psi) states use 40-digit mpmath tanh-sinh quadrature of the
+    defining integrals with breakpoints every k T over the Fermi edge, and twelve (rho_Ye, T) and the older (rho, T,
+    Ye) states take psi from an mpmath root search on those integrals and c_V from a centred difference of u at
+    constant n_net, a different route from the fluctuation formula of the reference. Version 5 added the Sommerfeld
+    expansion of the degenerate gas (closed-form zero-temperature integrals plus terms in theta^2k), the series of
+    the Fermi-Dirac integrals in modified Bessel functions (exact for psi < m_e c^2 / k T), and the closed forms of
+    a classical gas with thermal pairs. In version 6 every stored gamma1 and nabla_ad comes from the definitions, by
+    the Jacobian chain rule on directly computed n_net, P and s at constant s / n_net, with no Maxwell relation,
+    fluctuation moment or c_V input: route M (Sommerfeld to theta^24, 60 digits, derivatives term by term) for
+    degenerate states, route S (Bessel series, 5 to 200 terms, 50 digits, five-point differences at h = 1e-10) and
+    route P0 (the charge-conjugation limit psi -> 0, 1-D integrals of the psi = 0 gas, error O(psi^2) below 1.4e-21)
+    for pair plasmas, and route Q (50-digit tanh-sinh quadrature with five-point differences) elsewhere; every
+    exponent target has a second route: S with P0 within 1.1e-22, M with Q within 4.2e-18 (within 1.7e-21 at the
+    cold degenerate states), Q with S within 4.3e-18, Q with a 34-digit Gauss-Legendre evaluation of the analytic
+    response moments (route G, no differences) within 9.3e-19, and M with the zero-temperature closed forms of the
+    Chandrasekhar gas within their thermal correction (6.3e-15 to 2.9e-13 for x >= 100, 1.9e-9 at x = 10). The
+    reference meets every stored target within 3.1e-12 for gamma1 and nabla_ad (at the degenerate corner), 3.3e-13
+    for c_V and 2.7e-14 for the other keys of the step 5 states. General case 1 needs no stored target for its
+    identities: at (rho, T, Ye) = (1e6 g cm^-3, 3e9 K, 0.5) it checks charge neutrality, the Euler relation, c_V =
+    du/dT = T ds/dT and (version 6) gamma1 and nabla_ad against five-point differences of the returned ln P and s /
+    rho along the adiabat, each within the first-order error budget of the stated accuracies computed in the test
+    (9.4e-8 and 1.4e-7 for the exponents, including 2e-8 for the stencil truncation, measured at 5.5e-9 and 8.8e-9
+    on the exact Bessel-series equation of state), and then every returned value against the Bessel-series targets
+    of that state. Error budget behind the 1e-8 accuracy of the exponents: in the coldest, densest states chi_T ~
+    1e-9 and (dP/dT)_n rests on an edge moment of relative size k T / E_F ~ 1e-5; momentum-space quadrature at psi ~
+    1e5 floors near 1e-8 in (dP/dT)_n (measured 6e-9 to 7.6e-8 on three blind codes), while edge-centred routes
+    reach about 1e-12 (reference 3.1e-12), so the tests separate the two at the three cold states, (1e13, 1.2e7),
+    (2e13, 1e7) and (2e12, 1e7) g cm^-3, K with Ye = 0.5, which appear in step 5 and in general case 2.
+    second_solution.py follows different routes: adaptive QUADPACK quadrature in the momentum p below the Fermi
+    window (split at p = 1, 2, 4, ... since version 6) and in y over it; n_net as n_minus - n_plus for psi >= 1 and
+    as the integral over psi of the positive charge susceptibility for psi < 1; P from the grand potential; Brent's
+    method for psi; c_V from the Jacobian of (u_tot, n_net) in (T, mu); and gamma1, nabla_ad from
+    Richardson-extrapolated five-point differences of ln P and s / n_net in ln n_net and ln T with psi re-solved at
+    every stencil state, without response moments or c_V. It meets every stored target within 1.8e-11 for the
+    exponents and 1e-13 for the other keys, passes every test case, and on a 40-state (rho_Ye, T) grid with the four
+    corners agrees with the reference within 3.2e-13 (psi, densities, P, u, s), 1.5e-12 (c_V) and 3.3e-10
+    (exponents, largest at the cool classical corner where the rounding of the occupation exponent near 590 is
+    divided by the difference step). Each step has named scientific mutants (net density by subtraction, entropy
+    from the Euler relation, positrons ignored in the density equation, Schur-form c_V and c_V without positron
+    fluctuations, and in step 5 c_V at constant psi, the adiabat at constant entropy density, the pair number frozen
+    in the response, and (dP/dT)_n through the cancelling (T, psi) Jacobian) and the whole-task mutant uses
+    classical (Maxwell-Boltzmann) statistics throughout; each fails at least one case of its target tests, the
+    rounding-noise (T, psi) mutant by 17x and 43x the tolerance at the corner states, identically with one
+    BLAS/OpenMP thread. tools/crown_check.py ran every test case alone in a fresh process for the reference (each
+    step with the reference earlier steps, and solution.py on every test file), the second solution and the mutants;
+    checked that scaling the outputs by 1 +- 1e-12 still passes every step case and, with all five functions scaled
+    at once, every general case; checked that all-None and all-zero controls pass no case; and checked the file
+    format. Both solutions were run three times in clean processes (once with one BLAS/OpenMP thread) and gave
+    identical outputs.
 
 required_dependencies: |-
   import numpy as np
@@ -112,30 +136,34 @@ required_dependencies: |-
 problem_description_main: |-
   In the hot, dense interiors of stars, white dwarfs and supernova cores the electrons form an ideal
   Fermi gas that can be anywhere between classical and completely degenerate, and between
-  non-relativistic and ultra-relativistic; above about 10^9 K, electron-positron pairs appear and at
+  non-relativistic and ultra-relativistic; above about 10^9 K, electron-positron pairs appear, and at
   low density they outnumber the electrons left over from the ions by many decades. We compute the
   equation of state of this gas from first principles: the number densities of electrons and
-  positrons, the pressure, the internal energy and the entropy for a given temperature and chemical
-  potential, the chemical potential that reproduces a given electron density, the specific heat at
-  constant density, and finally the complete equation of state for a given mass density, temperature
-  and electron fraction. The quantities wanted are often tiny differences of large ones (the net
-  electron density in a pair plasma, the entropy and the specific heat of a degenerate gas), and each
-  must be delivered with a small relative error.
+  positrons, the pressure, the energy and the entropy at a given temperature and chemical potential,
+  the chemical potential that reproduces a given net electron density, the specific heat at constant
+  density, and finally, for a given mass density, temperature and electron fraction, the complete
+  equation of state together with the two exponents of an adiabatic change of the gas, gamma1 and
+  nabla_ad, that enter the dynamical and the convective stability of a star. Several of the wanted
+  quantities are small differences or small fractions of large ones, and each must be delivered with a
+  small relative error everywhere in the stated domain.
 
-  Conventions used in every step. The particles have spin 1/2 (two states per momentum). Momenta p are
-  in units of m_e c, energies in units of m_e c^2: the total energy of a particle is eps = sqrt(1 + p^2)
-  and its kinetic energy is eps - 1. theta = k T / (m_e c^2). The state of the gas is given by T and
-  psi = (mu + m_e c^2) / (k T), where mu is the electron chemical potential without the rest mass; the
-  occupation numbers are f_-(p) = 1 / (exp(eps / theta - psi) + 1) for electrons and
-  f_+(p) = 1 / (exp(eps / theta + psi) + 1) for positrons (pairs are in equilibrium with radiation, so
-  the positron chemical potential is minus that of the electrons). psi > 0 means more electrons than
-  positrons. Number densities are n = (1 / (pi^2 lambda^3)) int_0^inf p^2 f(p) dp with
-  lambda = hbar / (m_e c). Constants (CGS, exact as given): m_e c^2 = 8.1871057769e-7 erg,
-  k = 1.380649e-16 erg/K, lambda = 3.8615926796e-11 cm, Avogadro's number N_A = 6.02214076e23 per mol.
+  Conventions used in every step. The particles do not interact and have spin 1/2: each cell of
+  volume (2 pi hbar)^3 of phase space holds two states. Momenta p are in units of m_e c and energies in
+  units of m_e c^2: a particle of momentum p has total energy eps = sqrt(1 + p^2) and kinetic energy
+  eps - 1; theta = k T / (m_e c^2). Pairs are in equilibrium with radiation (e- + e+ <-> photons), so
+  the positron chemical potential is minus that of the electrons, rest energies included. The state of
+  the gas is given by T and psi = (mu + m_e c^2) / (k T), where mu is the electron chemical potential
+  without the rest energy: an electron state of energy eps is occupied with probability
+  f_- = 1 / (exp(eps / theta - psi) + 1) and a positron state with f_+ = 1 / (exp(eps / theta + psi) + 1);
+  psi > 0 means more electrons than positrons. Every quantity computed is that of the electrons and
+  positrons alone: the radiation and the ions are not part of the gas. lambda = hbar / (m_e c).
+  Constants (CGS, exact as given): m_e c^2 = 8.1871057769e-7 erg, k = 1.380649e-16 erg/K,
+  lambda = 3.8615926796e-11 cm, Avogadro's number N_A = 6.02214076e23 per mol. The input ranges stated
+  for each function bound its arguments; they are not limits of the gas, which is defined beyond them.
 
 problem_io: |-
   def electron_positron_eos(rho, T, Ye):
-      '''Equation of state of the electron-positron gas for a mass density, temperature and electron fraction.
+      '''Equation of state and adiabatic exponents of the electron-positron gas.
 
       Inputs:
         rho: float, mass density in g cm^-3.
@@ -143,12 +171,14 @@ problem_io: |-
         Ye: float, electrons per baryon, 0 < Ye <= 1; 1e-10 <= rho Ye <= 1e13.
 
       Output:
-        dict with exactly the seven keys "psi", "n_minus", "n_plus", "P", "u", "s", "cv", whose values are
-          Python floats (units as in steps 1-4). Accuracy with respect to the exact values for the given
-          (rho, T, Ye): psi, n_minus, P, u, s relative 1e-10; n_plus relative 1e-10 when at least
-          1e-250 cm^-3, otherwise within 1e-250 cm^-3; cv relative 1e-8. This includes the error propagated
-          from psi, which n_minus, n_plus, P, u and s amplify up to about 600 times, so psi must be found to
-          about 1e-13 relative.
+        dict with exactly the nine keys "psi", "n_minus", "n_plus", "P", "u", "s", "cv", "gamma1",
+          "nabla_ad", whose values are Python floats: psi, densities (cm^-3), P (erg cm^-3), u (erg cm^-3),
+          s (erg K^-1 cm^-3) and cv (erg K^-1 cm^-3) as in steps 1-4; gamma1 = (d ln P / d ln rho) and
+          nabla_ad = (d ln T / d ln P), both at constant s / rho and Ye for the electron-positron gas alone,
+          pairs in equilibrium. Accuracy with respect to the exact values for the given (rho, T, Ye),
+          including the error propagated from psi: psi, n_minus, P, u, s relative 1e-10; n_plus relative
+          1e-10 when at least 1e-250 cm^-3, otherwise within 1e-250 cm^-3; cv, gamma1, nabla_ad relative
+          1e-8.
 
       Raises:
         ValueError if Ye is not in (0, 1], or if T or rho Ye is outside its range.
@@ -160,10 +190,10 @@ second_solution: second_solution.py
 
 mutants:
   - name: whole_task_classical_occupation
-    description: "Uses Boltzmann occupation numbers e^{-x} instead of the Fermi-Dirac ones, wrong for degenerate gases."
+    description: "Uses Boltzmann occupation numbers e^{-x} instead of the Fermi-Dirac ones throughout, including the response moments of the adiabatic exponents; wrong for degenerate gases."
     file: mutants/whole_task_classical_occupation.py
 
-edit_label: grading_fix
+edit_label: difficulty_increase
 
 sub_steps:
 
@@ -173,20 +203,15 @@ sub_steps:
     tests: tests/step_1.py
     step_description_prompt: |-
       Number densities of the electron-positron gas. For given T (K) and psi (see the conventions), return
-      the tuple (n_minus, n_plus, n_net) of Python floats: the electron number density n_minus, the
-      positron number density n_plus and the net electron density n_net = n_minus - n_plus, all in cm^-3:
-        n_minus = (1 / (pi^2 lambda^3)) int_0^inf p^2 / (exp(eps / theta - psi) + 1) dp,
-        n_plus  = (1 / (pi^2 lambda^3)) int_0^inf p^2 / (exp(eps / theta + psi) + 1) dp,
-      with eps = sqrt(1 + p^2) and theta = k T / (m_e c^2).
-
+      the tuple (n_minus, n_plus, n_net) of Python floats: the number density of electrons n_minus, the
+      number density of positrons n_plus and the net electron density n_net = n_minus - n_plus, all in
+      cm^-3, of the gas in equilibrium.
       Accuracy: n_minus with a relative error below 1e-10; n_plus and n_net each with a relative error
       below 1e-10 whenever its exact value is at least 1e-250 cm^-3, and otherwise within 1e-250 cm^-3 of
-      it (in a cool gas with very small psi, n_net falls below the range of double precision).
-      This holds over the whole domain: a strongly degenerate gas (for psi up to 1e6 the electrons fill all
-      states up to a Fermi energy of up to about 1e6 k T, with an occupation edge only a few k T wide), a
-      classical one, and a pair plasma in which positrons and electrons outnumber their difference by many
-      decades (for small psi, n_net / n_minus is of order psi); n_net must have the stated accuracy there
-      too.
+      it. These bounds hold everywhere in the input domain, which contains completely degenerate gases
+      (Fermi energies up to about 1e6 k T), classical gases, cool gases whose net density lies below the
+      range of double precision, and pair plasmas in which the electrons and the positrons outnumber their
+      difference by up to about 20 decades.
       Inputs: T (float, 1e7 <= T <= 1e11) and psi (float, 0 < psi <= 1e6).
       Errors: raise ValueError if T is outside [1e7, 1e11] or if psi is not in (0, 1e6].
     function_header: |-
@@ -196,14 +221,15 @@ sub_steps:
           Inputs:
             T: float, temperature in K, 1e7 <= T <= 1e11.
             psi: float, (mu + m_e c^2) / (k T) with mu the electron chemical potential without the rest
-                 mass, 0 < psi <= 1e6; electrons occupy 1 / (exp(eps/theta - psi) + 1), positrons
-                 1 / (exp(eps/theta + psi) + 1), eps = sqrt(1 + p^2), theta = k T / (m_e c^2).
+                 energy, 0 < psi <= 1e6; a state of total energy eps (units m_e c^2) is occupied by an
+                 electron with probability 1 / (exp(eps/theta - psi) + 1) and by a positron with
+                 probability 1 / (exp(eps/theta + psi) + 1), theta = k T / (m_e c^2).
 
           Output:
-            (n_minus, n_plus, n_net): Python floats in cm^-3, n = (1 / (pi^2 lambda^3)) int p^2 f dp with
-              lambda = hbar / (m_e c); n_net = n_minus - n_plus. n_minus with a relative error below
-              1e-10; n_plus and n_net each with a relative error below 1e-10 when at least 1e-250 cm^-3,
-              otherwise within 1e-250 cm^-3.
+            (n_minus, n_plus, n_net): Python floats in cm^-3, the electron and positron number densities
+              (two spin states per (2 pi hbar)^3 of phase space) and n_net = n_minus - n_plus. n_minus with a
+              relative error below 1e-10; n_plus and n_net each with a relative error below 1e-10 when at
+              least 1e-250 cm^-3, otherwise within 1e-250 cm^-3.
 
           Raises:
             ValueError if T is outside [1e7, 1e11] or psi is not in (0, 1e6].
@@ -218,7 +244,7 @@ sub_steps:
     n_test_cases: 5
     contract:
       quantity: "Number densities of electrons and positrons and their difference in an ideal relativistic Fermi gas with pairs."
-      assumptions: "Ideal gas, spin 1/2, pairs in equilibrium with radiation (positron chemical potential minus the electron one, rest energy included)."
+      assumptions: "Ideal (non-interacting) gas of spin-1/2 particles, two states per (2 pi hbar)^3 of phase space; pairs in equilibrium with radiation (positron chemical potential minus the electron one, rest energy included); electrons and positrons only."
       result_kind: exact
       valid_input_ranges: "1e7 <= T <= 1e11 K; 0 < psi <= 1e6."
       units: "cm^-3."
@@ -234,18 +260,13 @@ sub_steps:
     solution: solution/step_2.py
     tests: tests/step_2.py
     step_description_prompt: |-
-      Pressure, internal energy and entropy of the electron-positron gas at given T (K) and psi, with the
-      occupation numbers f_- of electrons and f_+ of positrons defined in the conventions.
-      Return the tuple (P, u, s) of Python floats:
-        P = (m_e c^2 / (3 pi^2 lambda^3)) int_0^inf (p^4 / eps) (f_- + f_+) dp          (erg cm^-3),
-        u = (m_e c^2 / (pi^2 lambda^3)) int_0^inf p^2 [(eps - 1) f_- + (eps + 1) f_+] dp (erg cm^-3),
-            the kinetic energy of the electrons plus the kinetic energy and the rest energy 2 m_e c^2 of
-            each positron (the energy of the pairs),
-        s = -(k / (pi^2 lambda^3)) int_0^inf p^2 [f_- ln f_- + (1 - f_-) ln(1 - f_-)
-                                                 + f_+ ln f_+ + (1 - f_+) ln(1 - f_+)] dp  (erg K^-1 cm^-3).
-      Each with a relative error below 1e-10 over the whole domain, including the strongly degenerate gas,
-      whose entropy is a tiny fraction of (u + P) / T (about 1e-11 of it for psi near 1e6), the classical
-      gas and the pair plasma.
+      Pressure, energy and entropy of the electron-positron gas. For given T (K) and psi (see the
+      conventions), return the tuple (P, u, s) of Python floats for the gas in equilibrium: the pressure P
+      (erg cm^-3); the energy density u (erg cm^-3), counted as the kinetic energy of the electrons plus,
+      for each positron, its kinetic energy and the rest energy 2 m_e c^2 of the pair, so that
+      u + n_net m_e c^2 is the total energy density including all rest energies; and the entropy density s
+      (erg K^-1 cm^-3) of both species. Each with a relative error below 1e-10 everywhere in the input
+      domain: pair plasmas, classical gases and completely degenerate gases with psi up to 1e6.
       Inputs: T (float, 1e7 <= T <= 1e11) and psi (float, 0 < psi <= 1e6).
       Errors: raise ValueError if T is outside [1e7, 1e11] or if psi is not in (0, 1e6].
     function_header: |-
@@ -273,7 +294,7 @@ sub_steps:
     n_test_cases: 7
     contract:
       quantity: "Pressure, energy density and entropy density of the ideal electron-positron gas."
-      assumptions: "Occupation numbers and constants of the conventions in problem_description_main (shared with step 1, whose function is not used); energy density counts the kinetic energy of the electrons and kinetic plus rest energy of the pairs."
+      assumptions: "Occupation numbers, phase-space normalization and constants of the conventions in problem_description_main (shared with step 1, whose function is not used); energy density counts the kinetic energy of the electrons and kinetic plus rest energy of the pairs; entropy of both species; radiation and ions not included."
       result_kind: exact
       valid_input_ranges: "1e7 <= T <= 1e11 K; 0 < psi <= 1e6."
       units: "erg cm^-3, erg cm^-3, erg K^-1 cm^-3."
@@ -348,9 +369,9 @@ sub_steps:
       as T rises, and the positron number is not held fixed: only n_net is.
       Return c_V as a Python float with a relative error below 1e-8 over the whole domain, with respect to
       the exact c_V at the given rho_Ye and T (an error in the psi used enters c_V amplified up to about
-      600 times). In a strongly degenerate gas c_V is smaller than u / T by a factor proportional to
-      (k T / E_F)^2 (E_F the Fermi energy), below 1e-9 in the densest, coolest gases of the domain; the
-      stated relative accuracy is required there too.
+      600 times). The domain contains completely degenerate gases, with Fermi energies up to about
+      1.3e5 k T in the densest, coolest of them, as well as classical gases and pair plasmas; the stated
+      relative accuracy is required in all of them.
       Inputs: rho_Ye (float, 1e-10 <= rho_Ye <= 1e13) and T (float, 1e7 <= T <= 1e11).
       Errors: raise ValueError if rho_Ye or T is outside its range.
     function_header: |-
@@ -397,24 +418,29 @@ sub_steps:
     solution: solution/step_5.py
     tests: tests/step_5.py
     step_description_prompt: |-
-      Complete equation of state of the electron-positron gas for a mass density rho (g cm^-3), a
-      temperature T (K) and an electron fraction Ye (electrons per baryon). With rho_Ye = rho Ye, find psi
-      with degeneracy_parameter (step 3), then the densities with pair_densities (step 1), P, u and s with
-      pair_thermodynamics (step 2) and c_V with specific_heat (step 4).
-      Return a dict with exactly the seven keys "psi", "n_minus", "n_plus", "P", "u", "s", "cv" (Python
-      floats, units as in the earlier steps). Accuracy, with respect to the exact values for the given
-      (rho, T, Ye): psi, n_minus, P, u, s relative 1e-10; n_plus relative 1e-10 when at least 1e-250 cm^-3,
-      otherwise within 1e-250 cm^-3; cv relative 1e-8. These bounds include the error propagated from psi:
-      n_minus, n_plus, P, u and s change by up to about 600 times the relative change of psi
-      (|d ln X / d ln psi| is close to psi in a cool classical gas, where psi is close to m_e c^2 / (k T)),
-      so the psi used for them must be accurate to about 1e-13 relative, far better than the 1e-10 required
-      of degeneracy_parameter.
+      Equation of state and adiabatic exponents of the electron-positron gas. For a mass density rho
+      (g cm^-3), a temperature T (K) and an electron fraction Ye (electrons per baryon), the gas has
+      n_net = rho Ye N_A. Return a dict with exactly the nine keys "psi", "n_minus", "n_plus", "P", "u",
+      "s", "cv", "gamma1", "nabla_ad", whose values are Python floats: psi, the densities, P, u, s and c_V
+      of this state as defined in steps 1 to 4 (units as there), and the two exponents of a reversible
+      adiabatic change of the electron-positron gas alone, at fixed Ye and with the pairs in equilibrium at
+      every instant:
+        gamma1   = (d ln P / d ln rho) at constant s / rho  (the first adiabatic exponent),
+        nabla_ad = (d ln T / d ln P)   at constant s / rho  (the adiabatic temperature gradient),
+      where s / rho is the entropy of the gas per unit mass.
+      Accuracy with respect to the exact values at the given (rho, T, Ye), including the error propagated
+      from psi (n_minus, n_plus, P, u and s change by up to about 600 times the relative change of psi):
+      psi, n_minus, P, u and s relative 1e-10; n_plus relative 1e-10 when at least 1e-250 cm^-3, otherwise
+      within 1e-250 cm^-3; cv, gamma1 and nabla_ad relative 1e-8. These bounds hold everywhere in the input
+      domain, its boundaries included, from completely degenerate gases to pair plasmas.
+      pair_densities (step 1), pair_thermodynamics (step 2), degeneracy_parameter (step 3) and
+      specific_heat (step 4) are available.
       Inputs: rho (float), T (float, 1e7 <= T <= 1e11) and Ye (float, 0 < Ye <= 1), with
       1e-10 <= rho Ye <= 1e13.
       Errors: raise ValueError if Ye is not in (0, 1], or if T or rho Ye is outside its range.
     function_header: |-
       def electron_positron_eos(rho, T, Ye):
-          '''Equation of state of the electron-positron gas for a mass density, temperature and electron fraction.
+          '''Equation of state and adiabatic exponents of the electron-positron gas.
 
           Inputs:
             rho: float, mass density in g cm^-3.
@@ -422,30 +448,48 @@ sub_steps:
             Ye: float, electrons per baryon, 0 < Ye <= 1; 1e-10 <= rho Ye <= 1e13.
 
           Output:
-            dict with exactly the seven keys "psi", "n_minus", "n_plus", "P", "u", "s", "cv", whose values are
-              Python floats (units as in steps 1-4). Accuracy with respect to the exact values for the given
-              (rho, T, Ye): psi, n_minus, P, u, s relative 1e-10; n_plus relative 1e-10 when at least
-              1e-250 cm^-3, otherwise within 1e-250 cm^-3; cv relative 1e-8. This includes the error propagated
-              from psi, which n_minus, n_plus, P, u and s amplify up to about 600 times, so psi must be found to
-              about 1e-13 relative.
+            dict with exactly the nine keys "psi", "n_minus", "n_plus", "P", "u", "s", "cv", "gamma1",
+              "nabla_ad", whose values are Python floats: psi, densities (cm^-3), P (erg cm^-3), u (erg cm^-3),
+              s (erg K^-1 cm^-3) and cv (erg K^-1 cm^-3) as in steps 1-4; gamma1 = (d ln P / d ln rho) and
+              nabla_ad = (d ln T / d ln P), both at constant s / rho and Ye for the electron-positron gas alone,
+              pairs in equilibrium. Accuracy with respect to the exact values for the given (rho, T, Ye),
+              including the error propagated from psi: psi, n_minus, P, u, s relative 1e-10; n_plus relative
+              1e-10 when at least 1e-250 cm^-3, otherwise within 1e-250 cm^-3; cv, gamma1, nabla_ad relative
+              1e-8.
 
           Raises:
             ValueError if Ye is not in (0, 1], or if T or rho Ye is outside its range.
           '''
     return_line: return result
     step_background: |-
-      A complete equation of state gives every thermodynamic quantity of the electron-positron component
-      for (rho, T, Y_e); ions and radiation are added separately in a stellar model.
-    n_test_cases: 7
+      A stellar model takes two adiabatic exponents from its equation of state: Gamma1 = (d ln P / d ln rho)
+      at constant entropy, which decides dynamical stability (a self-gravitating body needs a pressure-
+      weighted Gamma1 above 4/3), and nabla_ad = (d ln T / d ln P) at constant entropy, the threshold of the
+      Schwarzschild criterion for convection (Cox and Giuli 1968). For the completely degenerate electron
+      gas Gamma1 falls from 5/3 to 4/3 as the electrons become relativistic, which sets the Chandrasekhar
+      mass (Chandrasekhar 1939). Pair creation turns heat into rest energy and lowers Gamma1 of the pair gas
+      below 4/3; together with the radiation this softening drives the pair instability of very massive
+      stars. Here the exponents are those of the electron-positron gas by itself, the component that
+      supplies the pressure in degenerate matter.
+    n_test_cases: 10
     contract:
-      quantity: "Equation of state of the electron-positron gas for (rho, T, Y_e)."
-      assumptions: "As in steps 1-4."
+      quantity: "Equation of state of the electron-positron gas for (rho, T, Y_e), with its first adiabatic exponent gamma1 and its adiabatic temperature gradient nabla_ad."
+      assumptions: "As in steps 1-4. Reversible adiabatic change of the electron-positron gas alone at constant entropy per unit mass and fixed Y_e; the pair number follows equilibrium; ions and radiation are not included."
       result_kind: exact
       valid_input_ranges: "1e7 <= T <= 1e11 K; 0 < Ye <= 1; 1e-10 <= rho Ye <= 1e13 g cm^-3."
-      units: "As in steps 1-4."
-      output_shape: "Dict of seven Python floats."
+      units: "As in steps 1-4; gamma1 and nabla_ad dimensionless."
+      output_shape: "Dict of nine Python floats."
       step_dependencies: [1, 2, 3, 4]
     mutants:
       - name: cv_at_fixed_psi
-        description: "Differentiates the energy at constant psi instead of constant net electron density."
+        description: "Differentiates the energy at constant psi instead of constant net electron density; the wrong c_V is returned and enters gamma1 and nabla_ad."
         file: mutants/step_5_cv_at_fixed_psi.py
+      - name: adiabat_at_constant_entropy_density
+        description: "Holds the entropy per volume s instead of the entropy per mass s / rho fixed along the adiabat: Gamma3 - 1 = ((dP/dT)_n - s) / c_V."
+        file: mutants/step_5_adiabat_at_constant_entropy_density.py
+      - name: pairs_frozen_in_response
+        description: "Keeps the positron number fixed during the adiabatic change (electron response moments only in (dP/dT)_n, (dP/dn)_T and the c_V of the exponents)."
+        file: mutants/step_5_pairs_frozen_in_response.py
+      - name: thermal_pressure_from_T_psi_jacobian
+        description: "Takes (dP/dT)_n through the variables (T, psi), s + n k psi - n k T (dn/dT)_psi / (dn/dpsi)_T, which cancels by about psi^2 in a degenerate gas."
+        file: mutants/step_5_thermal_pressure_from_T_psi_jacobian.py
