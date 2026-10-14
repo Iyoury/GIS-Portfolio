@@ -329,3 +329,6 @@ pente infinie, 700 unités, 8 piézomètres horaires, inventaire daté à l'inte
   de science.
 - Auto-kill (×3) : jamais de motif `pkill -f` dans une commande dont le texte contient le motif (y compris un
   heredoc qui cite `solve.py`) ; script de kill dans un fichier, appelé par son seul chemin.
+- **Vérification de référence 0/3 sur la plateforme (glissements, 14 oct. 15 h 16)** : le test importait pandas, l'image du
+  vérificateur n'a que pytest et numpy. Règle (déjà connue, re-apprise) : **le test est en bibliothèque standard + numpy,
+  et l'émulation Docker (oracle ×3, nop) se fait avant toute livraison, sans exception, même pour un chantier.**
