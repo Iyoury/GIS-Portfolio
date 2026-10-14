@@ -233,3 +233,23 @@ lignes mortes). Un seul levier à ~50 % de réussite n'est pas assez. Mesures et
   incluses, et relire chaque nombre.
 - Le motif d'un kill (`grep "[a]grcal"`) ne doit pas partager sa commande avec la ligne de relance qui
   contient le nom en clair : le shell s'est tué une troisième fois.
+
+### Complément v4 : trois sondes de plus à effort bas (Opus, 15-19 commandes chacune)
+
+- Sonde 8 (détecteur mort sur tout le vol 2) : **résolue** — nivellement par croisements sur les rattachements
+  **et** correction de relief par lancer de rayons sur le MNT, en 17 commandes.
+- Troisième levier ajouté : une source de contrôle (radium) oubliée dans la soute au vol 3 (spectre additif
+  constant sur toutes les fenêtres ; le détecteur haut ne la voit pas ; le passage QC sur la ligne test et le
+  passage sur l'eau la montrent ; les rattachements la portent dans le nivellement du vol 2 ; a_u biaisé si le
+  passage sur l'eau du vol 3 est pris tel quel). Variantes « prise pour du sol » (cellules eU 12 %) et « retirée
+  comme un facteur » (74 %) : échec net ; référence (passage QC contre le vol d'étalonnage, deux itérations) et
+  indépendante (passage sur l'eau) : passent.
+- Sonde 9 (données livrées, trois leviers) : **échec** — mais elle a mesuré la source sur le passage sur l'eau
+  (15,5 cps, vraie 15,7) et nivelé le vol 2 sur les rattachements en 19 commandes ; seul le relief l'a arrêtée.
+- **Bilan sur cinq sondes à effort bas** : croisements sur rattachements 3/3, source oubliée 1/1, pads/dérive de
+  gain/a_u/retard 5/5 ; relief 2/5. À ce niveau d'agent, **tout contrôle qualité « du métier » est fait
+  systématiquement** (il vérifie les passages QC, l'eau, les croisements sans qu'on le lui dise) ; les défauts
+  d'instrument, même en chaîne, ne retiennent rien. Le seul levier qui tient est la physique que l'agent doit
+  *décider* d'appliquer (le relief), et il la décide ~40 % du temps malgré l'indice obligatoire des portes.
+- Conséquence pour la suite : ne plus empiler de défauts QC ; chercher des leviers de physique dont l'oubli est
+  silencieux et dont la correction n'est pas une recette (le relief en est un ; en trouver un deuxième par tâche).
