@@ -253,3 +253,11 @@ lignes mortes). Un seul levier à ~50 % de réussite n'est pas assez. Mesures et
   *décider* d'appliquer (le relief), et il la décide ~40 % du temps malgré l'indice obligatoire des portes.
 - Conséquence pour la suite : ne plus empiler de défauts QC ; chercher des leviers de physique dont l'oubli est
   silencieux et dont la correction n'est pas une recette (le relief en est un ; en trouver un deuxième par tâche).
+- Sonde 10 (données livrées) : échec par le relief seul ; elle a **absorbé la source oubliée comme du radon** par
+  croisements des rattachements avec le vol 1 (le spectre d'une source U et celui du radon ont les mêmes rapports
+  de fenêtres) : un levier « contamination additive » est annulé par n'importe quel nivellement par croisements.
+  Bilan final v4 sur données livrées : 0/2 à effort bas, par le relief dans les deux cas.
+- Boucle a_u → radon → décalages de vol → a_u : instable (gain > 1), point fixe faux sur 4 graines. Règle :
+  **une constante mesurée sur un passage de référence ne se révise pas** avec des quantités qui en dépendent ;
+  prendre le passage au signal le plus fort et s'y tenir. Vérifier toujours les constantes estimées contre la
+  vérité sur toutes les graines, pas seulement le reward.
