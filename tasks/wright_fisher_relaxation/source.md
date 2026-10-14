@@ -610,13 +610,13 @@ problem.yaml):
   lists of every mutant, shift with every step output and every evaluated function in the whole-task tests scaled
   by 1 +- 1e-12, and the all-None and all-zero controls passing no case).
 
-## Version 15 (grading_fix: platform content-check rules, applied before any report on this task)
+## Version 15 (grading_fix: platform content-check rules, applied before the platform v11 report was read)
 
 - Finding: the platform content check now enforces (2026-10-12): no non-finite literal anywhere in the tests; no
   finiteness promise in the visible text; computed values must clearly outweigh validation per step (assertion
   sites: type/shape/exception checks, a stated raise at half weight, against computed-value checks); no relative
   requirement on an exactly zero output; every stated output shape and inclusive endpoint exercised with values.
-  No platform report on this task yet; the rules were applied proactively.
+  Written before the platform v11 report was read; the rules were applied proactively.
 - Cause (audit of version 14, commit 9a6c5ee): (1) Non-finite inputs and promises: every raise list contained a
   non-finite input (float("nan") in steps 1, 3, 4, 6 and 7, float("inf") in steps 2, 5 and 7), and 15 lines of
   problem.yaml (problem_description_main, the step prompts and the function_header docstrings, with their copies in the
@@ -741,4 +741,38 @@ problem.yaml):
   step 7 dense_eigenvalues, numerical_inverse and regularized_absorbing [0, 1, 2, 3, 4, 6, 7], largest_entry_positive
   [1, 2, 3, 4, 6, 7]; the whole-task mutant fails general [0, 1, 2, 3, 4]. shift: every step output, and every
   evaluated function in the whole-task tests, scaled by 1 +- 1e-12: every case passes. controls: all-None and all-zero
-  stubs pass no case of any step or of the general tests. Raw folder size 496 KB.
+  stubs pass no case of any step or of the general tests. Raw folder size 425,859 bytes (du -sb).
+
+## Version 16 / platform v12 (grading_fix: platform v11 returned by an administrator)
+
+- Version mapping: platform v11 is commit 0054371 (local Version 11, submitted 5 Oct). Local Versions 12 to 15
+  were prepared while v11 was queued and go up together with this note as platform v12.
+- Finding (platform v11 report): content check "1 to consider"; exploit probe clean; difficulty probe 0/3; rollouts
+  in band 1/8 (rewards 0.00, 0.86, 0.57, 0.86, 0.86, 0.86, 1.00, 0.86); attempts 0, 2 and 7 invalid ("possibly
+  timed out"); lost credit: code synthesis 4, process 1, no single cause 2; task-level notes "verifier correctness"
+  and "solution discoverability" at 1/6 each; step 7 failed on the final file of most attempts. Returned "Needs
+  revision" by an administrator on 13 Oct 04:31, in the same minute as another task of the author; no reason shown.
+- Cause (what v11 still contained, checked in commit 0054371): a per-call budget "within 20 s on one CPU core" in
+  the prompts (5 lines of problem.yaml) and perf_counter timing asserts in the tests of steps 2 to 7; exact
+  floating-point zero asserts (mode[N] == 0.0 at absorbing states); the finiteness clauses and non-finite inputs.
+  All are against the authoring guide or the platform rules of 10-12 Oct. They were removed by Versions 12 (budget,
+  timing asserts, exact zeros: absolute 1e-250 rule) and 15 (finiteness). The verifier-correctness note could not
+  be traced to a test: an independent fairness audit (a valid step-7 implementation written from the visible text
+  only, and step-7 targets recomputed by a different high-precision route) found no defect.
+- Change (pre-upload audit, two stated behaviours that no test exercised):
+  - Step 7 case 8 (new): the low end of the stated range of lambda_min, N = 400, s = -0.5, u = v = 0.1, lambda_min
+    = 1.3567455827803434e-225, with 81 mode entries of strictly alternating sign (i = 0, 5, ..., 400). Target:
+    independent_recomputation, the matrix from mpmath binomials at 400 digits, inverse iteration with one plain LU
+    factorization in mpmath (no use of the Vandermonde structure); cross-checked by a Lagrange-inverse route at 120
+    digits followed by the power method at 60 digits (lambda within 3.6e-30, entries within 4.6e-18).
+  - Step 3 case 8 (new): the "within 1e-250" rule for the far tail, N = 400, s = -0.5, u = 0.1, v = 1e-12; the
+    distribution crosses 1e-250 between i = 340 and 341 and 60 entries lie below it. Target:
+    independent_recomputation, pi (I - P) = 0, sum(pi) = 1 solved by one plain LU in mpmath at 400 digits;
+    cross-checked by GTH elimination in mpmath at 40 digits (55 stored entries within 4.4e-18).
+  - n_test_cases: step 3 and step 7 go from 8 to 9.
+- Regression: the reference meets the new targets within 1.2e-13 (lambda) and 6.3e-13 (mode) in step 7 and 5.6e-13
+  relative / 3.4e-264 absolute in step 3; the second solution within 6.9e-13 / 1.3e-12 and 1.4e-13 / 2.4e-264.
+  The new cases reject the step 3 mutant dense_eigenvector and the step 7 mutants dense_eigenvalues,
+  numerical_inverse and largest_entry_positive.
+- Rerun: tools/crown_check.py, all modes; every case alone in a fresh single-threaded process (69 cases, about 88 s
+  in all, slowest about 7.6 s); raw folder size after this note about 437 KB (du -sb).

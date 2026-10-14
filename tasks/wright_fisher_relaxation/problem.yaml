@@ -314,7 +314,7 @@ sub_steps:
       limit it is Wright's distribution, proportional to p**(2 N v - 1) (1 - p)**(2 N u - 1) exp(2 N s p).
       With rare mutations it is concentrated on the two fixed states; the probabilities of the
       intermediate states are many orders of magnitude smaller but still needed.
-    n_test_cases: 8
+    n_test_cases: 9
     contract:
       quantity: "Stationary distribution of the number of copies of A under mutation, selection and drift."
       assumptions: "Wright-Fisher chain of step 1 with u, v > 0 (irreducible)."
@@ -572,7 +572,7 @@ sub_steps:
       lambda_k = (1 - u - v)**k N! / (N**k (N - k)!) (Feller 1951; Cannings 1974): the k-th mode is a
       polynomial of degree k in the allele frequency, damped by drift and mutation. With selection the
       spectrum has no closed form.
-    n_test_cases: 8
+    n_test_cases: 9
     contract:
       quantity: Smallest eigenvalue of the Wright-Fisher transition matrix and its right eigenvector.
       assumptions: Wright-Fisher chain of step 1 with u and v each either 0 or in [1e-12, 0.1]; absorbing states when u = 0 or v = 0; real positive eigenvalues.

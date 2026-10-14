@@ -684,14 +684,14 @@ Rerun for version 14 (after items 10-12):
   - CONTROLS: all-None and all-zero stubs pass 0 cases in every step and in general.
   - SUMMARY ALL OK.
 
-## Version 15 (grading_fix: platform content-check rules, applied before any report on this task)
+## Version 15 (grading_fix: platform content-check rules, applied before the platform v13 report was read)
 
 - Finding: the platform content check now enforces (2026-10-12): no non-finite literal anywhere in the tests
   (float("nan"), float("inf"), np.nan, np.inf, also inside helpers); no finiteness promise in the visible text;
   computed values must clearly outweigh validation per step (assertion sites: type/shape/exception checks, a
   stated raise at half weight, against computed-value checks); no relative requirement on an exactly zero
-  output; every stated output shape and inclusive endpoint exercised with values. No platform report on this
-  task yet; the rules were applied proactively.
+  output; every stated output shape and inclusive endpoint exercised with values. Written before the platform v13
+  report was read; the rules were applied proactively.
 - Cause (audit of version 14): (1) the invalid-input lists held non-finite inputs (step 1: h = nan and inf;
   step 2: h = nan and an array with inf; step 3: h = nan, a = nan, rate = inf; step 4: a = nan; step 5:
   sigma = nan, h = nan; step 6: weights with inf and nan, a = nan, rate = inf), matching the "not finite" /
@@ -779,3 +779,32 @@ Rerun for version 14 (after items 10-12):
     function shifted.
   - CONTROLS: all-None and all-zero stubs pass 0 cases in every step and in general.
   - SUMMARY ALL OK.
+
+## Platform v13 report (returned 13 Oct 04:31) and upload as platform v14 (grading_fix)
+
+- Version mapping: platform v13 is commit 000951e (local Version 12 with its content-check fixes, submitted
+  5 Oct). Local Versions 13 to 15 and this clarification go up together as platform v14.
+- Finding (platform v13 report): content check no findings; exploit probe clean; difficulty probe pass; rollouts
+  in band 1/8 (rewards 0.83, 1.00, 0.83, 0.50, 0.50, 0.83, 0.83, 0.83); attempts 0, 5 and 6 invalid ("possibly
+  timed out"); lost credit: domain reasoning 2, code synthesis 4, no single cause 1; attempts 3 and 4 "wrong model
+  or method", attempt 4 also "verifier correctness" (task-level note 1/7); attempts 2 and 7 "numerical method".
+  Returned "Needs revision" by an administrator on 13 Oct 04:31, in the same minute as another task of the author;
+  no reason shown.
+- Cause (what v13 still contained, checked in commit 000951e): per-call time budgets in the prompts (step 6 stated
+  60 s) and SIGALRM / perf_counter timing asserts in every test file; finiteness clauses and NaN/inf inputs; and an
+  unstated convention found by the pre-upload audit: the meaning of the float input psi = np.pi / 2. Read
+  literally, np.pi / 2 lies 6e-17 below pi/2, where the astroid gives h_sw = 1 - 2.3e-11, while every test (step 3
+  case 4 in particular) takes it as the hard axis with h_sw = 1 exactly. An audit copy of solution.py with its
+  psi == np.pi / 2 special cases removed (the literal reading) passed every case except step 3 case 4, where
+  near the switching field it missed by up to 0.95 at (a, f0 / rate) = (40, 1e13). This may explain the
+  verifier-correctness note of attempt 4; that is not verified (no trajectory available).
+- Change: the timing budgets and asserts were removed in Version 13 and the finiteness clauses and inputs in
+  Version 15. The visible text now states the convention: problem_description_main "an input psi equal to
+  np.pi / 2 is the end point pi/2 itself (the hard axis, where h_sw = 1 exactly)", and the step 3 prompt "For
+  0 < psi < pi/2 (an input equal to np.pi / 2 is the end point pi/2)". No test, reference, tolerance or domain
+  changed.
+- Regression test: step 3 case 4 (the hard-axis case), which the literal-reading copy fails and the stated
+  convention now covers.
+- Rerun: tools/crown_check.py, all modes; every case alone in a fresh single-threaded process (46 cases, about
+  165 s in all, slowest about 16.5 s).
+
