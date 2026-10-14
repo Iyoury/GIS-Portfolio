@@ -288,3 +288,9 @@ ils deviennent un livrable noté à 25 % près. Règles tirées :
 - Sonde locale à effort bas (22 commandes) : a **dérivé les incréments à 9 % près** par un ajustement conjoint
   « valeurs au sol fixées » (et a échoué par le relief seul). Même ce levier ne résiste pas à un agent compétent ;
   il ajoute une étape à réussir, pas une barrière.
+- Complément v5, suite : (a) les croisements de nivellement se font aussi **hors sol à thorium anormal** et entre traces
+  à dégagement voisin (±40 m), et la ligne test se garde à plus de 600 m de l'anomalie (un croisement sur l'anomalie
+  se lisait comme 50 cps de radon) ; (b) la porte de la sensibilité U est liée à celle des incréments (un tiers à la
+  moitié de la fenêtre U est du stripping sur la ligne test) : porte U à 15 %, K/Th à 10 % ; (c) une sonde xhigh
+  locale (42 commandes) a tout résolu, incréments compris ; les deux sondes à effort bas ont dérivé les incréments
+  à 7-9 % près et échoué par le relief seul. Une constante retirée du paquet **ajoute une étape, pas une barrière**.
