@@ -746,14 +746,16 @@ problem.yaml):
 ## Version 16 / platform v12 (grading_fix: platform v11 returned by an administrator)
 
 - Version mapping: platform v11 is commit 0054371 (local Version 11, submitted 5 Oct). Local Versions 12 to 15
-  were prepared while v11 was queued and go up together with this note as platform v12.
+  were prepared while v11 was on the platform (rollouts finished 7 Oct, then in review until its return on
+  13 Oct) and go up together with this note as platform v12.
 - Finding (platform v11 report): content check "1 to consider"; exploit probe clean; difficulty probe 0/3; rollouts
   in band 1/8 (rewards 0.00, 0.86, 0.57, 0.86, 0.86, 0.86, 1.00, 0.86); attempts 0, 2 and 7 invalid ("possibly
   timed out"); lost credit: code synthesis 4, process 1, no single cause 2; task-level notes "verifier correctness"
-  and "solution discoverability" at 1/6 each; step 7 failed on the final file of most attempts. Returned "Needs
+  and "solution discoverability" at 1/6 each; the one per-step grading shown (attempt 1, under the verifier-correctness note) fails step 7 on the final
+  file; attempts 1, 3, 4, 5 and 7 scored 0.86 (6 of 7 steps). Returned "Needs
   revision" by an administrator on 13 Oct 04:31, in the same minute as another task of the author; no reason shown.
 - Cause (what v11 still contained, checked in commit 0054371): a per-call budget "within 20 s on one CPU core" in
-  the prompts (5 lines of problem.yaml) and perf_counter timing asserts in the tests of steps 2 to 7; exact
+  the prompts of steps 2 to 7 (six sentences) and perf_counter timing asserts in the tests of steps 2 to 7; exact
   floating-point zero asserts (mode[N] == 0.0 at absorbing states); the finiteness clauses and non-finite inputs.
   All are against the authoring guide or the platform rules of 10-12 Oct. They were removed by Versions 12 (budget,
   timing asserts, exact zeros: absolute 1e-250 rule) and 15 (finiteness). The verifier-correctness note could not

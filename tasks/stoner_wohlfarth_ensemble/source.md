@@ -807,4 +807,10 @@ Rerun for version 14 (after items 10-12):
   convention now covers.
 - Rerun: tools/crown_check.py, all modes; every case alone in a fresh single-threaded process (46 cases, about
   165 s in all, slowest about 16.5 s).
-
+- Second pass (independent verification of this change): the main-text sentence now names the switching field
+  of step 1 ("where the switching field h_sw of step 1 is exactly 1"), the step 3 function_header docstring and
+  its copies (steps/step_3.py, solution/step_3.py, solution.py, second_solution.py and the two mutants that copy
+  it) and the step 3 contract carry the same parenthetical, and the difficulty_explanation describes the end
+  point as a stated convention that must be implemented exactly. A copy of solution.py that follows the literal
+  astroid formulas but honours the stated convention passes all 46 cases; every test oracle that uses psi =
+  np.pi / 2 takes h_sw = 1. crown_check all modes: SUMMARY ALL OK.
