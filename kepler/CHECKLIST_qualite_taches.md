@@ -332,3 +332,41 @@ pente infinie, 700 unités, 8 piézomètres horaires, inventaire daté à l'inte
 - **Vérification de référence 0/3 sur la plateforme (glissements, 14 oct. 15 h 16)** : le test importait pandas, l'image du
   vérificateur n'a que pytest et numpy. Règle (déjà connue, re-apprise) : **le test est en bibliothèque standard + numpy,
   et l'émulation Docker (oracle ×3, nop) se fait avant toute livraison, sans exception, même pour un chantier.**
+
+### Sismicité induite (sujet 2 du profil approuvé) — leçons de construction (14 oct.)
+
+- **Simulation et espérance doivent partager le même noyau.** Les délais d'Omori simulés (loi
+  continue non tronquée) ne correspondaient pas au noyau discret de 1 200 jours de l'espérance :
+  19 % des répliques tombaient hors fenêtre, la part « le jour même » différait, et la mémoire
+  ajustée sur le catalogue semblait « sous-estimée » alors que c'était la clé qui était fausse.
+  Vérifier systématiquement : comptes simulés par puits-année contre l'espérance (écart < 10 %).
+- **Clé conditionnelle au dossier.** Quand le processus a de la mémoire (grappes, répliques), la clé
+  2027 doit être l'espérance *sachant* les événements réalisés 2019-2026, pas l'espérance
+  inconditionnelle : une séquence Mw 4,4 réalisée en 2026 pèse sur 2027 et l'agent la voit.
+- **Bruit irréductible mesuré avant de fixer les portes.** Option `--catseed` du générateur :
+  même vérité, autre réalisation du catalogue ; la chaîne de référence sur 10 réalisations donne
+  l'étalement (ici facteur 1,15-1,74 sur l'annuel, 9/10 passent). Les portes se fixent au-dessus de
+  cet étalement (annuel ×1,5, mensuel ×1,6), pas au-dessus de l'erreur sur une seule graine.
+- **Redressement du bruit journalier.** Une réponse en max(dp/dt, 0) redresse le bruit journalier
+  d'injection : le niveau « stable » du dossier contient cette composante, et un programme lissé
+  (taux constants dans le mois) ne l'a pas. Dire dans l'instruction que les taux 2027 sont
+  constants dans le mois ; une route sur moyennes mensuelles surestime d'un facteur 2-3.
+- **Ajustement journalier, pas mensuel.** Au pas mensuel, la mémoire des répliques et la réponse
+  lente de diffusion sont confondues (la mémoire absorbe tout, ν → 0,9). Au pas journalier
+  (Poisson, NNLS repondéré), la structure à court délai identifie ν ; p et α restent non
+  identifiables (valeurs de manuel, dit dans le README) ; un seul poids de mémoire pour la région.
+- **Le puits qui s'arrête doit avoir des patchs proches**, sinon la queue après arrêt est de la
+  diffusion lointaine et l'ablation « sans mémoire » passe. Même ainsi, les noyaux lointains
+  imitent la mémoire dans 3 graines sur 6 : à dire tel quel dans le README et le task.toml.
+- **Porte « mois sans injection »** (≥ 70 % des puits-mois à taux planifié nul dans la tolérance) :
+  c'est elle qui sépare le retard/décroissance et la mémoire ; la porte mensuelle globale ne
+  sépare que le retard.
+- **Instance livrée = celle où toutes les ablations échouent** (graine 2), même si la route
+  indépendante n'y passe pas (elle passe 2/6, dit dans le task.toml). La difficulté essentielle sur
+  l'instance livrée pèse plus que la route indépendante sur cette instance.
+- **Route indépendante avec une autre famille de noyaux** : elle extrapole les arrêts autrement
+  (gamma vs diffusion) ; ne pas espérer 6/6, et le dire.
+- **Sonde locale (Opus, effort bas, 11 commandes)** : trouve la carrière, les doublons, la station
+  biaisée, ML→Mw, les phases du réseau, les bouffées au redémarrage — tout — mais extrapole « à la
+  main » (analogues) : 24/48 mois, annuel ×2,8, récompense 0. La difficulté est dans la modélisation
+  quantitative, pas dans la détection des mécanismes.
