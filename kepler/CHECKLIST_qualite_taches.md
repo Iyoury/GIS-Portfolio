@@ -294,3 +294,13 @@ ils deviennent un livrable noté à 25 % près. Règles tirées :
   moitié de la fenêtre U est du stripping sur la ligne test) : porte U à 15 %, K/Th à 10 % ; (c) une sonde xhigh
   locale (42 commandes) a tout résolu, incréments compris ; les deux sondes à effort bas ont dérivé les incréments
   à 7-9 % près et échoué par le relief seul. Une constante retirée du paquet **ajoute une étape, pas une barrière**.
+
+### Radiométrie v5 — verdict de la plateforme (14 oct., 9 h 48)
+
+Sonde de facilité **échouée : 2 réussites sur 3** à effort bas (10-15 min, 35-44 k jetons de sortie par essai),
+après que la v4 avait passé cette même sonde (0/3) et échoué la sonde de difficulté (7/7 à xhigh). Lecture :
+retirer une constante du paquet (incréments de stripping) n'a rien ajouté comme barrière, et le levier du
+relief, qui arrêtait 2 essais sur 3 à effort bas en v3-v4, s'est trouvé franchi 2 fois sur 3 cette fois : à
+effort bas la réussite tient au tirage, pas à la tâche. Le squelette « gamma aéroporté » est abandonné (il
+figure d'ailleurs au catalogue des squelettes à ne plus reprendre). Règle : **quand un levier ne tient que
+60 % du temps à effort bas, il ne porte pas une tâche ; on change de sujet au lieu d'empiler des artefacts.**
