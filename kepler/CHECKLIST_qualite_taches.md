@@ -261,3 +261,30 @@ lignes mortes). Un seul levier à ~50 % de réussite n'est pas assez. Mesures et
   **une constante mesurée sur un passage de référence ne se révise pas** avec des quantités qui en dépendent ;
   prendre le passage au signal le plus fort et s'y tenir. Vérifier toujours les constantes estimées contre la
   vérité sur toutes les graines, pas seulement le reward.
+
+## Leçon de la v5 (`airborne-radiometric-reduction`) : une constante retirée du paquet
+
+Sonde de difficulté de la plateforme sur la v4 : **7 réussites sur 7 notées** à effort xhigh (un essai en erreur
+d'infrastructure) ; la sonde de facilité est passée. Les agents forts font toute la chaîne. Levier v5 : les
+incréments de hauteur des rapports de stripping ne sont plus dans le paquet (le manuel donne 0,00049/0,00065 par
+mètre, le pack synthétique vaut 2 à 3 fois plus, build-up tiré par graine) ; une terrasse à thorium dominant
+(eTh 45-65, eU 2,5-4,5, K ~1 %) de 2 × 1,4 km sur la ligne test, survolée à cinq hauteurs, permet de les mesurer ;
+ils deviennent un livrable noté à 25 % près. Règles tirées :
+
+- **Un paramètre ne se mesure que sur un sol qui l'isole.** L'ajustement conjoint sur toute la ligne test
+  (U et Th corrélés le long de la ligne) était mal posé : valeurs négatives. Il faut un tronçon où l'élément
+  contaminant domine (Th ≫ U, K) : l'IAEA le dit (calibration range), le générateur doit le fournir.
+- **L'empreinte impose la taille de la cible** : une terrasse de 170-230 m nord-sud biaisait β de 50 % aux
+  passages hauts (l'empreinte à 165 m a 300 m de rayon et voyait le K de l'encaissant). Largeur ≥ 2 × 700 m,
+  contraste de K faible, marges de 600 m (sensibilités à 80 m) et 900 m (atténuation à 170 m) : la queue
+  d'empreinte d'un sol à 50 ppm de Th contre 8 autour biaisait la sensibilité Th de 9 % avec 350 m de marge.
+- **Découpler les ajustements** : atténuation et sensibilités sur le sol ordinaire de la ligne test, incréments
+  sur la terrasse seule ; sinon α', μ_U et S_U forment une boucle qui converge à côté (μ_U 0,0056 pour 0,0075).
+- **Les croisements de nivellement se comparent sur des taux strippés** : sur la terrasse, la fuite de Th dans la
+  fenêtre U dépend de la hauteur de chaque trace, et la différence brute se lisait comme du radon (0,8 ppm sur
+  une ligne entière du vol mort).
+- **Porte relative, pas absolue**, quand la vraie valeur varie d'un facteur 2 entre graines : 0,0003/m valait 12 à
+  30 % selon la graine ; 25 % relatif garde la discrimination (manuel à 50-75 %).
+- Sonde locale à effort bas (22 commandes) : a **dérivé les incréments à 9 % près** par un ajustement conjoint
+  « valeurs au sol fixées » (et a échoué par le relief seul). Même ce levier ne résiste pas à un agent compétent ;
+  il ajoute une étape à réussir, pas une barrière.
