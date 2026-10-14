@@ -304,3 +304,28 @@ relief, qui arrêtait 2 essais sur 3 à effort bas en v3-v4, s'est trouvé franc
 effort bas la réussite tient au tirage, pas à la tâche. Le squelette « gamma aéroporté » est abandonné (il
 figure d'ailleurs au catalogue des squelettes à ne plus reprendre). Règle : **quand un levier ne tient que
 60 % du temps à effort bas, il ne porte pas une tâche ; on change de sujet au lieu d'empiler des artefacts.**
+
+### Glissements superficiels (sujet 1 du profil approuvé) — leçons de construction (14 oct.)
+
+Chaîne : neige/pluie sur neige, sol gelé, cohésion racinaire après coupe, convergence, épaisseur de sol →
+pente infinie, 700 unités, 8 piézomètres horaires, inventaire daté à l'intervalle d'imagerie. Règles tirées :
+
+- **La clé doit porter le FS minimal de la colonne intacte sur tout le scénario**, pas le FS du premier jour sous 1 :
+  sinon presque toutes les ruptures sont « marginales » et la bande d'incertitude du vérificateur avale la notation.
+- **Un capteur piézométrique à 0,7-0,9 de la profondeur du sol censure tout** (nappe presque toujours en dessous) :
+  sonde à la base du sol, sinon le gel et la réponse aux tempêtes sont invisibles.
+- **Vérité reproductible depuis les données journalières** : pluie du jour étalée sur 24 h ; une concentration horaire
+  cachée biaise de 10-30 % les pics de tout modèle journalier, donc l'agent, donc la référence.
+- **Le printemps sature tout si l'hiver est trop neigeux** (normales mensuelles réalistes, DDF forêt 1,8-2,6) ; sinon
+  l'automne ne peut pas dépasser l'histoire (m plafonné à 1) et le scénario ne produit rien.
+- **Cinq mécanismes calés en cascade = ±0,05-0,08 de FS par unité** ; les portes binaires sur un seuil absolu sont
+  injustes (la référence signalait 20 à 104 unités pour 55 vraies selon la graine) ; les portes par classement
+  (N unités les moins stables) sont justes mais n'éprouvent plus les mécanismes « de niveau » (fonte, gel), qui ne se
+  voient plus que par les dates. Préférer deux ou trois mécanismes à effet fort (facteur 2 sur l'entité) à cinq
+  mécanismes à effet fin.
+- **La sonde Opus à effort bas a retrouvé les cinq mécanismes en 42 commandes** : les fichiers eux-mêmes les
+  suggèrent (relevés de neige, thermistors, années de coupe, sondes d'épaisseur). Quand chaque mécanisme a « son »
+  fichier, il n'est pas caché ; la difficulté restante est la précision du calage, ce qui n'est pas une difficulté
+  de science.
+- Auto-kill (×3) : jamais de motif `pkill -f` dans une commande dont le texte contient le motif (y compris un
+  heredoc qui cite `solve.py`) ; script de kill dans un fichier, appelé par son seul chemin.
