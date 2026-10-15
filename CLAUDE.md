@@ -161,10 +161,11 @@ prism v4 (local v7) failed the content check after a self-run emulation. From no
   not in the repo.
 - Release gate run 2026-10-15: ELECTRON v4 PASS (probes 39/43, 40/43, 40/43 on the final tests; background
   occupation-number typo fixed) -> zips9, first to upload. WF v12 FAIL on content only (probes 66, 68, 67 of 69, fair):
-  every two-sided error rule tested on one side since the Version 15 trim -> fix + re-verify running. STONER v14 FAIL:
-  a Sonnet-medium probe solved 46/46 (step 5 gives the Sturm-Liouville form and Garanin's quadrature; the np.pi/2 trap
-  is now stated), plus one-sided error rules and an ill-posed step 6 h_half input -> fixes + de-recipe hardening
-  re-probe running in a scratch copy.
+  every two-sided error rule tested on one side since the Version 15 trim -> fixed (Version 17), independent
+  re-verification GATE PASS -> zips9, second to upload (after electron's result). STONER v14 FAIL: a Sonnet-medium probe
+  solved 46/46; content fixes committed (both sides of rules, step 3 case 7, step 6 h_half exclusion); removing the
+  step 5 key formulas (scratch copy gate/stoner_wohlfarth_ensemble/harden) did not help (47/47, 45, 45 of 47): the
+  models know Brown/Garanin. Not releasable; author decides (park, or new science).
 - All tasks: authoring-guide conformance passes 1-2 (2026-10-10/11). Author metadata filled 2026-10-12 with the
   author's own text (tools/set_author_meta.py): affiliation "Independent Researcher"; relevant_experience = B.Sc.
   Georesources and Environment (FST Fes, 2016), graduate certificate in geomatics (Universite Laval), GIS analyst
