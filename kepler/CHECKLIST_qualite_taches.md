@@ -370,3 +370,19 @@ pente infinie, 700 unités, 8 piézomètres horaires, inventaire daté à l'inte
   biaisée, ML→Mw, les phases du réseau, les bouffées au redémarrage — tout — mais extrapole « à la
   main » (analogues) : 24/48 mois, annuel ×2,8, récompense 0. La difficulté est dans la modélisation
   quantitative, pas dans la détection des mécanismes.
+
+### Règle Kepler (15 oct.) : l'instruction décrit la tâche, pas le correcteur
+
+- Pas de « verifier », « grader », « answer key », « reward », « credit », « score » dans
+  `instruction.md`. Titres « ## Output » et « ## Requirements », jamais « what is graded ».
+- Le correcteur n'est jamais l'acteur : « solve.py is run with Python 3.13 », pas « the verifier
+  runs… » ; « the program will also be run on other inputs in the same format », pas « hidden
+  evaluation runs ».
+- Les tolérances sont des exigences : « each value must be within 2 % of the true value », pas
+  « graded with a 2 % tolerance » ; « all N conditions must hold », pas « reward 1 requires » ni
+  « no partial credit ». Ne pas se contenter de changer le mot (« what counts is X » reste du
+  correcteur) : « X must be low on unseen data », « put the full answer in out.json ».
+- Fait sur `induced-seismicity-forecast` (zip du 15 oct.). L'instruction du sujet 1 garé
+  (`shallow-landslide-forecast`) a la même formulation ancienne : à réécrire avant toute
+  resoumission. Le README et le task.toml (champs d'explication pour la revue) gardent le
+  vocabulaire de vérification.
