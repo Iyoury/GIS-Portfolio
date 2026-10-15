@@ -100,9 +100,8 @@ starting points, use judgement and flag what does not fit. Update prompt, refere
   stoner v13 were both returned by an administrator at 13 Oct 04:31 (batch, no reason shown; both submitted 5 Oct with
   time budgets and finiteness clauses in their prompts). While on hold: no upload advice; prepare and audit locally only;
   when lifted, submit one fully audited task at a time and wait for its result.
-- HOLD LIFTED (2026-10-15): Harry (AfterQuery team) unpaused the account. Upload order advised: WF v12 (zips8) first,
-  then stoner v14 (zips8), electron v4 (zips7), borehole v10 last (last version); one at a time, each only after the
-  previous one's pipeline result is read.
+- HOLD LIFTED (2026-10-15): Harry (AfterQuery team) unpaused the account. Upload only what passed the RELEASE GATE,
+  one task at a time, each only after the previous one's pipeline result is read (zips8 WF/stoner withdrawn).
 
 ## RELEASE GATE (author's rule, 2026-10-15): never send a zip that has not passed all of these
 
@@ -160,6 +159,12 @@ prism v4 (local v7) failed the content check after a self-run emulation. From no
   fail, hodgkin-huxley v1 reference fail, hydrogen-stark-resonances v1 too easy; older geo tasks (basin-backstripping,
   gravity-basin-stripping, earthquake-swarm-location, gnss-euler-pole, zircon-discordia-ages, paleopole-synfolding)
   not in the repo.
+- Release gate run 2026-10-15: ELECTRON v4 PASS (probes 39/43, 40/43, 40/43 on the final tests; background
+  occupation-number typo fixed) -> zips9, first to upload. WF v12 FAIL on content only (probes 66, 68, 67 of 69, fair):
+  every two-sided error rule tested on one side since the Version 15 trim -> fix + re-verify running. STONER v14 FAIL:
+  a Sonnet-medium probe solved 46/46 (step 5 gives the Sturm-Liouville form and Garanin's quadrature; the np.pi/2 trap
+  is now stated), plus one-sided error rules and an ill-posed step 6 h_half input -> fixes + de-recipe hardening
+  re-probe running in a scratch copy.
 - All tasks: authoring-guide conformance passes 1-2 (2026-10-10/11). Author metadata filled 2026-10-12 with the
   author's own text (tools/set_author_meta.py): affiliation "Independent Researcher"; relevant_experience = B.Sc.
   Georesources and Environment (FST Fes, 2016), graduate certificate in geomatics (Universite Laval), GIS analyst
