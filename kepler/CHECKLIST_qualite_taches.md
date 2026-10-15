@@ -421,3 +421,55 @@ découvrir seul »). Ce qui a corrigé :
   paquet (le README.txt du paquet suffit), tolérances en exigences.
 - Garder la route statistique dans les preuves (`statistical_lags.py`, 2/6) : elle montre que la
   physique est nécessaire, ce qui est l'argument de difficulté essentielle.
+
+## Exemple de référence (autre auteur) : `shallow-landslide-forecast`, chaîne complète passée (15 oct.)
+
+Tâche d'un autre auteur, même thème que notre sujet 1 garé : 37 fichiers, 7,7 Mo, budget agent
+5 h, revue de qualité passée, anti-triche passée, sonde de facilité passée, **sonde de difficulté
+0/8 à effort xhigh** (bande 0-7), audit des 8 trajectoires entièrement « pass ». ADN à retenir,
+extrait de l'audit :
+
+- **Livrable et portes** : liste des unités qui rompent avec la date (`unit_id, fail_date`), deux
+  portes seulement : précision ≥ 0,62 et rappel daté ≥ 0,57 (±1 jour). La vérité est la sortie
+  exacte du générateur (`unit_truth.csv`), pas une sortie de l'oracle : « aucune erreur
+  d'estimation dans la référence ».
+- **Marges** : référence 0,73/0,66 sur l'instance livrée, 0,73-0,87 / 0,66-0,78 sur 5 graines →
+  portes 0,09-0,25 sous la référence ; toutes les ablations à un mécanisme et le réflexe (seuil
+  pluviométrique) échouent sur les 5 graines ; route indépendante (autres formes fonctionnelles :
+  routage Quinn, pluie/neige logistique, SHALSTAB, recharge gamma) passe 4/5 dont l'instance livrée
+  (0,69/0,59). L'audit note tout de même que cette route « clear dated recall by only 0.02 » et
+  « no generator-blind implementation is on record inside the accept region » : même critique que
+  sur notre sismicité. Viser une marge ≥ 0,05-0,10 pour la route indépendante aussi.
+- **Mécanismes non nommés mais lisibles** : décalages de réinstallation des piézomètres (+0,09 m,
+  journal de terrain), tubes gelés (lectures bloquées → indice de gel), gradient thermique du
+  logger de crête, neige degré-jour calée sur le relevé nival, recharge réservoir linéaire calée
+  sur les piézomètres, profondeur de sol Tobit (sondes censurées « >1.50 »), routage MFD, pente
+  infinie avec perte/regain racinaire après coupe, **vraisemblance de survie censurée par
+  intervalle** sur l'inventaire daté aux images, limite de tête de chenal A·tan²β. Deux tempêtes
+  d'automne (froide avec limite neige, pluie sur neige), une tempête de 260 mm sur sol gelé qui ne
+  fait rien, une fonte de mai : les dates sont discrètes donc gradables à ±1 jour.
+- **Ce qui rend la tâche dure pour les agents** (8/8 échecs, tous « meaningful difficulty ») : les
+  agents retrouvent presque tous les mécanismes et paramètres (gradient 6,2 °C/km, fonte 2,25-2,5
+  contre 2,4, perte 7 mm/j, seuil de gel) et les bons jours de tempête, mais **échouent sur la
+  discrimination unité par unité** (précision 0,33-0,60, rappel daté 0,06-0,22) : sans limite de
+  tête de chenal, sans vraisemblance censurée au niveau de l'unité, avec un facteur de force
+  latent qui dilue le classement. Confirme notre constat : la difficulté est dans la calibration
+  quantitative, pas dans la détection des mécanismes.
+- **Comportement des agents** : tous s'arrêtent volontairement à 1 h 14-3 h 12 sur 5 h en
+  estimant eux-mêmes leur chance de passer < 5-20 %. Un budget de 5 h ne nuit pas à la difficulté.
+- **Points que l'audit a vérifiés et qu'il faut pouvoir montrer** : instruction qui énonce la
+  fenêtre, le schéma, la règle « rompt une fois, au premier jour », les scellés ne rompent plus, les
+  deux portes exactes ; README des données documentant chaque bizarrerie (censure, journal de
+  terrain, lignes du scénario) ; vérificateur = comparaison d'ensembles déterministe ; aucune
+  donnée privilégiée dans l'oracle (la limite de tête de chenal choisie par la vraisemblance
+  publique, pas par la vérité cachée). Faiblesse notée : la sélection des cellules candidates de
+  l'oracle (20 plus humides, 10 plus raides, 10 par a·tanβ/z) « closely mirrors the generator's »
+  — éviter ces détails d'implémentation partagés entre générateur et référence.
+
+Conséquences pour nous :
+1. **Notre sujet 1 garé porte le même nom et le même thème** : une resoumission tomberait sur la
+   similarité. S'il est repris, le renommer et le différencier (autre contexte, autre livrable), ou
+   l'abandonner au profit des sujets 4 et 5 du profil.
+2. Gabarit à copier pour les prochains sujets : vérité exacte du générateur, deux ou trois portes
+   simples avec marge ≥ 0,09 sur la référence et ≥ 0,05 sur la route indépendante, ablations 0/N sur
+   toutes les graines, calibration par vraisemblance sur un inventaire censuré, dates discrètes.
