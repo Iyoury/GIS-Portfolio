@@ -506,3 +506,51 @@ Conséquences pour nous :
 - Bilan v3 : référence 5/6, indépendante 6/6, aveugle 0/6, statistique 1/6, ablations 0/6 sauf
   termes de station 4/6, nuls et fichiers mal formés 0/6, réalisations du catalogue 7/10 (ratio
   annuel 1,11-1,75). Docker sur l'instance livrée : oracle ×3 = 1, tout le reste 0, indépendante 1.
+
+### Chaleur urbaine nocturne (sujet 5, 15 oct.) : la v1 était trop lisible, leçons de la v2
+
+- **Mesurer les nuls et les ablations à la conception, pas à la fin.** En v1 les quatre nuls
+  échouaient, mais sur la graine 1 les ablations « sans météo » et « sans facteur de vue du ciel »
+  passaient : l'îlot n'était fort que dans le cœur (300 cellules sur 3 000), et les banlieues à
+  1 °C d'îlot tolèrent n'importe quel modèle à ±0,5 °C. Une porte « 80 % des cellules » est
+  dominée par les cellules faciles si le signal est concentré. Remède v2 : amplitude d'îlot répartie
+  sur toute la ville (coefficient imperméable 2,2-3,0 au lieu de 1,4-2,0) et porte par nuit.
+- **Un agent aveugle (xhigh, 82 appels, 35 min) a résolu la v1 avec marge** (93 % des cellules,
+  rho 0,94) et une sonde basse-effort (38 appels, 7 min) l'a presque résolue (rho 0,886 contre 0,90
+  sur la nuit venteuse). Tous les mécanismes (facteur de vue, parcs, vallée, mémoire thermique,
+  biais d'abri, dérive, relocalisation, retard de la sonde) étaient trouvés. Ne pas livrer avant
+  d'avoir fait les deux sondes locales : elles coûtent 40 min et évitent l'aller-retour de deux jours.
+- **L'extrapolation annoncée doit être réelle.** La description disait « une semaine plus chaude
+  que tout ce que le réseau a vu » mais les étés du réseau contenaient des vagues de 4 jours à
+  36 °C et l'indice de chaleur stockée du scénario (26) dépassait à peine celui du dossier (23,5).
+  v2 : étés 2025-2026 sans vague de plus de deux jours ni jour au-dessus de 31 °C (indice max 12),
+  les années antérieures gardent leurs vagues (l'agent ne peut pas les exploiter : pas de réseau).
+- **Artefacts du générateur à traquer** : les paramètres journaliers (Tmax, amplitude, nuage,
+  vent, direction) indexés par jour civil créent un saut à minuit (|ΔT| moyen 1,66 °C à 00:00
+  contre 0,74 à 01:00) que l'agent aveugle a remarqué (« la série saute à chaque minuit »). Remède :
+  valeurs journalières fixées à midi et interpolées linéairement entre les midis ; direction du vent
+  interpolée par ses composantes. Même famille : climat irréaliste (Tmax record 41 °C au Québec →
+  34 °C), mémoire thermique non causale (la nuit de la veille utilisait le maximum du lendemain →
+  coupure à midi), mémoire sans le jour même (j ≥ 1 → j ≥ 0).
+- **Levier physique ajouté en v2 : l'advection de l'îlot par le vent** (le champ chaud lu au point
+  amont, λ·vent, λ = 90-150 m par m/s ; l'îlot se déplace de 100-300 m les nuits calmes, les
+  capteurs de bordure du cœur lisent chaud ou froid selon la direction de la nuit ; le scénario a
+  un flux de sud et le front tourne au nord-ouest). Lisible dans le dossier (résidus des capteurs
+  contre la direction, traversées de nuits différentes), ignoré par la sonde basse-effort v2
+  (« la direction du vent comptait à certains capteurs, mais je l'ai laissée de côté ») et par la
+  route aveugle v1 (0/6 sur les données v2). La convention de direction (d'où vient le vent) est
+  écrite dans le README des données.
+- **Portes par nuit** plutôt que sur l'ensemble des cellules-nuits : une nuit particulière (le front
+  nuageux et venteux) discrimine les modèles sans météo ; une porte globale la dilue dans les
+  quatre nuits faciles.
+- **Grille des seuils par étapes** (mémoire, puis portée et seuil de creux, puis advection : ~30
+  ajustements au lieu de 486) : la référence passe de 7 à 3-4 min ; les ablations sur 6 graines
+  deviennent abordables. Les grilles ne contiennent pas la valeur exacte du générateur (T* 21/23/25/27
+  pour un seuil vrai de 24).
+- **Calcul** : quatre processus NumPy/SciPy sur quatre cœurs saturent la machine par les threads
+  BLAS (charge 18, chaque run 4× plus lent, timeouts) ; `OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1`
+  dans les scripts de calibration. Ne jamais `pkill -f <motif>` depuis un shell dont la ligne de
+  commande contient le motif : le shell se tue lui-même (code 144).
+- Résultats v2 sur la graine 1 : référence 93 % / rho 0,98 / 0,14 °C (λ ajusté 120 pour 135 vrai) ;
+  nuls 9-35 % des cellules, rho ≤ 0,70, niveau ≥ 0,9 °C ; route aveugle v1 appliquée aux données v2
+  0/6 ; sonde basse-effort v2 : 30 % / 0,76 / 0,88 (échec sur les trois portes).
