@@ -374,7 +374,9 @@ pente infinie, 700 unités, 8 piézomètres horaires, inventaire daté à l'inte
 ### Règle Kepler (15 oct.) : l'instruction décrit la tâche, pas le correcteur
 
 - Pas de « verifier », « grader », « answer key », « reward », « credit », « score » dans
-  `instruction.md`. Titres « ## Output » et « ## Requirements », jamais « what is graded ».
+  `instruction.md`. **Aucun titre Markdown** dans l'instruction (le contrôle de structure refuse
+  `## …`, erreur `instruction-heading`) : libellés en gras en tête de paragraphe, « **Output.** »
+  et « **Requirements.** », jamais « what is graded ».
 - Le correcteur n'est jamais l'acteur : « solve.py is run with Python 3.13 », pas « the verifier
   runs… » ; « the program will also be run on other inputs in the same format », pas « hidden
   evaluation runs ».
