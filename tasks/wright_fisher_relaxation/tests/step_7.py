@@ -18,8 +18,7 @@ def _crown_case():
     def _t_call(N, s, u, v):
         # the return type: (Python float, numpy float array of shape (N + 1,))
         lam, mode = fastest_mode(N, s, u, v)
-        mode = np.asarray(mode)
-        assert isinstance(lam, float) and mode.shape == (N + 1,) and np.issubdtype(mode.dtype, np.floating), (lam, mode.shape, mode.dtype)
+        assert isinstance(lam, float) and isinstance(mode, np.ndarray) and mode.shape == (N + 1,) and np.issubdtype(mode.dtype, np.floating), (lam, type(mode), np.shape(mode))
         return lam, mode
 
     def _t_absorbing_mask(N, u, v):
@@ -413,17 +412,20 @@ def _crown_case():
 _crown_case()
 
 # --- test case 5 ---
-# each stated error rule once, just outside the domain: N above 400, N a float (even integer-valued), N a bool,
-# s above 0.5, v above 0.1, a positive u and a positive v below the floor 1e-12 (u and v are each 0 or in
-# [1e-12, 0.1], so a positive rate below 1e-12 is out of range, however small), and N = 1 without mutation (P is the
-# identity)
+# each bound of each stated error rule, just outside the domain on each side: N = 401 and N = 0, N a float (even
+# integer-valued), N a bool (True, otherwise in range), s = -0.51 and 0.51, u negative, a positive u below the floor
+# 1e-12 and u = 0.11, v negative, a positive v below the floor and v = 0.11 (u and v are each 0 or in [1e-12, 0.1],
+# so a positive rate below 1e-12 is out of range, however small), and N = 1 without mutation (P is the identity);
+# every entry breaks exactly one rule
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for _t_bad in ((401, 0.1, 0.01, 0.01), (5.0, 0.1, 0.01, 0.01), (True, 0.1, 0.01, 0.01), (10, 0.51, 0.01, 0.01),
-                   (10, 0.1, 0.01, 0.11), (10, 0.1, 1e-13, 0.01), (10, 0.1, 0.01, 1e-200), (1, 0.2, 0.0, 0.0)):
+    for _t_bad in ((401, 0.1, 0.01, 0.01), (0, 0.1, 0.01, 0.01), (5.0, 0.1, 0.01, 0.01), (True, 0.1, 0.01, 0.01),
+                   (10, -0.51, 0.01, 0.01), (10, 0.51, 0.01, 0.01), (10, 0.1, -1e-6, 0.01), (10, 0.1, 1e-13, 0.01),
+                   (10, 0.1, 0.11, 0.01), (10, 0.1, 0.01, -1e-6), (10, 0.1, 0.01, 1e-200), (10, 0.1, 0.01, 0.11),
+                   (1, 0.2, 0.0, 0.0)):
         try:
             fastest_mode(*_t_bad)
         except ValueError:

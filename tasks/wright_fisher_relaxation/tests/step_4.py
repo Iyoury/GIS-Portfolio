@@ -130,15 +130,17 @@ def _crown_case():
 _crown_case()
 
 # --- test case 4 ---
-# each stated error rule once, just outside the domain: N above 400, N a float (even integer-valued), N a bool,
-# s above 0.5, u = 0 (below its floor 1e-12: the chain is then not irreducible), v above 0.1
+# each bound of each stated error rule, just outside the domain on each side: N = 0 and N = 401, N a float
+# (even integer-valued), N a bool (True, otherwise in range), s = -0.51 and 0.51, u = 0 (below its floor 1e-12: the chain is then not irreducible)
+# and u = 0.11, v = 1e-13 (below its floor) and v = 0.11; every entry breaks exactly one rule
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for _t_bad in ((401, 0.1, 0.01, 0.01), (8.0, 0.1, 0.01, 0.01), (False, 0.1, 0.01, 0.01), (10, 0.51, 0.01, 0.01),
-                   (10, 0.1, 0.0, 0.01), (10, 0.1, 0.01, 0.11)):
+    for _t_bad in ((0, 0.1, 0.01, 0.01), (401, 0.1, 0.01, 0.01), (8.0, 0.1, 0.01, 0.01), (True, 0.1, 0.01, 0.01),
+                   (10, -0.51, 0.01, 0.01), (10, 0.51, 0.01, 0.01), (10, 0.1, 0.0, 0.01), (10, 0.1, 0.11, 0.01),
+                   (10, 0.1, 0.01, 1e-13), (10, 0.1, 0.01, 0.11)):
         try:
             relaxation_rate(*_t_bad)
         except ValueError:

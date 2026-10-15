@@ -116,14 +116,17 @@ def _crown_case():
 _crown_case()
 
 # --- test case 3 ---
-# each stated error rule once, just outside the domain: N = 1 (no transient state), N a float (even
-# integer-valued), i0 a bool, i0 = N (an absorbing state), s above 0.5
+# each bound of each stated error rule, just outside the domain on each side: N = 1 (no transient state; the range
+# [1, N - 1] of i0 is then empty, so N below 2, like N = True, cannot break the N rule alone) and N = 401 (alone),
+# N a float (even integer-valued), i0 a bool, i0 a float (even integer-valued), i0 = 0 and i0 = N (absorbing
+# states), s = -0.51 and 0.51
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for _t_bad in ((1, 0.1, 1), (10.0, 0.1, 1), (10, 0.1, True), (10, 0.1, 10), (10, 0.51, 3)):
+    for _t_bad in ((1, 0.1, 1), (401, 0.1, 3), (10.0, 0.1, 1), (10, 0.1, True), (10, 0.1, 3.0), (10, 0.1, 0),
+                   (10, 0.1, 10), (10, -0.51, 3), (10, 0.51, 3)):
         try:
             fixation_statistics(*_t_bad)
         except ValueError:

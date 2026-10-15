@@ -118,15 +118,17 @@ def _crown_case():
 _crown_case()
 
 # --- test case 4 ---
-# each stated error rule once, just outside the domain: N above 400, N a float (even integer-valued), N a bool,
-# s below -0.5, u negative, v above 0.1
+# each bound of each stated error rule, just outside the domain on each side: N = 401 and N = 0, N a float (even
+# integer-valued), N a bool (True, otherwise in range), s = -0.51 and 0.51, u = -1e-6 and 0.11, v = -1e-6 and 0.11;
+# every entry breaks exactly one rule
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for _t_bad in ((401, 0.1, 0.01, 0.01), (10.0, 0.1, 0.01, 0.01), (True, 0.1, 0.01, 0.01), (10, -0.51, 0.01, 0.01),
-                   (10, 0.1, -1e-6, 0.01), (10, 0.1, 0.01, 0.11)):
+    for _t_bad in ((401, 0.1, 0.01, 0.01), (0, 0.1, 0.01, 0.01), (10.0, 0.1, 0.01, 0.01), (True, 0.1, 0.01, 0.01),
+                   (10, -0.51, 0.01, 0.01), (10, 0.51, 0.01, 0.01), (10, 0.1, -1e-6, 0.01), (10, 0.1, 0.11, 0.01),
+                   (10, 0.1, 0.01, -1e-6), (10, 0.1, 0.01, 0.11)):
         try:
             wf_transition_matrix(*_t_bad)
         except ValueError:

@@ -58,8 +58,9 @@ metadata:
     and stored inline. Further independent checks: the binomial ratio identity P[i, j + 1] (j + 1) q_i =
     P[i, j] (N - j) p_i on every entry above 1e-238 of N = 400 matrices; the exact neutral stationary moments up to
     the fourth (a triangular system solved in rational arithmetic); the origin-fixation limit of the one-way
-    absorption rate, N v pi_A with pi_A from an extended-precision LU solve; a t_up of about 3.45e290 generations at
-    N = 400, next to the excluded corner, from plain LU at 380 and 450 digits; and lambda_min and the mode of small chains
+    absorption rate, N v pi_A with pi_A from an extended-precision LU solve; t_up of about 3.45e290 and 2.88e298
+    generations at N = 400 (the second inside the corner region where the 1e300 exclusion can apply) from plain LU at
+    380 to 480 digits; and lambda_min and the mode of small chains
     from the Faddeev-LeVerrier characteristic polynomial in rational arithmetic and a null-vector solve, without any
     eigensolver or inverse iteration. The whole-task tests call every step, compare the final function (and the gap, passage
     times, stationary and quasi-stationary distributions) with extended precision, and check identities between the
@@ -436,7 +437,7 @@ sub_steps:
       In the origin-fixation regime (rare mutations) the waiting time for a substitution is about
       1 / (N v p_fix), with p_fix the fixation probability of one new copy (step 2). The exact mean
       first-passage times include all the failed attempts and the duration of the sweeps.
-    n_test_cases: 12
+    n_test_cases: 13
     contract:
       quantity: "Mean first-passage times between the two monomorphic states (0 -> N and N -> 0)."
       assumptions: "Wright-Fisher chain of step 1 with u, v > 0."

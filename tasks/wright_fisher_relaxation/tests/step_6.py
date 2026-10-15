@@ -15,7 +15,7 @@ def _crown_case():
         # the return type: a tuple (Python float, numpy array of shape (N,))
         out = quasi_stationary(N, s, v)
         q = np.asarray(out[1])
-        assert isinstance(out, tuple) and len(out) == 2 and isinstance(out[0], float) and q.shape == (N,), out
+        assert isinstance(out, tuple) and len(out) == 2 and isinstance(out[0], float) and isinstance(out[1], np.ndarray) and q.shape == (N,), out
         return out[0], q
 
     rate, q = _t_call(1, 0.3, 0.05)
@@ -181,14 +181,16 @@ def _crown_case():
 _crown_case()
 
 # --- test case 4 ---
-# each stated error rule once, just outside the domain: N above 400, N a float (even integer-valued), N a bool,
-# s above 0.5, v = 0 (below its floor 1e-12: i = 0 would then be absorbing as well)
+# each bound of each stated error rule, just outside the domain on each side: N = 401 and N = 0, N a float (even
+# integer-valued), N a bool (True, otherwise in range), s = -0.51 and 0.51, v = 0 (below its floor 1e-12: i = 0
+# would then be absorbing as well) and v = 0.11; every entry breaks exactly one rule
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for _t_bad in ((401, 0.1, 0.01), (5.0, 0.1, 0.01), (True, 0.1, 0.01), (10, 0.51, 0.01), (10, 0.1, 0.0)):
+    for _t_bad in ((401, 0.1, 0.01), (0, 0.1, 0.01), (5.0, 0.1, 0.01), (True, 0.1, 0.01), (10, -0.51, 0.01),
+                   (10, 0.51, 0.01), (10, 0.1, 0.0), (10, 0.1, 0.11)):
         try:
             quasi_stationary(*_t_bad)
         except ValueError:

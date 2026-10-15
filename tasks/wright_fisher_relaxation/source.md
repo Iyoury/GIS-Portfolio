@@ -778,3 +778,55 @@ problem.yaml):
   numerical_inverse and largest_entry_positive.
 - Rerun: tools/crown_check.py, all modes; every case alone in a fresh single-threaded process (69 cases, about 88 s
   in all, slowest about 7.6 s); raw folder size after this note about 437 KB (du -sb).
+
+## Version 17 / platform v12, together with Version 16 (grading_fix: release-gate content emulation)
+
+- Finding (release-gate emulation of the platform content check and judge, before upload): (B1) every stated error
+  rule is a two-sided range or a type rule, but each raise list tested one side only, so a copy of the reference
+  with one bound removed still passed its error case: 28 bounds in all, step 1 N < 1, s > 0.5, u > 0.1, v < 0;
+  step 2 N > 400, i0 < 1, s < -0.5, i0 a float; step 3 N > 400, s > 0.5, u > 0.1, v < 1e-12; step 4 N < 1,
+  s < -0.5, u > 0.1, v < 1e-12; step 5 N < 1, s > 0.5, u > 0.1, v < 1e-12; step 6 N < 1, s < -0.5, v > 0.1; step 7
+  N < 1, s < -0.5, u < 0, u > 0.1, v < 0. (B2) step 4 tested the bool rule with N = False, which is also below 1,
+  so a candidate that casts a bool to int passed. (S1) the stated domain of step 5 reaches t_up just below 1e300 in
+  the corner N >= 370, s <= -0.46, u >= 0.06, v <= 3e-3, but no case went beyond 3.45e290 (case 11, s = -0.45, outside
+  that corner), and the case 11 comment called it "the largest passage times in the domain", which is false.
+  (N2) the stated numpy-array return of the mode (step 7) and of the quasi-stationary distribution (step 6) was read
+  through np.asarray only, so a list was accepted.
+- Cause: the Version 15 trim (each stated rule once, just outside the domain) kept one side of each rule; the
+  corner bounds of step 5 (Version 13, item 10) were stated without a case at their edge.
+- Change (tests, the step 5 n_test_cases and verification_explanation; no change to the agent-visible text, the code
+  or the mutants):
+  - Raise lists (each bound of each stated rule on its own, every entry breaking exactly one rule): step 1 case 4,
+    6 -> 10 entries (N = 0, s = 0.51, u = 0.11, v = -1e-6 added); step 2 case 3, 5 -> 9 (N = 401, i0 = 3.0,
+    i0 = 0, s = -0.51 added; N = 1 kept: below N = 2 the range [1, N - 1] of i0 is empty, so N < 2, like N = True,
+    cannot break the N rule alone and a validator without that bound still raises); steps 3, 4, 5 case 4, 6 -> 10
+    (the missing side of N, s, u and v added; step 3 N = 401, s = 0.51, u = 0.11, v = 1e-13; step 4 N = 0,
+    s = -0.51, u = 0.11, v = 1e-13 and N = True instead of False; step 5 N = 0, s = 0.51, u = 0.11, v = 1e-13);
+    step 6 case 4, 5 -> 8 (N = 0, s = -0.51, v = 0.11); step 7 case 5, 8 -> 13 (N = 0, s = -0.51, u = -1e-6,
+    u = 0.11, v = -1e-6). Every entry raises ValueError in solution.py, second_solution.py and the chain
+    solution/step_1..k.
+  - Step 5 case 12 (new): substitution_times(400, -0.5, 0.1, 3e-3), the corner of the region where the 1e300
+    exclusion can apply, at its largest v: t_up = 2.880405182970480026078759257723970688343e+298 (inside the domain)
+    and t_down = 19.2170882505991680416501542658857022291, relative 1e-8 each (the stated accuracy). Target:
+    independent_recomputation, the hitting-time systems (I - Q) t = 1 with the matrix from mpmath binomials, plain
+    LU in mpmath (no use of either solution): t_up at 420, 450 and 480 digits and t_down at 100, 120 and 150 digits,
+    identical to 40 digits (three separate runs each). The reference agrees to 1.4e-13 and 7.1e-14, the second
+    solution to 3.9e-14 and 5.7e-15. Case 11 comment corrected ("a passage time near 1e290", outside the corner).
+    n_test_cases of step 5: 12 -> 13. verification_explanation mentions the new target.
+  - Step 6 case 0 and step 7 case 0: isinstance(..., np.ndarray) added to the existing contract assert (no new
+    assert site).
+- Regression: a copy of the reference with any single stated bound removed (all other rules kept) passed the old
+  error case for each of the 28 bounds above and now fails the new one, for every bound of every step (step 2
+  N < 2 and N bool excepted: redundant with the i0 rule, as above); the gate's weakened candidates (one side
+  unchecked, bool cast to int in step 4, no N range in step 2) all fail now. The step 5 mutant dense_solve fails
+  case 12.
+- Per-step assertion sites after this version (static count over the cases: computed-value asserts / contract
+  asserts / raise entries, at half weight in brackets): step 1 14 / 1 / 10 (5); step 2 13 / 1 / 9 (4.5); step 3
+  17 / 1 / 10 (5); step 4 12 / 1 / 10 (5); step 5 15 / 1 / 10 (5); step 6 15 / 1 / 8 (4); step 7 25 / 1 / 13 (6.5);
+  general 28 / 0 / 0. Computed values outweigh validation at least two to one in every step.
+- Rerun: tools/crown_check.py on the whole folder, all modes, every case alone in a fresh process (-j 3): SUMMARY
+  ALL OK, FORMAT OK. ref and second: 8/8, 8/8, 9/9, 11/11, 13/13, 7/7, 9/9 and general 5/5; mutants as in Version
+  16, with step 5 dense_solve now failing [0, 1, 2, 3, 5, 7, 8, 9, 10, 11, 12]; shift +-1e-12 passes every case;
+  all-None and all-zero controls pass no case. The two new mpmath runs (t_up at 450 digits, 237 s; t_down at 120
+  digits, 161 s) were made for this version; the 420/480 and 100/150 digit runs come from the release gate.
+  Raw folder size 444,165 bytes (du -sb).

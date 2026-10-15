@@ -141,15 +141,17 @@ def _crown_case():
 _crown_case()
 
 # --- test case 4 ---
-# each stated error rule once, just outside the domain: N above 400, N a float (even integer-valued), N a bool,
-# s below -0.5, u = 0 (below its floor 1e-12: i = 0 is then never reached from i = N), v above 0.1
+# each bound of each stated error rule, just outside the domain on each side: N = 0 and N = 401, N a float
+# (even integer-valued), N a bool (True, otherwise in range), s = -0.51 and 0.51, u = 0 (below its floor 1e-12: i = 0 is then never reached from i = N)
+# and u = 0.11, v = 1e-13 (below its floor) and v = 0.11; every entry breaks exactly one rule
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for _t_bad in ((401, 0.1, 0.01, 0.01), (6.0, 0.1, 0.01, 0.01), (True, 0.1, 0.01, 0.01), (10, -0.51, 0.01, 0.01),
-                   (10, 0.1, 0.0, 0.01), (10, 0.1, 0.01, 0.11)):
+    for _t_bad in ((0, 0.1, 0.01, 0.01), (401, 0.1, 0.01, 0.01), (6.0, 0.1, 0.01, 0.01), (True, 0.1, 0.01, 0.01),
+                   (10, -0.51, 0.01, 0.01), (10, 0.51, 0.01, 0.01), (10, 0.1, 0.0, 0.01), (10, 0.1, 0.11, 0.01),
+                   (10, 0.1, 0.01, 1e-13), (10, 0.1, 0.01, 0.11)):
         try:
             substitution_times(*_t_bad)
         except ValueError:
@@ -447,8 +449,8 @@ def _crown_case():
 _crown_case()
 
 # --- test case 11 ---
-# the largest passage times in the domain: N = 400 with A strongly deleterious (s = -0.45, next to the excluded
-# corner, which needs s <= -0.46), mutation A -> a at its upper end u = 0.1 and a -> A at its floor v = 1e-12, where
+# a passage time near 1e290: N = 400 with A strongly deleterious (s = -0.45, just outside the region s <= -0.46 where
+# the 1e300 exclusion can apply), mutation A -> a at its upper end u = 0.1 and a -> A at its floor v = 1e-12, where
 # t_up is about 3.45e290 generations while t_down is about 12 generations. Independent targets: the hitting-time systems
 # (I - Q) t = 1 (Q the matrix without the target state), with the transition matrix from mpmath binomials, solved by
 # plain Gaussian elimination with partial pivoting in mpmath, run once: t_up at 380 and at 450 digits (identical to
@@ -461,6 +463,27 @@ def _crown_case():
     t_up, t_down = substitution_times(400, -0.45, 0.1, 1e-12)
     target_up = float("3.452011881615877833006321693380180711916e+290")
     target_down = float("12.41572647226185732189932164804773815549")
+    assert abs(t_up - target_up) < 1e-8 * target_up, (t_up, target_up)
+    assert abs(t_down - target_down) < 1e-8 * target_down, (t_down, target_down)
+
+
+_crown_case()
+
+# --- test case 12 ---
+# t_up just below the 1e300 limit of the domain: the corner N = 400, s = -0.5, u = 0.1 of the region where the 1e300
+# exclusion can apply (N >= 370, s <= -0.46, u >= 0.06 and v <= 3e-3), at its largest v = 3e-3, where t_up is about
+# 2.88e298 generations (inside the domain, below 1e300) while t_down is about 19 generations. Independent targets: the
+# hitting-time systems (I - Q) t = 1 (Q the matrix without the target state), with the transition matrix from mpmath
+# binomials, solved by plain Gaussian elimination with partial pivoting in mpmath (no use of either solution): t_up at
+# 420, 450 and 480 digits and t_down at 100, 120 and 150 digits (identical to 40 digits)
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+    t_up, t_down = substitution_times(400, -0.5, 0.1, 3e-3)
+    target_up = float("2.880405182970480026078759257723970688343e+298")
+    target_down = float("19.2170882505991680416501542658857022291")
     assert abs(t_up - target_up) < 1e-8 * target_up, (t_up, target_up)
     assert abs(t_down - target_down) < 1e-8 * target_down, (t_down, target_down)
 
