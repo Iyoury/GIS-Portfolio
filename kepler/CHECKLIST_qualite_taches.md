@@ -473,3 +473,36 @@ Conséquences pour nous :
 2. Gabarit à copier pour les prochains sujets : vérité exacte du générateur, deux ou trois portes
    simples avec marge ≥ 0,09 sur la référence et ≥ 0,05 sur la route indépendante, ablations 0/N sur
    toutes les graines, calibration par vraisemblance sur un inventaire censuré, dates discrètes.
+
+### Sismicité induite v3 (15 oct.) : application de LECONS-TACHES.md
+
+- **Route aveugle** (§3.1 du document) : sous-agent (Opus, 82 appels, 42 min) avec seulement
+  l'instruction, le README des données et les données de l'instance livrée. Il a reconstruit la
+  physique de la tâche sans la connaître (20 patchs, diffusion 3-D, critère max(dp/dt, 0), cascade
+  ETAS, termes de station, phases de complétude) mais passe 0/6 : sur l'instance livrée toutes les
+  portes sauf P (ratée de 0,05, b trop bas), ailleurs un facteur 2 sur l'ajustement par unité. Livrée
+  telle quelle (`blind_route.py` + rapport). Confirme l'exemple glissements : les agents trouvent
+  les mécanismes, échouent sur la calibration. C'est l'argument de « difficulté essentielle » à
+  présenter, pas une faiblesse à cacher.
+- **Constantes du générateur dans la référence** (§3.2) : traquées une à une. Fenêtre d'Omori
+  1 200 j → 1 500 j ; rayon de la région de fond 20 km → anneau au-delà de deux rayons jusqu'à
+  l'étendue du catalogue ; complétude +0,15 → +0,2 (littérature) ; longueur de convolution =
+  longueur de la série. Piège rencontré : l'estimation du fond « au-delà des cercles » comptait les
+  événements induits à 5-7,6 km (dispersion des patchs de bord) et donnait 1,6 au lieu de 0,1 par
+  mois ; d'où l'anneau au-delà de deux rayons.
+- **Une constante du générateur peut se cacher dans la vérité** : le noyau d'Omori tronqué à 1 200 j
+  dans le générateur faisait dépendre la route indépendante de ce choix (6/6 avec sa mémoire à
+  1 200 j, 5/6 à 2 000 j). Corrigé à la source : le noyau du générateur court sur la longueur du
+  dossier (3 000 j), et les routes (1 500 / 2 000 j) n'en dépendent plus (6/6). Règle : aucune
+  troncature arbitraire dans le générateur que l'agent ne puisse connaître.
+- **Consigne = vérité** (§3.4) : la clé compte les événements là où ils sont localisés (part de la
+  dispersion d'un patch dans le cercle), comme le dit « within 5 km of the wellhead ».
+- **Fichiers mal formés** (§5) : cinq cas ajoutés dans `cheats.py`, tous à 0 ; `tests/Dockerfile`
+  crée `/app/output`.
+- **Conflit entre documents** : LECONS-TACHES recommande des libellés en gras dans l'instruction ;
+  la revue de qualité de cette tâche les a refusés (« decorative bold labels »). Prose pure gardée.
+- **Instance livrée** choisie dans le tableau : la seule où référence et route indépendante passent
+  et où les cinq ablations échouent (graine 1 ; l'ablation « termes de station » passe 4/6).
+- Bilan v3 : référence 5/6, indépendante 6/6, aveugle 0/6, statistique 1/6, ablations 0/6 sauf
+  termes de station 4/6, nuls et fichiers mal formés 0/6, réalisations du catalogue 7/10 (ratio
+  annuel 1,11-1,75). Docker sur l'instance livrée : oracle ×3 = 1, tout le reste 0, indépendante 1.
