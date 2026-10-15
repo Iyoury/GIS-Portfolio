@@ -942,8 +942,10 @@ def _crown_case():
 _crown_case()
 
 # --- test case 7 ---
-# each stated error rule once: arrays of different lengths, 2-D arrays, empty arrays, a psi above pi/2, a
-# negative weight, weights adding up to zero, a rate that is not positive, a above 1000, f0 / rate above 1e13
+# each stated error rule on each side: arrays of different lengths, 2-D arrays, empty arrays, a psi below 0
+# and one above pi/2, a negative weight, weights adding up to zero, a, f0 and rate not positive (zero, and f0
+# and rate both negative with f0 / rate = 1e9 inside its range), a below 40 and above 1000, f0 / rate below
+# 1e5 and above 1e13
 import numpy as np
 
 
@@ -952,11 +954,17 @@ def _crown_case():
     for _t_bad in ((np.array([0.1, 0.2]), np.array([1.0]), 100.0, 1e9, 1.0),
                    (np.array([[0.1, 0.2]]), np.array([[1.0, 1.0]]), 100.0, 1e9, 1.0),
                    (np.array([]), np.array([]), 100.0, 1e9, 1.0),
+                   (np.array([-0.01, 0.2]), np.array([1.0, 1.0]), 100.0, 1e9, 1.0),
                    (np.array([0.1, np.pi / 2 + 0.01]), np.array([1.0, 1.0]), 100.0, 1e9, 1.0),
                    (np.array([0.1, 0.2]), np.array([1.0, -1.0]), 100.0, 1e9, 1.0),
                    (np.array([0.1, 0.2]), np.array([0.0, 0.0]), 100.0, 1e9, 1.0),
+                   (np.array([0.1]), np.array([1.0]), 0.0, 1e9, 1.0),
+                   (np.array([0.1]), np.array([1.0]), 100.0, 0.0, 1.0),
                    (np.array([0.1]), np.array([1.0]), 100.0, 1e9, 0.0),
+                   (np.array([0.1]), np.array([1.0]), 100.0, -1e9, -1.0),
+                   (np.array([0.1]), np.array([1.0]), 39.5, 1e9, 1.0),
                    (np.array([0.1]), np.array([1.0]), 1000.5, 1e9, 1.0),
+                   (np.array([0.1]), np.array([1.0]), 100.0, 9.9e4, 1.0),
                    (np.array([0.1]), np.array([1.0]), 100.0, 1.01e13, 1.0)):
         try:
             ensemble_switching(*_t_bad)

@@ -311,14 +311,18 @@ def _crown_case():
 _crown_case()
 
 # --- test case 4 ---
-# each stated error rule once, just outside its limit: psi above pi/2, a rate that is not positive, a below
-# 40 and f0 / rate below 1e5
+# each stated error rule on each side, just outside its limit: psi below 0 and above pi/2; a, f0 and rate
+# not positive (zero, and f0 and rate both negative with f0 / rate = 1e9 inside its range); a below 40 and
+# above 1000; f0 / rate below 1e5 and above 1e13
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for _t_bad in ((np.pi / 2 + 0.01, 100.0, 1e9, 1.0), (0.5, 100.0, 1e9, 0.0), (0.5, 39.5, 1e9, 1.0), (0.5, 100.0, 9.9e4, 1.0)):
+    for _t_bad in ((-0.01, 100.0, 1e9, 1.0), (np.pi / 2 + 0.01, 100.0, 1e9, 1.0),
+                   (0.5, 0.0, 1e9, 1.0), (0.5, 100.0, 0.0, 1.0), (0.5, 100.0, 1e9, 0.0),
+                   (0.5, 100.0, -1e9, -1.0), (0.5, 39.5, 1e9, 1.0), (0.5, 1000.5, 1e9, 1.0),
+                   (0.5, 100.0, 9.9e4, 1.0), (0.5, 100.0, 1.01e13, 1.0)):
         try:
             switching_field_statistics(*_t_bad)
         except ValueError:

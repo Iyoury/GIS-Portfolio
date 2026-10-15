@@ -240,14 +240,14 @@ def _crown_case():
 _crown_case()
 
 # --- test case 4 ---
-# each stated error rule once: psi outside [0, pi/2], a scalar h on the boundary |h| = h_sw (psi = 0,
-# h_sw = 1), and an array with one entry beyond -h_sw (psi = pi/4, h_sw = 1/2)
+# each stated error rule on each side: psi below 0 and above pi/2, a scalar h on the boundary |h| = h_sw
+# (psi = 0, h_sw = 1), and an array with one entry beyond -h_sw (psi = pi/4, h_sw = 1/2)
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for _t_bad in ((0.0, np.pi / 2 + 0.01), (1.0, 0.0), (np.array([0.1, -0.6]), np.pi / 4)):
+    for _t_bad in ((0.0, -0.01), (0.0, np.pi / 2 + 0.01), (1.0, 0.0), (np.array([0.1, -0.6]), np.pi / 4)):
         try:
             escape_barriers(*_t_bad)
         except ValueError:

@@ -95,6 +95,7 @@ No target is copied from the reference solution. Every test computes its own tar
 | branch along the equilibrium curve (step 1 case 5, since version 15) | inverse parametrization of e' = 0: an angle theta between the fold angle (tan(theta)**3 = -tan(psi)) and psi, with e''(theta) > 0, fixes h = -sin(2 theta) / (2 sin(theta - psi)) and m = cos(theta - psi); theta + pi at -h gives the branch after the jump; h_sw = -h(fold angle) | exact to rounding (no root finding); fields at least 1.5e-3 from the jump; reference within 1e-15, second solution within 1.8e-13 |
 | psi = pi/4 closed forms (step 1 case 6, step 2 case 5, step 3 case 6, step 4 case 6, since version 15) | with u = theta - pi/4, e' = 0 is sin(u)**2 - h sin(u) - 1/2 = 0, sin(u) = (h -+ sqrt(h**2 + 2)) / 2, e'' = cos(u) (h - 2 sin(u)): branch m = cos(u) and barriers c1 (r + 3h) / 2, (c2 (r - 3h) + c1 (r + 3h)) / 4 in 40-digit mpmath (steps 1, 2); for steps 3 and 4 the same barriers in a cancellation-free double form (checked against 40 digits to 4.4e-16 on 4005 fields up to 1e-15 from +-1/2), escape integral by scipy quad with relative tolerance 1e-12, median by Brent's method, mean = 1/2 - int P dh by quad split at the median | exact closed form; h_sw = 1/2 exact; reference within 2.2e-16 (steps 1, 2), 1.3e-14 (step 3), 3.3e-16 (step 4) |
 | psi = 0 with psi = pi/2, weights 3 and 1 (step 6 case 8, since version 15) | the hard-axis particle has m = h in both minima and has left within about rate / f0 below h = 1 (survival exp(-1e4) or smaller at the fields concerned): 3 (2 P0(-h_c) - 1) - h_c = 0 and P0(-h_half) = 2/3 with the erfc form of P0, roots by Brent's method to 1e-15 | exact; reference within 1.1e-16, second solution within 1.3e-15 |
+| upper switching window (step 3 case 7, since the 2026-10-15 release gate) | independent 30-digit mpmath computation, not the reference: the four extrema as the unit-circle roots z = exp(i theta) of z**4 - 1 + 2 h (z**3 exp(-i psi) - z exp(i psi)) = 0 (mp.polyroots; at psi = 1.31 also numpy roots polished by mp Newton steps, same 16 digits), sorted by e'' into two maxima and two minima, original minimum = the one with cos(theta) > 0; escape rate over f0 = sum over both maxima of exp(-2 a Delta_e); escape integral from h to h_sw (astroid formula in mp) by mp.quad in u with h' = h_sw - u**2 over 16 panels (removes the square-root singularity of the newborn extremum at +h_sw); P = exp(-(f0 / rate) I); inline targets rounded to 15 digits: 0.984799783108895, 0.984796865857878, 0.984629685360849 (psi = 1.31, a = 45, f0 / rate = 1e9, h = 0.3, 0, -0.2) and 0.090586591241382 (psi = 1.54, a = 300, f0 / rate = 1e9, h = 0.5 and 0) | exact model, 30 digits; all fields far more than 1e-6 below h_sw; reference within 1.9e-14, second solution within 1.2e-13 |
 
 ## Version 3 changes (difficulty increase)
 
@@ -814,3 +815,52 @@ Rerun for version 14 (after items 10-12):
   point as a stated convention that must be implemented exactly. A copy of solution.py that follows the literal
   astroid formulas but honours the stated convention passes all 46 cases; every test oracle that uses psi =
   np.pi / 2 takes h_sw = 1. crown_check all modes: SUMMARY ALL OK.
+
+## Release gate before platform v14 (2026-10-15, grading_fix)
+
+- Finding F1 (content-check emulation, "stated vs tested"): four validation cases tested only one side of a
+  compound error rule. Step 2 case 4 had no psi < 0; step 3 case 5 had no psi < 0, no a or f0 that is not
+  positive, no a < 40 and no f0 / rate < 1e5; step 4 case 4 had no psi < 0, no a or f0 that is not positive, no
+  a > 1000 and no f0 / rate > 1e13; step 6 case 7 had no psi < 0, no a or f0 that is not positive, no a < 40 and
+  no f0 / rate < 1e5. A stated rule left untested is a blocking content-check category.
+- Cause: the Version 15 trim kept one entry per rule and so one side of each two-sided rule.
+- Change: the missing entries were added to the same loops (one assertion site per case, as before): psi = -0.01;
+  a = 0; f0 = 0; f0 = -1e9 with rate = -1 (f0 / rate = 1e9 lies inside its range, so only the positivity rule
+  applies); a = 39.5 and 1000.5 and f0 / rate = 9.9e4 and 1.01e13 where they were missing. Step 2 case 4 now has
+  4 entries, step 3 case 5 and step 4 case 4 have 10 each, step 6 case 7 has 15.
+- Regression: every entry, called alone, raises ValueError in solution.py, in second_solution.py and in the
+  solution/step_1..k chain (checked entry by entry, then each case as a whole).
+- Finding F2 (gate judge): no step 3 case had a field inside or after the upper switching window. For psi above
+  about pi/4 the lower barrier has a local minimum at a positive field (at or just below +h_sw near the hard
+  axis), so part of the escape happens there and P stays flat through h = 0 before the lower window; the step 3
+  accuracy is promised for every h, but only step 4 case 5 (through the mean) exercised this.
+- Change: step 3 case 7 (n_test_cases 7 -> 8): psi = 1.31, a = 45, f0 = 3e9, rate = 3 at h = 0.3, 0 and -0.2
+  (targets 0.984799783108895, 0.984796865857878, 0.984629685360849), and psi = 1.54, a = 300, f0 = 1e10,
+  rate = 10 at h = 0.5 and 0 (target 0.090586591241382 at both fields), absolute tolerance 1e-8 (the stated
+  accuracy; every field is far more than 1e-6 below h_sw). Targets from the independent 30-digit mpmath oracle of
+  the target table (row "upper switching window"), not from the reference; verification_explanation mentions it.
+- Regression: reference within 1.9e-14 and second solution within 1.2e-13 of the targets; a variant of the
+  reference that drops every escape at positive fields fails case 7 (P = 1 instead of 0.9848 at h = 0.3), and
+  also cases 4 and 6. The three blind probe candidates of the gate pass case 7 (errors 5e-15 to 1.7e-10).
+- Finding F3 (gate judge): h_half of step 6 is ill-posed for an ensemble whose switched weight stays at 1/2 in
+  double precision over a range of fields. Example: equal weights at psi = 0 and psi = pi/2, a = 100,
+  f0 / rate = 1e9: the reference returns h_half = -0.0 and the second solution 0.2829, while the true value is
+  -0.999999607 (60-digit closed forms: the crossing is where the hard-axis survival probability equals the
+  easy-axis switched probability, both about 1.5e-171). h_c (0.571486501731) is well defined and both solutions
+  agree on it.
+- Cause: between the two switching windows the switched weight is 1/2 + (Q0 - P_hard) / 2 with
+  |Q0 - P_hard| below 1e-160, far below the spacing of doubles at 1/2, so any double-precision root finder
+  returns an arbitrary field of the plateau.
+- Change: one domain-exclusion sentence in the step 6 prompt (such an ensemble is outside the domain, because
+  h_half is then not resolvable), the same exclusion as a "Not in the domain" line in the Inputs of the step 6
+  function_header, problem_io and every docstring copy (steps/step_6.py, solution/step_6.py, solution.py,
+  second_solution.py, mutants/step_6_athermal_particles.py, mutants/whole_task_barriers_from_global_minimum.py),
+  and in the step 6 contract valid_input_ranges. No reference, test or tolerance changed for F3.
+- Regression: no test uses such an ensemble. For each of the 21 ensembles of step 6 and tests/general.py the
+  switched weight minus 1/2 at -h_half -+ 1e-7 is at least 4.2e-12 in magnitude, of opposite signs and growing with
+  the offset up to 1e-4 (smallest slope 4.2e-5 per unit field, step 6 case 6), so h_half is resolved there.
+- Rerun: tools/crown_check.py all modes (-j 3), every case alone in a fresh process: reference and second
+  solution pass all 47 cases (step 3 now 8/8), every mutant fails at least one case of its tests (step 3
+  lower_route_only fails cases 0, 1, 4 and 6), the +-1e-12 shifts pass every case, the all-None and all-zero
+  controls pass none; SUMMARY ALL OK. Scaffolds equal the function_header and every docstring copy matches it;
+  __pycache__ removed.

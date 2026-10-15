@@ -76,7 +76,9 @@ metadata:
     move the returned median (step 4 case 5, three particles at angles above pi/4 whose switching field has
     two windows, holds the rate at its value 1e-7 below h_sw over the last 1e-7, where the grid no longer
     separates the merging extrema; its mean targets agree to 8.4e-12 or better with a Richardson-extrapolated
-    trapezoid rule on 2e5 and 4e5 nodes); step 5 uses an extended-precision (mpmath) Legendre-polynomial expansion of
+    trapezoid rule on 2e5 and 4e5 nodes); step 3 case 7 (the upper switching window at psi = 1.31 and 1.54)
+    holds inline values from a 30-digit mpmath computation (extrema as polynomial roots on the unit circle,
+    escape integral by mpmath quadrature in u with h = h_sw - u**2); step 5 uses an extended-precision (mpmath) Legendre-polynomial expansion of
     Brown's operator solved by banded elimination (converged: 80 more modes and 25 more digits change
     nothing at sigma = 60). Step 6 and the whole-task tests (ensemble_switching of solution.py) use a
     Newton step with analytic derivatives on the independently computed ensemble magnetization and
@@ -154,6 +156,9 @@ problem_io: |-
         f0: float, attempt frequency in 1/s, > 0.
         rate: float, sweep rate |dh/dt| in units of H_K per second, > 0, with
               1e5 <= f0 / rate <= 1e13.
+        Not in the domain: an ensemble in which the weight that has left its original
+        minimum stays equal to 1/2 in double precision over a range of fields (for
+        example equal weights at psi = 0 and psi = pi/2), where h_half is not resolvable.
 
       Output:
         (h_c, h_half): tuple of two floats, absolute errors below 1e-6.
@@ -356,7 +361,7 @@ sub_steps:
       almost all switching happens in a narrow field window well before the
       zero-temperature switching field (Sharrock 1994); slower sweeps and higher
       temperatures switch at smaller fields.
-    n_test_cases: 7
+    n_test_cases: 8
     contract:
       quantity: Survival probability of the original minimum during a descending field sweep with thermally activated escape.
       assumptions: Arrhenius escape over both maxima with attempt frequency f0, no back jumps, no escape outside the astroid, certain switching when the original minimum vanishes, constant sweep rate.
@@ -546,7 +551,11 @@ sub_steps:
       half of the total weight having left its original minimum at h = -h_half. Give both
       with an absolute error below 1e-6. Angles may be anywhere in [0, pi/2], end points
       included, and single weights may be zero (such a particle does not count); a, f0 and
-      rate have the domain of step 3, 40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13.
+      rate have the domain of step 3, 40 <= a <= 1000 and 1e5 <= f0 / rate <= 1e13. An
+      ensemble in which the weight that has left its original minimum stays equal to 1/2 in
+      double precision over a whole range of fields (for example equal weights at psi = 0 and
+      psi = pi/2: between the two switching windows the hard-axis particle has surely left and
+      the easy-axis one surely not) is outside the domain, because h_half is then not resolvable.
       Errors: raise ValueError if psis and weights are not 1-D arrays of the same nonzero
       length, if a psi is outside [0, pi/2], if a weight is negative, if the
       weights add up to zero, if a, f0 or rate is not positive, if a is
@@ -563,6 +572,9 @@ sub_steps:
             f0: float, attempt frequency in 1/s, > 0.
             rate: float, sweep rate |dh/dt| in units of H_K per second, > 0, with
                   1e5 <= f0 / rate <= 1e13.
+            Not in the domain: an ensemble in which the weight that has left its original
+            minimum stays equal to 1/2 in double precision over a range of fields (for
+            example equal weights at psi = 0 and psi = pi/2), where h_half is not resolvable.
 
           Output:
             (h_c, h_half): tuple of two floats, absolute errors below 1e-6.
@@ -586,7 +598,7 @@ sub_steps:
       quantity: Dynamic coercive field and half-switching field of a weighted ensemble of Stoner-Wohlfarth particles with thermally activated switching.
       assumptions: Same model as step 3 for every particle; independent particles; expected magnetization from the survival probabilities.
       result_kind: exact
-      valid_input_ranges: Angles in [0, pi/2]; nonnegative weights, not all zero; 40 <= a <= 1000; 1e5 <= f0 / rate <= 1e13.
+      valid_input_ranges: Angles in [0, pi/2]; nonnegative weights, not all zero; 40 <= a <= 1000; 1e5 <= f0 / rate <= 1e13; excluded are ensembles whose switched weight stays equal to 1/2 in double precision over a range of fields (e.g. equal weights at psi = 0 and psi = pi/2), where h_half is not resolvable.
       units: Units of H_K.
       output_shape: Tuple of two Python floats.
       step_dependencies: [1, 3]

@@ -324,14 +324,18 @@ def _crown_case():
 _crown_case()
 
 # --- test case 5 ---
-# each stated error rule once, just outside its limit: psi above pi/2, a rate that is not positive, a above
-# 1000 and f0 / rate above 1e13
+# each stated error rule on each side, just outside its limit: psi below 0 and above pi/2; a, f0 and rate
+# not positive (zero, and f0 and rate both negative with f0 / rate = 1e9 inside its range); a below 40 and
+# above 1000; f0 / rate below 1e5 and above 1e13
 import numpy as np
 
 
 def _crown_case():
     import numpy as np
-    for _t_bad in ((-0.3, np.pi / 2 + 0.01, 100.0, 1e9, 1.0), (-0.3, 0.5, 100.0, 1e9, 0.0), (-0.3, 0.5, 1000.5, 1e9, 1.0), (-0.3, 0.5, 100.0, 1.01e13, 1.0)):
+    for _t_bad in ((-0.3, -0.01, 100.0, 1e9, 1.0), (-0.3, np.pi / 2 + 0.01, 100.0, 1e9, 1.0),
+                   (-0.3, 0.5, 0.0, 1e9, 1.0), (-0.3, 0.5, 100.0, 0.0, 1.0), (-0.3, 0.5, 100.0, 1e9, 0.0),
+                   (-0.3, 0.5, 100.0, -1e9, -1.0), (-0.3, 0.5, 39.5, 1e9, 1.0), (-0.3, 0.5, 1000.5, 1e9, 1.0),
+                   (-0.3, 0.5, 100.0, 9.9e4, 1.0), (-0.3, 0.5, 100.0, 1.01e13, 1.0)):
         try:
             survival_probability(*_t_bad)
         except ValueError:
@@ -386,6 +390,36 @@ def _crown_case():
             p = survival_probability(x, np.pi / 4, _t_a, _t_f0, _t_rate)
             target = float(np.exp(-_t_U(x, _t_a, ratio)))
             assert abs(p - target) < 1e-8, (_t_a, ratio, x, p, target)
+
+
+_crown_case()
+
+# --- test case 7 ---
+# the upper switching window: for psi above about pi/4 the lower barrier also has a local minimum at a positive
+# field (at or just below +h_sw close to the hard axis), so part of the escape happens there and P is flat through
+# h = 0 before the lower window. psi = 1.31 (h_sw = 0.6152), a = 45, f0 / rate = 3e9 / 3 = 1e9: about 1.5 % of the
+# particles have left at h = 0.3, a little more by h = 0 and h = -0.2. psi = 1.54 (h_sw = 0.8692), a = 300,
+# f0 / rate = 1e10 / 10 = 1e9: P falls to 0.0906 just below h_sw and is the same at h = 0.5 and h = 0.
+# Targets: independent 30-digit mpmath computation (scratch oracle, not the reference): the four extrema are
+# the unit-circle roots z = exp(i theta) of z**4 - 1 + 2 h (z**3 exp(-i psi) - z exp(i psi)) = 0 (mp.polyroots;
+# at psi = 1.31 also numpy roots with mp Newton polishing, same 16 digits), sorted by e'' into two maxima and two
+# minima, the original minimum being the one with cos(theta) > 0; the escape rate over f0 is
+# sum over both maxima of exp(-2 a (e_max - e_orig)) and its integral from h to h_sw (astroid formula in mp) is
+# taken by mp.quad in u with h' = h_sw - u**2 over 16 panels (this removes the square-root singularity of the
+# newborn extremum at +h_sw); P = exp(-(f0 / rate) I). Reference and second solution agree with these targets
+# to 2e-14 and 1.2e-13. Tolerance: the stated absolute 1e-8 (all fields are far more than 1e-6 below h_sw).
+import numpy as np
+
+
+def _crown_case():
+    import numpy as np
+    for _t_args, x, target in (((1.31, 45.0, 3e9, 3.0), 0.3, 0.984799783108895),
+                               ((1.31, 45.0, 3e9, 3.0), 0.0, 0.984796865857878),
+                               ((1.31, 45.0, 3e9, 3.0), -0.2, 0.984629685360849),
+                               ((1.54, 300.0, 1e10, 10.0), 0.5, 0.090586591241382),
+                               ((1.54, 300.0, 1e10, 10.0), 0.0, 0.090586591241382)):
+        p = survival_probability(x, *_t_args)
+        assert abs(p - target) < 1e-8, (_t_args, x, p, target)
 
 
 _crown_case()

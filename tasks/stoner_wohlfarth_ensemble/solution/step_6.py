@@ -16,6 +16,9 @@ def ensemble_switching(psis, weights, a, f0, rate):
       f0: float, attempt frequency in 1/s, > 0.
       rate: float, sweep rate |dh/dt| in units of H_K per second, > 0, with
             1e5 <= f0 / rate <= 1e13.
+      Not in the domain: an ensemble in which the weight that has left its original
+      minimum stays equal to 1/2 in double precision over a range of fields (for
+      example equal weights at psi = 0 and psi = pi/2), where h_half is not resolvable.
 
     Output:
       (h_c, h_half): tuple of two floats, absolute errors below 1e-6.
