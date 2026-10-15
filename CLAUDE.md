@@ -100,6 +100,9 @@ starting points, use judgement and flag what does not fit. Update prompt, refere
   stoner v13 were both returned by an administrator at 13 Oct 04:31 (batch, no reason shown; both submitted 5 Oct with
   time budgets and finiteness clauses in their prompts). While on hold: no upload advice; prepare and audit locally only;
   when lifted, submit one fully audited task at a time and wait for its result.
+- HOLD LIFTED (2026-10-15): Harry (AfterQuery team) unpaused the account. Upload order advised: WF v12 (zips8) first,
+  then stoner v14 (zips8), electron v4 (zips7), borehole v10 last (last version); one at a time, each only after the
+  previous one's pipeline result is read.
 
 ## Validation before every zip
 
