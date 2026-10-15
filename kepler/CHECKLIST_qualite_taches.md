@@ -388,3 +388,36 @@ pente infinie, 700 unités, 8 piézomètres horaires, inventaire daté à l'inte
   (`shallow-landslide-forecast`) a la même formulation ancienne : à réécrire avant toute
   resoumission. Le README et le task.toml (champs d'explication pour la revue) gardent le
   vocabulaire de vérification.
+
+### Sismicité induite — verdict de la revue de qualité v1 (14 oct., 22 h 10) et correction
+
+Deux critères bloquants : **essential difficulty** (« la référence utilise exactement le noyau du
+générateur ; la seule route structurellement différente échoue l'instance livrée et ne passe que
+2/6 ; la référence est collée aux bornes : mensuel 79-100 % contre 80 %, annuel 1,09-1,52 contre
+1,5 ; la région d'acceptation récompense la forme fonctionnelle du générateur ») et **instruction
+clarity** (« libellés en gras décoratifs ; narration du contenu du paquet que l'agent peut
+découvrir seul »). Ce qui a corrigé :
+
+- **La route indépendante doit être une autre physique, pas une autre statistique.** Les familles
+  de retards gamma (toutes variantes : grilles, ridge, résolution) plafonnent à 2-3/6 parce que les
+  composantes lentes du dossier (mémoire des répliques, bruit journalier redressé par les patchs
+  proches) sont attribuées à des noyaux lents qui persistent après un arrêt. La route qui passe
+  6/6 : diffusion radiale résolue par **volumes finis** (cellules de 100 m, pas implicite
+  journalier, source volumique dans la cellule du puits, diffusivité sur grille) et loi
+  **rate-and-state de Dieterich** (état intégré exactement jour par jour, Aσ sur grille), classes
+  de distance 0,5-4,5 km, vraisemblance de Poisson par L-BFGS-B. Rien de la loi max(dp/dt, 0).
+- **Support spatial de la réponse** : ne pas ajuster de réponse dans une classe de distance sans
+  séismes (≥ 2 % des événements du puits). Sans cela, la classe à 4,5 km absorbe les composantes
+  lentes et persiste après l'arrêt. Le regroupement par classe *dans l'ajustement* (comptes par
+  classe) est pire : la mémoire absorbe alors le niveau stable (ν → 0,6).
+- **Grilles jusqu'aux bords** : les paramètres choisis étaient aux bords (D 16 000, Aσ 0,03) ; en
+  étendant (D 32 000, Aσ 0,01) la route passe de 3/6 à 6/6. Toujours vérifier qu'un optimum de
+  grille n'est pas au bord.
+- **Marge aux bornes** : les portes se fixent avec marge sur l'étalement de la référence ET de la
+  route indépendante (mensuel 75 % pour 79-100 observé ; annuel 1,6 pour 1,09-1,52), pas au ras.
+- **Instance livrée** : celle où référence et route indépendante passent et où les cinq ablations
+  échouent (graine 4) — à choisir à partir du tableau, pas par défaut la graine 1.
+- **Instruction** : prose pure, sans titre, sans libellé en gras, sans liste des fichiers du
+  paquet (le README.txt du paquet suffit), tolérances en exigences.
+- Garder la route statistique dans les preuves (`statistical_lags.py`, 2/6) : elle montre que la
+  physique est nécessaire, ce qui est l'argument de difficulté essentielle.
