@@ -11,7 +11,7 @@ numbers of electrons and positrons.
 
 The pairs are in equilibrium with radiation, so the positron chemical potential is minus that of the
 electrons, rest energy included. With psi = (mu + m_e c^2)/(k T), the occupation numbers are
-1/(exp(eps/kT -+ psi) + 1). Here eps is the total energy of a particle in units of m_e c^2.
+1/(exp(eps/theta -+ psi) + 1), with theta = kT/(m_e c^2). Here eps is the total energy of a particle in units of m_e c^2.
 
 The gas spans pair plasmas, in which the net electron density lies many decades below the electron and
 positron densities, classical gases, and completely degenerate gases, whose thermal properties are tiny
@@ -20,9 +20,9 @@ compared with their zero-temperature values.
 A stellar model also needs the response of the gas to a reversible adiabatic change, at constant
 entropy per unit mass:
 
-- **First adiabatic exponent** Gamma1 = (d ln P / d ln rho) at constant entropy. It decides dynamical
+- **First adiabatic exponent** Gamma1 = (d ln P / d ln rho) at constant entropy per unit mass. It decides dynamical
   stability: a self-gravitating body needs a pressure-weighted Gamma1 above 4/3.
-- **Adiabatic temperature gradient** nabla_ad = (d ln T / d ln P) at constant entropy, the threshold of
+- **Adiabatic temperature gradient** nabla_ad = (d ln T / d ln P) at constant entropy per unit mass, the threshold of
   the Schwarzschild criterion for convection.
 
 With the pairs in equilibrium only the net electron number is conserved during the change, so pair

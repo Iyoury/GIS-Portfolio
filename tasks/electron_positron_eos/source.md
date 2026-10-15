@@ -1012,3 +1012,11 @@ blocking; each item below gives the finding, its cause, the change, the regressi
   - The three pre-probe codes of the approved specification score 39/43, 40/43 and 40/43 on the final
     tests, as before: all three pass the new corner state and the new error input.
   - Raw folder size: 344,232 bytes (du -sb, this note included), against a limit of 650 KB.
+- Release gate (independent content-check emulation and judge, 2026-10-15): background.md wrote the occupation
+  number as 1/(exp(eps/kT -+ psi) + 1) with eps in units of m_e c^2, which is dimensionally wrong and contradicts
+  the main text (eps / theta); now 1/(exp(eps/theta -+ psi) + 1) with theta = kT/(m_e c^2). The same slip in a
+  comment of tests/step_1.py is corrected. background.md and the step 5 step_background now say "at constant
+  entropy per unit mass", as the prompt does. No visible text, test logic, target or code changed; crown_check
+  all modes rerun: SUMMARY ALL OK. The calibrated probes of the approved text score 39/43, 40/43 and 40/43 on the
+  final tests (each fails only nabla_ad at the cold degenerate states).
+

@@ -465,8 +465,9 @@ sub_steps:
     return_line: return result
     step_background: |-
       A stellar model takes two adiabatic exponents from its equation of state: Gamma1 = (d ln P / d ln rho)
-      at constant entropy, which decides dynamical stability (a self-gravitating body needs a pressure-
-      weighted Gamma1 above 4/3), and nabla_ad = (d ln T / d ln P) at constant entropy, the threshold of the
+      at constant entropy per unit mass, which decides dynamical stability (a self-gravitating body needs a
+      pressure-weighted Gamma1 above 4/3), and nabla_ad = (d ln T / d ln P) at constant entropy per unit mass,
+      the threshold of the
       Schwarzschild criterion for convection (Cox and Giuli 1968). For the completely degenerate electron
       gas Gamma1 falls from 5/3 to 4/3 as the electrons become relativistic, which sets the Chandrasekhar
       mass (Chandrasekhar 1939). Pair creation turns heat into rest energy and lowers Gamma1 of the pair gas

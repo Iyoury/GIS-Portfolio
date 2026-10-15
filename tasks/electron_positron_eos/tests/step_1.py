@@ -4,7 +4,7 @@
 # integrals in the momentum (breakpoints every k T over the Fermi edge), the chemical potential by a
 # root search on those integrals and the specific heat by a centred difference of the energy at constant
 # net electron density (T +- 1e-7 T), all in mpmath; positron densities of a classical positron gas
-# (eps/kT + psi >= 40) from the Maxwell-Juettner formula.
+# (eps/theta + psi >= 40) from the Maxwell-Juettner formula.
 # classical gases, Maxwell-Juettner densities: at (T, psi) = (1e8, 20), (2e7, 5) and (5e7, 30) the
 # electron occupation exponent stays above 39 and that of the positrons above 59, so Fermi corrections are
 # below 1e-17; at (2e8, 0.0156), a classical pair plasma with 0.97 positrons per electron (n_net 3 percent
