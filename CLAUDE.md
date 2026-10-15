@@ -104,6 +104,20 @@ starting points, use judgement and flag what does not fit. Update prompt, refere
   then stoner v14 (zips8), electron v4 (zips7), borehole v10 last (last version); one at a time, each only after the
   previous one's pipeline result is read.
 
+## RELEASE GATE (author's rule, 2026-10-15): never send a zip that has not passed all of these
+
+Borehole v10 (the LAST version) came back "too easy" after only uncalibrated blind solvers had been run on it, and
+prism v4 (local v7) failed the content check after a self-run emulation. From now on a zip is sent only when:
+1. crown_check ALL OK (all modes) on the final folder, size <= 650 KB raw.
+2. An INDEPENDENT content-check emulation (agent that did not write the change): every category, per-step counts,
+   stated <-> tested both ways, no NaN/inf, no zero-relative tolerance, no hidden convention, no recipe, no test
+   inputs in prompts; no blocking or should-fix finding left.
+3. A CALIBRATED difficulty probe on the FINAL visible text (tools/visible_spec.py): 2 x Sonnet medium + 1 x Opus low,
+   blind, one cand.py each, graded end to end with tools/grade_candidate.py on the real tests. Pass only if NO probe
+   passes every case, and the failures are fair scientific/numerical mistakes (judge reads the code).
+4. An independent fairness audit of the hardest step (a valid alternative passes; targets recomputed by another route).
+5. Every finding fixed and the gate re-run on the changed parts. Otherwise: no zip, and tell the author why.
+
 ## Validation before every zip
 
 1. Reference: each case of tests/step_k.py run alone in a fresh process with solution/step_1..k; each case
@@ -140,6 +154,12 @@ starting points, use judgement and flag what does not fit. Update prompt, refere
 - wright_fisher_relaxation pre-upload audit (2026-10-14): step 7 case 8 (lambda_min 1.36e-225, low end of the stated
   range) and step 3 case 8 (1e-250 absolute rule) added with independent mp targets; source.md Version 16 records the
   v11 report. Ready as platform v12 (zips8), not uploaded (account on hold).
+- Dashboard 2026-10-15: ACCEPTED two-center-rhf v12 (sto3g), ising-strip-transfer v8, josephson-phase-diffusion v10.
+  Needs revision: borehole v10 too easy (last version), prism v4 content check FAIL (local v7, report not yet pasted),
+  activation v14 and electron v3 too easy, stoner v13 and WF v11 returned by admin, layered-surface-wave v2 content
+  fail, hodgkin-huxley v1 reference fail, hydrogen-stark-resonances v1 too easy; older geo tasks (basin-backstripping,
+  gravity-basin-stripping, earthquake-swarm-location, gnss-euler-pole, zircon-discordia-ages, paleopole-synfolding)
+  not in the repo.
 - All tasks: authoring-guide conformance passes 1-2 (2026-10-10/11). Author metadata filled 2026-10-12 with the
   author's own text (tools/set_author_meta.py): affiliation "Independent Researcher"; relevant_experience = B.Sc.
   Georesources and Environment (FST Fes, 2016), graduate certificate in geomatics (Universite Laval), GIS analyst
