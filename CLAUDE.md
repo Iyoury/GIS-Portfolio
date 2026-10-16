@@ -178,7 +178,12 @@ prism v4 (local v7) failed the content check after a self-run emulation. From no
   author's call). Gate item 3 is now 2 x Opus-high + 1 x Sonnet-high, blind, unlimited self-checking; pass only at
   0 of 3 full solves with fair failures. WF v13 design (scratchpad wf13/DESIGN_FINAL.md): new final step 8
   relaxation_spectrum (all N+1 eigenvalues and rates to 1e-8, totally positive structure; dense eig gets 22-32 of 401
-  right at N = 400; certified arb targets A/B/C), step 1 in words, step 6 as a Yaglom limit; pre-build strong probe next.
+  right at N = 400; certified arb targets A/B/C), step 1 in words, step 6 as a Yaglom limit. PRE-BUILD STRONG PROBE:
+  STOP - 2 of 3 strong proxies solved v13 end to end (all three wrote Koev's totally-nonnegative eigenvalue algorithm,
+  401/401 eigenvalues; the third missed only the old step 7 N = 1 corner). Not built. Lesson: strong models know the
+  specialised algorithms (GTH, Koev TN, Brown/Garanin, Sommerfeld); removing formulas or adding a known advanced
+  algorithm does not create difficulty. Always run the strong probe on a DESIGN (spec + prototype harness) before
+  building anything.
 - All tasks: authoring-guide conformance passes 1-2 (2026-10-10/11). Author metadata filled 2026-10-12 with the
   author's own text (tools/set_author_meta.py): affiliation "Independent Researcher"; relevant_experience = B.Sc.
   Georesources and Environment (FST Fes, 2016), graduate certificate in geomatics (Universite Laval), GIS analyst
