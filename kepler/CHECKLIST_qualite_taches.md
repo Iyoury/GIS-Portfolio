@@ -594,3 +594,20 @@ Conséquences pour nous :
   la boucle par cellule (2 min) ; la référence passe de 7 à 1,5 min, 48 ablations × 6 graines
   deviennent une heure. Ne jamais mettre `rm -rf` avec variable dans un `bash -c` lancé en nohup :
   le garde-fou bloque toute la commande.
+
+### Chaleur urbaine nocturne : bilan final (16 oct., 02 h) et livraison
+
+- Tableau final sur 6 graines : référence 6/6 (89-99 % / 0,95-0,99 / ≤ 0,18 °C) ; indépendante 6/6
+  (89-95 %) ; aveugle 0/6 (52-66 %, niveau toujours bon) ; ablations advection, mémoire, météo,
+  facteur de vue 0/6 ; drainage 1/6 ; portée des parcs, QC capteurs, traversées 6/6 (dits tels quels
+  dans le README et le task.toml) ; nuls et fichiers mal formés 0/6. Docker sur l'instance livrée :
+  oracle ×3 = 1 (sorties identiques), rien-fait 0, tout le reste conforme au local.
+- **Vérifier le chemin de l'émulation Docker** : `full.sh` pointait encore sur le répertoire v1
+  (`unhcal` au lieu de `unhcal2`) ; la phase 2 donnait 0 partout, y compris à l'indépendante qui
+  passait en local. Un zéro inattendu sur une route qui passe en local = chemin ou montage, pas
+  physique. Toujours comparer phase 2 et scores locaux route par route.
+- **Redémarrage du conteneur en pleine calibration** : les tâches de fond meurent, le disque
+  survit ; recenser les sorties manquantes (par nom de fichier attendu, pas par compte de lignes :
+  le nombre de cellules urbaines varie d'une graine à l'autre) et relancer seulement celles-là.
+- Livraison : `urban-night-heat.zip` (45 fichiers, 4,4 Mo, dossier racine au nom de la tâche) +
+  `NOTES_chaleur_FR.md`, par SendUserFile, rien sur GitHub.
