@@ -115,7 +115,7 @@ prism v4 (local v7) failed the content check after a self-run emulation. From no
    tools/grade_candidate.py on the real tests. Pass only if NO probe passes every case, and the failures are fair
    scientific/numerical mistakes (judge reads the code). WARNING (2026-10-16): the weak proxy (2 x Sonnet medium +
    1 x Opus low, single pass) let WF v12 through while the platform solved it 2/2; use STRONG agentic proxies
-   (Opus high, unlimited self-checking) until the recalibration says otherwise.
+   (2 x Opus high + 1 x Sonnet high, unlimited self-checking): recalibrated 2026-10-16 on WF v12.
 4. An independent fairness audit of the hardest step (a valid alternative passes; targets recomputed by another route).
 5. Every finding fixed and the gate re-run on the changed parts. Otherwise: no zip, and tell the author why.
 
@@ -173,7 +173,12 @@ prism v4 (local v7) failed the content check after a self-run emulation. From no
   settings saved in scratchpad wf13/platform_feedback_v12.md). The weak proxy (Sonnet-medium/Opus-low single pass)
   scored 66-68/69 and missed it: the platform quick model is STRONGER than that proxy. v11's 0/3 probe came partly
   from the 20 s budget and timing asserts. Recalibration with strong agentic proxies (Opus high x2, Sonnet high,
-  unlimited self-checking) running on WF v12 and electron v4; electron v4 NOT to be uploaded until predicted.
+  unlimited self-checking) DONE 2026-10-16: on WF v12 they scored 69, 70, 70 of 70 (2 of 3 full solves = matches the
+  platform's 2/2); on electron v4 43/43 x3 -> electron v4 WOULD BE TOO EASY: do NOT upload it (needs new science,
+  author's call). Gate item 3 is now 2 x Opus-high + 1 x Sonnet-high, blind, unlimited self-checking; pass only at
+  0 of 3 full solves with fair failures. WF v13 design (scratchpad wf13/DESIGN_FINAL.md): new final step 8
+  relaxation_spectrum (all N+1 eigenvalues and rates to 1e-8, totally positive structure; dense eig gets 22-32 of 401
+  right at N = 400; certified arb targets A/B/C), step 1 in words, step 6 as a Yaglom limit; pre-build strong probe next.
 - All tasks: authoring-guide conformance passes 1-2 (2026-10-10/11). Author metadata filled 2026-10-12 with the
   author's own text (tools/set_author_meta.py): affiliation "Independent Researcher"; relevant_experience = B.Sc.
   Georesources and Environment (FST Fes, 2016), graduate certificate in geomatics (Universite Laval), GIS analyst
