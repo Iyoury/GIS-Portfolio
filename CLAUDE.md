@@ -111,9 +111,11 @@ prism v4 (local v7) failed the content check after a self-run emulation. From no
 2. An INDEPENDENT content-check emulation (agent that did not write the change): every category, per-step counts,
    stated <-> tested both ways, no NaN/inf, no zero-relative tolerance, no hidden convention, no recipe, no test
    inputs in prompts; no blocking or should-fix finding left.
-3. A CALIBRATED difficulty probe on the FINAL visible text (tools/visible_spec.py): 2 x Sonnet medium + 1 x Opus low,
-   blind, one cand.py each, graded end to end with tools/grade_candidate.py on the real tests. Pass only if NO probe
-   passes every case, and the failures are fair scientific/numerical mistakes (judge reads the code).
+3. A CALIBRATED difficulty probe on the FINAL visible text (tools/visible_spec.py), graded end to end with
+   tools/grade_candidate.py on the real tests. Pass only if NO probe passes every case, and the failures are fair
+   scientific/numerical mistakes (judge reads the code). WARNING (2026-10-16): the weak proxy (2 x Sonnet medium +
+   1 x Opus low, single pass) let WF v12 through while the platform solved it 2/2; use STRONG agentic proxies
+   (Opus high, unlimited self-checking) until the recalibration says otherwise.
 4. An independent fairness audit of the hardest step (a valid alternative passes; targets recomputed by another route).
 5. Every finding fixed and the gate re-run on the changed parts. Otherwise: no zip, and tell the author why.
 
@@ -166,6 +168,12 @@ prism v4 (local v7) failed the content check after a self-run emulation. From no
   solved 46/46; content fixes committed (both sides of rules, step 3 case 7, step 6 h_half exclusion); removing the
   step 5 key formulas (scratch copy gate/stoner_wohlfarth_ensemble/harden) did not help (47/47, 45, 45 of 47): the
   models know Brown/Garanin. Not releasable; author decides (park, or new science).
+- WF v12 (uploaded 15 Oct 19:17): content check NO FINDINGS, exploit clean, but DIFFICULTY PROBE 2/2 TOO EASY
+  (feedback: step 1 recipe, step 6 key formula, steps 2-5 textbook, step 7 solved every time; suggested harder
+  settings saved in scratchpad wf13/platform_feedback_v12.md). The weak proxy (Sonnet-medium/Opus-low single pass)
+  scored 66-68/69 and missed it: the platform quick model is STRONGER than that proxy. v11's 0/3 probe came partly
+  from the 20 s budget and timing asserts. Recalibration with strong agentic proxies (Opus high x2, Sonnet high,
+  unlimited self-checking) running on WF v12 and electron v4; electron v4 NOT to be uploaded until predicted.
 - All tasks: authoring-guide conformance passes 1-2 (2026-10-10/11). Author metadata filled 2026-10-12 with the
   author's own text (tools/set_author_meta.py): affiliation "Independent Researcher"; relevant_experience = B.Sc.
   Georesources and Environment (FST Fes, 2016), graduate certificate in geomatics (Universite Laval), GIS analyst
