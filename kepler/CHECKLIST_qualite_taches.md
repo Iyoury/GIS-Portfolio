@@ -554,3 +554,43 @@ Conséquences pour nous :
 - Résultats v2 sur la graine 1 : référence 93 % / rho 0,98 / 0,14 °C (λ ajusté 120 pour 135 vrai) ;
   nuls 9-35 % des cellules, rho ≤ 0,70, niveau ≥ 0,9 °C ; route aveugle v1 appliquée aux données v2
   0/6 ; sonde basse-effort v2 : 30 % / 0,76 / 0,88 (échec sur les trois portes).
+
+### Chaleur urbaine nocturne, suite (nuit du 15 au 16 oct.) : ce que la référence a appris sur 6 graines
+
+- **Le minimum d'une série bruitée est biaisé bas.** Anomalie « min capteur − min aéroport » :
+  +0,2 à +0,3 °C de biais (bruit horaire 0,15 et 0,3 °C, minimum sur 9 heures). Référence passée à
+  la moyenne horaire des différences sur la fenêtre plate de l'îlot (23 h-06 h). Les deux agents
+  aveugles l'avaient vu ; la référence non. Vérifier chaque statistique d'ordre dans la vérité et
+  dans la référence.
+- **Un décalage commun réseau-cellules n'est pas observable.** Avec des termes de site libres, le
+  niveau de la prévision n'était fixé que par la structure multiplicative (intercept × météo ×
+  mémoire) : +0,6 °C sur deux graines quand le scénario sort du domaine du dossier. Contrainte
+  « moyenne des sites = 0 » (le réseau est représentatif) + intercept physique borné (±0,3 °C pour
+  une cellule ouverte) + forme d'Oke pour le vent → 6/6. Règle : dire explicitement ce qui fixe le
+  niveau absolu d'une prévision ; si c'est une hypothèse, l'écrire dans le README.
+- **La vérité doit être calculable à partir de ce qui est livré.** Le facteur de vue « règle de
+  canyon » (fonction de bh, bf) différait de celui que l'agent calcule sur le modèle de surface ;
+  la régression de la référence compensait par l'intercept et κ en butée, et le niveau extrapolé
+  partait. Vérité recalculée par lancer de rayons sur le DSM livré (pixels de rue, 16 azimuts) ;
+  la référence utilise un lancer différent (12 azimuts, 25 pas) pour ne pas copier.
+- **Une ablation qui passe = un mécanisme colinéaire.** « Sans facteur de vue » passait (94 %)
+  parce que hauteur et fraction bâties étaient corrélées à 0,79 dans une ville concentrique.
+  Ajout de 8 quartiers de tours (bf 0,2-0,3, 30-55 m) et 8 quartiers bas et denses (bf 0,5-0,6,
+  3,5-5,5 m) : corrélation 0,34, (1−svf) corrélé 0,48 à bf et 0,92 à la hauteur ; l'ablation tombe
+  à 59-62 %. Règle : à la conception, vérifier la matrice de corrélation des covariables cachées,
+  et casser les colinéarités par des quartiers « contre-exemples ».
+- **La portée des parcs reste un terme de second ordre** (ablation 91-94 %, passe) : écrit tel quel
+  dans le README (« listé parce que le dossier le montre, pas parce que les portes en dépendent »).
+  Ne pas gonfler une liste de mécanismes avec des termes que les portes ne voient pas sans le dire.
+- **La mémoire thermique est le levier d'extrapolation et le point faible de toute route** : τ
+  ajusté 1,6-3,0 j pour 1,9-2,3 vrai même avec (τ, T*) continus ; une vague de 3 jours dans les étés
+  du réseau a suffi à ramener la référence dans les marges (0,07-0,18 °C de niveau). Sans aucune
+  vague de plus de 2 jours, la référence elle-même ratait deux graines.
+- **Agents aveugles** : v1 passe ; v2a (deux passes) 0/6 ; v3 sur l'instance finale 0/6 (52-72 %
+  des cellules, niveau toujours bon, forme 0,84-0,91). Ils trouvent l'advection, le stockage, les
+  biais d'abri, la dérive, la relocalisation, le retard de la sonde ; jamais le facteur de vue sur le
+  DSM, rarement le drainage. Sonde basse-effort finale : 25 % / 0,62 / 0,88 °C.
+- **Calcul** : SVF vectorisé sur toute la grille (16 az × 30 pas sur 480 k pixels : 5 s) au lieu de
+  la boucle par cellule (2 min) ; la référence passe de 7 à 1,5 min, 48 ablations × 6 graines
+  deviennent une heure. Ne jamais mettre `rm -rf` avec variable dans un `bash -c` lancé en nohup :
+  le garde-fou bloque toute la commande.
