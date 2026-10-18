@@ -103,6 +103,25 @@ starting points, use judgement and flag what does not fit. Update prompt, refere
 - HOLD LIFTED (2026-10-15): Harry (AfterQuery team) unpaused the account. Upload only what passed the RELEASE GATE,
   one task at a time, each only after the previous one's pipeline result is read (zips8 WF/stoner withdrawn).
 
+## Official skeleton and README (2026-10-18, docs/skeleton_2026-10-18/, from the platform's Instructions/Walkthrough)
+
+- Domains now listed: physics, biology, materials, math, chemistry, EARTH, OCEAN (earth was refused on 2026-10-12;
+  existing geo tasks stay in physics, new geoscience tasks may use earth).
+- Environment: Python 3.12 stdlib + numpy 2.1.3, scipy 1.14.1, sympy 1.13.3, h5py 3.12.1, mpmath 1.3.0; offline.
+- Limits: at most 50 tasks and 8 MB per zip (keep our 650 KB raw habit anyway).
+- A step prompt must NAME every earlier function the step calls (the content check sends back a step that uses
+  one its prompt never mentions); per-step solution files do not repeat earlier functions.
+- Mutant names: letters, digits, _ and - only; each needs name, description, file in the right list.
+- Placeholder affiliations ("none", "n/a", "independent", "self-employed") are refused; exactly "Independent
+  Researcher" is accepted. author_profile: Scholar/LinkedIn/personal site.
+- "Do not upload platform logs or review records as author submission files": keep source.md revision notes to
+  finding/cause/change/regression/rerun without pipeline quotes (rewards, admin returns, probe counts).
+- Tests: bare blocks after "# --- test case N ---", expected values inline, no preamble before case 0 (our
+  _crown_case wrapping is compatible). "Test invalid inputs only when the prompt specifies how they are handled."
+- Difficulty must come from scientific reasoning or implementation choices, not hidden assumptions, arbitrary
+  precision demands or runtime. Audit 2026-10-18: all 9 repo tasks pass the mechanical rules (prompts name the
+  earlier functions they call, dependencies, mutant names, metadata).
+
 ## RELEASE GATE (author's rule, 2026-10-15): never send a zip that has not passed all of these
 
 Borehole v10 (the LAST version) came back "too easy" after only uncalibrated blind solvers had been run on it, and

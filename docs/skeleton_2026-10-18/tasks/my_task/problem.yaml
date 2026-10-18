@@ -1,0 +1,549 @@
+# AUTHOR GUIDE: start here. This is a format example, not a finished task.
+# Replace every <...> placeholder and every toy calculation before submission.
+# If using an AI assistant: treat these comments as authoring guidance. Do not
+# invent citations, validation results, qualifications, or difficulty evidence.
+# The domain expert must check the science and run the resulting code.
+#
+# 1. Choose a research-grounded computation you can independently verify.
+# 2. State valid inputs, units, boundary conventions, outputs, and accuracy.
+# 3. Divide it into meaningful scientific substeps. The final step should
+#    assemble the result. Do not split trivial operations just to add steps.
+# 4. Align each prompt, function_header, reference, and test file.
+# 5. Verify references against the tests and check that mutants are rejected.
+# 6. Check current upload requirements for accepted domains and step count.
+#
+# Difficulty should come from scientific reasoning or implementation choices,
+# not hidden assumptions, arbitrary precision demands, or excessive runtime.
+# Explain plausible incorrect approaches and test the valid cases they miss.
+# Neither this layout nor local test success guarantees entry into rollouts.
+#
+# Rename tasks/my_task/ to a unique task name; retain that name for revisions.
+# Keep paths relative to that folder. Do not add a shared placeholder problem_id.
+# Do not upload platform logs or review records as author submission files.
+#
+# ZIP LAYOUT (N means each actual step number, not a literal filename):
+# tasks/
+#   your_task_name/
+#     problem.yaml             this definition and its file references
+#     solution.py              complete reference, all step functions
+#     second_solution.py       independent reference, included in this template
+#     background.md            supporting scientific explanation
+#     source.md                citations or original derivation
+#     steps/step_N.py          scaffold mirrors
+#     solution/step_N.py       per-step references
+#     tests/step_N.py          per-step test blocks
+#     tests/general.py         whole-task test blocks
+#     mutants/step_N_*.py      at least one wrong function per step
+#     mutants/whole_task_*.py  at least one complete wrong solution
+#
+# FILE WIRING:
+# Each sub_steps entry names its scaffold, solution, and tests. Its mutants
+# list names that step's wrong-function files. The top-level mutants list
+# names complete wrong solutions. Merely placing a mutant in the folder is
+# not enough: reference it in the correct list, with a name and description.
+# general_tests points to tests/general.py; these tests call the final function.
+#
+# ADDING OR REMOVING A STEP:
+# Update sub_steps, all referenced files, and the complete references together.
+# Keep numbering consecutive. Update dependencies and the final result.
+# Use as many meaningful steps as the science needs, within current rules.
+# If you remove an optional file, remove its YAML reference as well. Optional
+# to the importer does not mean unnecessary for your scientific validation.
+#
+# BEFORE ZIPPING:
+# Replace all placeholders. Check every path and function signature.
+# Count test blocks; do not count assert statements or comment lines.
+# Run the reference tests, whole-task tests, and the negative controls.
+# Include every actual input/data asset your supported test setup needs.
+# Exclude .DS_Store, __pycache__, virtual environments, credentials, and logs.
+# Do not convert this authoring folder to a generated bundle before upload.
+#
+# CONTENT PREFLIGHT: complete this before requesting evaluation.
+# This is practical author guidance based on the local check definitions.
+# Live rules can change. It is not a claim that this toy task passes review.
+#
+# DEFINE THE SCIENTIFIC RESULT
+# - Name the quantity being computed, its mathematical definition, and why it matters
+#   in this scientific setting.
+# - Distinguish an exact model result from an approximation, fitted quantity,
+#   asymptotic limit, or discretized estimate.
+# - State the assumptions that make the problem well posed. If multiple answers are
+#   valid, define the requested branch or accept equivalent answers.
+# - Check formulas, constants, signs, units, and source attributions against the
+#   derivation. A plausible topic is not evidence that the computation is correct.
+#
+# MAKE THE VISIBLE CONTRACT SUFFICIENT
+# - Specify arguments, dimensions, valid ranges, units, output components, and any
+#   nonstandard ordering or normalization in each relevant step prompt or header.
+# - Do not leave graded rules only in background.md, contract summaries, source
+#   notes, reference comments, or author explanations.
+# - State special-case and error behavior only when it is relevant. Tests must not
+#   invent a new rule for empty inputs, exact dtypes, or exception classes.
+# - Describe the scientific problem, not which test inputs the grader uses. Remove
+#   references to hidden tests or the expected grading strategy from solver-facing
+#   prose.
+#
+# CHECK COVERAGE IN BOTH DIRECTIONS
+# - For each stated requirement, identify a test assertion that checks it. For each
+#   assertion, identify the visible requirement it checks.
+# - Inspect every returned component, important input parameter, allowed branch, and
+#   scientific regime. Ask what plausible wrong implementation could still pass.
+# - Whole-task assertions can cover intermediate requirements. Avoid duplicating the
+#   same validation check for every argument without a scientific reason.
+# - Do not require an exact container, dtype, helper call, or implementation pathway
+#   unless that is genuinely part of the stated task.
+#
+# PROBE THE ALLOWED NUMERICAL DOMAIN
+# - For every division, log, square root, inverse function, matrix solve, and
+#   cancellation-prone difference, identify the allowed inputs where it becomes
+#   singular or unstable.
+# - Test relevant limits and regime changes, not only comfortable middle-of-range
+#   inputs. Name the input and failure mechanism; do not add random edge cases for
+#   volume.
+# - If a quantity is undefined at an allowed input, define meaningful behavior or
+#   justify a narrower domain. Update the prompt, references, and tests together.
+# - Compare a fragile case with an analytic limit, higher-precision calculation, or
+#   genuinely independent method before setting its expected value.
+#
+# MAKE ACCURACY REQUIREMENTS FAIR
+# - Justify absolute and relative tolerances from numerical error and the scale of
+#   the result, including values near zero.
+# - Where valid grids, interpolation rules, solver stopping criteria, or equivalent
+#   methods give different answers, either specify the scientifically necessary
+#   choice or allow their justified numerical spread.
+# - Check error propagation between substeps. A later step must not silently require
+#   an earlier result to be more accurate than its own contract and tests require.
+# - Avoid boundaries separated by one floating-point rounding step unless that
+#   distinction is scientifically necessary and explicitly defined.
+#
+# ESTABLISH TRUSTWORTHY REFERENCES AND TARGETS
+# - The reference must compute the requested answer, not recognize test inputs or
+#   return cached test answers.
+# - Record how expected values were obtained and the limits of that method. Agreement
+#   with a copy of the same reference is not independent validation.
+# - Use analytic cases, conservation laws, independent formulations, convergence
+#   studies, or higher precision where appropriate. Explain what each check
+#   establishes and what it does not.
+# - Do not present an analytic bound as an exact value or a special-case formula as a
+#   target for a different regime. Never invent citations or successful validation
+#   runs.
+#
+# KEEP DIFFICULTY SCIENTIFIC
+# - Explain the research decision, derivation, method choice, or integration
+#   challenge that the solver must resolve.
+# - Simple setup steps can be useful, but the whole task must do more than transcribe
+#   supplied equations or repackage a standard worked exercise.
+# - Do not remove necessary conventions to make the task harder. Do not add arbitrary
+#   precision, string formatting, excessive runtime, or busywork as difficulty.
+# - Build realistic wrong-method mutants and confirm the tests distinguish them from
+#   the reference for the intended scientific reason.
+#
+# REVISE THE UNDERLYING ISSUE, THEN RECHECK
+# - For a finding, locate the exact prompt rule, reference behavior, and test
+#   assertion involved. Decide whether the problem is the specification,
+#   implementation, target, or coverage.
+# - Fix all affected files together. Keep a short explanation of the concrete change;
+#   do not add reassuring claims that the code does not support.
+# - If a finding seems mistaken, provide a specific allowed input, derivation, or
+#   existing assertion that resolves it. Do not obscure the requirement or delete a
+#   useful test just to silence a warning.
+# - Rerun references, whole-task checks, and mutants after edits. Local format checks
+#   are not scientific approval, difficulty calibration, or a guarantee of passing
+#   content review.
+
+# problem.yaml: one per task folder. File paths are relative to this folder.
+
+# One of: physics, biology, materials, math, chemistry, earth, ocean.
+domain: physics
+
+# Who wrote the task and what it says about itself, written into the bundle's
+# task.toml. The solver never sees it, and reviewers never see the author
+# fields. Fill in every field except research_advisor and referred_by.
+# Fill in your actual background and task-specific experience. Do not copy
+# example credentials. Optional fields are marked in the skeleton below.
+metadata:
+  author_name: <Your name>
+  author_email: <you@example.org>
+  author_organization: <Your university, institute, lab or employer, or exactly "Independent Researcher">
+  author_profile: <A Google Scholar link (LinkedIn or a personal site also works)>
+  research_advisor: ""            # optional: your advisor/supervisor, if a PhD student or postdoc
+  referred_by: ""                 # optional: who referred you, if anyone
+  conflicts_of_interest: None     # disclose any (employer, vendor engagement, competing benchmark work), or "None"
+  subfield: <Your specialization within the domain, a short phrase.>
+  tags: [<keyword>, <keyword>, <keyword>]   # specific, relevant keywords
+  expert_time_estimate_hours: 4             # best-case hours for a focused domain expert
+  relevant_experience: |-
+    <Your professional background for THIS task; generic statements fail review.>
+  # Name the scientific or numerical challenge and plausible wrong approaches.
+  # Only describe measured model performance if you actually have that evidence.
+  difficulty_explanation: |-
+    <What makes this task hard, and for whom: the insight or technique it
+    needs, and where a capable non-specialist would go wrong.>
+  # Explain the method, why it computes the stated quantity, and its limitations.
+  solution_explanation: |-
+    <The approach the reference solution takes, and why it is correct.>
+  # Explain how expected values were established, which regimes are covered,
+  # and why the tolerances admit other correct methods. Do not claim unrun checks.
+  verification_explanation: |-
+    <How the tests establish correctness: what each checks, and where the
+    expected values come from.>
+
+# Every import the solutions use, one per line. The code is graded with these.
+# Declare every import and alias used by the solutions. Use the supported
+# stack; do not rely on undeclared packages, internet downloads, or local paths.
+required_dependencies: |-
+  import numpy as np
+
+# The problem statement the solver reads first. The task's background prose
+# goes in background.md.
+# Write a self-contained problem: model, inputs, valid ranges, units, and goal.
+# Put every graded requirement here or in a step prompt, not only in background.
+problem_description_main: |-
+  <What the whole task asks for, in a few sentences.>
+
+# The function the last step defines, header and docstring only.
+# Match the final step signature exactly. Define its output and conventions.
+problem_io: |-
+  def final_result(x):
+      '''<What it takes and what it returns.>'''
+
+# The whole-task tests, run against solution.py.
+# The whole-task test file must exist. It calls the final function from
+# solution.py; do not make it a placeholder or only test individual helpers.
+general_tests: tests/general.py
+
+# The whole task solved again by a different method; the tests must accept it.
+# Provide a genuinely independent approach when supplying this file. A renamed
+# copy is not a cross-check. This field is optional in the importer; retaining
+# it here gives you a place to document and implement independent validation.
+second_solution: second_solution.py
+
+# At least one complete solution with one deliberate error.
+# Required by Crown source checks: at least one mutant per step, plus one
+# whole-task mutant. Put complete wrong solutions in the top-level list and
+# wrong step functions in that step's list. Each item needs name, description,
+# and a real file path.
+mutants:
+  - name: whole_task_wrong_power                 # letters, digits, _ and - only
+    description: <The one error it encodes, in one line.>
+    file: mutants/whole_task_wrong_power.py
+
+# On a new version of an uploaded task only, what kind of edit it is:
+# repair | clarification | grading_fix | robustness | difficulty_increase
+# edit_label: repair
+
+# The steps, in order. Each step is one function the solver writes.
+sub_steps:
+  # SUBSTEP 1: WHAT TO WRITE BEFORE IMPLEMENTING
+  # Define the first independently useful scientific result.
+  # State how raw inputs become the mathematical representation you use.
+  # Check dimensions, units, ordering, and any symmetry or normalization.
+  # The toy squaring operation is wiring only, not a suggested scientific step.
+  #
+  # PROMPT CHECKLIST: put the answers in step_description_prompt/function_header.
+  # - Purpose: which scientific quantity or result does this step produce?
+  # - Inputs: argument names, types, shapes, units, ranges, and assumptions.
+  # - Output: type, shape, units, ordering, and the precise mathematical meaning.
+  # - Dependencies: which earlier functions are used, and what do they return?
+  # - Conventions: relevant boundaries, degeneracies, ties, branches, or errors.
+  # - Accuracy: justified numerical requirements, where the result is approximate.
+  # Do not prescribe your exact algorithm unless that method is itself the task.
+  #
+  # IMPLEMENTATION AND EVIDENCE CHECKLIST:
+  # - solution/step_1.py implements this exact header and contract.
+  # - The matching function in solution.py stays consistent with this reference.
+  # - tests/step_1.py checks ordinary cases and relevant scientific edge cases.
+  # - Explain where expected values come from and why tolerances are defensible.
+  # - Add a plausible wrong function to mutants and identify the case rejecting it.
+  # - Keep n_test_cases, dependencies, and YAML file paths in sync.
+  #
+  # CONTENT REVIEW FOR THIS SPECIFIC STEP:
+  # - Read only this visible prompt and header. Can an expert infer every rule
+  #   that the tests enforce without seeing the reference or background?
+  # - Map each output and meaningful branch to an assertion, and each assertion
+  #   back to a stated rule. Do not enforce undocumented validation behavior.
+  # - Identify an allowed difficult input: a near singularity, regime transition,
+  #   zero limit, or cancellation if applicable. Verify the reference there.
+  # - Check that its error allowance remains sufficient for downstream steps.
+  # - Name the scientific mistake its mutant represents and a test catching it.
+  # - Keep scientific decisions open where appropriate, but make the requested
+  #   result precise. Hidden conventions are not legitimate difficulty.
+  # If the prompt changes, recheck the reference, tests, and mutants together.
+  # These are author notes. Replace placeholders in the actual fields below; the
+  # solver does not receive these YAML comments as its problem statement.
+  - step_number: 1                    # 1, 2, 3, ... in order
+    # Keep this mirror file aligned with function_header. YAML is authoritative.
+    scaffold: steps/step_1.py         # the header with no body
+    # This file defines the step function, not a wrapper that reads test answers.
+    solution: solution/step_1.py      # this step's reference solution
+    # This file must contain independent numbered test blocks for this step.
+    tests: tests/step_1.py            # this step's test cases
+    # State exactly what this function computes and returns. Name earlier step
+    # functions it may use. Specify ties, degeneracies, and invalid-input behavior
+    # only where relevant to the task, then ensure the tests follow that contract.
+    step_description_prompt: |-       # what this step asks the solver to write
+      <What step 1 computes, its inputs and its output.>
+    # This YAML header is the scaffold the importer reads. Update its mirror in
+    # steps/, the reference function, and every test call whenever it changes.
+    function_header: |-               # the signature and docstring, no body
+      def step_one(x):
+          '''<What it takes and what it returns.>'''
+    return_line: return y             # the function's last line
+    step_background: |-               # background for this step only
+      <What the solver needs to know for this step alone.>
+    # Count actual test blocks, not assert statements. Number blocks from 0.
+    n_test_cases: 2                   # how many test cases tests/step_1.py holds
+    # Record the quantity, assumptions, units, shape, and step dependencies.
+    # This reviewer-facing summary does not replace solver-visible requirements.
+    contract:                         # what the step computes, for the reviewer
+      quantity: <The quantity this step computes.>
+      assumptions: <What it assumes about its inputs and the model.>
+      result_kind: exact              # exact | approximate | asymptotic
+      valid_input_ranges: <The inputs the result holds for.>
+      units: <The units of the output, or dimensionless.>
+      output_shape: <The output's type and shape.>
+      step_dependencies: []           # the earlier steps this one calls
+    # Required by Crown source checks: at least one mutant per step, plus one
+    # whole-task mutant. Put complete wrong solutions in the top-level list and
+    # wrong step functions in that step's list. Each item needs name, description,
+    # and a real file path.
+    mutants:                          # at least one per step
+      - name: wrong_power
+        description: <The one error it encodes, in one line.>
+        file: mutants/step_1_wrong_power.py
+
+  # SUBSTEP 2: WHAT TO WRITE BEFORE IMPLEMENTING
+  # Define a distinct calculation, not a cosmetic wrapper around step 1.
+  # If it uses step 1, name that function and explain how its output is used.
+  # Check signs, weights, units, and any conservation relation that applies.
+  # The toy sum is wiring only; choose a meaningful result for your science.
+  #
+  # PROMPT CHECKLIST: put the answers in step_description_prompt/function_header.
+  # - Purpose: which scientific quantity or result does this step produce?
+  # - Inputs: argument names, types, shapes, units, ranges, and assumptions.
+  # - Output: type, shape, units, ordering, and the precise mathematical meaning.
+  # - Dependencies: which earlier functions are used, and what do they return?
+  # - Conventions: relevant boundaries, degeneracies, ties, branches, or errors.
+  # - Accuracy: justified numerical requirements, where the result is approximate.
+  # Do not prescribe your exact algorithm unless that method is itself the task.
+  #
+  # IMPLEMENTATION AND EVIDENCE CHECKLIST:
+  # - solution/step_2.py implements this exact header and contract.
+  # - The matching function in solution.py stays consistent with this reference.
+  # - tests/step_2.py checks ordinary cases and relevant scientific edge cases.
+  # - Explain where expected values come from and why tolerances are defensible.
+  # - Add a plausible wrong function to mutants and identify the case rejecting it.
+  # - Keep n_test_cases, dependencies, and YAML file paths in sync.
+  #
+  # CONTENT REVIEW FOR THIS SPECIFIC STEP:
+  # - Read only this visible prompt and header. Can an expert infer every rule
+  #   that the tests enforce without seeing the reference or background?
+  # - Map each output and meaningful branch to an assertion, and each assertion
+  #   back to a stated rule. Do not enforce undocumented validation behavior.
+  # - Identify an allowed difficult input: a near singularity, regime transition,
+  #   zero limit, or cancellation if applicable. Verify the reference there.
+  # - Check that its error allowance remains sufficient for downstream steps.
+  # - Name the scientific mistake its mutant represents and a test catching it.
+  # - Keep scientific decisions open where appropriate, but make the requested
+  #   result precise. Hidden conventions are not legitimate difficulty.
+  # If the prompt changes, recheck the reference, tests, and mutants together.
+  # These are author notes. Replace placeholders in the actual fields below; the
+  # solver does not receive these YAML comments as its problem statement.
+  - step_number: 2
+    # Keep this mirror file aligned with function_header. YAML is authoritative.
+    scaffold: steps/step_2.py
+    # This file defines the step function, not a wrapper that reads test answers.
+    solution: solution/step_2.py
+    # This file must contain independent numbered test blocks for this step.
+    tests: tests/step_2.py
+    # State exactly what this function computes and returns. Name earlier step
+    # functions it may use. Specify ties, degeneracies, and invalid-input behavior
+    # only where relevant to the task, then ensure the tests follow that contract.
+    step_description_prompt: |-
+      <What step 2 computes, its inputs and its output.> It calls step_one.
+    # This YAML header is the scaffold the importer reads. Update its mirror in
+    # steps/, the reference function, and every test call whenever it changes.
+    function_header: |-
+      def step_two(x):
+          '''<What it takes and what it returns.>'''
+    return_line: return total
+    step_background: |-
+      <What the solver needs to know for this step alone.>
+    # Count actual test blocks, not assert statements. Number blocks from 0.
+    n_test_cases: 1
+    # Record the quantity, assumptions, units, shape, and step dependencies.
+    # This reviewer-facing summary does not replace solver-visible requirements.
+    contract:
+      quantity: <The quantity this step computes.>
+      assumptions: <What it assumes about its inputs and the model.>
+      result_kind: exact
+      valid_input_ranges: <The inputs the result holds for.>
+      units: <The units of the output, or dimensionless.>
+      output_shape: <The output's type and shape.>
+      step_dependencies: [1]
+    # Required by Crown source checks: at least one mutant per step, plus one
+    # whole-task mutant. Put complete wrong solutions in the top-level list and
+    # wrong step functions in that step's list. Each item needs name, description,
+    # and a real file path.
+    mutants:
+      - name: missing_square
+        description: <The one error it encodes, in one line.>
+        file: mutants/step_2_missing_square.py
+
+  # SUBSTEP 3: WHAT TO WRITE BEFORE IMPLEMENTING
+  # Define the next quantity and the assumptions under which it exists.
+  # For roots, eigenvalues, equilibria, or optimizers, specify the requested
+  # branch or admissible result and how equivalent answers are compared.
+  # Only include these conventions if relevant. The toy square root is not
+  # a required pattern for a scientific task.
+  #
+  # PROMPT CHECKLIST: put the answers in step_description_prompt/function_header.
+  # - Purpose: which scientific quantity or result does this step produce?
+  # - Inputs: argument names, types, shapes, units, ranges, and assumptions.
+  # - Output: type, shape, units, ordering, and the precise mathematical meaning.
+  # - Dependencies: which earlier functions are used, and what do they return?
+  # - Conventions: relevant boundaries, degeneracies, ties, branches, or errors.
+  # - Accuracy: justified numerical requirements, where the result is approximate.
+  # Do not prescribe your exact algorithm unless that method is itself the task.
+  #
+  # IMPLEMENTATION AND EVIDENCE CHECKLIST:
+  # - solution/step_3.py implements this exact header and contract.
+  # - The matching function in solution.py stays consistent with this reference.
+  # - tests/step_3.py checks ordinary cases and relevant scientific edge cases.
+  # - Explain where expected values come from and why tolerances are defensible.
+  # - Add a plausible wrong function to mutants and identify the case rejecting it.
+  # - Keep n_test_cases, dependencies, and YAML file paths in sync.
+  #
+  # CONTENT REVIEW FOR THIS SPECIFIC STEP:
+  # - Read only this visible prompt and header. Can an expert infer every rule
+  #   that the tests enforce without seeing the reference or background?
+  # - Map each output and meaningful branch to an assertion, and each assertion
+  #   back to a stated rule. Do not enforce undocumented validation behavior.
+  # - Identify an allowed difficult input: a near singularity, regime transition,
+  #   zero limit, or cancellation if applicable. Verify the reference there.
+  # - Check that its error allowance remains sufficient for downstream steps.
+  # - Name the scientific mistake its mutant represents and a test catching it.
+  # - Keep scientific decisions open where appropriate, but make the requested
+  #   result precise. Hidden conventions are not legitimate difficulty.
+  # If the prompt changes, recheck the reference, tests, and mutants together.
+  # These are author notes. Replace placeholders in the actual fields below; the
+  # solver does not receive these YAML comments as its problem statement.
+  - step_number: 3
+    # Keep this mirror file aligned with function_header. YAML is authoritative.
+    scaffold: steps/step_3.py
+    # This file defines the step function, not a wrapper that reads test answers.
+    solution: solution/step_3.py
+    # This file must contain independent numbered test blocks for this step.
+    tests: tests/step_3.py
+    # State exactly what this function computes and returns. Name earlier step
+    # functions it may use. Specify ties, degeneracies, and invalid-input behavior
+    # only where relevant to the task, then ensure the tests follow that contract.
+    step_description_prompt: |-
+      <What step 3 computes, its inputs and its output.> It calls step_two.
+    # This YAML header is the scaffold the importer reads. Update its mirror in
+    # steps/, the reference function, and every test call whenever it changes.
+    function_header: |-
+      def step_three(x):
+          '''<What it takes and what it returns.>'''
+    return_line: return norm
+    step_background: |-
+      <What the solver needs to know for this step alone.>
+    # Count actual test blocks, not assert statements. Number blocks from 0.
+    n_test_cases: 1
+    # Record the quantity, assumptions, units, shape, and step dependencies.
+    # This reviewer-facing summary does not replace solver-visible requirements.
+    contract:
+      quantity: <The quantity this step computes.>
+      assumptions: <What it assumes about its inputs and the model.>
+      result_kind: exact
+      valid_input_ranges: <The inputs the result holds for.>
+      units: <The units of the output, or dimensionless.>
+      output_shape: <The output's type and shape.>
+      step_dependencies: [2]
+    # Required by Crown source checks: at least one mutant per step, plus one
+    # whole-task mutant. Put complete wrong solutions in the top-level list and
+    # wrong step functions in that step's list. Each item needs name, description,
+    # and a real file path.
+    mutants:
+      - name: missing_root
+        description: <The one error it encodes, in one line.>
+        file: mutants/step_3_missing_root.py
+
+  # SUBSTEP 4: WHAT TO WRITE BEFORE IMPLEMENTING
+  # Define the integrated scientific output and every component it contains.
+  # Explain how earlier results contribute; name the functions it may call.
+  # State the valid domain of any final division, transformation, or average.
+  # Check the end-to-end answer, not only the individual intermediate values.
+  # This is the final step in this example; adapt the role if you add steps.
+  #
+  # PROMPT CHECKLIST: put the answers in step_description_prompt/function_header.
+  # - Purpose: which scientific quantity or result does this step produce?
+  # - Inputs: argument names, types, shapes, units, ranges, and assumptions.
+  # - Output: type, shape, units, ordering, and the precise mathematical meaning.
+  # - Dependencies: which earlier functions are used, and what do they return?
+  # - Conventions: relevant boundaries, degeneracies, ties, branches, or errors.
+  # - Accuracy: justified numerical requirements, where the result is approximate.
+  # Do not prescribe your exact algorithm unless that method is itself the task.
+  #
+  # IMPLEMENTATION AND EVIDENCE CHECKLIST:
+  # - solution/step_4.py implements this exact header and contract.
+  # - The matching function in solution.py stays consistent with this reference.
+  # - tests/step_4.py checks ordinary cases and relevant scientific edge cases.
+  # - Explain where expected values come from and why tolerances are defensible.
+  # - Add a plausible wrong function to mutants and identify the case rejecting it.
+  # - Keep n_test_cases, dependencies, and YAML file paths in sync.
+  #
+  # CONTENT REVIEW FOR THIS SPECIFIC STEP:
+  # - Read only this visible prompt and header. Can an expert infer every rule
+  #   that the tests enforce without seeing the reference or background?
+  # - Map each output and meaningful branch to an assertion, and each assertion
+  #   back to a stated rule. Do not enforce undocumented validation behavior.
+  # - Identify an allowed difficult input: a near singularity, regime transition,
+  #   zero limit, or cancellation if applicable. Verify the reference there.
+  # - Check that its error allowance remains sufficient for downstream steps.
+  # - Name the scientific mistake its mutant represents and a test catching it.
+  # - Keep scientific decisions open where appropriate, but make the requested
+  #   result precise. Hidden conventions are not legitimate difficulty.
+  # If the prompt changes, recheck the reference, tests, and mutants together.
+  # These are author notes. Replace placeholders in the actual fields below; the
+  # solver does not receive these YAML comments as its problem statement.
+  - step_number: 4
+    # Keep this mirror file aligned with function_header. YAML is authoritative.
+    scaffold: steps/step_4.py
+    # This file defines the step function, not a wrapper that reads test answers.
+    solution: solution/step_4.py
+    # This file must contain independent numbered test blocks for this step.
+    tests: tests/step_4.py
+    # State exactly what this function computes and returns. Name earlier step
+    # functions it may use. Specify ties, degeneracies, and invalid-input behavior
+    # only where relevant to the task, then ensure the tests follow that contract.
+    step_description_prompt: |-
+      <What step 4 computes, its inputs and its output.> It calls step_three.
+    # This YAML header is the scaffold the importer reads. Update its mirror in
+    # steps/, the reference function, and every test call whenever it changes.
+    function_header: |-
+      def final_result(x):
+          '''<What it takes and what it returns.>'''
+    return_line: return result
+    step_background: |-
+      <What the solver needs to know for this step alone.>
+    # Count actual test blocks, not assert statements. Number blocks from 0.
+    n_test_cases: 1
+    # Record the quantity, assumptions, units, shape, and step dependencies.
+    # This reviewer-facing summary does not replace solver-visible requirements.
+    contract:
+      quantity: <The quantity this step computes.>
+      assumptions: <What it assumes about its inputs and the model.>
+      result_kind: exact
+      valid_input_ranges: <The inputs the result holds for.>
+      units: <The units of the output, or dimensionless.>
+      output_shape: <The output's type and shape.>
+      step_dependencies: [3]
+    # Required by Crown source checks: at least one mutant per step, plus one
+    # whole-task mutant. Put complete wrong solutions in the top-level list and
+    # wrong step functions in that step's list. Each item needs name, description,
+    # and a real file path.
+    mutants:
+      - name: inverted_scale
+        description: <The one error it encodes, in one line.>
+        file: mutants/step_4_inverted_scale.py
