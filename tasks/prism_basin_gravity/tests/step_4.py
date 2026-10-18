@@ -61,7 +61,9 @@ def _crown_case():
     _t_sign[1, 1] = 1e-6
     _t_zero = _t_gz.copy()
     _t_zero[2, 1] = 0.0
-    for _t_args in ((_t_xe[::-1], _t_ye, _t_gz, _T_DRHO0, _T_LAM),
+    for _t_args in ((_t_xe.reshape(1, -1), _t_ye, _t_gz, _T_DRHO0, _T_LAM),
+                    (_t_xe, _t_ye[:1], np.full((_t_gz.shape[0], 0), -1e-4), _T_DRHO0, _T_LAM),
+                    (_t_xe[::-1], _t_ye, _t_gz, _T_DRHO0, _T_LAM),
                     (_t_xe, np.array([0.0, 1000.0, 2000.0, 2000.0, 4000.0]), _t_gz, _T_DRHO0, _T_LAM),
                     (np.linspace(0.0, 101000.0, 102), np.array([0.0, 1000.0]), np.full((101, 1), -1e-4), _T_DRHO0, _T_LAM),
                     (_t_xe, _t_ye, _t_gz[:, :3], _T_DRHO0, _T_LAM), (_t_xe, _t_ye, _t_gz, 0.0, _T_LAM),

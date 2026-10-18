@@ -739,3 +739,27 @@ general 0 / 10. No target, tolerance, algorithm, mutant or n_test_cases changed.
 modes (one BLAS thread, -j 2) after the pass: FORMAT OK; REF and SECOND 8/8, 8/8, 7/7, 10/10 and general
 3/3; every mutant fails the same cases as listed above; SHIFT +-1e-12 all pass; all-None and all-zero
 controls pass 0 cases; SUMMARY ALL OK.
+
+## Version 8 (grading_fix: platform content check v4)
+
+Finding (content check of the uploaded version 7, two items in "Requirements tested", both in step 4): the
+stated input format "1-D arrays of nx + 1 and ny + 1 floats (nx, ny >= 1)" is read as a requirement, and no test
+passes a two-dimensional edge array or an edge array with fewer than two entries; an implementation that
+flattened or accepted a zero-cell dimension could pass every test.
+
+Cause: version 7 restated the array format as an input precondition without an error rule, on the view that
+such arrays describe no grid and that testing them adds validation weight; the check requires every stated
+input condition to be exercised with a raised ValueError.
+
+Change: the step 4 prompt, function_header, problem_io and every docstring copy (steps/step_4.py,
+solution/step_4.py, solution.py, second_solution.py, the mutants) now state "raise ValueError if an edge array is
+not one-dimensional or has fewer than two entries"; the step 4 error case gets two entries, a (1, 6) x_edges
+array and a one-entry y_edges with a (5, 0) gz_obs, each otherwise valid. The reference, the second solution and
+every mutant already rejected both inputs (checked before the entries were added); no other file changes.
+
+Regression test: the two new entries of tests/step_4.py (the error case); a copy of the reference without its
+ndim / size check passes the old error case and fails the new one.
+
+Rerun: tools/crown_check.py, all modes (SUMMARY ALL OK); the agent-visible text regenerated with
+tools/visible_spec.py and the step 4 header checked equal to steps/step_4.py and problem_io.
+

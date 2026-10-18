@@ -428,7 +428,8 @@ def invert_basin_depths(x_edges, y_edges, gz_obs, drho0, lam):
       depths: numpy array (nx, ny) in m (also when nx or ny is 1), each with a relative error below 1e-8.
 
     Raises:
-      ValueError for edges that are not strictly increasing, nx ny > 100, gz_obs of the wrong shape,
+      ValueError for an edge array that is not one-dimensional or has fewer than two entries, edges that
+      are not strictly increasing, nx ny > 100, gz_obs of the wrong shape,
       drho0 = 0, lam outside [0, 1e-2], an observation that is zero or of the sign opposite to drho0,
       or (lam > 0) an observation of at least 2 pi G |drho0| / lam.
     """

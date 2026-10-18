@@ -147,7 +147,8 @@ problem_io: |-
         depths: numpy array (nx, ny) in m (also when nx or ny is 1), each with a relative error below 1e-8.
 
       Raises:
-        ValueError for edges that are not strictly increasing, nx ny > 100, gz_obs of the wrong shape,
+        ValueError for an edge array that is not one-dimensional or has fewer than two entries, edges that
+        are not strictly increasing, nx ny > 100, gz_obs of the wrong shape,
         drho0 = 0, lam outside [0, 1e-2], an observation that is zero or of the sign opposite to drho0,
         or (lam > 0) an observation of at least 2 pi G |drho0| / lam.
       """
@@ -382,7 +383,8 @@ sub_steps:
       Inputs: x_edges and y_edges, 1-D arrays of nx + 1 and ny + 1 floats (nx, ny >= 1), strictly
       increasing, nx ny <= 100; gz_obs, a float array of shape (nx, ny) (m s^-2); drho0 (float, nonzero);
       lam (float, 0 <= lam <= 1e-2).
-      Errors: raise ValueError if an edge array is not strictly increasing, if nx ny > 100, if gz_obs does
+      Errors: raise ValueError if an edge array is not one-dimensional or has fewer than two entries, if
+      an edge array is not strictly increasing, if nx ny > 100, if gz_obs does
       not have shape (nx, ny), if drho0 is zero, if lam is not in [0, 1e-2], if an observation is zero or
       of the sign opposite to drho0, or (for lam > 0) if an observation is at least the attraction of an
       infinite slab, 2 pi G |drho0| / lam.
@@ -403,7 +405,8 @@ sub_steps:
             depths: numpy array (nx, ny) in m (also when nx or ny is 1), each with a relative error below 1e-8.
 
           Raises:
-            ValueError for edges that are not strictly increasing, nx ny > 100, gz_obs of the wrong shape,
+            ValueError for an edge array that is not one-dimensional or has fewer than two entries, edges that
+            are not strictly increasing, nx ny > 100, gz_obs of the wrong shape,
             drho0 = 0, lam outside [0, 1e-2], an observation that is zero or of the sign opposite to drho0,
             or (lam > 0) an observation of at least 2 pi G |drho0| / lam.
           """
