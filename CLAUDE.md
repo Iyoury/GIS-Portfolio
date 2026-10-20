@@ -208,6 +208,9 @@ prism v4 (local v7) failed the content check after a self-run emulation. From no
   16/16 in ~10 min -> NOT built (too easy). Prism v8 (content-check v4 fixes, commit 8ed027b) STRONG PROBE: Sonnet-high
   36/36 (full solve), Opus-high B 35/36 (Newton diverged on the rough 6x6 case, fair) -> GATE FAIL, prism not sent.
   Seven designs in a row solved by a strong proxy; strategy to be discussed with the author before more topics.
+- PRISM v5 (uploaded 20 Oct 15:30 at the author's request, as a calculated risk, local Version 9 = commit 6eeb1d0):
+  content check NO FINDINGS, exploit clean, DIFFICULTY PROBE 2/2 TOO EASY (detailed feedback still being prepared).
+  The strong proxy predicted it (Sonnet-high 36/36). Content-check emulation now reliable; difficulty is the blocker.
 - All tasks: authoring-guide conformance passes 1-2 (2026-10-10/11). Author metadata filled 2026-10-12 with the
   author's own text (tools/set_author_meta.py): affiliation "Independent Researcher"; relevant_experience = B.Sc.
   Georesources and Environment (FST Fes, 2016), graduate certificate in geomatics (Universite Laval), GIS analyst
