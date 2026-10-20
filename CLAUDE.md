@@ -205,7 +205,9 @@ prism v4 (local v7) failed the content check after a self-run emulation. From no
   building anything.
 - New topic search 2026-10-18/20: lithosphere_strength_inversion (earth; geotherm + Byerlee + creep envelope +
   (Curie, LAB) inversion; design/proto/harness in scratchpad newtopic/geotherm) -> STRONG PROBE: Opus-high solved
-  16/16 in ~10 min -> NOT built (too easy). Prism v8 (content-check v4 fixes, commit 8ed027b) strong probe running.
+  16/16 in ~10 min -> NOT built (too easy). Prism v8 (content-check v4 fixes, commit 8ed027b) STRONG PROBE: Sonnet-high
+  36/36 (full solve), Opus-high B 35/36 (Newton diverged on the rough 6x6 case, fair) -> GATE FAIL, prism not sent.
+  Seven designs in a row solved by a strong proxy; strategy to be discussed with the author before more topics.
 - All tasks: authoring-guide conformance passes 1-2 (2026-10-10/11). Author metadata filled 2026-10-12 with the
   author's own text (tools/set_author_meta.py): affiliation "Independent Researcher"; relevant_experience = B.Sc.
   Georesources and Environment (FST Fes, 2016), graduate certificate in geomatics (Universite Laval), GIS analyst
