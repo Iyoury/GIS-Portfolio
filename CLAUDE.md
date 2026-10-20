@@ -211,6 +211,13 @@ prism v4 (local v7) failed the content check after a self-run emulation. From no
 - PRISM v5 (uploaded 20 Oct 15:30 at the author's request, as a calculated risk, local Version 9 = commit 6eeb1d0):
   content check NO FINDINGS, exploit clean, DIFFICULTY PROBE 2/2 TOO EASY (detailed feedback still being prepared).
   The strong proxy predicted it (Sonnet-high 36/36). Content-check emulation now reliable; difficulty is the blocker.
+- Dashboard 2026-10-20 (author's list of unfinished tasks): accepted sto3g v12, ising v8, josephson v10. Too easy:
+  prism v5, WF v12, borehole v10 (last version), activation v14, electron v3, hydrogen-stark v1, paleopole-synfolding v9.
+  Stoner v13 in band (pre-probe era; weak proxies already 45-47/47 on v14, so a resubmission risks the probe).
+  Never reached the difficulty probe (quality or reference fail, zips not in the repo): layered-surface-wave v2,
+  hodgkin-huxley v1, basin-backstripping v4, gravity-basin-stripping v9, earthquake-swarm-location v4, gnss-euler-pole v6,
+  zircon-discordia-ages v15. Triage given: most promising = layered-surface-wave and earthquake-swarm-location (asked for
+  their latest zips and reports); strong probe on the design before any rebuild.
 - All tasks: authoring-guide conformance passes 1-2 (2026-10-10/11). Author metadata filled 2026-10-12 with the
   author's own text (tools/set_author_meta.py): affiliation "Independent Researcher"; relevant_experience = B.Sc.
   Georesources and Environment (FST Fes, 2016), graduate certificate in geomatics (Universite Laval), GIS analyst
