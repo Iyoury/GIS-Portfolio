@@ -203,6 +203,9 @@ prism v4 (local v7) failed the content check after a self-run emulation. From no
   specialised algorithms (GTH, Koev TN, Brown/Garanin, Sommerfeld); removing formulas or adding a known advanced
   algorithm does not create difficulty. Always run the strong probe on a DESIGN (spec + prototype harness) before
   building anything.
+- New topic search 2026-10-18/20: lithosphere_strength_inversion (earth; geotherm + Byerlee + creep envelope +
+  (Curie, LAB) inversion; design/proto/harness in scratchpad newtopic/geotherm) -> STRONG PROBE: Opus-high solved
+  16/16 in ~10 min -> NOT built (too easy). Prism v8 (content-check v4 fixes, commit 8ed027b) strong probe running.
 - All tasks: authoring-guide conformance passes 1-2 (2026-10-10/11). Author metadata filled 2026-10-12 with the
   author's own text (tools/set_author_meta.py): affiliation "Independent Researcher"; relevant_experience = B.Sc.
   Georesources and Environment (FST Fes, 2016), graduate certificate in geomatics (Universite Laval), GIS analyst
