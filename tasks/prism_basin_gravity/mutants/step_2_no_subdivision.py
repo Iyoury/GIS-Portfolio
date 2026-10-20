@@ -267,7 +267,9 @@ def prism_gradients(points, bounds, rho):
         times the diagonal of the prism.
 
     Raises:
-      ValueError for a point on the surface of the prism (on a face, an edge or a corner).
+      ValueError for invalid bounds (not six numbers with x1 < x2, y1 < y2, z1 < z2), rho = 0,
+      points of the wrong shape, or a point on the surface of the prism (on a face, an edge or a
+      corner).
     """
     p, single = _check_points(points)
     b, rho = _check_bounds(bounds, rho)

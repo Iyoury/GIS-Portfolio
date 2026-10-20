@@ -763,3 +763,26 @@ ndim / size check passes the old error case and fails the new one.
 Rerun: tools/crown_check.py, all modes (SUMMARY ALL OK); the agent-visible text regenerated with
 tools/visible_spec.py and the step 4 header checked equal to steps/step_4.py and problem_io.
 
+## Version 9 (grading_fix: pre-upload content-check emulation)
+
+Finding (independent emulation of the content check on version 8): step 2 stated input conditions (bounds with
+x1 < x2, y1 < y2, z1 < z2, nonzero rho, points of shape (3,) or (n, 3) with n >= 1) but its only error rule and
+its only error test concerned a point on the surface of the prism; the same pattern was flagged twice in step 4.
+Steps 1 and 3 tested the strict bound inequalities only at equality for x and z (step 1) and for y (step 3).
+
+Cause: step 2 had inherited the input conditions of step 1 as preconditions, and the version 7 trim kept one entry
+per rule.
+
+Change: the step 2 prompt, function_header and every docstring copy (steps/step_2.py, solution/step_2.py,
+solution.py, second_solution.py, the mutants) now state "raise ValueError if bounds are not six numbers with
+x1 < x2, y1 < y2, z1 < z2, if rho is zero, if points do not have shape (3,) or (n, 3) with n >= 1, or if a point
+lies on the surface of the prism"; the step 2 contract says the same. Step 2 case 3 gets ten entries (bounds of five
+and seven numbers, x1 = x2, x1 > x2, y1 = y2, z1 = z2, rho = 0, points of shape (2,), (0, 3) and (2, 2)); step 1
+case 3 gets x1 > x2 and z1 > z2; step 3 case 3 gets y1 > y2. Every solution and mutant already raised on all of
+them. Step 2 validation weight 6.5 against 12 computed assertion sites.
+
+Regression test: the new entries; copies of the reference with any single stated condition removed now fail the
+error case of their step.
+
+Rerun: tools/crown_check.py, all modes (SUMMARY ALL OK).
+

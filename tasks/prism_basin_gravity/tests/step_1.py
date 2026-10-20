@@ -173,7 +173,7 @@ _crown_case()
 
 # --- test case 3 ---
 # each stated error rule once: bounds of five and of seven numbers (not six), a prism without extent along
-# each axis (x1 = x2; y1 > y2 and y1 = y2; z1 = z2), a zero density (U = 0, where a relative accuracy has
+# each axis (x1 = x2 and x1 > x2; y1 > y2 and y1 = y2; z1 = z2 and z1 > z2), a zero density (U = 0, where a relative accuracy has
 # no meaning), points of shape (2,), an empty (0, 3) array and a two-dimensional array of width 2, (2, 2)
 import numpy as np
 
@@ -184,8 +184,8 @@ def _crown_case():
     _T_BA, _T_RA = (0.0, 100.0, 0.0, 200.0, 50.0, 300.0), 2670.0
 
     for _t_args in (((0, 0, 0), (0, 100, 0, 200, 50), 1.0), ((0, 0, 0), (0, 100, 0, 200, 50, 300, 400), 1.0),
-                    ((0, 0, 0), (100, 100, 0, 200, 50, 300), 1.0),
-                    ((0, 0, 0), (0, 100, 200, 0, 50, 300), 1.0), ((0, 0, 0), (0, 100, 200, 200, 50, 300), 1.0),
+                    ((0, 0, 0), (100, 100, 0, 200, 50, 300), 1.0), ((0, 0, 0), (200, 100, 0, 200, 50, 300), 1.0),
+                    ((0, 0, 0), (0, 100, 0, 200, 300, 50), 1.0), ((0, 0, 0), (0, 100, 200, 0, 50, 300), 1.0), ((0, 0, 0), (0, 100, 200, 200, 50, 300), 1.0),
                     ((0, 0, 0), (0, 100, 0, 200, 300, 300), 1.0), ((0, 0, 0), _T_BA, 0.0), ((0, 0), _T_BA, 1.0),
                     (np.zeros((0, 3)), _T_BA, 1.0), (np.zeros((2, 2)), _T_BA, 1.0)):
         try:

@@ -253,7 +253,9 @@ sub_steps:
       times the shortest; rho (float, nonzero).
       Output: a numpy array of shape (3, 3) for points of shape (3,), of shape (n, 3, 3) for shape (n, 3)
       (n = 1 included).
-      Errors: raise ValueError if a point lies on the surface of the prism (on a face, an edge or a corner).
+      Errors: raise ValueError if bounds are not six numbers with x1 < x2, y1 < y2, z1 < z2, if rho is zero,
+      if points do not have shape (3,) or (n, 3) with n >= 1, or if a point lies on the surface of the prism
+      (on a face, an edge or a corner).
     function_header: |-
       def prism_gradients(points, bounds, rho):
           """Gravity-gradient tensor T_ij = d g_i / d x_j of a right rectangular prism of uniform density.
@@ -271,7 +273,9 @@ sub_steps:
               times the diagonal of the prism.
 
           Raises:
-            ValueError for a point on the surface of the prism (on a face, an edge or a corner).
+            ValueError for invalid bounds (not six numbers with x1 < x2, y1 < y2, z1 < z2), rho = 0,
+            points of the wrong shape, or a point on the surface of the prism (on a face, an edge or a
+            corner).
           """
     return_line: return T
     step_background: |-
@@ -284,7 +288,7 @@ sub_steps:
       quantity: "Gravity-gradient tensor of a uniform right rectangular prism."
       assumptions: "As in step 1."
       result_kind: exact
-      valid_input_ranges: "Any point not on the surface of the prism (a point on it raises ValueError), up to a million diagonals from it, n >= 1 and at most 1000 points per call; bounds (x1 < x2, y1 < y2, z1 < z2, longest edge at most 1000 times the shortest) and nonzero rho as in step 1."
+      valid_input_ranges: "Any point not on the surface of the prism, up to a million diagonals from it, n >= 1 and at most 1000 points per call; bounds (x1 < x2, y1 < y2, z1 < z2, longest edge at most 1000 times the shortest) and nonzero rho; invalid bounds, rho = 0, points of the wrong shape and points on the surface raise ValueError."
       units: "s^-2."
       output_shape: "Array (3, 3) or (n, 3, 3), n >= 1."
       step_dependencies: [1]
