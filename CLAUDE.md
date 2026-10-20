@@ -218,6 +218,13 @@ prism v4 (local v7) failed the content check after a self-run emulation. From no
   hodgkin-huxley v1, basin-backstripping v4, gravity-basin-stripping v9, earthquake-swarm-location v4, gnss-euler-pole v6,
   zircon-discordia-ages v15. Triage given: most promising = layered-surface-wave and earthquake-swarm-location (asked for
   their latest zips and reports); strong probe on the design before any rebuild.
+- STRONG PROBE 2026-10-20 on the author's two best candidates (platform zips in scratchpad lsw/in, eq/in; visible
+  text as uploaded): layered-surface-wave v2 -> Opus-high A 33/33 (Prufer-angle Love count, Wittrick-Williams Rayleigh
+  count, compound-matrix secular function; found 3e-12 near-coincident pairs) -> too easy, not rebuilt. earthquake-
+  swarm-location v4 (old pytest-style tests, no mutants; grader scratchpad eq/grader/grade_old.py) -> Opus-high A and
+  Sonnet-high A 38/39 each, the only failure an implementation-dependent test (full run must take > 2 rounds; their
+  joint inversion converges faster) -> effectively full solves, not rebuilt. Since the difficulty probe started
+  (12 Oct) no task has passed it; the three accepted tasks predate it.
 - All tasks: authoring-guide conformance passes 1-2 (2026-10-10/11). Author metadata filled 2026-10-12 with the
   author's own text (tools/set_author_meta.py): affiliation "Independent Researcher"; relevant_experience = B.Sc.
   Georesources and Environment (FST Fes, 2016), graduate certificate in geomatics (Universite Laval), GIS analyst
