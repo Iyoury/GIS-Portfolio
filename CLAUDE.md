@@ -122,6 +122,15 @@ starting points, use judgement and flag what does not fit. Update prompt, refere
   precision demands or runtime. Audit 2026-10-18: all 9 repo tasks pass the mechanical rules (prompts name the
   earlier functions they call, dependencies, mutant names, metadata).
 
+## Practical-guide video (2026-10-21, docs/crown_practical_guide_video_2026-10-21.md)
+
+- Challenge = "what could a capable non-specialist get wrong?"; "a specialized topic can still be easy for a strong
+  model"; useful difficulty = valid branch, regime change, numerical stability, coupled quantities.
+- Too easy: inspect the model's solution, look for a shortcut valid for every allowed input, add a justified regime or
+  dependency; "if the model was simply correct, do not punish its method". Local runs are indicative only.
+- "If several revisions are not resolving the same problem, stop and ask for a targeted clarification" (task name,
+  exact feedback, what you tried, one specific question). Our difficulty misses qualify.
+
 ## RELEASE GATE (author's rule, 2026-10-15): never send a zip that has not passed all of these
 
 Borehole v10 (the LAST version) came back "too easy" after only uncalibrated blind solvers had been run on it, and
