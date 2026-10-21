@@ -122,6 +122,9 @@ starting points, use judgement and flag what does not fit. Update prompt, refere
   precision demands or runtime. Audit 2026-10-18: all 9 repo tasks pass the mechanical rules (prompts name the
   earlier functions they call, dependencies, mutant names, metadata).
 
+- Skeleton re-check 2026-10-21: crown-task-skeleton_1.zip (dated 21 Oct) is byte-identical to docs/skeleton_2026-10-18
+  (tasks part); task-folders-skeleton_4/_5 are the older 8 Oct uncommented copies (same YAML data). Nothing new.
+
 ## Practical-guide video (2026-10-21, docs/crown_practical_guide_video_2026-10-21.md)
 
 - Challenge = "what could a capable non-specialist get wrong?"; "a specialized topic can still be easy for a strong
